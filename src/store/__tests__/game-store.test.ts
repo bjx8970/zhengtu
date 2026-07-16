@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createInitialState, createTestStore } from '../game-store';
+import { createInitialState, createTestStore, dispatch } from '../game-store';
 import type { PlayerSave } from '../../types/player';
 import { CareerLine } from '../../types/enums';
 
@@ -216,5 +216,68 @@ describe('dispatch - ADVANCE_TIME', () => {
     const state = store.getRawState();
     expect(state.totalDaysPlayed).toBe(7);
     expect(state.slots.available).toBe(4);
+  });
+});
+
+describe('dispatch - persistence (localStorage)', () => {
+  const SAVE_KEY = 'zhengtu_autosave';
+
+  it('ADVANCE_TIME 后写入 localStorage', () => {
+    dispatch({
+      type: 'LOAD_SAVE',
+      save: createInitialState({
+        characterName: '测试',
+        currentPositionId: 'admin_l3_0',
+        currentLevel: 3,
+        currentCareerLine: CareerLine.Administrative,
+        userId: 'test-user',
+        saveId: 'test-save',
+        time: { year: 2024, month: 6, day: 15, granularity: 'day' },
+      }),
+    });
+
+    dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+    const saved = localStorage.getItem(SAVE_KEY);
+    expect(saved).not.toBeNull();
+    const content = JSON.parse(saved!);
+    expect(content.characterName).toBe('测试');
+  });
+
+  it('NEW_GAME 后写入 localStorage', () => {
+    dispatch({
+      type: 'NEW_GAME',
+      data: {
+        characterName: '新角色',
+        gender: '男',
+        birthPlace: '北京',
+        education: '本科',
+        motivation: '为民服务',
+        personality: '稳健型',
+        birthYear: 1994,
+        familyBackground: '普通家庭',
+        currentPositionId: 'admin_l1_0',
+        remainingBudget: 800,
+      },
+    });
+
+    const saved = localStorage.getItem(SAVE_KEY);
+    expect(saved).not.toBeNull();
+    const content = JSON.parse(saved!);
+    expect(content.characterName).toBe('新角色');
+  });
+
+  it('createTestStore 的 dispatch 不写 localStorage（测试隔离）', () => {
+    localStorage.clear();
+    const store = createTestStore({
+      characterName: '隔离测试',
+      currentPositionId: 'admin_l3_0',
+      currentLevel: 3,
+      currentCareerLine: CareerLine.Administrative,
+      time: { year: 2024, month: 6, day: 15, granularity: 'day' },
+    });
+
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+    expect(localStorage.getItem(SAVE_KEY)).toBeNull();
   });
 });

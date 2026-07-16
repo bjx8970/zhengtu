@@ -3,7 +3,7 @@
  *
  * 当前为开发模式跳过登录的占位页面。
  * Phase 1 将接入 Supabase Auth（手机号 + 验证码）。
- * 点击"跳过登录"直接进入仪表盘。
+ * 点击按钮跳转到建档系统。
  */
 
 import { navigate } from '../../router';
@@ -11,6 +11,8 @@ import { createSignal } from 'solid-js';
 
 export function LoginPage() {
   const [phone, setPhone] = createSignal('');
+
+  const goToCharacter = () => navigate('/character');
 
   return (
     <div
@@ -42,7 +44,7 @@ export function LoginPage() {
         }}
       />
       <button
-        onClick={() => navigate('/dashboard')}
+        onClick={goToCharacter}
         style={{
           padding: '0.6rem 2rem',
           'font-size': '1rem',
@@ -61,7 +63,7 @@ export function LoginPage() {
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            navigate('/dashboard');
+            goToCharacter();
           }}
           style={{ color: '#888', 'font-size': '0.9rem' }}
         >
