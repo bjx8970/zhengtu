@@ -1,5 +1,20 @@
 # AGENTS.md
 
+## CRITICAL: Branch workflow — NEVER push directly to main
+
+```
+main 是受保护分支。任何变更必须:
+  1. git checkout -b <type>/<desc>  从 main 新建分支
+  2. 编写代码 + 测试
+  3. git push + 创建 PR
+  4. CI 全部通过 + OpenCode review 通过
+  5. Squash Merge 到 main
+
+分支命名: feat/<name> | fix/<name> | refactor/<name> | docs/<name> | chore/<name>
+```
+
+**包括文档变更也必须走分支 PR。** 即使一行修改也不例外。
+
 ## Framework: SolidJS, NOT React
 
 - SolidJS `render()` **appends** content to the container — never clears `innerHTML` by itself. `src/main.tsx` explicitly calls `root.innerHTML = ''` before `render()` for this reason.
@@ -31,12 +46,29 @@ UI (Solid pages/components) → Store (createStore + dispatch) → Engine (pure 
 - Engine files live in `src/engine/<domain>/`. All engine functions must be **pure**: no DOM, no global state, no store references.
 - Engine tests in sibling `__tests__/` with `.test.ts` extension.
 - `src/engine/index.ts` is the aggregate export — register new engine modules there.
+- Engine files ≤200 lines. Exceeding means it should be split.
 
 ## State management quirk
 
 `dispatch()` and `createTestStore()` both call `reduceGameState(draft, action)`. This is the **only place** to add new action handlers. Add new action types to `GameAction` union type first, then add the case in `reduceGameState`.
 
 Tests use `createTestStore()` for isolation. Never import the module-level `dispatch()` in tests.
+
+## TypeScript rules (strict mode)
+
+- No `any` (use `// eslint-disable-next-line @typescript-eslint/no-explicit-any` as last resort).
+- Unused params: `_` prefix (`argsIgnorePattern: '^_'`).
+- Non-null `!` is a warning — only use with a comment explaining why it's safe.
+- All types in `src/types/`, never scatter interfaces in business code.
+- Player attribute mutations use `applyPlayerAttr()` which validates against `PLAYER_NUMERIC_ATTRS` set and clamps with `clampAttr()`.
+
+## Code comments (mandatory for exports)
+
+- **File header**: every `.ts`/`.tsx` has a JSDoc block describing module responsibility.
+- **Exported functions**: MUST have `@param` and `@returns` JSDoc.
+- **Interfaces**: add inline comments for non-obvious fields.
+- **Key logic**: explain "why" not "what" for non-trivial algorithms.
+- **Placeholders**: unimplemented code marked with `// Phase N 实现` for later grep.
 
 ## Config data: JSON templates, not TS factories
 
@@ -63,6 +95,13 @@ Tests use `createTestStore()` for isolation. Never import the module-level `disp
 - Coverage thresholds are enforced in CI: engine ≥90% lines, config ≥80%, store ≥70%.
 - Tests in `src/engine/*/__tests__/` use Vitest. Store tests use `createTestStore()` for isolation.
 - Run single file: `pnpm test -- --reporter=verbose src/engine/governance/__tests__/kpi.test.ts`
+- **When to write tests**:
+  - New engine function → MUST (coverage gate)
+  - Modified engine logic → MUST (update existing tests)
+  - New Store dispatch branch → MUST (integration test via `createTestStore`)
+  - New JSON config → auto-covered by `loader.test.ts` integrity traversal
+  - JSON value-only change → NOT required
+  - Pure refactor (no behavior change) → NOT required
 
 ## CI + deployment
 
