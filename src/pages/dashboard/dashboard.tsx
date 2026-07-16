@@ -36,6 +36,12 @@ export function Dashboard() {
       show: () => !!state.currentPositionId,
     },
     {
+      label: '管辖部门',
+      path: '/dept/0',
+      desc: '部门行动与资源',
+      show: () => !!state.currentPositionId,
+    },
+    {
       label: '上级关系',
       path: '/superior',
       desc: state.superiorFavor + ' 好感',

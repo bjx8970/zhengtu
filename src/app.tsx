@@ -15,6 +15,7 @@ import { SplashPage } from './pages/auth/splash';
 import { LoginPage } from './pages/auth/login';
 import { Dashboard } from './pages/dashboard/dashboard';
 import { PositionKPI } from './pages/career/position-kpi';
+import { PositionDept } from './pages/career/position-dept';
 
 /** 全局路由表 */
 const routes: Route[] = [
@@ -22,6 +23,7 @@ const routes: Route[] = [
   { path: '/login', component: LoginPage },
   { path: '/dashboard', component: Dashboard },
   { path: '/kpi', component: PositionKPI },
+  { path: '/dept/:deptIndex', component: PositionDept },
 ];
 
 export function App(): JSX.Element {
