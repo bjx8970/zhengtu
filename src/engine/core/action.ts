@@ -110,15 +110,18 @@ function emptyResult(success: boolean, error: string): ActionResult {
 /**
  * 合并多个 ActionEffectResult 为聚合的 KPI/玩家变化。
  * 按 target 分组汇总，供 store 层一次性应用。
+ *
+ * @deprecated Phase 2 实现：后续多行动并行执行时启用
  */
-export function resolveEffects(effects: ActionEffectResult[]): {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function resolveEffects(_effects: ActionEffectResult[]): {
   kpiChanges: Record<string, number>;
   playerChanges: Record<string, number>;
 } {
   const kpiChanges: Record<string, number> = {};
   const playerChanges: Record<string, number> = {};
 
-  for (const eff of effects) {
+  for (const eff of _effects) {
     if (eff.target.startsWith('dept.kpi.')) {
       const kpiId = eff.target.replace('dept.kpi.', '');
       kpiChanges[kpiId] = (kpiChanges[kpiId] ?? 0) + eff.delta;

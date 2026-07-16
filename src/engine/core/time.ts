@@ -35,7 +35,6 @@ export function advanceTime(
 
   const triggers: TimeTrigger[] = [];
   let { year, month, day } = current;
-  const oldYear = year;
 
   for (let i = 0; i < days; i++) {
     day++;
@@ -65,19 +64,21 @@ export function advanceTime(
   }
 
   return {
-    newState: { year: Math.max(year, oldYear), month, day },
+    newState: { year, month, day },
     triggers,
   };
 }
 
 /** 判断是否跨越了月（新日=1 且 旧日>1） */
-export function isCrossMonth(current: TimeState, newDay: number): boolean {
-  return newDay === 1 && current.day > newDay;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function isCrossMonth(_current: TimeState, _newDay: number): boolean {
+  return _newDay === 1 && _current.day > _newDay;
 }
 
 /** 判断结果年 > 当前年 */
-export function isCrossYear(current: TimeState, result: TimeState): boolean {
-  return result.year > current.year;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function isCrossYear(_current: TimeState, _result: TimeState): boolean {
+  return _result.year > _current.year;
 }
 
 /**
@@ -108,4 +109,19 @@ export function getRetirementCountdown(
   retirementAge: number,
 ): number {
   return Math.max(retirementAge - getAge(gameYear, birthYear), 0);
+}
+
+/**
+ * 根据推进粒度返回对应天数。
+ *
+ * @param granularity 推进粒度
+ * @param config      游戏配置
+ */
+export function getGranularityDays(
+  granularity: 'day' | 'week' | 'month',
+  config: GameConfig,
+): number {
+  if (granularity === 'day') return 1;
+  if (granularity === 'week') return 7;
+  return config.daysPerMonth;
 }

@@ -1,3 +1,15 @@
+/**
+ * 配置数据校验脚本
+ *
+ * 使用 zod schema 验证所有 JSON 配置文件的格式正确性和引用完整性。
+ * CI 中自动运行（pnpm validate:config），校验失败阻断合并。
+ *
+ * 校验范围：
+ * - 部门/KPI/事件模板格式
+ * - 职业线职位定义格式
+ * - 模板引用 ID 是否存在（departments ↔ career-lines）
+ * - constants.json 全局配置项格式
+ */
 import { z } from 'zod';
 import deptCore from '../src/config/templates/departments.json' with { type: 'json' };
 import deptExtra from '../src/config/templates/departments-extra.json' with { type: 'json' };

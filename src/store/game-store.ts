@@ -23,12 +23,11 @@ import type {
 import type { PlayerSave, GameTime } from '../types/player';
 import type { PromotionResult, TimeTrigger } from '../types/game';
 import { getSlotLimits, executeAction } from '../engine/core/action';
-import { advanceTime } from '../engine/core/time';
+import { advanceTime, getGranularityDays } from '../engine/core/time';
 import { monthlySettlement } from '../engine/governance/budget';
 import { calculateKPI } from '../engine/governance/kpi';
 import { annualAssessment as runAnnualAssessment } from '../engine/governance/assessment';
 import { getConfigLoader } from '../config/loader';
-import { getGranularityDays } from '../types/config';
 import { clamp, clampAttr } from '../utils/math';
 import { writeLocalSave, upsertSave } from '../services/save-repo';
 
@@ -337,7 +336,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       draft.totalDaysPlayed += days;
       resolveTriggers(draft, timeResult.triggers);
 
-      const max = getSlotLimits(action.granularity, cfg);
+      const max = getSlotLimits(action.granularity, cfgAdv);
       draft.slots.max = max;
       draft.slots.available = max;
       draft.time.granularity = action.granularity;
@@ -372,7 +371,7 @@ export function dispatch(action: GameAction): void {
 
   // 推进时间时同步到 Supabase
   if (action.type === 'ADVANCE_TIME') {
-    upsertSave(unwrap(state)).catch(() => {});
+    upsertSave(unwrap(state)).catch((e: unknown) => console.warn('Supabase sync failed:', e));
   }
 }
 

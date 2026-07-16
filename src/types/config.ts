@@ -9,7 +9,7 @@
  * 数据流：JSON 模板 → [Template] → ConfigLoader → [Config] → Engine/UI
  */
 
-import type { CareerLine, TimeGranularity } from './enums';
+import type { CareerLine } from './enums';
 
 /** 行动效果的单项定义：对某个目标属性施加的操作 */
 export interface ActionEffectDef {
@@ -182,11 +182,4 @@ export interface GameConfig {
   kpiTierColors: Record<string, string>;
   /** 进度条颜色阈值 */
   completionBarThresholds: { excellent: number; good: number };
-}
-
-/** 根据推进粒度返回对应天数 */
-export function getGranularityDays(granularity: TimeGranularity, config: GameConfig): number {
-  if (granularity === 'day') return 1;
-  if (granularity === 'week') return 7;
-  return config.daysPerMonth;
 }

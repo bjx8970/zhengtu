@@ -15,15 +15,9 @@ import { createMemo, For, Show } from 'solid-js';
 import type { KPIResult } from '../../types/game';
 import { KPITier } from '../../types/enums';
 
-/** 等次颜色映射（使用 KPITier 枚举确保类型安全） */
+/** 等次颜色映射（从配置读取） */
 function tierColor(tier: KPITier): string {
-  const map: Record<KPITier, string> = {
-    [KPITier.Excellent]: '#4CAF50',
-    [KPITier.Competent]: '#4A6FA5',
-    [KPITier.Basic]: '#FF9800',
-    [KPITier.Incompetent]: '#C44D4D',
-  };
-  return map[tier];
+  return getConfigLoader().getGameConfig().kpiTierColors[tier] ?? '#888';
 }
 
 export function PositionKPI() {
