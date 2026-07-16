@@ -16,11 +16,13 @@ import { LoginPage } from './pages/auth/login';
 import { Dashboard } from './pages/dashboard/dashboard';
 import { PositionKPI } from './pages/career/position-kpi';
 import { PositionDept } from './pages/career/position-dept';
+import { CharacterCreation } from './pages/character/character-creation';
 
 /** 全局路由表 */
 const routes: Route[] = [
   { path: '/', component: SplashPage },
   { path: '/login', component: LoginPage },
+  { path: '/character', component: CharacterCreation },
   { path: '/dashboard', component: Dashboard },
   { path: '/kpi', component: PositionKPI },
   { path: '/dept/:deptIndex', component: PositionDept },

@@ -30,6 +30,7 @@ import { annualAssessment as runAnnualAssessment } from '../engine/governance/as
 import { getConfigLoader } from '../config/loader';
 import { getGranularityDays } from '../types/config';
 import { clamp, clampAttr } from '../utils/math';
+import { writeLocalSave } from '../services/save-repo';
 
 export type GameState = PlayerSave;
 
@@ -372,6 +373,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
  */
 export function dispatch(action: GameAction): void {
   setState(produce((draft) => reduceGameState(draft, action)));
+
+  // 阶段提交：推进时间或建档后同步持久化到 localStorage
+  if (action.type === 'ADVANCE_TIME' || action.type === 'NEW_GAME') {
+    writeLocalSave(unwrap(state));
+  }
 }
 
 /**
