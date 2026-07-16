@@ -10,6 +10,7 @@
  */
 
 import type { KPITemplate } from '../../types/config';
+import type { GameConfig } from '../../types/config';
 import type { DepartmentState } from '../../types/player';
 import type { AssessmentResult, KPIResult } from '../../types/game';
 import { KPITier } from '../../types/enums';
@@ -49,11 +50,13 @@ export function aggregateKPIValue(
  *
  * @param indicators 职位级 KPI 指标列表
  * @param deptStates 当前各部门运行时状态
+ * @param config     游戏配置常量
  * @returns 完整考核结果
  */
 export function calculateKPI(
   indicators: KPITemplate[],
   deptStates: Record<string, DepartmentState>,
+  config: GameConfig,
 ): AssessmentResult {
   const results: KPIResult[] = indicators.map((ind) => {
     const currentValue = aggregateKPIValue(ind.id, deptStates);
@@ -63,7 +66,9 @@ export function calculateKPI(
       case 'ratio':
         // targetValue 为 0 时视为已完成（避免除零）
         completionRate =
-          ind.targetValue === 0 ? 1.0 : Math.min(currentValue / ind.targetValue, 1.5);
+          ind.targetValue === 0
+            ? 1.0
+            : Math.min(currentValue / ind.targetValue, config.completionRateCap);
         break;
       case 'inverse':
         // 反向指标：targetValue 为 0 时视为已达成
@@ -94,7 +99,7 @@ export function calculateKPI(
   });
 
   const totalScore = results.reduce((sum, r) => sum + r.weightedScore, 0);
-  const tier = scoreToKPITier(totalScore);
+  const tier = scoreToKPITier(totalScore, config.kpiTierThresholds);
 
   return { totalScore, tier, indicators: results };
 }
@@ -102,14 +107,15 @@ export function calculateKPI(
 /**
  * 将综合评分映射为考核等次。
  *
- * - >= 90 → 优秀
- * - >= 75 → 称职
- * - >= 60 → 基本称职
- * - < 60  → 不称职
+ * @param score      综合评分
+ * @param thresholds 等次阈值配置
  */
-export function scoreToKPITier(score: number): KPITier {
-  if (score >= 90) return KPITier.Excellent;
-  if (score >= 75) return KPITier.Competent;
-  if (score >= 60) return KPITier.Basic;
+export function scoreToKPITier(
+  score: number,
+  thresholds: GameConfig['kpiTierThresholds'],
+): KPITier {
+  if (score >= thresholds.excellent) return KPITier.Excellent;
+  if (score >= thresholds.competent) return KPITier.Competent;
+  if (score >= thresholds.basic) return KPITier.Basic;
   return KPITier.Incompetent;
 }

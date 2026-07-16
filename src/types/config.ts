@@ -9,7 +9,7 @@
  * 数据流：JSON 模板 → [Template] → ConfigLoader → [Config] → Engine/UI
  */
 
-import type { CareerLine, TimeGranularity } from './enums';
+import type { CareerLine } from './enums';
 
 /** 行动效果的单项定义：对某个目标属性施加的操作 */
 export interface ActionEffectDef {
@@ -160,11 +160,26 @@ export interface GameConfig {
   transferWindowLevels: [number, number][];
   /** 各属性的合法边界 [min, max] */
   attributeBounds: Record<string, [number, number]>;
-}
-
-/** 根据推进粒度返回对应天数 */
-export function getGranularityDays(granularity: TimeGranularity, config: GameConfig): number {
-  if (granularity === 'day') return 1;
-  if (granularity === 'week') return 7;
-  return config.daysPerMonth;
+  /** KPI 等次阈值 */
+  kpiTierThresholds: { excellent: number; competent: number; basic: number };
+  /** 完成率上限（防止溢出） */
+  completionRateCap: number;
+  /** 每槽位对应的天数折算系数 */
+  daysPerSlotUnit: number;
+  /** 触发舆情生成的最低级别 */
+  sentimentMinLevel: number;
+  /** 不称职处罚冻结届数 */
+  incompetentFrozenPeriods: number;
+  /** 连续不称职触发降级的次数阈值 */
+  consecutiveFailureThreshold: number;
+  /** 最大冻结届数上限 */
+  maxFrozenPeriods: number;
+  /** 角色默认起始年龄 */
+  defaultStartingAge: number;
+  /** 角色初始属性默认值 */
+  initialAttributes: Record<string, number>;
+  /** KPI 等次对应的 UI 颜色 */
+  kpiTierColors: Record<string, string>;
+  /** 进度条颜色阈值 */
+  completionBarThresholds: { excellent: number; good: number };
 }

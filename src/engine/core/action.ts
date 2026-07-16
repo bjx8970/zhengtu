@@ -21,6 +21,7 @@ import type { DepartmentState } from '../../types/player';
  * @param slotAvailable   当前剩余槽位数
  * @param remainingBudget 当前剩余预算
  * @param gameDay         当前游戏日（用于冷却计算）
+ * @param config          游戏配置常量
  * @returns 执行结果，success=false 时 error 字段说明原因
  */
 export function executeAction(
@@ -29,6 +30,7 @@ export function executeAction(
   slotAvailable: number,
   remainingBudget: number,
   gameDay: number,
+  config: GameConfig,
 ): ActionResult {
   // 校验：槽位
   if (slotAvailable < actionConfig.slotCost) {
@@ -64,7 +66,7 @@ export function executeAction(
   }
 
   // 天数消耗：每 slotCost 约 1.5 天
-  const daysAdvanced = Math.max(1, Math.ceil(actionConfig.slotCost * 1.5));
+  const daysAdvanced = Math.max(1, Math.ceil(actionConfig.slotCost * config.daysPerSlotUnit));
 
   return {
     success: true,
@@ -108,15 +110,18 @@ function emptyResult(success: boolean, error: string): ActionResult {
 /**
  * 合并多个 ActionEffectResult 为聚合的 KPI/玩家变化。
  * 按 target 分组汇总，供 store 层一次性应用。
+ *
+ * @deprecated Phase 2 实现：后续多行动并行执行时启用
  */
-export function resolveEffects(effects: ActionEffectResult[]): {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function resolveEffects(_effects: ActionEffectResult[]): {
   kpiChanges: Record<string, number>;
   playerChanges: Record<string, number>;
 } {
   const kpiChanges: Record<string, number> = {};
   const playerChanges: Record<string, number> = {};
 
-  for (const eff of effects) {
+  for (const eff of _effects) {
     if (eff.target.startsWith('dept.kpi.')) {
       const kpiId = eff.target.replace('dept.kpi.', '');
       kpiChanges[kpiId] = (kpiChanges[kpiId] ?? 0) + eff.delta;

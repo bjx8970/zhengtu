@@ -34,7 +34,7 @@ function makeDeptState(overrides?: Partial<DepartmentState>): DepartmentState {
 describe('executeAction', () => {
   describe('successful execution', () => {
     it('消耗槽位并返回效果', () => {
-      const result = executeAction(makeAction(), makeDeptState(), 3, 1000, 10);
+      const result = executeAction(makeAction(), makeDeptState(), 3, 1000, 10, cfg);
       expect(result.success).toBe(true);
       expect(result.slotCost).toBe(1);
       expect(result.kpiChanges).toHaveLength(1);
@@ -43,13 +43,27 @@ describe('executeAction', () => {
     });
 
     it('消耗资金', () => {
-      const result = executeAction(makeAction({ budgetDelta: 50 }), makeDeptState(), 3, 1000, 10);
+      const result = executeAction(
+        makeAction({ budgetDelta: 50 }),
+        makeDeptState(),
+        3,
+        1000,
+        10,
+        cfg,
+      );
       expect(result.success).toBe(true);
       expect(result.budgetDelta).toBe(50);
     });
 
     it('设置冷却时间', () => {
-      const result = executeAction(makeAction({ cooldownDays: 5 }), makeDeptState(), 3, 1000, 10);
+      const result = executeAction(
+        makeAction({ cooldownDays: 5 }),
+        makeDeptState(),
+        3,
+        1000,
+        10,
+        cfg,
+      );
       expect(result.success).toBe(true);
       expect(result.newCooldown.expiresAt).toBe(15); // gameDay(10) + cooldown(5)
     });
@@ -57,13 +71,13 @@ describe('executeAction', () => {
 
   describe('slot validation', () => {
     it('槽位不足时拒绝', () => {
-      const result = executeAction(makeAction({ slotCost: 3 }), makeDeptState(), 2, 1000, 10);
+      const result = executeAction(makeAction({ slotCost: 3 }), makeDeptState(), 2, 1000, 10, cfg);
       expect(result.success).toBe(false);
       expect(result.error).toContain('槽位不足');
     });
 
     it('槽位刚好够时通过', () => {
-      const result = executeAction(makeAction({ slotCost: 3 }), makeDeptState(), 3, 1000, 10);
+      const result = executeAction(makeAction({ slotCost: 3 }), makeDeptState(), 3, 1000, 10, cfg);
       expect(result.success).toBe(true);
     });
   });
@@ -73,7 +87,7 @@ describe('executeAction', () => {
       const deptState = makeDeptState({
         actionCooldowns: { test_action: 15 },
       });
-      const result = executeAction(makeAction(), deptState, 3, 1000, 10);
+      const result = executeAction(makeAction(), deptState, 3, 1000, 10, cfg);
       expect(result.success).toBe(false);
       expect(result.error).toContain('冷却');
     });
@@ -82,14 +96,21 @@ describe('executeAction', () => {
       const deptState = makeDeptState({
         actionCooldowns: { test_action: 9 },
       });
-      const result = executeAction(makeAction(), deptState, 3, 1000, 10);
+      const result = executeAction(makeAction(), deptState, 3, 1000, 10, cfg);
       expect(result.success).toBe(true);
     });
   });
 
   describe('budget validation', () => {
     it('预算不足时拒绝', () => {
-      const result = executeAction(makeAction({ budgetDelta: 100 }), makeDeptState(), 3, 50, 10);
+      const result = executeAction(
+        makeAction({ budgetDelta: 100 }),
+        makeDeptState(),
+        3,
+        50,
+        10,
+        cfg,
+      );
       expect(result.success).toBe(false);
       expect(result.error).toContain('预算不足');
     });

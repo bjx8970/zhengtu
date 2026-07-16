@@ -23,14 +23,13 @@ import type {
 import type { PlayerSave, GameTime } from '../types/player';
 import type { PromotionResult, TimeTrigger } from '../types/game';
 import { getSlotLimits, executeAction } from '../engine/core/action';
-import { advanceTime } from '../engine/core/time';
+import { advanceTime, getGranularityDays } from '../engine/core/time';
 import { monthlySettlement } from '../engine/governance/budget';
 import { calculateKPI } from '../engine/governance/kpi';
 import { annualAssessment as runAnnualAssessment } from '../engine/governance/assessment';
 import { getConfigLoader } from '../config/loader';
-import { getGranularityDays } from '../types/config';
 import { clamp, clampAttr } from '../utils/math';
-import { writeLocalSave } from '../services/save-repo';
+import { writeLocalSave, upsertSave } from '../services/save-repo';
 
 export type GameState = PlayerSave;
 
@@ -69,15 +68,15 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     currentCareerLine: 'admin' as CareerLine,
     yearsInCurrentPosition: 0,
     slots,
-    politicalCapital: 0,
+    politicalCapital: cfg.initialAttributes['politicalCapital'] ?? 0,
     remainingBudget: 1000,
     comprehensiveScore: 0,
     annualAssessments: [],
-    integrity: 50,
-    stability: 50,
-    performance: 0,
-    charisma: 50,
-    competence: 50,
+    integrity: cfg.initialAttributes['integrity'] ?? 50,
+    stability: cfg.initialAttributes['stability'] ?? 50,
+    performance: cfg.initialAttributes['performance'] ?? 0,
+    charisma: cfg.initialAttributes['charisma'] ?? 50,
+    competence: cfg.initialAttributes['competence'] ?? 50,
     promotionStage: 'idle' as PromotionStage,
     promotionAttempts: 0,
     frozenPeriods: 0,
@@ -102,10 +101,10 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
         conservative: 0,
       },
     },
-    superiorFavor: 20,
+    superiorFavor: cfg.initialAttributes['superiorFavor'] ?? 20,
     reserveTier: 0 as ReserveCadreTier,
-    demoralization: 0,
-    corruptionRisk: 0,
+    demoralization: cfg.initialAttributes['demoralization'] ?? 0,
+    corruptionRisk: cfg.initialAttributes['corruptionRisk'] ?? 0,
     isUnderInvestigation: false,
     time: getInitialTime(),
     successor: null,
@@ -138,18 +137,9 @@ export type GameAction =
 // Solid 响应式 store
 const [state, setState] = createStore<GameState>(createInitialState());
 
-/** 可被行动修改的玩家数值属性，key 与 ActionEffectDef.target 中 "player." 后缀一致 */
-const PLAYER_NUMERIC_ATTRS = new Set([
-  'integrity',
-  'stability',
-  'performance',
-  'charisma',
-  'competence',
-  'corruptionRisk',
-  'superiorFavor',
-  'politicalCapital',
-  'demoralization',
-]);
+/** 可被行动修改的玩家数值属性，运行时从配置的 attributeBounds keys 派生 */
+const cfg = getConfigLoader().getGameConfig();
+const PLAYER_NUMERIC_ATTRS = new Set(Object.keys(cfg.attributeBounds));
 
 /**
  * 将行动效果的属性变更应用到 draft 上，含边界钳位。
@@ -217,12 +207,12 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
       case 'annual_assessment': {
         if (!position) break;
         // KPI 考核
-        const kpiResult = calculateKPI(position.kpiIndicators, draft.departmentStates);
+        const kpiResult = calculateKPI(position.kpiIndicators, draft.departmentStates, cfg);
         // 年度评价
-        const assessment = runAnnualAssessment(kpiResult, draft.yearsInCurrentPosition);
+        const assessment = runAnnualAssessment(kpiResult, draft.yearsInCurrentPosition, cfg);
         draft.comprehensiveScore = assessment.score;
         draft.frozenPeriods += assessment.frozenPeriods;
-        draft.frozenPeriods = clamp(draft.frozenPeriods, 0, 5); // 最多冻结5届
+        draft.frozenPeriods = clamp(draft.frozenPeriods, 0, cfg.maxFrozenPeriods);
         draft.annualAssessments.push({
           year: trigger.year ?? draft.time.year,
           score: assessment.score,
@@ -299,6 +289,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
         draft.slots.available,
         draft.remainingBudget,
         draft.totalDaysPlayed,
+        cfg,
       );
 
       if (!result.success) break;
@@ -323,6 +314,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
         result.daysAdvanced,
         draft.birthYear,
         draft.currentLevel,
+        cfg,
       );
       draft.time.year = timeResult.newState.year;
       draft.time.month = timeResult.newState.month;
@@ -334,9 +326,9 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       break;
     }
     case 'ADVANCE_TIME': {
-      const cfg = getConfigLoader().getGameConfig();
-      const days = getGranularityDays(action.granularity, cfg);
-      const timeResult = advanceTime(draft.time, days, draft.birthYear, draft.currentLevel);
+      const cfgAdv = getConfigLoader().getGameConfig();
+      const days = getGranularityDays(action.granularity, cfgAdv);
+      const timeResult = advanceTime(draft.time, days, draft.birthYear, draft.currentLevel, cfgAdv);
 
       draft.time.year = timeResult.newState.year;
       draft.time.month = timeResult.newState.month;
@@ -344,7 +336,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       draft.totalDaysPlayed += days;
       resolveTriggers(draft, timeResult.triggers);
 
-      const max = getSlotLimits(action.granularity, cfg);
+      const max = getSlotLimits(action.granularity, cfgAdv);
       draft.slots.max = max;
       draft.slots.available = max;
       draft.time.granularity = action.granularity;
@@ -374,9 +366,12 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
 export function dispatch(action: GameAction): void {
   setState(produce((draft) => reduceGameState(draft, action)));
 
-  // 阶段提交：推进时间或建档后同步持久化到 localStorage
-  if (action.type === 'ADVANCE_TIME' || action.type === 'NEW_GAME') {
-    writeLocalSave(unwrap(state));
+  // 每次操作实时写入本地
+  writeLocalSave(unwrap(state));
+
+  // 推进时间时同步到 Supabase
+  if (action.type === 'ADVANCE_TIME') {
+    upsertSave(unwrap(state)).catch((e: unknown) => console.warn('Supabase sync failed:', e));
   }
 }
 

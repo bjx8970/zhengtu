@@ -26,5 +26,31 @@
     "superiorFavor": [0, 100],
     "politicalCapital": [0, 500],
     "demoralization": [0, 100]
-  }
+  },
+  "kpiTierThresholds": { "excellent": 90, "competent": 75, "basic": 60 },
+  "completionRateCap": 1.5,
+  "daysPerSlotUnit": 1.5,
+  "sentimentMinLevel": 4,
+  "incompetentFrozenPeriods": 1,
+  "consecutiveFailureThreshold": 2,
+  "maxFrozenPeriods": 5,
+  "defaultStartingAge": 30,
+  "initialAttributes": {
+    "integrity": 50,
+    "stability": 50,
+    "performance": 0,
+    "charisma": 50,
+    "competence": 50,
+    "corruptionRisk": 0,
+    "superiorFavor": 20,
+    "politicalCapital": 0,
+    "demoralization": 0
+  },
+  "kpiTierColors": {
+    "优秀": "#4CAF50",
+    "称职": "#4A6FA5",
+    "基本称职": "#FF9800",
+    "不称职": "#C44D4D"
+  },
+  "completionBarThresholds": { "excellent": 1, "good": 0.6 }
 }

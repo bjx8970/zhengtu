@@ -1,3 +1,15 @@
+/**
+ * 配置数据校验脚本
+ *
+ * 使用 zod schema 验证所有 JSON 配置文件的格式正确性和引用完整性。
+ * CI 中自动运行（pnpm validate:config），校验失败阻断合并。
+ *
+ * 校验范围：
+ * - 部门/KPI/事件模板格式
+ * - 职业线职位定义格式
+ * - 模板引用 ID 是否存在（departments ↔ career-lines）
+ * - constants.json 全局配置项格式
+ */
 import { z } from 'zod';
 import deptCore from '../src/config/templates/departments.json' with { type: 'json' };
 import deptExtra from '../src/config/templates/departments-extra.json' with { type: 'json' };
@@ -181,6 +193,46 @@ for (const [eventId, event] of Object.entries(events) as [string, z.infer<typeof
     console.error(`❌ 事件 ${eventId}: 选项数 ${event.options.length} 不为 3`);
     errors++;
   }
+}
+
+console.log('\n--- 常量配置校验 ---\n');
+
+const ConstantsSchema = z.object({
+  slotLimits: z.object({ day: z.number(), week: z.number(), month: z.number() }),
+  daysPerMonth: z.number().min(1),
+  monthsPerYear: z.number().min(1),
+  retirementAge: z.number().min(1),
+  startYear: z.number(),
+  congressCycleYears: z.number().min(1),
+  budgetByLevel: z.array(z.number().min(0)),
+  budgetMultiplierByLine: z.record(z.number().min(0)),
+  initialTransferCount: z.number().min(0),
+  lineLockLevel: z.number().min(1),
+  transferWindowLevels: z.array(z.tuple([z.number(), z.number()])),
+  attributeBounds: z.record(z.tuple([z.number(), z.number()])),
+  kpiTierThresholds: z.object({ excellent: z.number(), competent: z.number(), basic: z.number() }),
+  completionRateCap: z.number().positive(),
+  daysPerSlotUnit: z.number().positive(),
+  sentimentMinLevel: z.number().min(1),
+  incompetentFrozenPeriods: z.number().min(0),
+  consecutiveFailureThreshold: z.number().min(1),
+  maxFrozenPeriods: z.number().min(1),
+  defaultStartingAge: z.number().min(18),
+  initialAttributes: z.record(z.number()),
+  kpiTierColors: z.record(z.string()),
+  completionBarThresholds: z.object({ excellent: z.number(), good: z.number() }),
+});
+
+import constants from '../src/config/constants.json' with { type: 'json' };
+
+const cResult = ConstantsSchema.safeParse(constants);
+if (!cResult.success) {
+  for (const issue of cResult.error.issues) {
+    console.error(`❌ constants.json [${issue.path.join('.')}] ${issue.message}`);
+    errors++;
+  }
+} else {
+  console.log('   ✅ constants.json 格式校验通过');
 }
 
 if (errors > 0) {

@@ -98,15 +98,19 @@ export function CharacterCreation() {
 
   function handleComplete() {
     const cfg = getConfigLoader().getGameConfig();
-    const startPos = getConfigLoader().getPosition(CareerLine.Administrative, 1, 0);
+    const startLine = CareerLine.Administrative;
+    const startLevel = 1;
+    const startIndex = 0;
+    const DEFAULT_START_POS_ID = `${startLine}_l${startLevel}_${startIndex}`;
+    const startPos = getConfigLoader().getPosition(startLine, startLevel, startIndex);
     dispatch({
       type: 'NEW_GAME',
       data: {
         ...data(),
-        birthYear: cfg.startYear - 30,
+        birthYear: cfg.startYear - cfg.defaultStartingAge,
         familyBackground: '普通家庭',
-        currentPositionId: startPos?.id ?? 'admin_l1_0',
-        remainingBudget: startPos?.annualBudget ?? 800,
+        currentPositionId: startPos?.id ?? DEFAULT_START_POS_ID,
+        remainingBudget: startPos?.annualBudget ?? cfg.budgetByLevel[startLevel] ?? 0,
       },
     });
     navigate('/dashboard');
