@@ -14,6 +14,7 @@
 
 import type { JSX } from 'solid-js';
 
+/** 页面组件的 props 类型：路径参数键值对，如 { deptIndex: "0" } */
 export type PageProps = Record<string, string>;
 
 /** 路由定义 */

@@ -3,6 +3,8 @@
  *
  * 展示指定部门的行动列表、冷却状态、KPI 当前值。
  * 玩家在此选择和执行部门行动，执行后槽位/KPI/冷却自动更新。
+ *
+ * @param props.deptIndex 部门在职位配置中的索引（从 0 开始）
  */
 import { createMemo, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
@@ -20,11 +22,11 @@ function canExecute(
   remainingBudget: number,
   budgetDelta: number,
 ): { ok: boolean; reason: string } {
-  if (slotAvailable < slotCost) return { ok: false, reason: `槽位不足（需${slotCost}，剩${slotAvailable}）` };
+  if (slotAvailable < slotCost)
+    return { ok: false, reason: `槽位不足（需${slotCost}，剩${slotAvailable}）` };
   if (gameDay < cooldownEnd)
     return { ok: false, reason: `冷却中（剩余${cooldownEnd - gameDay}天）` };
-  if (remainingBudget < budgetDelta)
-    return { ok: false, reason: `预算不足（需${budgetDelta}万）` };
+  if (remainingBudget < budgetDelta) return { ok: false, reason: `预算不足（需${budgetDelta}万）` };
   return { ok: true, reason: '' };
 }
 
@@ -91,15 +93,10 @@ export function PositionDept(props: PageProps) {
           ←
         </button>
         <div style={{ flex: 1 }}>
-          <Show
-            when={deptConfig()}
-            fallback={<span style={{ color: '#888' }}>无部门数据</span>}
-          >
+          <Show when={deptConfig()} fallback={<span style={{ color: '#888' }}>无部门数据</span>}>
             {(dept) => (
               <>
-                <div style={{ 'font-size': '1.1rem', 'font-weight': 'bold' }}>
-                  {dept().name}
-                </div>
+                <div style={{ 'font-size': '1.1rem', 'font-weight': 'bold' }}>{dept().name}</div>
                 <div style={{ 'font-size': '0.75rem', color: '#888' }}>
                   {positionConfig()?.name} · {allDepts().length} 个部门
                 </div>
@@ -151,6 +148,7 @@ export function PositionDept(props: PageProps) {
             </div>
           }
         >
+          {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- outer Show guarantees non-null */}
           <Show when={deptConfig()!} keyed>
             {(dept) => (
               <Show when={deptState()!} keyed>
@@ -179,7 +177,13 @@ export function PositionDept(props: PageProps) {
                           }}
                         >
                           <div style={{ 'font-size': '0.75rem', color: '#888' }}>槽位</div>
-                          <div style={{ 'font-size': '1.2rem', 'font-weight': 'bold', color: '#4A6FA5' }}>
+                          <div
+                            style={{
+                              'font-size': '1.2rem',
+                              'font-weight': 'bold',
+                              color: '#4A6FA5',
+                            }}
+                          >
                             {state.slots.available}/{state.slots.max}
                           </div>
                         </div>
@@ -193,7 +197,13 @@ export function PositionDept(props: PageProps) {
                           }}
                         >
                           <div style={{ 'font-size': '0.75rem', color: '#888' }}>月度消耗</div>
-                          <div style={{ 'font-size': '1.2rem', 'font-weight': 'bold', color: '#FF9800' }}>
+                          <div
+                            style={{
+                              'font-size': '1.2rem',
+                              'font-weight': 'bold',
+                              color: '#FF9800',
+                            }}
+                          >
                             {budgetInfo().monthly}
                           </div>
                         </div>
@@ -337,7 +347,8 @@ export function PositionDept(props: PageProps) {
                                 >
                                   <span>{kpi.name}</span>
                                   <span style={{ color: '#888' }}>
-                                    {value} / {kpi.targetValue}{kpi.unit}
+                                    {value} / {kpi.targetValue}
+                                    {kpi.unit}
                                   </span>
                                 </div>
                                 <div
