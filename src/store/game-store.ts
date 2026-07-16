@@ -22,14 +22,14 @@ import type {
 } from '../types/enums';
 import type { PlayerSave, GameTime } from '../types/player';
 import type { PromotionResult, TimeTrigger } from '../types/game';
-import { getSlotLimits } from '../engine/core/action';
+import { getSlotLimits, executeAction } from '../engine/core/action';
 import { advanceTime } from '../engine/core/time';
 import { monthlySettlement } from '../engine/governance/budget';
 import { calculateKPI } from '../engine/governance/kpi';
 import { annualAssessment as runAnnualAssessment } from '../engine/governance/assessment';
 import { getConfigLoader } from '../config/loader';
 import { getGranularityDays } from '../types/config';
-import { clamp } from '../utils/math';
+import { clamp, clampAttr } from '../utils/math';
 
 export type GameState = PlayerSave;
 
@@ -137,6 +137,44 @@ export type GameAction =
 // Solid 响应式 store
 const [state, setState] = createStore<GameState>(createInitialState());
 
+/** 可被行动修改的玩家数值属性，key 与 ActionEffectDef.target 中 "player." 后缀一致 */
+const PLAYER_NUMERIC_ATTRS = new Set([
+  'integrity',
+  'stability',
+  'performance',
+  'charisma',
+  'competence',
+  'corruptionRisk',
+  'superiorFavor',
+  'politicalCapital',
+  'demoralization',
+]);
+
+/**
+ * 将行动效果的属性变更应用到 draft 上，含边界钳位。
+ *
+ * @param draft  当前状态 draft
+ * @param attr   属性名（"player." 前缀已剥离）
+ * @param delta  变化量
+ * @param bounds 属性边界表
+ */
+function applyPlayerAttr(
+  draft: PlayerSave,
+  attr: string,
+  delta: number,
+  bounds: Record<string, [number, number]>,
+): void {
+  if (!PLAYER_NUMERIC_ATTRS.has(attr)) return;
+  const d = draft as unknown as Record<string, number>;
+  d[attr] = clampAttr(attr, (d[attr] ?? 0) + delta, bounds);
+}
+
+/** 从 positionId（如 "admin_l3_0"）提取职位索引 */
+function extractPositionIndex(positionId: string): number {
+  const idx = parseInt(positionId.split('_').pop() ?? '0', 10);
+  return Number.isNaN(idx) ? 0 : idx;
+}
+
 /**
  * 处理时间推进产生的周期事件触发器。
  *
@@ -150,11 +188,7 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
   const position = loader.getPosition(
     draft.currentCareerLine,
     draft.currentLevel,
-    // 从 positionId 提取索引：如 "admin_l3_0" → 2
-    (() => {
-      const parts = draft.currentPositionId.split('_');
-      return parseInt(parts[parts.length - 1] ?? '0', 10);
-    })(),
+    extractPositionIndex(draft.currentPositionId),
   );
 
   for (const trigger of triggers) {
@@ -215,62 +249,144 @@ export function getRawState(): PlayerSave {
 }
 
 /**
+ * 纯状态 reducer：接收 draft 和 action，直接修改 draft。
+ *
+ * 所有业务逻辑在此函数中，不依赖 store 实例。
+ * 供 dispatch 和 createTestStore 复用。
+ */
+function reduceGameState(draft: PlayerSave, action: GameAction): void {
+  switch (action.type) {
+    case 'SET_GRANULARITY': {
+      const cfg = getConfigLoader().getGameConfig();
+      const max = getSlotLimits(action.granularity, cfg);
+      draft.time.granularity = action.granularity;
+      draft.slots.max = max;
+      draft.slots.available = max;
+      break;
+    }
+    case 'EXECUTE_ACTION': {
+      const loader = getConfigLoader();
+      const cfg = loader.getGameConfig();
+      const positionIndex = extractPositionIndex(draft.currentPositionId);
+      const position = loader.getPosition(
+        draft.currentCareerLine,
+        draft.currentLevel,
+        positionIndex,
+      );
+      if (!position) break;
+
+      const deptConfig = position.departments.find((d) => d.id === action.deptId);
+      if (!deptConfig) break;
+      const actionConfig = deptConfig.actions.find((a) => a.id === action.actionId);
+      if (!actionConfig) break;
+
+      const deptState = draft.departmentStates[action.deptId] ?? {
+        id: action.deptId,
+        kpiValues: {},
+        monthlyConsumption: 0,
+        cumulativeConsumption: 0,
+        actionCooldowns: {},
+        lastActionDay: 0,
+      };
+      if (!draft.departmentStates[action.deptId]) {
+        draft.departmentStates[action.deptId] = deptState;
+      }
+
+      const result = executeAction(
+        actionConfig,
+        deptState,
+        draft.slots.available,
+        draft.remainingBudget,
+        draft.totalDaysPlayed,
+      );
+
+      if (!result.success) break;
+
+      for (const kpi of result.kpiChanges) {
+        deptState.kpiValues[kpi.indicatorId] =
+          (deptState.kpiValues[kpi.indicatorId] ?? 0) + kpi.delta;
+      }
+
+      for (const change of result.playerChanges) {
+        applyPlayerAttr(draft, change.attr, change.delta, cfg.attributeBounds);
+      }
+
+      deptState.actionCooldowns[result.newCooldown.actionId] = result.newCooldown.expiresAt;
+      deptState.lastActionDay = draft.totalDaysPlayed;
+
+      draft.slots.available -= result.slotCost;
+      draft.remainingBudget -= result.budgetDelta;
+
+      const timeResult = advanceTime(
+        draft.time,
+        result.daysAdvanced,
+        draft.birthYear,
+        draft.currentLevel,
+      );
+      draft.time.year = timeResult.newState.year;
+      draft.time.month = timeResult.newState.month;
+      draft.time.day = timeResult.newState.day;
+      draft.totalDaysPlayed += result.daysAdvanced;
+      resolveTriggers(draft, timeResult.triggers);
+
+      draft.totalActions += 1;
+      break;
+    }
+    case 'ADVANCE_TIME': {
+      const cfg = getConfigLoader().getGameConfig();
+      const days = getGranularityDays(action.granularity, cfg);
+      const timeResult = advanceTime(draft.time, days, draft.birthYear, draft.currentLevel);
+
+      draft.time.year = timeResult.newState.year;
+      draft.time.month = timeResult.newState.month;
+      draft.time.day = timeResult.newState.day;
+      draft.totalDaysPlayed += days;
+      resolveTriggers(draft, timeResult.triggers);
+
+      const max = getSlotLimits(action.granularity, cfg);
+      draft.slots.max = max;
+      draft.slots.available = max;
+      draft.time.granularity = action.granularity;
+      draft.updatedAt = Date.now();
+      break;
+    }
+    case 'LOAD_SAVE': {
+      Object.assign(draft, action.save);
+      break;
+    }
+    case 'NEW_GAME': {
+      const fresh = createInitialState();
+      Object.assign(draft, fresh, action.data);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/**
  * 派发动作修改游戏状态。
  *
  * 所有状态变更的唯一入口。引擎函数在此处被调用，
  * 结果通过 produce() 直接修改 draft，Solid 自动追踪变更并通知组件。
  */
 export function dispatch(action: GameAction): void {
-  setState(
-    produce((draft) => {
-      switch (action.type) {
-        case 'SET_GRANULARITY': {
-          const cfg = getConfigLoader().getGameConfig();
-          const max = getSlotLimits(action.granularity, cfg);
-          draft.time.granularity = action.granularity;
-          draft.slots.max = max;
-          draft.slots.available = max;
-          break;
-        }
-        case 'EXECUTE_ACTION': {
-          // Phase 2 实现：调用 actionEngine.execute() + 应用效果 + 推进天数
-          break;
-        }
-        case 'ADVANCE_TIME': {
-          const cfg = getConfigLoader().getGameConfig();
-          const days = getGranularityDays(action.granularity, cfg);
-          const timeResult = advanceTime(draft.time, days, draft.birthYear, draft.currentLevel);
+  setState(produce((draft) => reduceGameState(draft, action)));
+}
 
-          draft.time.year = timeResult.newState.year;
-          draft.time.month = timeResult.newState.month;
-          draft.time.day = timeResult.newState.day;
-          draft.totalDaysPlayed += days;
+/**
+ * 创建独立的测试用 store。
+ * 返回独立的 state、dispatch、getRawState，测试间互不干扰。
+ */
+export function createTestStore(initialOverrides?: Partial<PlayerSave>) {
+  const [testState, testSetState] = createStore<GameState>(createInitialState(initialOverrides));
 
-          // 处理周期事件触发器
-          resolveTriggers(draft, timeResult.triggers);
-
-          // 重置槽位
-          const max = getSlotLimits(action.granularity, cfg);
-          draft.slots.max = max;
-          draft.slots.available = max;
-          draft.time.granularity = action.granularity;
-          draft.updatedAt = Date.now();
-          break;
-        }
-        case 'LOAD_SAVE': {
-          Object.assign(draft, action.save);
-          break;
-        }
-        case 'NEW_GAME': {
-          const fresh = createInitialState();
-          Object.assign(draft, fresh, action.data);
-          break;
-        }
-        default:
-          break;
-      }
-    }),
-  );
+  return {
+    state: testState,
+    getRawState: () => unwrap(testState),
+    dispatch: (action: GameAction) =>
+      testSetState(produce((draft) => reduceGameState(draft, action))),
+  };
 }
 
 /**
