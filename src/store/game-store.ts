@@ -35,9 +35,9 @@ import {
   checkPrerequisites,
   resolveDemocraticVote,
   resolveOrgInspection,
-  resolveJointReview,
 } from '../engine/career/promotion';
 import {
+  resolveJointReview,
   resolveCommitteeVote,
   resolvePublicNotice,
   resolveProbation,
@@ -211,7 +211,7 @@ function buildPromotionContext(draft: PlayerSave): PromotionContext {
     factionReputation: draft.factions.reputation,
     relations: { colleagues: draft.relations.colleagues },
     assessmentHistory: draft.annualAssessments.map((a) => ({ score: a.score, tier: a.tier })),
-    hasDisciplinaryRecord: false,
+    hasDisciplinaryRecord: false, // TODO: 待处分系统实现后动态计算
     hasGrassrootsExperience:
       draft.currentLevel <= 2 || draft.careerHistory.some((r) => r.level <= 2),
     hasMultiRegionExperience: draft.careerHistory.filter((r) => r.archived).length >= 2,
@@ -424,6 +424,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       if (!lineCfg) break;
       const nextLevelCfg = lineCfg.levels.find((l) => l.level === nextLevel);
       if (!nextLevelCfg || nextLevelCfg.positions.length === 0) break;
+      // 安全：上一行已 guard length === 0，positions[0] 必然非空
       const targetPos = nextLevelCfg.positions[0]!;
 
       draft.promotionAttempts += 1;

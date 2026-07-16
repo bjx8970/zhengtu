@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { checkPrerequisites, resolveDemocraticVote, resolveOrgInspection } from '../promotion';
 import {
-  checkPrerequisites,
-  resolveDemocraticVote,
-  resolveOrgInspection,
   resolveJointReview,
-  calculateFactionPenalty,
-} from '../promotion';
-import { resolveCommitteeVote, resolvePublicNotice, resolveProbation } from '../promotion-final';
+  resolveCommitteeVote,
+  resolvePublicNotice,
+  resolveProbation,
+} from '../promotion-final';
+import { calculateFactionPenalty } from '../faction-penalty';
 import { getConfigLoader } from '../../../config/loader';
 import { OrgInspectResult } from '../../../types/enums';
 import type { PromotionContext } from '../../../types/game';
@@ -219,11 +219,10 @@ describe('resolveJointReview', () => {
   });
 
   it('多部门未通过 → detail 列出', () => {
-    const result = resolveJointReview(makeCtx({ corruptionRisk: 80 }), cfg, () => 0.1);
-    if (!result.passed) {
-      const deptNames = ['纪委', '公安', '信访', '审计', '网信'];
-      expect(deptNames.some((d) => result.detail.includes(d))).toBe(true);
-    }
+    const result = resolveJointReview(makeCtx({ corruptionRisk: 80 }), cfg, () => 0.95);
+    expect(result.passed).toBe(false);
+    const deptNames = ['纪委', '公安', '信访', '审计', '网信'];
+    expect(deptNames.some((d) => result.detail.includes(d))).toBe(true);
   });
 });
 

@@ -234,6 +234,10 @@ const ConstantsSchema = z.object({
       influencePoliticalCost: z.number().min(0),
       influenceScoreBonus: z.number(),
     }),
+    jointReview: z.object({
+      disciplineCorruptionThreshold: z.number(),
+      otherDepartmentsPassRate: z.number().min(0).max(1),
+    }),
     committeeVote: z.object({
       minSize: z.number().int().min(1),
       maxSize: z.number().int().min(1),

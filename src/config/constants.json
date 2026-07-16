@@ -66,6 +66,10 @@
       "influencePoliticalCost": 20,
       "influenceScoreBonus": 8
     },
+    "jointReview": {
+      "disciplineCorruptionThreshold": 50,
+      "otherDepartmentsPassRate": 0.85
+    },
     "committeeVote": {
       "minSize": 7,
       "maxSize": 13,

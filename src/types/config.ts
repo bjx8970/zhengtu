@@ -154,6 +154,10 @@ export interface PromotionConfig {
     influencePoliticalCost: number;
     influenceScoreBonus: number;
   };
+  jointReview: {
+    disciplineCorruptionThreshold: number;
+    otherDepartmentsPassRate: number;
+  };
   committeeVote: {
     minSize: number;
     maxSize: number;

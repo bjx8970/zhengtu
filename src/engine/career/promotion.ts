@@ -1,19 +1,19 @@
 /**
- * 晋升引擎 — 六阶段状态机（阶段 0~3）
+ * 晋升引擎 — 六阶段状态机（阶段 0~2）
  *
  * 核心职责：
  * 1. checkPrerequisites — 门槛校验（服务年限/考核次数/处分/特殊条件）
  * 2. resolveDemocraticVote — 民主推荐（玩家可拉票）
  * 3. resolveOrgInspection — 组织考察（玩家可引导考察组）
- * 4. resolveJointReview — 多部门联审（纪委/公安/信访/审计/网信）
  *
  * 所有函数为纯函数，rng 参数用于注入随机数生成器（默认 Math.random）。
- * 阶段 4~6 见 promotion-final.ts。
+ * 阶段 3~6 见 promotion-final.ts。
  */
 
 import type { PromotionContext } from '../../types/game';
 import type { PromotionRequirement, GameConfig } from '../../types/config';
 import { OrgInspectResult } from '../../types/enums';
+import { calculateFactionPenalty } from './faction-penalty';
 
 /**
  * 晋升门槛校验。
@@ -153,69 +153,4 @@ export function resolveOrgInspection(
     detail: `组织考察结论：${result}`,
     politicalCost,
   };
-}
-
-/**
- * 阶段3 — 多部门联审。
- *
- * 纪委（廉政审查）/ 公安 / 信访 / 审计 / 网信 五部门逐一审核。
- * corruptionRisk 影响纪委和信访的通过率。
- *
- * @param ctx 晋升上下文
- * @param cfg 晋升配置常量
- * @param rng 随机数生成器（默认 Math.random）
- * @returns 是否全过 + 各部门意见 + 详情
- */
-export function resolveJointReview(
-  ctx: PromotionContext,
-  _cfg: GameConfig,
-  rng: () => number = Math.random,
-): {
-  passed: boolean;
-  opinions: Record<string, boolean>;
-  detail: string;
-} {
-  const departments = ['纪委', '公安', '信访', '审计', '网信'];
-  const opinions: Record<string, boolean> = {};
-
-  for (const dept of departments) {
-    if (dept === '纪委') {
-      opinions[dept] = ctx.corruptionRisk < 50;
-    } else if (dept === '信访') {
-      opinions[dept] = rng() < 1 - ctx.corruptionRisk / 200;
-    } else {
-      opinions[dept] = rng() < 0.85;
-    }
-  }
-
-  const passed = Object.values(opinions).every((v) => v);
-  const failedDepts = Object.entries(opinions)
-    .filter(([, v]) => !v)
-    .map(([k]) => k);
-
-  return {
-    passed,
-    opinions,
-    detail: passed ? '多部门联审全部通过' : `${failedDepts.join('、')}出具负面意见，提拔程序终止`,
-  };
-}
-
-/**
- * 从派系声望计算惩罚值。
- *
- * 对立派系的声望加权求和得到负向影响。
- * 目前为简化实现：声望越高对立派系，惩罚越大。
- *
- * @param factionReputation 各派系声望
- * @returns 惩罚分（0~30）
- */
-export function calculateFactionPenalty(factionReputation: Record<string, number>): number {
-  const reputations = Object.values(factionReputation).filter((v) => v > 0);
-  if (reputations.length <= 1) return 0;
-
-  const sorted = [...reputations].sort((a, b) => b - a);
-  const max = sorted[0] ?? 0;
-  const second = sorted[1] ?? 0;
-
-  return Math.round(((max - second) / 100) * 15);
 }

@@ -1,17 +1,65 @@
 /**
- * 晋升引擎 — 六阶段状态机（阶段 4~6）
+ * 晋升引擎 — 六阶段状态机（阶段 3~6）
  *
  * 核心职责：
- * 1. resolveCommitteeVote — 常委会票决
- * 2. resolvePublicNotice — 任前公示
- * 3. resolveProbation — 试用期考察
+ * 1. resolveJointReview — 多部门联审（纪委/公安/信访/审计/网信）
+ * 2. resolveCommitteeVote — 常委会票决
+ * 3. resolvePublicNotice — 任前公示
+ * 4. resolveProbation — 试用期考察
  *
  * 所有函数为纯函数，rng 参数用于注入随机数生成器。
- * 阶段 0~3 见 promotion.ts。
+ * 阶段 0~2 见 promotion.ts。
  */
 
 import type { PromotionContext } from '../../types/game';
 import type { GameConfig } from '../../types/config';
+import { calculateFactionPenalty } from './faction-penalty';
+
+/**
+ * 阶段3 — 多部门联审。
+ *
+ * 纪委（廉政审查）/ 公安 / 信访 / 审计 / 网信 五部门逐一审核。
+ * corruptionRisk 影响纪委和信访的通过率。
+ *
+ * @param ctx 晋升上下文
+ * @param cfg 晋升配置常量
+ * @param rng 随机数生成器（默认 Math.random）
+ * @returns 是否全过 + 各部门意见 + 详情
+ */
+export function resolveJointReview(
+  ctx: PromotionContext,
+  cfg: GameConfig,
+  rng: () => number = Math.random,
+): {
+  passed: boolean;
+  opinions: Record<string, boolean>;
+  detail: string;
+} {
+  const jr = cfg.promotion.jointReview;
+  const departments = ['纪委', '公安', '信访', '审计', '网信'];
+  const opinions: Record<string, boolean> = {};
+
+  for (const dept of departments) {
+    if (dept === '纪委') {
+      opinions[dept] = ctx.corruptionRisk < jr.disciplineCorruptionThreshold;
+    } else if (dept === '信访') {
+      opinions[dept] = rng() < 1 - ctx.corruptionRisk / 200;
+    } else {
+      opinions[dept] = rng() < jr.otherDepartmentsPassRate;
+    }
+  }
+
+  const passed = Object.values(opinions).every((v) => v);
+  const failedDepts = Object.entries(opinions)
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
+
+  return {
+    passed,
+    opinions,
+    detail: passed ? '多部门联审全部通过' : `${failedDepts.join('、')}出具负面意见，提拔程序终止`,
+  };
+}
 
 /**
  * 阶段4 — 常委会票决。
@@ -48,7 +96,7 @@ export function resolveCommitteeVote(
 
   const approvalRate = (avgReputation + ctx.superiorFavor) / 200;
 
-  const factionPenalty = calculateFactionDisparity(ctx.factionReputation) / 100;
+  const factionPenalty = calculateFactionPenalty(ctx.factionReputation) / 100;
   const finalRate = Math.max(approvalRate - factionPenalty, 0.1);
 
   let forVotes = 0;
@@ -144,21 +192,4 @@ export function resolveProbation(
     passed,
     detail: passed ? '一年试用期考核合格，正式定岗' : '试用期考核不合格，降回原职级',
   };
-}
-
-/**
- * 根据派系声望差异计算常委会惩罚系数。
- *
- * @param factionReputation 各派系声望记录
- * @returns 惩罚系数（0~15）
- */
-function calculateFactionDisparity(factionReputation: Record<string, number>): number {
-  const reputations = Object.values(factionReputation).filter((v) => v > 0);
-  if (reputations.length <= 1) return 0;
-
-  const sorted = [...reputations].sort((a, b) => b - a);
-  const max = sorted[0] ?? 0;
-  const second = sorted[1] ?? 0;
-
-  return Math.round(((max - second) / 100) * 15);
 }

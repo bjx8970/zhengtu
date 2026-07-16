@@ -13,3 +13,4 @@ export * from './governance/budget';
 export * from './governance/assessment';
 export * from './career/promotion';
 export * from './career/promotion-final';
+export * from './career/faction-penalty';
