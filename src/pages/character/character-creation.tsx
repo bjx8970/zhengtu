@@ -16,22 +16,7 @@ import { useGameStore } from '../../store/game-store';
 import { getConfigLoader } from '../../config/loader';
 import { navigate } from '../../router';
 import { CareerLine } from '../../types/enums';
-
-interface CharacterData {
-  characterName: string;
-  gender: '男' | '女';
-  birthPlace: string;
-  education: '高中' | '大专' | '本科' | '硕士' | '博士';
-  motivation: '为民服务' | '个人抱负' | '家族期望';
-  personality: '廉洁型' | '务实型' | '改革型' | '稳健型';
-}
-
-interface StepDef {
-  title: string;
-  field: keyof CharacterData;
-  type: 'input' | 'options';
-  options?: string[];
-}
+import type { CharacterData, StepDef } from '../../types/character';
 
 const STEPS: StepDef[] = [
   { title: '姓名', field: 'characterName', type: 'input' },
@@ -72,10 +57,17 @@ const INITIAL_DATA: CharacterData = {
 };
 
 export function CharacterCreation() {
-  const { dispatch } = useGameStore();
+  const { state, dispatch } = useGameStore();
+
+  // 已有存档时跳过建档，直接进入仪表盘
+  if (state.characterName) {
+    navigate('/dashboard');
+    return null;
+  }
   const [step, setStep] = createSignal(0);
   const [data, setData] = createSignal<CharacterData>({ ...INITIAL_DATA });
 
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- step() 始终在 STEPS 索引范围内
   const currentStep = () => STEPS[step()]!;
   const isFirst = () => step() === 0;
   const isLast = () => step() === STEPS.length - 1;
@@ -201,6 +193,7 @@ export function CharacterCreation() {
               width: '260px',
             }}
           >
+            {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- 仅 options 类型步骤渲染此 For */}
             <For each={currentStep().options!}>
               {(opt) => {
                 const selected = data()[currentStep().field] === opt;

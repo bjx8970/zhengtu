@@ -16,7 +16,7 @@ import { readLocalSave } from './services/save-repo';
 
 const root = document.getElementById('root');
 if (root) {
-  // 从 localStorage 恢复上次会话（如果有）
+  // 从 localStorage 恢复上次会话（LOAD_SAVE 不触发写回，不会产生循环）
   const saved = readLocalSave();
   if (saved) {
     dispatch({ type: 'LOAD_SAVE', save: saved });
