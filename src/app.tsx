@@ -14,12 +14,14 @@ import { createRouter, type Route } from './router';
 import { SplashPage } from './pages/auth/splash';
 import { LoginPage } from './pages/auth/login';
 import { Dashboard } from './pages/dashboard/dashboard';
+import { PositionKPI } from './pages/career/position-kpi';
 
 /** 全局路由表 */
 const routes: Route[] = [
   { path: '/', component: SplashPage },
   { path: '/login', component: LoginPage },
   { path: '/dashboard', component: Dashboard },
+  { path: '/kpi', component: PositionKPI },
 ];
 
 export function App(): JSX.Element {
