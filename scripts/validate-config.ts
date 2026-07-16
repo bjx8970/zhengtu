@@ -221,6 +221,37 @@ const ConstantsSchema = z.object({
   initialAttributes: z.record(z.number()),
   kpiTierColors: z.record(z.string()),
   completionBarThresholds: z.object({ excellent: z.number(), good: z.number() }),
+  promotion: z.object({
+    democraticVote: z.object({
+      passThreshold: z.number(),
+      connectionsBonus: z.number(),
+      connectionsRiskProbability: z.number().min(0).max(1),
+    }),
+    orgInspection: z.object({
+      excellentThreshold: z.number(),
+      qualifiedThreshold: z.number(),
+      suspendedThreshold: z.number(),
+      influencePoliticalCost: z.number().min(0),
+      influenceScoreBonus: z.number(),
+    }),
+    committeeVote: z.object({
+      minSize: z.number().int().min(1),
+      maxSize: z.number().int().min(1),
+      sizePerLevelInterval: z.number().int().min(0),
+    }),
+    publicNotice: z.object({
+      complaintProbPerRisk: z.number().min(0).max(1),
+      sentimentProbPerRisk: z.number().min(0).max(1),
+    }),
+    probation: z.object({
+      passThreshold: z.number(),
+    }),
+    progression: z.object({
+      demoralizationOnFail: z.number().min(0),
+      demoralizationOnRejected: z.number().min(0),
+      politicalCapitalBonusOnSuccess: z.number().min(0),
+    }),
+  }),
 });
 
 import constants from '../src/config/constants.json' with { type: 'json' };

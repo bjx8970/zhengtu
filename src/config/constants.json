@@ -52,5 +52,36 @@
     "基本称职": "#FF9800",
     "不称职": "#C44D4D"
   },
-  "completionBarThresholds": { "excellent": 1, "good": 0.6 }
+  "completionBarThresholds": { "excellent": 1, "good": 0.6 },
+  "promotion": {
+    "democraticVote": {
+      "passThreshold": 60,
+      "connectionsBonus": 10,
+      "connectionsRiskProbability": 0.3
+    },
+    "orgInspection": {
+      "excellentThreshold": 80,
+      "qualifiedThreshold": 60,
+      "suspendedThreshold": 40,
+      "influencePoliticalCost": 20,
+      "influenceScoreBonus": 8
+    },
+    "committeeVote": {
+      "minSize": 7,
+      "maxSize": 13,
+      "sizePerLevelInterval": 2
+    },
+    "publicNotice": {
+      "complaintProbPerRisk": 0.005,
+      "sentimentProbPerRisk": 0.003
+    },
+    "probation": {
+      "passThreshold": 55
+    },
+    "progression": {
+      "demoralizationOnFail": 5,
+      "demoralizationOnRejected": 8,
+      "politicalCapitalBonusOnSuccess": 10
+    }
+  }
 }

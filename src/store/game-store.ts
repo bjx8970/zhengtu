@@ -13,15 +13,16 @@
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
-import type {
+import {
   CareerLine,
   PromotionStage,
+  OrgInspectResult,
   ReserveCadreTier,
-  TimeGranularity,
   FileAction,
 } from '../types/enums';
+import type { TimeGranularity } from '../types/enums';
 import type { PlayerSave, GameTime } from '../types/player';
-import type { PromotionResult, TimeTrigger } from '../types/game';
+import type { TimeTrigger } from '../types/game';
 import { getSlotLimits, executeAction } from '../engine/core/action';
 import { advanceTime, getGranularityDays } from '../engine/core/time';
 import { monthlySettlement } from '../engine/governance/budget';
@@ -30,6 +31,19 @@ import { annualAssessment as runAnnualAssessment } from '../engine/governance/as
 import { getConfigLoader } from '../config/loader';
 import { clamp, clampAttr } from '../utils/math';
 import { writeLocalSave, upsertSave } from '../services/save-repo';
+import {
+  checkPrerequisites,
+  resolveDemocraticVote,
+  resolveOrgInspection,
+  resolveJointReview,
+} from '../engine/career/promotion';
+import {
+  resolveCommitteeVote,
+  resolvePublicNotice,
+  resolveProbation,
+} from '../engine/career/promotion-final';
+import type { PromotionContext } from '../types/game';
+import type { CareerRecord } from '../types/player';
 
 export type GameState = PlayerSave;
 
@@ -80,6 +94,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     promotionStage: 'idle' as PromotionStage,
     promotionAttempts: 0,
     frozenPeriods: 0,
+    promotionState: null,
     transferCount: cfg.initialTransferCount,
     isLineLocked: false,
     departmentStates: {},
@@ -129,8 +144,13 @@ export type GameAction =
   | { type: 'SET_GRANULARITY'; granularity: TimeGranularity }
   | { type: 'CHOOSE_EVENT_OPTION'; eventId: string; optionIndex: number }
   | { type: 'PROCESS_DOCUMENT'; docId: string; action: FileAction }
-  | { type: 'START_PROMOTION'; targetPositionId: string }
-  | { type: 'PROMOTION_RESOLVE_STAGE'; result: PromotionResult }
+  | { type: 'START_PROMOTION' }
+  | {
+      type: 'PROMOTION_RESOLVE_STAGE';
+      choices?: { useConnections?: boolean; influenceInspectors?: boolean };
+      /** 仅测试用：注入随机数生成器 */
+      _rng?: () => number;
+    }
   | { type: 'LOAD_SAVE'; save: PlayerSave }
   | { type: 'NEW_GAME'; data: Record<string, unknown> };
 
@@ -164,6 +184,43 @@ function applyPlayerAttr(
 function extractPositionIndex(positionId: string): number {
   const idx = parseInt(positionId.split('_').pop() ?? '0', 10);
   return Number.isNaN(idx) ? 0 : idx;
+}
+
+/** 非 idle/completed/failed 时禁止执行其他操作 */
+function canAct(stage: PromotionStage): boolean {
+  return (
+    stage === PromotionStage.Idle ||
+    stage === PromotionStage.Completed ||
+    stage === PromotionStage.Failed
+  );
+}
+
+/**
+ * 从 draft 中提取晋升引擎所需的上下文快照。
+ *
+ * @param draft 当前游戏状态
+ * @returns PromotionContext
+ */
+function buildPromotionContext(draft: PlayerSave): PromotionContext {
+  return {
+    playerLevel: draft.currentLevel,
+    playerScore: draft.comprehensiveScore,
+    yearsInPosition: draft.yearsInCurrentPosition,
+    politicalCapital: draft.politicalCapital,
+    corruptionRisk: draft.corruptionRisk,
+    factionReputation: draft.factions.reputation,
+    relations: { colleagues: draft.relations.colleagues },
+    assessmentHistory: draft.annualAssessments.map((a) => ({ score: a.score, tier: a.tier })),
+    hasDisciplinaryRecord: false,
+    hasGrassrootsExperience:
+      draft.currentLevel <= 2 || draft.careerHistory.some((r) => r.level <= 2),
+    hasMultiRegionExperience: draft.careerHistory.filter((r) => r.archived).length >= 2,
+    charisma: draft.charisma,
+    superiorFavor: draft.superiorFavor,
+    performance: draft.performance,
+    competence: draft.competence,
+    integrity: draft.integrity,
+  };
 }
 
 /**
@@ -211,6 +268,8 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
         // 年度评价
         const assessment = runAnnualAssessment(kpiResult, draft.yearsInCurrentPosition, cfg);
         draft.comprehensiveScore = assessment.score;
+        // 冻结期每年递减 1，再累加不称职处罚
+        if (draft.frozenPeriods > 0) draft.frozenPeriods -= 1;
         draft.frozenPeriods += assessment.frozenPeriods;
         draft.frozenPeriods = clamp(draft.frozenPeriods, 0, cfg.maxFrozenPeriods);
         draft.annualAssessments.push({
@@ -256,6 +315,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       break;
     }
     case 'EXECUTE_ACTION': {
+      if (!canAct(draft.promotionStage)) break;
       const loader = getConfigLoader();
       const cfg = loader.getGameConfig();
       const positionIndex = extractPositionIndex(draft.currentPositionId);
@@ -326,6 +386,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       break;
     }
     case 'ADVANCE_TIME': {
+      if (!canAct(draft.promotionStage)) break;
       const cfgAdv = getConfigLoader().getGameConfig();
       const days = getGranularityDays(action.granularity, cfgAdv);
       const timeResult = advanceTime(draft.time, days, draft.birthYear, draft.currentLevel, cfgAdv);
@@ -350,6 +411,213 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
     case 'NEW_GAME': {
       const fresh = createInitialState();
       Object.assign(draft, fresh, action.data);
+      break;
+    }
+    case 'START_PROMOTION': {
+      // 晋升进行中不能重新触发
+      if (!canAct(draft.promotionStage)) break;
+      // 冻结期中不能晋升
+      if (draft.frozenPeriods > 0) break;
+
+      const nextLevel = draft.currentLevel + 1;
+      const lineCfg = getConfigLoader().getCareerLine(draft.currentCareerLine);
+      if (!lineCfg) break;
+      const nextLevelCfg = lineCfg.levels.find((l) => l.level === nextLevel);
+      if (!nextLevelCfg || nextLevelCfg.positions.length === 0) break;
+      const targetPos = nextLevelCfg.positions[0]!;
+
+      draft.promotionAttempts += 1;
+
+      const ctx = buildPromotionContext(draft);
+      const prereq = checkPrerequisites(ctx, nextLevelCfg.promotionRequirements);
+
+      if (!prereq.eligible) {
+        draft.promotionStage = PromotionStage.Failed;
+        draft.promotionState = {
+          targetPositionId: targetPos.id,
+          targetLevel: nextLevel,
+          currentStage: PromotionStage.Failed,
+          stageResults: {},
+        };
+        break;
+      }
+
+      draft.promotionStage = PromotionStage.DemocraticVote;
+      draft.promotionState = {
+        targetPositionId: targetPos.id,
+        targetLevel: nextLevel,
+        currentStage: PromotionStage.DemocraticVote,
+        stageResults: {},
+      };
+      break;
+    }
+    case 'PROMOTION_RESOLVE_STAGE': {
+      const ps = draft.promotionState;
+      if (!ps) break;
+
+      const cfgPromoStore = getConfigLoader().getGameConfig();
+      const ctxStore = buildPromotionContext(draft);
+      const choices = action.choices ?? {};
+      const rng = action._rng ?? Math.random;
+
+      switch (ps.currentStage) {
+        case PromotionStage.DemocraticVote: {
+          const result = resolveDemocraticVote(ctxStore, choices, cfgPromoStore, rng);
+          ps.stageResults.democraticVotes = result.votes;
+          if (result.flaggedForRisk) ps.flaggedForRisk = true;
+          if (result.passed) {
+            ps.currentStage = PromotionStage.OrgInspection;
+            draft.promotionStage = PromotionStage.OrgInspection;
+          } else {
+            draft.promotionStage = PromotionStage.Failed;
+            ps.currentStage = PromotionStage.Failed;
+            draft.demoralization = clamp(
+              (draft.demoralization ?? 0) +
+                cfgPromoStore.promotion.progression.demoralizationOnFail,
+              0,
+              100,
+            );
+          }
+          break;
+        }
+        case PromotionStage.OrgInspection: {
+          const result = resolveOrgInspection(ctxStore, choices, cfgPromoStore);
+          ps.stageResults.inspectionResult = result.result;
+          if (result.politicalCost > 0) {
+            draft.politicalCapital -= result.politicalCost;
+          }
+          if (result.passed) {
+            ps.currentStage = PromotionStage.JointReview;
+            draft.promotionStage = PromotionStage.JointReview;
+          } else if (result.result === OrgInspectResult.Rejected) {
+            draft.promotionStage = PromotionStage.Failed;
+            ps.currentStage = PromotionStage.Failed;
+            draft.frozenPeriods = clamp(draft.frozenPeriods + 2, 0, cfgPromoStore.maxFrozenPeriods);
+            draft.demoralization = clamp(
+              (draft.demoralization ?? 0) +
+                cfgPromoStore.promotion.progression.demoralizationOnRejected,
+              0,
+              100,
+            );
+          } else {
+            // Suspended — 本次搁置
+            draft.promotionStage = PromotionStage.Failed;
+            ps.currentStage = PromotionStage.Failed;
+          }
+          break;
+        }
+        case PromotionStage.JointReview: {
+          const result = resolveJointReview(ctxStore, cfgPromoStore, rng);
+          ps.stageResults.reviewPassedDepts = Object.entries(result.opinions)
+            .filter(([, v]) => v)
+            .map(([k]) => k);
+          ps.stageResults.reviewFailedDepts = Object.entries(result.opinions)
+            .filter(([, v]) => !v)
+            .map(([k]) => k);
+          if (result.passed) {
+            ps.currentStage = PromotionStage.CommitteeVote;
+            draft.promotionStage = PromotionStage.CommitteeVote;
+          } else {
+            draft.promotionStage = PromotionStage.Failed;
+            ps.currentStage = PromotionStage.Failed;
+            draft.demoralization = clamp(
+              (draft.demoralization ?? 0) +
+                cfgPromoStore.promotion.progression.demoralizationOnFail,
+              0,
+              100,
+            );
+          }
+          break;
+        }
+        case PromotionStage.CommitteeVote: {
+          const result = resolveCommitteeVote(ctxStore, cfgPromoStore, rng);
+          ps.stageResults.committeeForVotes = result.forVotes;
+          ps.stageResults.committeeAgainstVotes = result.againstVotes;
+          if (result.passed) {
+            ps.currentStage = PromotionStage.PublicNotice;
+            draft.promotionStage = PromotionStage.PublicNotice;
+          } else {
+            draft.promotionStage = PromotionStage.Failed;
+            ps.currentStage = PromotionStage.Failed;
+            draft.demoralization = clamp(
+              (draft.demoralization ?? 0) +
+                cfgPromoStore.promotion.progression.demoralizationOnFail,
+              0,
+              100,
+            );
+          }
+          break;
+        }
+        case PromotionStage.PublicNotice: {
+          const result = resolvePublicNotice(ctxStore, cfgPromoStore, rng);
+          ps.stageResults.hasComplaint = result.hasComplaint;
+          ps.stageResults.sentimentEscalated = result.sentimentEscalated;
+          if (result.passed) {
+            ps.currentStage = PromotionStage.Appointment;
+            draft.promotionStage = PromotionStage.Appointment;
+          } else {
+            draft.promotionStage = PromotionStage.Failed;
+            ps.currentStage = PromotionStage.Failed;
+            draft.demoralization = clamp(
+              (draft.demoralization ?? 0) +
+                cfgPromoStore.promotion.progression.demoralizationOnFail,
+              0,
+              100,
+            );
+          }
+          break;
+        }
+        case PromotionStage.Appointment: {
+          ps.currentStage = PromotionStage.Probation;
+          draft.promotionStage = PromotionStage.Probation;
+          break;
+        }
+        case PromotionStage.Probation: {
+          const result = resolveProbation(ctxStore, cfgPromoStore, rng);
+          if (result.passed) {
+            // 晋升成功：更新职位
+            const oldPos = getConfigLoader().getPosition(
+              draft.currentCareerLine,
+              draft.currentLevel,
+              extractPositionIndex(draft.currentPositionId),
+            );
+            const careerRecord: CareerRecord = {
+              positionId: draft.currentPositionId,
+              positionName: oldPos?.name ?? draft.currentPositionId,
+              level: draft.currentLevel,
+              careerLine: draft.currentCareerLine,
+              startYear: draft.time.year - draft.yearsInCurrentPosition,
+              endYear: draft.time.year,
+              assessmentResults: draft.annualAssessments.map((a) => a.tier),
+              archived: false,
+            };
+            draft.careerHistory.push(careerRecord);
+            draft.currentPositionId = ps.targetPositionId;
+            draft.currentLevel = ps.targetLevel;
+            draft.yearsInCurrentPosition = 0;
+            draft.politicalCapital = clamp(
+              draft.politicalCapital +
+                cfgPromoStore.promotion.progression.politicalCapitalBonusOnSuccess,
+              0,
+              500,
+            );
+            draft.promotionStage = PromotionStage.Completed;
+            ps.currentStage = PromotionStage.Completed;
+          } else {
+            draft.promotionStage = PromotionStage.Failed;
+            ps.currentStage = PromotionStage.Failed;
+            draft.demoralization = clamp(
+              (draft.demoralization ?? 0) +
+                cfgPromoStore.promotion.progression.demoralizationOnFail,
+              0,
+              100,
+            );
+          }
+          break;
+        }
+        default:
+          break;
+      }
       break;
     }
     default:

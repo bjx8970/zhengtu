@@ -140,6 +140,39 @@ export interface SlotConfig {
   month: number;
 }
 
+/** 晋升引擎配置常量 */
+export interface PromotionConfig {
+  democraticVote: {
+    passThreshold: number;
+    connectionsBonus: number;
+    connectionsRiskProbability: number;
+  };
+  orgInspection: {
+    excellentThreshold: number;
+    qualifiedThreshold: number;
+    suspendedThreshold: number;
+    influencePoliticalCost: number;
+    influenceScoreBonus: number;
+  };
+  committeeVote: {
+    minSize: number;
+    maxSize: number;
+    sizePerLevelInterval: number;
+  };
+  publicNotice: {
+    complaintProbPerRisk: number;
+    sentimentProbPerRisk: number;
+  };
+  probation: {
+    passThreshold: number;
+  };
+  progression: {
+    demoralizationOnFail: number;
+    demoralizationOnRejected: number;
+    politicalCapitalBonusOnSuccess: number;
+  };
+}
+
 /** 全局游戏配置常量（从 constants.json 读取） */
 export interface GameConfig {
   slotLimits: SlotConfig;
@@ -182,4 +215,6 @@ export interface GameConfig {
   kpiTierColors: Record<string, string>;
   /** 进度条颜色阈值 */
   completionBarThresholds: { excellent: number; good: number };
+  /** 晋升引擎阈值配置 */
+  promotion: PromotionConfig;
 }

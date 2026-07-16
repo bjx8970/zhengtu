@@ -17,6 +17,7 @@ import { Dashboard } from './pages/dashboard/dashboard';
 import { PositionKPI } from './pages/career/position-kpi';
 import { PositionDept } from './pages/career/position-dept';
 import { CharacterCreation } from './pages/character/character-creation';
+import { Promotion } from './pages/career/promotion';
 
 /** 全局路由表 */
 const routes: Route[] = [
@@ -26,6 +27,7 @@ const routes: Route[] = [
   { path: '/dashboard', component: Dashboard },
   { path: '/kpi', component: PositionKPI },
   { path: '/dept/:deptIndex', component: PositionDept },
+  { path: '/promotion', component: Promotion },
 ];
 
 export function App(): JSX.Element {

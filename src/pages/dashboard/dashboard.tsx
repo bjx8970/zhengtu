@@ -65,6 +65,19 @@ export function Dashboard() {
       desc: state.achievements.length + ' 项',
       show: () => true,
     },
+    {
+      label: '晋升提名',
+      path: '/promotion',
+      desc:
+        state.promotionStage === 'idle'
+          ? '可启动'
+          : state.promotionStage === 'completed'
+            ? '已完成'
+            : state.promotionStage === 'failed'
+              ? '已失败'
+              : '进行中',
+      show: () => !!state.currentPositionId && state.promotionStage !== 'completed',
+    },
   ];
 
   /** 可见入口（过滤后） */
