@@ -44,7 +44,11 @@ export function PositionKPI() {
   const kpiResult = createMemo(() => {
     const pos = positionConfig();
     if (!pos) return null;
-    return calculateKPI(pos.kpiIndicators, state.departmentStates);
+    return calculateKPI(
+      pos.kpiIndicators,
+      state.departmentStates,
+      getConfigLoader().getGameConfig(),
+    );
   });
 
   return (

@@ -21,6 +21,7 @@ import type { DepartmentState } from '../../types/player';
  * @param slotAvailable   当前剩余槽位数
  * @param remainingBudget 当前剩余预算
  * @param gameDay         当前游戏日（用于冷却计算）
+ * @param config          游戏配置常量
  * @returns 执行结果，success=false 时 error 字段说明原因
  */
 export function executeAction(
@@ -29,6 +30,7 @@ export function executeAction(
   slotAvailable: number,
   remainingBudget: number,
   gameDay: number,
+  config: GameConfig,
 ): ActionResult {
   // 校验：槽位
   if (slotAvailable < actionConfig.slotCost) {
@@ -64,7 +66,7 @@ export function executeAction(
   }
 
   // 天数消耗：每 slotCost 约 1.5 天
-  const daysAdvanced = Math.max(1, Math.ceil(actionConfig.slotCost * 1.5));
+  const daysAdvanced = Math.max(1, Math.ceil(actionConfig.slotCost * config.daysPerSlotUnit));
 
   return {
     success: true,

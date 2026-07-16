@@ -103,10 +103,10 @@ export function CharacterCreation() {
       type: 'NEW_GAME',
       data: {
         ...data(),
-        birthYear: cfg.startYear - 30,
+        birthYear: cfg.startYear - cfg.defaultStartingAge,
         familyBackground: '普通家庭',
         currentPositionId: startPos?.id ?? 'admin_l1_0',
-        remainingBudget: startPos?.annualBudget ?? 800,
+        remainingBudget: startPos?.annualBudget ?? cfg.budgetByLevel[1] ?? 800,
       },
     });
     navigate('/dashboard');

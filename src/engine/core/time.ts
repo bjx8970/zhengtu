@@ -2,18 +2,15 @@
  * 时间推进引擎
  *
  * 核心职责：
- * 1. 按天数推进游戏时间（每月固定30天，每年12个月）
- * 2. 检测周期边界并生成对应的 TimeTrigger（月度结算/年度考核/两会/退休……）
+ * 1. 按天数推进游戏时间（每月天数、每年月数从 GameConfig 读取）
+ * 2. 检测周期边界并生成对应的 TimeTrigger
  * 3. 提供辅助函数：年龄、退休倒计时、跨年判断等
  *
- * 纯函数，不引用全局状态。所有依赖通过参数传入。
+ * 纯函数，所有配置通过参数传入。
  */
 
 import type { TimeState, TimeAdvanceResult, TimeTrigger } from '../../types/game';
-
-const DAYS_PER_MONTH = 30;
-const MONTHS_PER_YEAR = 12;
-const RETIREMENT_AGE = 65;
+import type { GameConfig } from '../../types/config';
 
 /**
  * 推进游戏时间，逐天检测周期事件。
@@ -21,7 +18,8 @@ const RETIREMENT_AGE = 65;
  * @param current         当前时间状态
  * @param days            推进天数
  * @param playerBirthYear 玩家出生年份（用于退休检测）
- * @param playerLevel     玩家当前级别（用于舆情生成判断：rank4+ 触发）
+ * @param playerLevel     玩家当前级别（用于舆情生成判断）
+ * @param config          游戏配置常量
  * @returns 新时间状态 + 触发的周期事件列表
  */
 export function advanceTime(
@@ -29,6 +27,7 @@ export function advanceTime(
   days: number,
   playerBirthYear: number,
   playerLevel: number,
+  config: GameConfig,
 ): TimeAdvanceResult {
   if (days < 0) {
     throw new Error('Cannot advance by negative days');
@@ -38,31 +37,27 @@ export function advanceTime(
   let { year, month, day } = current;
   const oldYear = year;
 
-  // 逐天推进，边界检测
   for (let i = 0; i < days; i++) {
     day++;
-    if (day > DAYS_PER_MONTH) {
+    if (day > config.daysPerMonth) {
       day = 1;
       month++;
       triggers.push({ type: 'monthly_settlement', month });
 
-      // rank4+ 每月触发舆情生成
-      if (playerLevel >= 4) {
+      if (playerLevel >= config.sentimentMinLevel) {
         triggers.push({ type: 'sentiment_generate', count: 1 });
       }
 
-      if (month > MONTHS_PER_YEAR) {
+      if (month > config.monthsPerYear) {
         month = 1;
         year++;
         triggers.push({ type: 'annual_assessment', year });
 
-        // 每5年触发两会/党代会
-        if (year % 5 === 0) {
+        if (year % config.congressCycleYears === 0) {
           triggers.push({ type: 'congress_cycle', year });
         }
 
-        // 65岁强制退休检测
-        if (year - playerBirthYear >= RETIREMENT_AGE) {
+        if (year - playerBirthYear >= config.retirementAge) {
           triggers.push({ type: 'retirement_check' });
         }
       }
@@ -85,9 +80,14 @@ export function isCrossYear(current: TimeState, result: TimeState): boolean {
   return result.year > current.year;
 }
 
-/** 判断是否为两会/党代会年份 */
-export function isCongressYear(year: number): boolean {
-  return year % 5 === 0;
+/**
+ * 判断是否为两会/党代会年份。
+ *
+ * @param year               年份
+ * @param congressCycleYears 周期年数
+ */
+export function isCongressYear(year: number, congressCycleYears: number): boolean {
+  return year % congressCycleYears === 0;
 }
 
 /** 计算当前年龄 */
@@ -95,7 +95,17 @@ export function getAge(gameYear: number, birthYear: number): number {
   return gameYear - birthYear;
 }
 
-/** 计算距离退休的倒计时年数 */
-export function getRetirementCountdown(gameYear: number, birthYear: number): number {
-  return Math.max(RETIREMENT_AGE - getAge(gameYear, birthYear), 0);
+/**
+ * 计算距离退休的倒计时年数。
+ *
+ * @param gameYear      当前游戏年份
+ * @param birthYear     出生年份
+ * @param retirementAge 退休年龄
+ */
+export function getRetirementCountdown(
+  gameYear: number,
+  birthYear: number,
+  retirementAge: number,
+): number {
+  return Math.max(retirementAge - getAge(gameYear, birthYear), 0);
 }

@@ -183,6 +183,46 @@ for (const [eventId, event] of Object.entries(events) as [string, z.infer<typeof
   }
 }
 
+console.log('\n--- 常量配置校验 ---\n');
+
+const ConstantsSchema = z.object({
+  slotLimits: z.object({ day: z.number(), week: z.number(), month: z.number() }),
+  daysPerMonth: z.number().min(1),
+  monthsPerYear: z.number().min(1),
+  retirementAge: z.number().min(1),
+  startYear: z.number(),
+  congressCycleYears: z.number().min(1),
+  budgetByLevel: z.array(z.number().min(0)),
+  budgetMultiplierByLine: z.record(z.number().min(0)),
+  initialTransferCount: z.number().min(0),
+  lineLockLevel: z.number().min(1),
+  transferWindowLevels: z.array(z.tuple([z.number(), z.number()])),
+  attributeBounds: z.record(z.tuple([z.number(), z.number()])),
+  kpiTierThresholds: z.object({ excellent: z.number(), competent: z.number(), basic: z.number() }),
+  completionRateCap: z.number().positive(),
+  daysPerSlotUnit: z.number().positive(),
+  sentimentMinLevel: z.number().min(1),
+  incompetentFrozenPeriods: z.number().min(0),
+  consecutiveFailureThreshold: z.number().min(1),
+  maxFrozenPeriods: z.number().min(1),
+  defaultStartingAge: z.number().min(18),
+  initialAttributes: z.record(z.number()),
+  kpiTierColors: z.record(z.string()),
+  completionBarThresholds: z.object({ excellent: z.number(), good: z.number() }),
+});
+
+import constants from '../src/config/constants.json' with { type: 'json' };
+
+const cResult = ConstantsSchema.safeParse(constants);
+if (!cResult.success) {
+  for (const issue of cResult.error.issues) {
+    console.error(`❌ constants.json [${issue.path.join('.')}] ${issue.message}`);
+    errors++;
+  }
+} else {
+  console.log('   ✅ constants.json 格式校验通过');
+}
+
 if (errors > 0) {
   console.error(`\n❌ 发现 ${errors} 个配置错误\n`);
   process.exit(1);
