@@ -12,7 +12,7 @@
 import { useGameStore } from '../../store/game-store';
 import { navigate } from '../../router';
 import { formatDate, formatGranularity } from '../../utils/format';
-import type { TimeGranularity } from '../../types/enums';
+import { PromotionStage, type TimeGranularity } from '../../types/enums';
 import { For, createMemo } from 'solid-js';
 
 interface DashboardEntry {
@@ -64,6 +64,19 @@ export function Dashboard() {
       path: '/archives',
       desc: state.achievements.length + ' 项',
       show: () => true,
+    },
+    {
+      label: '晋升提名',
+      path: '/promotion',
+      desc:
+        state.promotionStage === PromotionStage.Idle
+          ? '可启动'
+          : state.promotionStage === PromotionStage.Completed
+            ? '已完成'
+            : state.promotionStage === PromotionStage.Failed
+              ? '已失败'
+              : '进行中',
+      show: () => !!state.currentPositionId && state.promotionStage !== PromotionStage.Completed,
     },
   ];
 

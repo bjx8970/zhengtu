@@ -13,6 +13,7 @@
 import type {
   CareerLine,
   PromotionStage,
+  OrgInspectResult,
   ReserveCadreTier,
   Faction,
   SecretaryLevel,
@@ -100,6 +101,29 @@ export interface GameTime {
   granularity: TimeGranularity;
 }
 
+/** 晋升流程的跨阶段累积状态（非 null 时表示晋升进行中） */
+export interface PromotionState {
+  /** 目标职位 ID */
+  targetPositionId: string;
+  /** 目标级别 */
+  targetLevel: number;
+  /** 当前所处的晋升阶段 */
+  currentStage: PromotionStage;
+  /** 各阶段的中间结果 */
+  stageResults: {
+    democraticVotes?: number;
+    inspectionResult?: OrgInspectResult;
+    reviewPassedDepts?: string[];
+    reviewFailedDepts?: string[];
+    committeeForVotes?: number;
+    committeeAgainstVotes?: number;
+    hasComplaint?: boolean;
+    sentimentEscalated?: boolean;
+  };
+  /** 民主推荐阶段触发的风险标记 */
+  flaggedForRisk?: boolean;
+}
+
 /** 行动槽位状态 */
 export interface SlotState {
   /** 当前粒度的最大槽位数 */
@@ -157,6 +181,8 @@ export interface PlayerSave {
   promotionAttempts: number;
   /** 晋升冻结候选期数 */
   frozenPeriods: number;
+  /** 当前晋升流程的跨阶段累积状态（null 表示无进行中的晋升） */
+  promotionState: PromotionState | null;
 
   // ===== 转职 =====
   /** 剩余可用的跨线转职次数 */

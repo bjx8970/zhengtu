@@ -12,6 +12,7 @@ import type {
   FileCategory,
   SentimentType,
   OrgInspectResult,
+  PromotionStage,
   Faction,
   InvestigationEvidence,
 } from './enums';
@@ -154,7 +155,7 @@ export interface PromotionContext {
 
 /** 晋升流程的阶段性结果 */
 export interface PromotionResult {
-  stage: string;
+  stage: PromotionStage;
   passed: boolean;
   details: string;
   voteCount?: number;
