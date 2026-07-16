@@ -21,9 +21,14 @@ import type {
   FileAction,
 } from '../types/enums';
 import type { PlayerSave, GameTime } from '../types/player';
-import type { PromotionResult } from '../types/game';
+import type { PromotionResult, TimeTrigger } from '../types/game';
 import { getSlotLimits } from '../engine/core/action';
+import { advanceTime } from '../engine/core/time';
+import { monthlySettlement } from '../engine/governance/budget';
+import { calculateKPI } from '../engine/governance/kpi';
+import { annualAssessment as runAnnualAssessment } from '../engine/governance/assessment';
 import { getConfigLoader } from '../config/loader';
+import { getGranularityDays } from '../types/config';
 
 export type GameState = PlayerSave;
 
@@ -131,6 +136,72 @@ export type GameAction =
 // Solid 响应式 store
 const [state, setState] = createStore<GameState>(createInitialState());
 
+/**
+ * 处理时间推进产生的周期事件触发器。
+ *
+ * monthly_settlement：执行预算月度结算
+ * annual_assessment：执行 KPI 考核 + 年度评价
+ *
+ * 该方法直接修改 draft（在 produce 回调中调用）。
+ */
+function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
+  const loader = getConfigLoader();
+  const position = loader.getPosition(
+    draft.currentCareerLine,
+    draft.currentLevel,
+    // 从 positionId 提取索引：如 "admin_l3_0" → 索引 0
+    (() => {
+      const parts = draft.currentPositionId.split('_');
+      return parseInt(parts[parts.length - 1] ?? '0', 10);
+    })(),
+  );
+
+  for (const trigger of triggers) {
+    switch (trigger.type) {
+      case 'monthly_settlement': {
+        if (!position) break;
+        // 扣除各消耗部门的预算
+        const settlement = monthlySettlement(
+          draft.departmentStates,
+          position.departments,
+          draft.remainingBudget,
+        );
+        draft.remainingBudget = settlement.newRemaining;
+
+        // 更新各部门累计消耗和月度记录
+        for (const dept of position.departments) {
+          const ds = draft.departmentStates[dept.id];
+          if (ds) {
+            ds.monthlyConsumption = settlement.deptConsumptions[dept.id] ?? 0;
+            ds.cumulativeConsumption += settlement.deptConsumptions[dept.id] ?? 0;
+          }
+        }
+        break;
+      }
+      case 'annual_assessment': {
+        if (!position) break;
+        // KPI 考核
+        const kpiResult = calculateKPI(position.kpiIndicators, draft.departmentStates);
+        // 年度评价
+        const assessment = runAnnualAssessment(kpiResult, draft.yearsInCurrentPosition);
+        draft.comprehensiveScore = assessment.score;
+        draft.frozenPeriods += assessment.frozenPeriods;
+        draft.annualAssessments.push({
+          year: trigger.year ?? draft.time.year,
+          score: assessment.score,
+          tier: assessment.tier,
+        });
+        draft.yearsInCurrentPosition += 1;
+        break;
+      }
+      default:
+        // congress_cycle、retirement_check、random_event、sentiment_generate
+        // Phase 3+ 实现
+        break;
+    }
+  }
+}
+
 /** 读取当前状态（只读，组件自动追踪访问的字段） */
 export function getState(): Readonly<GameState> {
   return state;
@@ -160,11 +231,23 @@ export function dispatch(action: GameAction): void {
           break;
         }
         case 'EXECUTE_ACTION': {
-          // Phase 2 实现：调用 actionEngine.execute() + timeEngine.advance()
+          // Phase 2 实现：调用 actionEngine.execute() + 应用效果 + 推进天数
           break;
         }
         case 'ADVANCE_TIME': {
           const cfg = getConfigLoader().getGameConfig();
+          const days = getGranularityDays(action.granularity, cfg);
+          const timeResult = advanceTime(draft.time, days, draft.birthYear, draft.currentLevel);
+
+          draft.time.year = timeResult.newState.year;
+          draft.time.month = timeResult.newState.month;
+          draft.time.day = timeResult.newState.day;
+          draft.totalDaysPlayed += days;
+
+          // 处理周期事件触发器
+          resolveTriggers(draft, timeResult.triggers);
+
+          // 重置槽位
           const max = getSlotLimits(action.granularity, cfg);
           draft.slots.max = max;
           draft.slots.available = max;
