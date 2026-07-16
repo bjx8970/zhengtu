@@ -1,0 +1,64 @@
+name: OpenCode PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      issues: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: opencode/big-pickle
+          prompt: |
+            审查此 Pull Request，按以下优先级检查：
+
+            ## 1. 引擎函数（src/engine/）
+            - 是否纯函数：接收参数、返回数据，不引用全局 state 或 DOM
+            - 返回值类型是否显式声明
+            - 是否有 JSDoc（@param 描述每个参数，@returns 描述返回值）
+            - 是否添加了对应的测试文件（同级 __tests__/ 目录），覆盖率 ≥90%
+            - 单文件是否超过 200 行（超过应拆分）
+            - 已有测试是否全部通过
+
+            ## 2. 类型与配置
+            - 新增类型是否放在 src/types/ 下，未散落在业务代码中
+            - 新增/修改 JSON 配置时，模板引用 ID 是否存在（运行过 pnpm validate:config）
+            - 枚举值内部 key 用英文，显示值用中文
+
+            ## 3. 状态管理（src/store/）
+            - 状态变更是否通过 dispatch(action) 进行
+            - 未在组件中直接修改 state
+
+            ## 4. 代码质量
+            - 是否有遗留的 console.log
+            - non-null assertion (!) 的使用是否有必要且已加注释说明
+            - 未使用变量是否以 _ 前缀命名
+            - 是否有 any 类型的过度使用
+
+            ## 5. 注释
+            - 新增文件是否有文件头 JSDoc（模块职责）
+            - 公开导出函数是否有完整 JSDoc
+            - 非直观的逻辑是否有行内注释解释"为什么"
+
+            ## 6. 测试
+            - 新增引擎函数是否有配套测试（正常路径 + 边界：空值/负数/极值）
+            - 新增 Store dispatch 分支是否有集成测试
+            - 修改逻辑时是否更新了对应测试
+
+            ## 输出格式
+            以简洁中文列出发现的问题，按上述分类分组。每个问题注明文件路径和行号范围。
+            如果没有发现问题，回复 ✅ 即可。不要输出无关内容。
