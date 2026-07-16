@@ -177,9 +177,11 @@ export function PositionKPI() {
                             height: '100%',
                             width: `${Math.min(indicator.completionRate * 100, 100)}%`,
                             'background-color':
-                              indicator.completionRate >= 1 ? '#4CAF50' :
-                              indicator.completionRate >= 0.6 ? '#4A6FA5' :
-                              '#C44D4D',
+                              indicator.completionRate >= 1
+                                ? '#4CAF50'
+                                : indicator.completionRate >= 0.6
+                                  ? '#4A6FA5'
+                                  : '#C44D4D',
                             'border-radius': '3px',
                           }}
                         />
