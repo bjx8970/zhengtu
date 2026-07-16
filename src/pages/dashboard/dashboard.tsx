@@ -7,18 +7,58 @@
  * 3. 推进粒度切换（按天/按周/按月）
  * 4. 推进时间按钮（触发阶段结算和存档）
  * 5. 各子系统入口列表（根据条件动态显示/隐藏）
- *
- * Phase 0 状态：入口列表为固定占位，推进功能仅切换粒度和重置槽位。
  */
 
 import { useGameStore } from '../../store/game-store';
+import { navigate } from '../../router';
 import { formatDate, formatGranularity } from '../../utils/format';
 import type { TimeGranularity } from '../../types/enums';
+
+interface DashboardEntry {
+  label: string;
+  path: string;
+  desc: string;
+  show: () => boolean;
+}
 
 export function Dashboard() {
   const { state, dispatch } = useGameStore();
 
   const granularities: TimeGranularity[] = ['day', 'week', 'month'];
+
+  /** 子系统入口（根据条件动态显示） */
+  const entries: DashboardEntry[] = [
+    {
+      label: '考核指标',
+      path: '/kpi',
+      desc: 'KPI 完成率与等次',
+      show: () => !!state.currentPositionId,
+    },
+    {
+      label: '上级关系',
+      path: '/superior',
+      desc: state.superiorFavor + ' 好感',
+      show: () => true,
+    },
+    {
+      label: '人脉网络',
+      path: '/relations',
+      desc: '管理社交关系',
+      show: () => true,
+    },
+    {
+      label: '个人生活',
+      path: '/personal',
+      desc: '住房 / 子女 / 健康',
+      show: () => true,
+    },
+    {
+      label: '档案与成就',
+      path: '/archives',
+      desc: state.achievements.length + ' 项',
+      show: () => true,
+    },
+  ];
 
   return (
     <div
@@ -103,7 +143,7 @@ export function Dashboard() {
         ))}
       </div>
 
-      {/* 推进时间：唯一持久化时机 */}
+      {/* 推进时间按钮 */}
       <button
         onClick={() => dispatch({ type: 'ADVANCE_TIME', granularity: state.time.granularity })}
         style={{
@@ -120,7 +160,7 @@ export function Dashboard() {
         推进时间
       </button>
 
-      {/* 子系统入口列表（运行时根据条件显示/隐藏） */}
+      {/* 子系统入口列表 */}
       <div
         style={{
           flex: 1,
@@ -130,27 +170,25 @@ export function Dashboard() {
           gap: '0.5rem',
         }}
       >
-        {[
-          { label: '职业线入口', desc: '查看职位与部门' },
-          { label: '上级关系', desc: state.superiorFavor + ' 好感' },
-          { label: '人脉网络', desc: '管理社交关系' },
-          { label: '个人生活', desc: '住房 / 子女 / 健康' },
-          { label: '档案与成就', desc: state.achievements.length + ' 项' },
-        ].map((entry) => (
-          <div
-            style={{
-              padding: '0.8rem 1rem',
-              'background-color': '#16213e',
-              'border-radius': '8px',
-              display: 'flex',
-              'justify-content': 'space-between',
-              'align-items': 'center',
-            }}
-          >
-            <span>{entry.label}</span>
-            <span style={{ color: '#888', 'font-size': '0.85rem' }}>{entry.desc}</span>
-          </div>
-        ))}
+        {entries
+          .filter((e) => e.show())
+          .map((entry) => (
+            <div
+              onClick={() => navigate(entry.path)}
+              style={{
+                padding: '0.8rem 1rem',
+                'background-color': '#16213e',
+                'border-radius': '8px',
+                display: 'flex',
+                'justify-content': 'space-between',
+                'align-items': 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <span>{entry.label}</span>
+              <span style={{ color: '#888', 'font-size': '0.85rem' }}>{entry.desc}</span>
+            </div>
+          ))}
       </div>
     </div>
   );
