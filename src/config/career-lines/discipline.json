@@ -1,0 +1,8 @@
+{
+  "id": "discipline",
+  "name": "纪检线",
+  "color": "#2D7D46",
+  "description": "以纪律审查、廉政建设、反贪腐为核心的专业路线",
+  "privileges": ["案件调查权", "党纪处分权", "专项巡视权"],
+  "levels": []
+}

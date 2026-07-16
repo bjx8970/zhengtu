@@ -1,0 +1,326 @@
+{
+  "human_resources": {
+    "name": "人力资源部门",
+    "consumptionCoefficient": 0.5,
+    "baseConsumption": 40,
+    "actions": [
+      {
+        "id": "staff_evaluation",
+        "name": "员工考核评估",
+        "description": "组织季度员工考核，优化人力资源配置",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 10,
+        "effects": [{ "target": "dept.kpi.human_resources", "operation": "add", "value": 5 }]
+      },
+      {
+        "id": "talent_recruitment",
+        "name": "人才招聘",
+        "description": "面向社会公开招聘优秀人才",
+        "slotCost": 2,
+        "cooldownDays": 7,
+        "budgetDelta": 25,
+        "effects": [
+          { "target": "dept.kpi.human_resources", "operation": "add", "value": 8 },
+          { "target": "player.competence", "operation": "add", "value": 1 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["human_resources", "staff_satisfaction"]
+  },
+  "logistics": {
+    "name": "后勤保障部门",
+    "consumptionCoefficient": 0.7,
+    "baseConsumption": 50,
+    "actions": [
+      {
+        "id": "supply_management",
+        "name": "物资采购管理",
+        "description": "优化物资采购流程，降低采购成本",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 15,
+        "effects": [{ "target": "dept.kpi.logistics_score", "operation": "add", "value": 5 }]
+      },
+      {
+        "id": "facility_maintenance",
+        "name": "设施维护",
+        "description": "组织办公设施检修维护",
+        "slotCost": 1,
+        "cooldownDays": 5,
+        "budgetDelta": 20,
+        "effects": [
+          { "target": "dept.kpi.logistics_score", "operation": "add", "value": 6 },
+          { "target": "dept.kpi.cost_control", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["logistics_score", "cost_control"]
+  },
+  "statistics": {
+    "name": "统计部门",
+    "consumptionCoefficient": 0.4,
+    "baseConsumption": 30,
+    "actions": [
+      {
+        "id": "data_collection",
+        "name": "数据采集汇总",
+        "description": "组织各口数据采集和汇总分析",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 8,
+        "effects": [{ "target": "dept.kpi.statistics_score", "operation": "add", "value": 5 }]
+      },
+      {
+        "id": "report_publishing",
+        "name": "发布统计报告",
+        "description": "编制并发布季度统计报告",
+        "slotCost": 2,
+        "cooldownDays": 7,
+        "budgetDelta": 15,
+        "effects": [
+          { "target": "dept.kpi.statistics_score", "operation": "add", "value": 8 },
+          { "target": "dept.kpi.data_accuracy", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["statistics_score", "data_accuracy"]
+  },
+  "discipline_inspect": {
+    "name": "纪检部门",
+    "consumptionCoefficient": 0.5,
+    "baseConsumption": 40,
+    "actions": [
+      {
+        "id": "routine_inspection",
+        "name": "日常纪律检查",
+        "description": "开展日常纪律作风检查",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 5,
+        "effects": [
+          { "target": "dept.kpi.discipline_inspect", "operation": "add", "value": 5 },
+          { "target": "player.integrity", "operation": "add", "value": 1 }
+        ]
+      },
+      {
+        "id": "case_investigation",
+        "name": "案件调查",
+        "description": "对违纪线索进行立案调查",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 15,
+        "effects": [
+          { "target": "dept.kpi.discipline_inspect", "operation": "add", "value": 8 },
+          { "target": "dept.kpi.anti_corruption", "operation": "add", "value": 6 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["discipline_inspect", "anti_corruption"]
+  },
+  "community_service": {
+    "name": "社区服务部门",
+    "consumptionCoefficient": 0.6,
+    "baseConsumption": 45,
+    "actions": [
+      {
+        "id": "community_activity",
+        "name": "社区活动组织",
+        "description": "组织社区文化活动，丰富群众生活",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 12,
+        "effects": [{ "target": "dept.kpi.community_service", "operation": "add", "value": 6 }]
+      },
+      {
+        "id": "public_facility",
+        "name": "公共设施改造",
+        "description": "推进社区公共设施升级改造",
+        "slotCost": 2,
+        "cooldownDays": 7,
+        "budgetDelta": 35,
+        "effects": [
+          { "target": "dept.kpi.community_service", "operation": "add", "value": 8 },
+          { "target": "player.performance", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["community_service", "resident_satisfaction"]
+  },
+  "environment": {
+    "name": "环保部门",
+    "consumptionCoefficient": 0.8,
+    "baseConsumption": 55,
+    "actions": [
+      {
+        "id": "pollution_control",
+        "name": "污染治理",
+        "description": "开展重点污染源治理行动",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 25,
+        "effects": [{ "target": "dept.kpi.environment_score", "operation": "add", "value": 7 }]
+      },
+      {
+        "id": "green_initiative",
+        "name": "绿色行动",
+        "description": "推进城市绿化美化工程",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 40,
+        "effects": [
+          { "target": "dept.kpi.environment_score", "operation": "add", "value": 10 },
+          { "target": "player.charisma", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["environment_score", "resident_satisfaction"]
+  },
+  "cultural": {
+    "name": "文化部门",
+    "consumptionCoefficient": 0.5,
+    "baseConsumption": 35,
+    "actions": [
+      {
+        "id": "cultural_festival",
+        "name": "文化节庆活动",
+        "description": "举办具有地方特色的文化节庆活动",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 30,
+        "effects": [
+          { "target": "dept.kpi.cultural_activity", "operation": "add", "value": 8 },
+          { "target": "player.charisma", "operation": "add", "value": 3 }
+        ]
+      },
+      {
+        "id": "heritage_protection",
+        "name": "文物保护",
+        "description": "推进地方文化遗产保护工作",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 18,
+        "effects": [{ "target": "dept.kpi.cultural_activity", "operation": "add", "value": 5 }]
+      }
+    ],
+    "kpiTemplateIds": ["cultural_activity", "community_service"]
+  },
+  "social_security": {
+    "name": "社会保障部门",
+    "consumptionCoefficient": 1.0,
+    "baseConsumption": 65,
+    "actions": [
+      {
+        "id": "pension_audit",
+        "name": "养老金审计",
+        "description": "审核养老金发放情况，确保按时足额",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 10,
+        "effects": [
+          { "target": "dept.kpi.social_security_coverage", "operation": "add", "value": 5 }
+        ]
+      },
+      {
+        "id": "insurance_campaign",
+        "name": "参保宣传活动",
+        "description": "开展城乡居民参保宣传动员",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 20,
+        "effects": [
+          { "target": "dept.kpi.social_security_coverage", "operation": "add", "value": 10 },
+          { "target": "player.charisma", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["social_security_coverage", "livelihood_score"]
+  },
+  "disability_service": {
+    "name": "残疾人服务部门",
+    "consumptionCoefficient": 0.6,
+    "baseConsumption": 40,
+    "actions": [
+      {
+        "id": "barrier_free",
+        "name": "无障碍设施建设",
+        "description": "推进城市无障碍设施建设",
+        "slotCost": 2,
+        "cooldownDays": 7,
+        "budgetDelta": 35,
+        "effects": [{ "target": "dept.kpi.disability_service", "operation": "add", "value": 8 }]
+      },
+      {
+        "id": "employment_aid",
+        "name": "残疾人就业帮扶",
+        "description": "为残疾人提供职业技能培训和就业帮助",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 15,
+        "effects": [
+          { "target": "dept.kpi.disability_service", "operation": "add", "value": 5 },
+          { "target": "player.charisma", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["disability_service", "social_security_coverage"]
+  },
+  "elderly_care": {
+    "name": "养老服务体系",
+    "consumptionCoefficient": 0.9,
+    "baseConsumption": 55,
+    "actions": [
+      {
+        "id": "nursing_home",
+        "name": "养老院建设",
+        "description": "新建或改造养老院/日间照料中心",
+        "slotCost": 2,
+        "cooldownDays": 7,
+        "budgetDelta": 50,
+        "effects": [{ "target": "dept.kpi.elderly_care", "operation": "add", "value": 10 }]
+      },
+      {
+        "id": "home_care_service",
+        "name": "居家养老服务",
+        "description": "推进居家养老上门服务",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 20,
+        "effects": [
+          { "target": "dept.kpi.elderly_care", "operation": "add", "value": 6 },
+          { "target": "player.charisma", "operation": "add", "value": 1 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["elderly_care", "livelihood_score"]
+  },
+  "women_service": {
+    "name": "妇联/妇女工作部门",
+    "consumptionCoefficient": 0.4,
+    "baseConsumption": 30,
+    "actions": [
+      {
+        "id": "women_empowerment",
+        "name": "妇女赋能培训",
+        "description": "组织妇女职业技能和创业培训",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 12,
+        "effects": [{ "target": "dept.kpi.women_rights_score", "operation": "add", "value": 5 }]
+      },
+      {
+        "id": "women_rights_protection",
+        "name": "妇女权益保护",
+        "description": "开展妇女权益保护和反家暴宣传",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 8,
+        "effects": [
+          { "target": "dept.kpi.women_rights_score", "operation": "add", "value": 6 },
+          { "target": "player.charisma", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["women_rights_score", "livelihood_score"]
+  }
+}

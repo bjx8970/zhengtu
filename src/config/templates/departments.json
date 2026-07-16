@@ -1,0 +1,231 @@
+{
+  "urban_dev": {
+    "name": "城建部门",
+    "consumptionCoefficient": 1.5,
+    "baseConsumption": 100,
+    "actions": [
+      {
+        "id": "approve_project",
+        "name": "审批工程项目",
+        "description": "审批重大城市建设工程项目，提升项目完成度",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 50,
+        "effects": [{ "target": "dept.kpi.project_completion", "operation": "add", "value": 10 }]
+      },
+      {
+        "id": "urban_planning",
+        "name": "城市规划评审",
+        "description": "组织城市规划方案评审，优化城市布局",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 20,
+        "effects": [{ "target": "dept.kpi.planning_score", "operation": "add", "value": 5 }]
+      }
+    ],
+    "kpiTemplateIds": ["project_completion", "planning_score"]
+  },
+  "finance": {
+    "name": "财政部门",
+    "consumptionCoefficient": 0.8,
+    "baseConsumption": 60,
+    "actions": [
+      {
+        "id": "budget_review",
+        "name": "预算审查",
+        "description": "审查年度预算方案，提升财政健康度",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 10,
+        "effects": [{ "target": "dept.kpi.fiscal_health", "operation": "add", "value": 8 }]
+      },
+      {
+        "id": "tax_collection",
+        "name": "税收征管",
+        "description": "加强税收征管力度，提升财政收入",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 30,
+        "effects": [{ "target": "dept.kpi.revenue_rate", "operation": "add", "value": 6 }]
+      }
+    ],
+    "kpiTemplateIds": ["fiscal_health", "revenue_rate"]
+  },
+  "general_office": {
+    "name": "综合办公室",
+    "consumptionCoefficient": 0.5,
+    "baseConsumption": 40,
+    "actions": [
+      {
+        "id": "document_processing",
+        "name": "文件处理",
+        "description": "处理日常公文流转，提升办公效率",
+        "slotCost": 1,
+        "cooldownDays": 1,
+        "budgetDelta": 5,
+        "effects": [{ "target": "dept.kpi.office_efficiency", "operation": "add", "value": 5 }]
+      },
+      {
+        "id": "staff_meeting",
+        "name": "召开工作会议",
+        "description": "组织工作协调会议，提升部门协作",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 10,
+        "effects": [
+          { "target": "dept.kpi.office_efficiency", "operation": "add", "value": 3 },
+          { "target": "player.competence", "operation": "add", "value": 1 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["office_efficiency", "staff_satisfaction"]
+  },
+  "civil_affairs": {
+    "name": "民政部门",
+    "consumptionCoefficient": 1.0,
+    "baseConsumption": 70,
+    "actions": [
+      {
+        "id": "livelihood_survey",
+        "name": "民生调研",
+        "description": "深入基层调研民生问题，提升民生满意度",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 15,
+        "effects": [{ "target": "dept.kpi.livelihood_score", "operation": "add", "value": 6 }]
+      },
+      {
+        "id": "social_assistance",
+        "name": "社会救助",
+        "description": "开展社会救助帮扶活动",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 25,
+        "effects": [
+          { "target": "dept.kpi.livelihood_score", "operation": "add", "value": 4 },
+          { "target": "player.charisma", "operation": "add", "value": 1 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["livelihood_score", "social_security_coverage"]
+  },
+  "public_safety": {
+    "name": "公安/安全部门",
+    "consumptionCoefficient": 1.2,
+    "baseConsumption": 80,
+    "actions": [
+      {
+        "id": "safety_inspection",
+        "name": "安全生产检查",
+        "description": "开展安全生产专项检查，降低事故率",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 20,
+        "effects": [{ "target": "dept.kpi.safety", "operation": "add", "value": 8 }]
+      },
+      {
+        "id": "emergency_drill",
+        "name": "应急演练",
+        "description": "组织公共安全应急演练",
+        "slotCost": 2,
+        "cooldownDays": 7,
+        "budgetDelta": 40,
+        "effects": [
+          { "target": "dept.kpi.safety", "operation": "add", "value": 12 },
+          { "target": "player.stability", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["safety", "resident_satisfaction"]
+  },
+  "agriculture": {
+    "name": "农业农村部门",
+    "consumptionCoefficient": 0.9,
+    "baseConsumption": 60,
+    "actions": [
+      {
+        "id": "agricultural_subsidy",
+        "name": "农业补贴发放",
+        "description": "落实农业补贴政策，提升农业产值",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 35,
+        "effects": [{ "target": "dept.kpi.agricultural_output", "operation": "add", "value": 7 }]
+      },
+      {
+        "id": "rural_infrastructure",
+        "name": "农田基建",
+        "description": "推进农村基础设施建设，改善生产条件",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 60,
+        "effects": [
+          { "target": "dept.kpi.agricultural_output", "operation": "add", "value": 10 },
+          { "target": "player.performance", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["agricultural_output", "data_accuracy"]
+  },
+  "party_org": {
+    "name": "党委组织部",
+    "consumptionCoefficient": 0.4,
+    "baseConsumption": 35,
+    "actions": [
+      {
+        "id": "party_meeting",
+        "name": "党委会议",
+        "description": "召开党委组织工作会议",
+        "slotCost": 1,
+        "cooldownDays": 1,
+        "budgetDelta": 5,
+        "effects": [{ "target": "dept.kpi.party_building", "operation": "add", "value": 5 }]
+      },
+      {
+        "id": "cadre_training",
+        "name": "干部培训",
+        "description": "组织干部培训学习，提升队伍素质",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 20,
+        "effects": [
+          { "target": "dept.kpi.party_building", "operation": "add", "value": 8 },
+          { "target": "player.competence", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["party_building", "staff_satisfaction"]
+  },
+  "propaganda_dept": {
+    "name": "宣传部门",
+    "consumptionCoefficient": 0.6,
+    "baseConsumption": 45,
+    "actions": [
+      {
+        "id": "media_briefing",
+        "name": "新闻发布",
+        "description": "召开新闻发布会，引导舆论导向",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 10,
+        "effects": [
+          { "target": "dept.kpi.propaganda_score", "operation": "add", "value": 5 },
+          { "target": "player.charisma", "operation": "add", "value": 1 }
+        ]
+      },
+      {
+        "id": "cultural_event",
+        "name": "文化活动",
+        "description": "组织群众性文化活动",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 30,
+        "effects": [
+          { "target": "dept.kpi.propaganda_score", "operation": "add", "value": 8 },
+          { "target": "dept.kpi.cultural_activity", "operation": "add", "value": 6 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["propaganda_score", "cultural_activity"]
+  }
+}

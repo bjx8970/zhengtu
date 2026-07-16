@@ -1,0 +1,206 @@
+/**
+ * 玩家存档类型定义
+ *
+ * PlayerSave 是整个游戏状态的完整快照，可序列化到 Supabase JSONB 列。
+ * 其中包含：
+ * - 基础角色信息（建档时确定，不变）
+ * - 当前职位与资源
+ * - 五大核心属性
+ * - 派生系统状态（部门、秘书、人脉、派系……）
+ * - 统计与元数据
+ */
+
+import type {
+  CareerLine,
+  PromotionStage,
+  ReserveCadreTier,
+  Faction,
+  SecretaryLevel,
+  TimeGranularity,
+} from './enums';
+
+/** 行动冷却项：actionId 对应冷却到期日 */
+export interface ActionCooldown {
+  actionId: string;
+  /** 冷却到期的游戏内天数（绝对日数） */
+  expiresAtDay: number;
+}
+
+/** 单个部门的运行时状态 */
+export interface DepartmentState {
+  id: string;
+  /** KPI 当前值：kpiId → 当前数值 */
+  kpiValues: Record<string, number>;
+  monthlyConsumption: number;
+  cumulativeConsumption: number;
+  /** 行动冷却：actionId → 冷却到期日 */
+  actionCooldowns: Record<string, number>;
+  /** 最近一次行动的日期（用于活跃度追踪，Phase 2 引入） */
+  lastActionDay: number;
+}
+
+/** 秘书运行时状态 */
+export interface SecretaryState {
+  id: string;
+  name: string;
+  experience: number;
+  level: SecretaryLevel;
+}
+
+/** 职业履历中的一条记录 */
+export interface CareerRecord {
+  positionId: string;
+  positionName: string;
+  level: number;
+  careerLine: CareerLine;
+  startYear: number;
+  /** null 表示当前在职 */
+  endYear: number | null;
+  assessmentResults: string[];
+  /** 跨线转职后旧线索封存 */
+  archived: boolean;
+}
+
+/** 六类人脉关系网络：NPC id → 关系值（0~100） */
+export interface RelationState {
+  classmates: Record<string, number>;
+  colleagues: Record<string, number>;
+  business: Record<string, number>;
+  academic: Record<string, number>;
+  media: Record<string, number>;
+  central: Record<string, number>;
+}
+
+/** 派系归属与声望 */
+export interface FactionState {
+  /** 当前所属派系，independent 表示独立 */
+  alignment: Faction | 'independent';
+  /** 各派系声望值 */
+  reputation: { [K in Faction]: number };
+}
+
+/** 接班人培养状态 */
+export interface SuccessorState {
+  id: string | null;
+  name: string;
+  /** 已投入的关注值 */
+  investment: number;
+  /** 接位准备度（0~100，≥70 为合格） */
+  readiness: number;
+}
+
+/** 游戏内时间 */
+export interface GameTime {
+  year: number;
+  /** 1~12 */
+  month: number;
+  /** 1~30（每月固定30天） */
+  day: number;
+  /** 当前选择的推进粒度 */
+  granularity: TimeGranularity;
+}
+
+/** 行动槽位状态 */
+export interface SlotState {
+  /** 当前粒度的最大槽位数 */
+  max: number;
+  /** 当前剩余可用槽位数 */
+  available: number;
+}
+
+/**
+ * 玩家存档（完整游戏状态）
+ *
+ * 序列化：unwrap(state) → JSON → Supabase JSONB
+ * 反序列化：JSON.parse → setState()
+ */
+export interface PlayerSave {
+  // ===== 基础信息 =====
+  saveId: string;
+  userId: string;
+  characterName: string;
+  gender: '男' | '女';
+  birthPlace: string;
+  /** 游戏内出生年份，用于计算年龄和退休 */
+  birthYear: number;
+  education: '高中' | '大专' | '本科' | '硕士' | '博士';
+  motivation: '为民服务' | '个人抱负' | '家族期望';
+  personality: '廉洁型' | '务实型' | '改革型' | '稳健型';
+  familyBackground: '普通家庭' | '干部家庭' | '商人家庭';
+
+  // ===== 当前职位 =====
+  currentPositionId: string;
+  currentLevel: number;
+  currentCareerLine: CareerLine;
+  yearsInCurrentPosition: number;
+
+  // ===== 资源（槽位制） =====
+  slots: SlotState;
+  /** 政治资本（0~500） */
+  politicalCapital: number;
+  /** 剩余预算（万元） */
+  remainingBudget: number;
+
+  // ===== 考核 =====
+  comprehensiveScore: number;
+  annualAssessments: { year: number; score: number; tier: string }[];
+
+  // ===== 五大核心属性 =====
+  integrity: number;
+  stability: number;
+  performance: number;
+  charisma: number;
+  competence: number;
+
+  // ===== 晋升 =====
+  promotionStage: PromotionStage;
+  promotionAttempts: number;
+  /** 晋升冻结候选期数 */
+  frozenPeriods: number;
+
+  // ===== 转职 =====
+  /** 剩余可用的跨线转职次数 */
+  transferCount: number;
+  /** 副厅级后锁定 */
+  isLineLocked: boolean;
+
+  // ===== 部门状态 =====
+  departmentStates: Record<string, DepartmentState>;
+
+  // ===== 职业履历 =====
+  careerHistory: CareerRecord[];
+
+  // ===== 秘书 =====
+  secretary: SecretaryState | null;
+
+  // ===== 人脉与派系 =====
+  relations: RelationState;
+  factions: FactionState;
+  /** 直属上司好感值（0~100） */
+  superiorFavor: number;
+  reserveTier: ReserveCadreTier;
+  /** 消沉值（连续未晋升累积，影响考核） */
+  demoralization: number;
+
+  // ===== 风险 =====
+  /** 贪腐风险值（0~100，越高越容易被双规） */
+  corruptionRisk: number;
+  isUnderInvestigation: boolean;
+
+  // ===== 游戏时间 =====
+  time: GameTime;
+
+  // ===== 高级系统（级别 12+ 解锁） =====
+  successor: SuccessorState | null;
+  thinkTank: { science: string | null; economics: string | null; law: string | null };
+  mentees: { id: string; progress: number }[];
+
+  // ===== 成就与统计 =====
+  achievements: string[];
+  totalActions: number;
+  totalDaysPlayed: number;
+
+  // ===== 元数据 =====
+  /** Unix 时间戳，用于本地/远程存档仲裁 */
+  updatedAt: number;
+}

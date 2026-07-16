@@ -1,0 +1,30 @@
+{
+  "slotLimits": { "day": 3, "week": 4, "month": 6 },
+  "daysPerMonth": 30,
+  "monthsPerYear": 12,
+  "retirementAge": 65,
+  "startYear": 2024,
+  "congressCycleYears": 5,
+  "budgetByLevel": [0, 1000, 2000, 3000, 5000, 8000, 12000, 18000, 25000, 35000, 50000, 70000],
+  "budgetMultiplierByLine": { "admin": 1.0, "party": 0.8, "discipline": 1.0, "mass": 0.8 },
+  "initialTransferCount": 5,
+  "lineLockLevel": 7,
+  "transferWindowLevels": [
+    [1, 2],
+    [2, 3],
+    [3, 4],
+    [4, 5],
+    [5, 7]
+  ],
+  "attributeBounds": {
+    "integrity": [0, 100],
+    "stability": [0, 100],
+    "performance": [0, 9999],
+    "charisma": [0, 100],
+    "competence": [0, 100],
+    "corruptionRisk": [0, 100],
+    "superiorFavor": [0, 100],
+    "politicalCapital": [0, 500],
+    "demoralization": [0, 100]
+  }
+}

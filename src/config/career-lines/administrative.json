@@ -1,0 +1,190 @@
+{
+  "id": "admin",
+  "name": "行政线",
+  "color": "#4A6FA5",
+  "description": "以经济发展、民生服务和社会治理为核心的行政管理路线",
+  "privileges": ["经济管理权", "行政审批权", "财政支配权"],
+  "levels": [
+    {
+      "level": 1,
+      "label": "科员",
+      "positions": [
+        {
+          "id": "admin_l1_0",
+          "name": "乡镇科员",
+          "departmentTemplateIds": [
+            "general_office",
+            "civil_affairs",
+            "agriculture",
+            "public_safety"
+          ],
+          "kpiTemplateIds": [
+            "office_efficiency",
+            "livelihood_score",
+            "agricultural_output",
+            "safety"
+          ],
+          "annualBudget": 800
+        },
+        {
+          "id": "admin_l1_1",
+          "name": "社区工作员",
+          "departmentTemplateIds": [
+            "community_service",
+            "civil_affairs",
+            "environment",
+            "cultural"
+          ],
+          "kpiTemplateIds": [
+            "resident_satisfaction",
+            "livelihood_score",
+            "environment_score",
+            "cultural_activity"
+          ],
+          "annualBudget": 600
+        },
+        {
+          "id": "admin_l1_2",
+          "name": "乡镇办事员",
+          "departmentTemplateIds": ["general_office", "finance", "agriculture", "statistics"],
+          "kpiTemplateIds": [
+            "office_efficiency",
+            "fiscal_revenue",
+            "agricultural_output",
+            "data_accuracy"
+          ],
+          "annualBudget": 700
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 3,
+        "minAssessmentPasses": 2,
+        "politicalConditions": ["无党纪处分记录"]
+      }
+    },
+    {
+      "level": 2,
+      "label": "副科",
+      "positions": [
+        {
+          "id": "admin_l2_0",
+          "name": "副镇长",
+          "departmentTemplateIds": ["urban_dev", "finance", "public_safety", "civil_affairs"],
+          "kpiTemplateIds": ["gdp_growth", "fiscal_revenue", "safety", "livelihood_score"],
+          "annualBudget": 2000
+        },
+        {
+          "id": "admin_l2_1",
+          "name": "乡镇办公室主任",
+          "departmentTemplateIds": [
+            "general_office",
+            "human_resources",
+            "propaganda_dept",
+            "logistics"
+          ],
+          "kpiTemplateIds": [
+            "office_efficiency",
+            "staff_satisfaction",
+            "propaganda_score",
+            "cost_control"
+          ],
+          "annualBudget": 1500
+        },
+        {
+          "id": "admin_l2_2",
+          "name": "民政助理",
+          "departmentTemplateIds": [
+            "civil_affairs",
+            "social_security",
+            "disability_service",
+            "elderly_care"
+          ],
+          "kpiTemplateIds": [
+            "livelihood_score",
+            "social_security_coverage",
+            "disability_service",
+            "elderly_care"
+          ],
+          "annualBudget": 1800
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 3,
+        "minAssessmentPasses": 3,
+        "politicalConditions": ["无党纪处分记录", "人事档案合规"]
+      }
+    },
+    {
+      "level": 3,
+      "label": "正科",
+      "positions": [
+        {
+          "id": "admin_l3_0",
+          "name": "镇长",
+          "departmentTemplateIds": [
+            "urban_dev",
+            "finance",
+            "public_safety",
+            "civil_affairs",
+            "agriculture"
+          ],
+          "kpiTemplateIds": [
+            "gdp_growth",
+            "fiscal_revenue",
+            "livelihood_score",
+            "project_completion",
+            "safety"
+          ],
+          "annualBudget": 5000
+        },
+        {
+          "id": "admin_l3_1",
+          "name": "乡镇党委委员",
+          "departmentTemplateIds": [
+            "party_org",
+            "propaganda_dept",
+            "human_resources",
+            "discipline_inspect"
+          ],
+          "kpiTemplateIds": [
+            "party_building",
+            "propaganda_score",
+            "staff_satisfaction",
+            "anti_corruption"
+          ],
+          "annualBudget": 3500
+        },
+        {
+          "id": "admin_l3_2",
+          "name": "科室主任",
+          "departmentTemplateIds": ["general_office", "finance", "human_resources", "statistics"],
+          "kpiTemplateIds": [
+            "office_efficiency",
+            "fiscal_revenue",
+            "staff_satisfaction",
+            "data_accuracy"
+          ],
+          "annualBudget": 3000
+        },
+        {
+          "id": "admin_l3_3",
+          "name": "副乡镇党委书记",
+          "departmentTemplateIds": [
+            "party_org",
+            "general_office",
+            "public_safety",
+            "civil_affairs"
+          ],
+          "kpiTemplateIds": ["party_building", "office_efficiency", "safety", "livelihood_score"],
+          "annualBudget": 4000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 3,
+        "minAssessmentPasses": 3,
+        "politicalConditions": ["无党纪处分记录"],
+        "specialConditions": ["grassroots"]
+      }
+    }
+  ]
+}

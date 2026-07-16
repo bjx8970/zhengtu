@@ -1,0 +1,258 @@
+{
+  "gdp_growth": {
+    "id": "gdp_growth",
+    "name": "GDP增长率",
+    "targetValue": 8,
+    "weight": 0.25,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "fiscal_revenue": {
+    "id": "fiscal_revenue",
+    "name": "财政收入完成率",
+    "targetValue": 100,
+    "weight": 0.2,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "livelihood_score": {
+    "id": "livelihood_score",
+    "name": "民生满意度",
+    "targetValue": 80,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "project_completion": {
+    "id": "project_completion",
+    "name": "项目完成度",
+    "targetValue": 100,
+    "weight": 0.5,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "safety": {
+    "id": "safety",
+    "name": "安全生产事故率",
+    "targetValue": 2,
+    "weight": 0.1,
+    "unit": "次",
+    "calcType": "inverse"
+  },
+  "party_building": {
+    "id": "party_building",
+    "name": "党建工作评分",
+    "targetValue": 90,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "anti_corruption": {
+    "id": "anti_corruption",
+    "name": "廉政建设评分",
+    "targetValue": 95,
+    "weight": 0.25,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "case_clearance": {
+    "id": "case_clearance",
+    "name": "案件结案率",
+    "targetValue": 90,
+    "weight": 0.3,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "petition_resolve": {
+    "id": "petition_resolve",
+    "name": "信访化解率",
+    "targetValue": 85,
+    "weight": 0.2,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "planning_score": {
+    "id": "planning_score",
+    "name": "规划评分",
+    "targetValue": 80,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "fiscal_health": {
+    "id": "fiscal_health",
+    "name": "财政健康度",
+    "targetValue": 90,
+    "weight": 0.5,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "revenue_rate": {
+    "id": "revenue_rate",
+    "name": "税收完成率",
+    "targetValue": 100,
+    "weight": 0.5,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "office_efficiency": {
+    "id": "office_efficiency",
+    "name": "办公效率",
+    "targetValue": 85,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "staff_satisfaction": {
+    "id": "staff_satisfaction",
+    "name": "员工满意度",
+    "targetValue": 80,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "social_security_coverage": {
+    "id": "social_security_coverage",
+    "name": "社保覆盖率",
+    "targetValue": 95,
+    "weight": 0.5,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "resident_satisfaction": {
+    "id": "resident_satisfaction",
+    "name": "居民满意度",
+    "targetValue": 85,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "agricultural_output": {
+    "id": "agricultural_output",
+    "name": "农业产值",
+    "targetValue": 100,
+    "weight": 0.5,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "data_accuracy": {
+    "id": "data_accuracy",
+    "name": "数据准确率",
+    "targetValue": 95,
+    "weight": 0.5,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "propaganda_score": {
+    "id": "propaganda_score",
+    "name": "宣传评分",
+    "targetValue": 85,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "cultural_activity": {
+    "id": "cultural_activity",
+    "name": "文化活动完成度",
+    "targetValue": 90,
+    "weight": 0.5,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "disability_service": {
+    "id": "disability_service",
+    "name": "残疾人服务评分",
+    "targetValue": 85,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "elderly_care": {
+    "id": "elderly_care",
+    "name": "养老覆盖率",
+    "targetValue": 90,
+    "weight": 0.5,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "cost_control": {
+    "id": "cost_control",
+    "name": "费用控制率",
+    "targetValue": 95,
+    "weight": 0.5,
+    "unit": "%",
+    "calcType": "inverse"
+  },
+  "women_rights": {
+    "id": "women_rights",
+    "name": "妇女权益保障评分",
+    "targetValue": 85,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "youth_employ": {
+    "id": "youth_employ",
+    "name": "青年就业率",
+    "targetValue": 90,
+    "weight": 0.25,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "human_resources": {
+    "id": "human_resources",
+    "name": "人力资源利用率",
+    "targetValue": 85,
+    "weight": 0.5,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "logistics_score": {
+    "id": "logistics_score",
+    "name": "后勤保障评分",
+    "targetValue": 80,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "statistics_score": {
+    "id": "statistics_score",
+    "name": "统计工作评分",
+    "targetValue": 90,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "environment_score": {
+    "id": "environment_score",
+    "name": "环境保护评分",
+    "targetValue": 85,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "discipline_inspect": {
+    "id": "discipline_inspect",
+    "name": "纪检工作评分",
+    "targetValue": 90,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "community_service": {
+    "id": "community_service",
+    "name": "社区服务评分",
+    "targetValue": 85,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "women_rights_score": {
+    "id": "women_rights_score",
+    "name": "妇女权益评分",
+    "targetValue": 85,
+    "weight": 0.5,
+    "unit": "分",
+    "calcType": "ratio"
+  }
+}
