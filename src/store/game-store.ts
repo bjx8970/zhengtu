@@ -29,6 +29,7 @@ import { calculateKPI } from '../engine/governance/kpi';
 import { annualAssessment as runAnnualAssessment } from '../engine/governance/assessment';
 import { getConfigLoader } from '../config/loader';
 import { getGranularityDays } from '../types/config';
+import { clamp } from '../utils/math';
 
 export type GameState = PlayerSave;
 
@@ -149,7 +150,7 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
   const position = loader.getPosition(
     draft.currentCareerLine,
     draft.currentLevel,
-    // 从 positionId 提取索引：如 "admin_l3_0" → 索引 0
+    // 从 positionId 提取索引：如 "admin_l3_0" → 2
     (() => {
       const parts = draft.currentPositionId.split('_');
       return parseInt(parts[parts.length - 1] ?? '0', 10);
@@ -186,6 +187,7 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
         const assessment = runAnnualAssessment(kpiResult, draft.yearsInCurrentPosition);
         draft.comprehensiveScore = assessment.score;
         draft.frozenPeriods += assessment.frozenPeriods;
+        draft.frozenPeriods = clamp(draft.frozenPeriods, 0, 5); // 最多冻结5届
         draft.annualAssessments.push({
           year: trigger.year ?? draft.time.year,
           score: assessment.score,

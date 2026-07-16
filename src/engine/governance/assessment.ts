@@ -62,7 +62,7 @@ export function annualAssessment(
  * @returns 是否连续不合格
  */
 export function isConsecutiveFailure(
-  assessmentHistory: { tier: string }[],
+  assessmentHistory: { tier: KPITier }[],
   requiredConsecutive = 2,
 ): boolean {
   const recent = assessmentHistory.slice(-requiredConsecutive);

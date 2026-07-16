@@ -73,9 +73,13 @@ export function calculateKPI(
             : Math.max((ind.targetValue - currentValue) / ind.targetValue, 0);
         break;
       case 'absolute':
-      default:
         completionRate = currentValue >= ind.targetValue ? 1.0 : currentValue / ind.targetValue;
         break;
+      default: {
+        // 穷举检查：新增 calcType 时在此编译期报错
+        const _exhaustive: never = ind.calcType;
+        throw new Error(`Unknown calcType: ${_exhaustive}`);
+      }
     }
 
     return {
