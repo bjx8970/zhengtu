@@ -21,6 +21,40 @@ jobs:
       - uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           model: opencode/big-pickle
-          prompt: Review this pull request for code quality issues. Report problems in Chinese.
+          use_github_token: true
+          prompt: |
+            审查此 Pull Request，按以下优先级检查：
+
+            ## 1. 引擎函数（src/engine/）
+            - 是否纯函数：接收参数、返回数据，不引用全局 state 或 DOM
+            - 返回值类型是否显式声明
+            - 是否有 JSDoc（@param / @returns）
+            - 是否添加了测试（同级 __tests__/ 目录）
+            - 已有测试是否全部通过
+
+            ## 2. 类型与配置
+            - 新增类型是否在 src/types/ 下
+            - JSON 配置模板引用 ID 是否存在
+            - 枚举值内部 key 用英文
+
+            ## 3. 状态管理
+            - 状态变更是否通过 dispatch(action) 进行
+
+            ## 4. 代码质量
+            - 是否有遗留 console.log
+            - non-null assertion 是否必要
+            - 是否有 any 类型过度使用
+
+            ## 5. 注释
+            - 新增文件是否有文件头 JSDoc
+            - 公开函数是否有完整 JSDoc
+
+            ## 6. 测试
+            - 新增引擎函数是否有配套测试（正常路径 + 边界）
+
+            ## 输出格式
+            以简洁中文列出发现的问题，注明文件路径和行号。
+            如果没有问题，回复 ✅ 即可。不要输出无关内容。
