@@ -14,7 +14,7 @@
 
 import type { JSX } from 'solid-js';
 
-type PageProps = Record<string, string>;
+export type PageProps = Record<string, string>;
 
 /** 路由定义 */
 export interface Route {
