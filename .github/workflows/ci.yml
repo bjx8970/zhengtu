@@ -7,44 +7,69 @@ on:
     branches: [main]
 
 jobs:
-  quality:
-    name: Lint + TypeCheck + Test + Build
+  format:
+    name: Format (Prettier)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: 10
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+  lint:
+    name: Lint (ESLint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
 
-      - name: Prettier format check
-        run: pnpm format:check
+  typecheck:
+    name: TypeCheck (tsc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
 
-      - name: ESLint
-        run: pnpm lint
-
-      - name: TypeScript type check
-        run: pnpm typecheck
-
-      - name: Vitest with coverage
-        run: pnpm test -- --coverage
-
-      - name: Validate config data
-        run: pnpm validate:config
-
-      - name: Build (dry run)
-        run: pnpm build
-
+  test:
+    name: Test (Vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test -- --coverage
       - name: Upload coverage report
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
@@ -52,3 +77,35 @@ jobs:
           name: coverage-report
           path: coverage/
           retention-days: 7
+
+  validate-config:
+    name: Validate Config
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm validate:config
+
+  build-check:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build

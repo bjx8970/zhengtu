@@ -13,6 +13,7 @@ import { useGameStore } from '../../store/game-store';
 import { navigate } from '../../router';
 import { formatDate, formatGranularity } from '../../utils/format';
 import type { TimeGranularity } from '../../types/enums';
+import { For, createMemo } from 'solid-js';
 
 interface DashboardEntry {
   label: string;
@@ -59,6 +60,9 @@ export function Dashboard() {
       show: () => true,
     },
   ];
+
+  /** 可见入口（过滤后） */
+  const visibleEntries = createMemo(() => entries.filter((e) => e.show()));
 
   return (
     <div
@@ -170,9 +174,8 @@ export function Dashboard() {
           gap: '0.5rem',
         }}
       >
-        {entries
-          .filter((e) => e.show())
-          .map((entry) => (
+        <For each={visibleEntries()}>
+          {(entry) => (
             <div
               onClick={() => navigate(entry.path)}
               style={{
@@ -188,7 +191,8 @@ export function Dashboard() {
               <span>{entry.label}</span>
               <span style={{ color: '#888', 'font-size': '0.85rem' }}>{entry.desc}</span>
             </div>
-          ))}
+          )}
+        </For>
       </div>
     </div>
   );

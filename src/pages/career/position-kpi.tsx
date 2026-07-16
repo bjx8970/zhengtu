@@ -15,15 +15,15 @@ import { createMemo, For, Show } from 'solid-js';
 import type { KPIResult } from '../../types/game';
 import { KPITier } from '../../types/enums';
 
-/** 等次颜色映射 */
+/** 等次颜色映射（使用 KPITier 枚举确保类型安全） */
 function tierColor(tier: KPITier): string {
-  const map: Record<string, string> = {
-    '优秀': '#4CAF50',
-    '称职': '#4A6FA5',
-    '基本称职': '#FF9800',
-    '不称职': '#C44D4D',
+  const map: Record<KPITier, string> = {
+    [KPITier.Excellent]: '#4CAF50',
+    [KPITier.Competent]: '#4A6FA5',
+    [KPITier.Basic]: '#FF9800',
+    [KPITier.Incompetent]: '#C44D4D',
   };
-  return map[tier] ?? '#888';
+  return map[tier];
 }
 
 export function PositionKPI() {
