@@ -1,7 +1,7 @@
 name: OpenCode PR Review
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
@@ -16,7 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
           persist-credentials: false
 
       - uses: anomalyco/opencode/github@latest
