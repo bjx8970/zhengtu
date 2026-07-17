@@ -231,12 +231,3 @@ export interface RetirementOption {
   description: string;
   risk?: string;
 }
-
-/** 上级互动行为定义 */
-export interface SuperiorAction {
-  id: string;
-  name: string;
-  slotCost: number;
-  favorGain: number;
-  description: string;
-}

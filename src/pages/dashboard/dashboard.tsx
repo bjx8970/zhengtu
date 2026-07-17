@@ -10,7 +10,7 @@
  */
 
 import { createMemo, createSignal, For, Show } from 'solid-js';
-import { useGameStore, type GameAction } from '../../store/game-store';
+import { useGameStore } from '../../store/game-store';
 import type { SlotOccupant } from '../../types/player';
 import { formatDate } from '../../utils/format';
 import { calculateKPI } from '../../engine/governance/kpi';
@@ -112,7 +112,7 @@ export function Dashboard() {
   );
 
   function startAction(deptId: string, actionId: string) {
-    dispatch({ type: 'START_ACTION', deptId, actionId } as GameAction);
+    dispatch({ type: 'START_ACTION', deptId, actionId });
   }
 
   return (
@@ -484,7 +484,7 @@ export function Dashboard() {
 
           <Show when={!isActivePromotion() && state.promotionStage !== PromotionStage.Completed}>
             <button
-              onClick={() => dispatch({ type: 'START_PROMOTION' } as GameAction)}
+              onClick={() => dispatch({ type: 'START_PROMOTION' })}
               disabled={state.frozenPeriods > 0}
               style={{
                 padding: '0.5rem 1rem',
@@ -520,7 +520,7 @@ export function Dashboard() {
                     dispatch({
                       type: 'PROMOTION_RESOLVE_STAGE',
                       choices: { useConnections: false },
-                    } as GameAction)
+                    })
                   }
                   style={btnStyle()}
                 >
@@ -531,7 +531,7 @@ export function Dashboard() {
                     dispatch({
                       type: 'PROMOTION_RESOLVE_STAGE',
                       choices: { useConnections: true },
-                    } as GameAction)
+                    })
                   }
                   style={btnStyle()}
                 >
@@ -544,7 +544,7 @@ export function Dashboard() {
                     dispatch({
                       type: 'PROMOTION_RESOLVE_STAGE',
                       choices: { influenceInspectors: true },
-                    } as GameAction)
+                    })
                   }
                   style={btnStyle()}
                 >
@@ -555,7 +555,7 @@ export function Dashboard() {
 
             <Show when={!promotionHasChoices()}>
               <button
-                onClick={() => dispatch({ type: 'PROMOTION_RESOLVE_STAGE' } as GameAction)}
+                onClick={() => dispatch({ type: 'PROMOTION_RESOLVE_STAGE' })}
                 style={btnStyle()}
               >
                 推进阶段
@@ -569,10 +569,7 @@ export function Dashboard() {
 
           <Show when={state.promotionStage === PromotionStage.Failed}>
             <div style={{ color: colors.warning, 'margin-bottom': '0.3rem' }}>晋升失败</div>
-            <button
-              onClick={() => dispatch({ type: 'RESET_PROMOTION' } as GameAction)}
-              style={btnStyle()}
-            >
+            <button onClick={() => dispatch({ type: 'RESET_PROMOTION' })} style={btnStyle()}>
               关闭
             </button>
           </Show>

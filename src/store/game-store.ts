@@ -473,8 +473,20 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             actionName: slotOccupant.actionName,
             deptName,
             effects: [
-              ...effects.kpiChanges.map((k) => `KPI${k.delta >= 0 ? '+' : ''}${k.delta}`),
-              ...effects.playerChanges.map((p) => `${p.attr}${p.delta >= 0 ? '+' : ''}${p.delta}`),
+              ...effects.kpiChanges.map((k) =>
+                k.operation === 'multiply'
+                  ? `KPI×${k.delta}`
+                  : k.operation === 'set'
+                    ? `KPI=${k.delta}`
+                    : `KPI${k.delta >= 0 ? '+' : ''}${k.delta}`,
+              ),
+              ...effects.playerChanges.map((p) =>
+                p.operation === 'multiply'
+                  ? `${p.attr}×${p.delta}`
+                  : p.operation === 'set'
+                    ? `${p.attr}=${p.delta}`
+                    : `${p.attr}${p.delta >= 0 ? '+' : ''}${p.delta}`,
+              ),
             ],
             completedAtDay: draft.totalDaysPlayed,
           });
