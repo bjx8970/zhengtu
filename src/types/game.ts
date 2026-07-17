@@ -17,7 +17,7 @@ import type {
   InvestigationEvidence,
 } from './enums';
 import type { KPITier } from './enums';
-import type { SlotTierKey } from './player';
+import type { SlotTierKey, SlotOccupant } from './player';
 
 /** 时间推进后触发的周期事件 */
 export interface TimeTrigger {
@@ -50,6 +50,13 @@ export interface TimeAdvanceResult {
 /** 行动启动结果（放入槽位时的校验结果） */
 export type StartActionResult =
   { success: false; error: string } | { success: true; tierKey: SlotTierKey; slotIndex: number };
+
+/** 槽位完成结果：已到期的行动记录 */
+export interface CompletedSlotAction {
+  tierKey: SlotTierKey;
+  slotIndex: number;
+  occupant: SlotOccupant;
+}
 
 /** 随机事件的触发条件 */
 export interface EventCondition {

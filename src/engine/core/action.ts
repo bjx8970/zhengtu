@@ -9,8 +9,8 @@
  */
 
 import type { ActionTemplate } from '../../types/config';
-import type { SlotState, SlotOccupant, SlotTierKey } from '../../types/player';
-import type { StartActionResult } from '../../types/game';
+import type { SlotState, SlotTierKey } from '../../types/player';
+import type { StartActionResult, CompletedSlotAction } from '../../types/game';
 
 const TIER_ORDER: SlotTierKey[] = ['primary', 'secondary', 'reserve'];
 
@@ -67,11 +67,8 @@ export function startAction(
  * @param currentDay - 推进后的游戏天数
  * @returns 已完成行动的列表（含槽位位置 + 占用记录）
  */
-export function completeActions(
-  slotState: SlotState,
-  currentDay: number,
-): { tierKey: SlotTierKey; slotIndex: number; occupant: SlotOccupant }[] {
-  const completed: { tierKey: SlotTierKey; slotIndex: number; occupant: SlotOccupant }[] = [];
+export function completeActions(slotState: SlotState, currentDay: number): CompletedSlotAction[] {
+  const completed: CompletedSlotAction[] = [];
 
   for (const tierKey of TIER_ORDER) {
     const tier = slotState[tierKey];

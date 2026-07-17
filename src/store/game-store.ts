@@ -218,6 +218,12 @@ function setPlayerAttrDirect(
   (draft as unknown as Record<string, number>)[attr] = clampAttr(attr, value, bounds);
 }
 
+/** 读取玩家数值属性当前值 */
+function getPlayerAttr(draft: PlayerSave, attr: string): number {
+  if (!PLAYER_NUMERIC_ATTRS.has(attr)) return 0;
+  return (draft as unknown as Record<string, number>)[attr] ?? 0;
+}
+
 /** 从 positionId（如 "admin_l3_0"）提取职位索引 */
 function extractPositionIndex(positionId: string): number {
   const idx = parseInt(positionId.split('_').pop() ?? '0', 10);
@@ -475,8 +481,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             if (change.operation === 'add') {
               applyPlayerAttr(draft, change.attr, change.delta, cfgAdv.attributeBounds);
             } else if (change.operation === 'multiply' || change.operation === 'set') {
-              if (!PLAYER_NUMERIC_ATTRS.has(change.attr)) continue;
-              const cur = (draft as unknown as Record<string, number>)[change.attr] ?? 0;
+              const cur = getPlayerAttr(draft, change.attr);
               const newVal = change.operation === 'multiply' ? cur * change.delta : change.delta;
               setPlayerAttrDirect(draft, change.attr, newVal, cfgAdv.attributeBounds);
             }
