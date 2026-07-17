@@ -17,6 +17,7 @@ import type {
   InvestigationEvidence,
 } from './enums';
 import type { KPITier } from './enums';
+import type { SlotTierKey } from './player';
 
 /** 时间推进后触发的周期事件 */
 export interface TimeTrigger {
@@ -47,14 +48,8 @@ export interface TimeAdvanceResult {
 }
 
 /** 行动启动结果（放入槽位时的校验结果） */
-export interface StartActionResult {
-  success: boolean;
-  error?: string;
-  /** 放入的槽位等级 */
-  tierKey?: 'primary' | 'secondary' | 'reserve';
-  /** 槽位索引 */
-  slotIndex?: number;
-}
+export type StartActionResult =
+  { success: false; error: string } | { success: true; tierKey: SlotTierKey; slotIndex: number };
 
 /** 单个行动完成后的效果 */
 export interface CompletedActionEffect {

@@ -365,7 +365,7 @@ export function Dashboard() {
                       <div style={{ flex: 1 }}>
                         <div style={{ 'font-size': '0.85rem', 'font-weight': 'bold' }}>
                           {action.name}
-                          {action.minTier && action.minTier !== 'secondary' && (
+                          {action.minTier !== 'secondary' && (
                             <span
                               style={{
                                 'font-size': '0.65rem',

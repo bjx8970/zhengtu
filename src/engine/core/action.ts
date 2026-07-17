@@ -9,12 +9,20 @@
  */
 
 import type { ActionTemplate } from '../../types/config';
-import type { SlotState, SlotOccupant } from '../../types/player';
+import type { SlotState, SlotOccupant, SlotTierKey } from '../../types/player';
 import type { StartActionResult } from '../../types/game';
 
-const TIER_ORDER: ('primary' | 'secondary' | 'reserve')[] = ['primary', 'secondary', 'reserve'];
+const TIER_ORDER: SlotTierKey[] = ['primary', 'secondary', 'reserve'];
 
-/** 校验并启动一个行动 */
+/**
+ * 校验预算/重复性/槽位，将行动放入合适的槽位。
+ *
+ * @param actionConfig - 行动模板
+ * @param slotState - 当前槽位状态
+ * @param remainingBudget - 剩余预算
+ * @param _currentDay - 当前游戏天数（预留）
+ * @returns 成功时返回槽位位置；失败时返回错误信息
+ */
 export function startAction(
   actionConfig: ActionTemplate,
   slotState: SlotState,
@@ -39,7 +47,7 @@ export function startAction(
     if (tierIdx > minTierIdx) continue;
     const tier = slotState[tierKey];
     if (!tier) continue;
-    const idx = tier.occupants.findIndex((o: unknown) => o === null);
+    const idx = tier.occupants.findIndex((o) => o === null);
     if (idx === -1) continue;
 
     return {
@@ -52,7 +60,13 @@ export function startAction(
   return { success: false, error: '无空闲槽位' };
 }
 
-/** 推进时间后检查并收集已完成行动的效果 */
+/**
+ * 推进时间后检查所有槽位，收集已完成的行动。
+ *
+ * @param slotState - 当前槽位状态
+ * @param currentDay - 推进后的游戏天数
+ * @returns 已完成行动的列表（含槽位位置 + 占用记录）
+ */
 export function completeActions(
   slotState: SlotState,
   currentDay: number,
@@ -74,6 +88,12 @@ export function completeActions(
   return completed;
 }
 
+/**
+ * 解析行动模板的效果，生成 KPI 变更和属性变更。
+ *
+ * @param actionConfig - 已完成行动的模板
+ * @returns KPI 增量列表 + 玩家属性增量列表
+ */
 export function resolveActionEffects(actionConfig: ActionTemplate): {
   kpiChanges: { indicatorId: string; delta: number }[];
   playerChanges: { attr: string; delta: number }[];

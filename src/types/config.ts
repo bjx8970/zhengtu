@@ -10,6 +10,7 @@
  */
 
 import type { CareerLine } from './enums';
+import type { SlotTierKey } from './player';
 
 /** 行动效果的单项定义：对某个目标属性施加的操作 */
 export interface ActionEffectDef {
@@ -30,8 +31,8 @@ export interface ActionTemplate {
   description?: string;
   /** 执行所需天数 */
   durationDays: number;
-  /** 最低槽位等级: primary | secondary | reserve */
-  minTier: 'primary' | 'secondary' | 'reserve';
+  /** 最低槽位等级 */
+  minTier: SlotTierKey;
   /** 行动消耗预算（万元） */
   budgetDelta: number;
   /** 执行后对 KPI/属性的影响列表 */
@@ -141,7 +142,7 @@ export interface SlotTierConfig {
 }
 
 /** 各等级槽位配置 */
-export type SlotTiersConfig = Record<'primary' | 'secondary' | 'reserve', SlotTierConfig>;
+export type SlotTiersConfig = Record<SlotTierKey, SlotTierConfig>;
 
 /** 晋升引擎配置常量 */
 export interface PromotionConfig {

@@ -380,8 +380,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
         durationDays: actionConfig.durationDays,
       };
 
-      const tierKey = result.tierKey!;
-      const slotIdx = result.slotIndex!;
+      const tierKey = result.tierKey;
+      const slotIdx = result.slotIndex;
       draft.slots[tierKey].occupants[slotIdx] = occupant;
 
       draft.remainingBudget -= actionConfig.budgetDelta;

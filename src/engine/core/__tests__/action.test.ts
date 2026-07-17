@@ -40,8 +40,10 @@ describe('startAction', () => {
     it('分配到主要槽位', () => {
       const result = startAction(makeAction(), makeSlotState(), 1000, 0);
       expect(result.success).toBe(true);
-      expect(result.tierKey).toBe('primary');
-      expect(result.slotIndex).toBe(0);
+      if (result.success) {
+        expect(result.tierKey).toBe('primary');
+        expect(result.slotIndex).toBe(0);
+      }
     });
 
     it('找到主要中第一个空位', () => {
@@ -50,7 +52,10 @@ describe('startAction', () => {
       });
       const result = startAction(makeAction(), state, 1000, 0);
       expect(result.success).toBe(true);
-      expect(result.slotIndex).toBe(1);
+      if (result.success) {
+        expect(result.tierKey).toBe('primary');
+        expect(result.slotIndex).toBe(1);
+      }
     });
 
     it('主要满时分配到次要', () => {
@@ -59,7 +64,9 @@ describe('startAction', () => {
       });
       const result = startAction(makeAction({ minTier: 'secondary' }), state, 1000, 0);
       expect(result.success).toBe(true);
-      expect(result.tierKey).toBe('secondary');
+      if (result.success) {
+        expect(result.tierKey).toBe('secondary');
+      }
     });
 
     it('主要和次要满时分配到备用', () => {
@@ -69,7 +76,9 @@ describe('startAction', () => {
       });
       const result = startAction(makeAction({ minTier: 'reserve' }), state, 1000, 0);
       expect(result.success).toBe(true);
-      expect(result.tierKey).toBe('reserve');
+      if (result.success) {
+        expect(result.tierKey).toBe('reserve');
+      }
     });
 
     it('所有槽位满时返回无空闲槽位', () => {
@@ -80,7 +89,9 @@ describe('startAction', () => {
       });
       const result = startAction(makeAction({ minTier: 'reserve' }), state, 1000, 0);
       expect(result.success).toBe(false);
-      expect(result.error).toContain('无空闲槽位');
+      if (!result.success) {
+        expect(result.error).toContain('无空闲槽位');
+      }
     });
   });
 
@@ -91,14 +102,18 @@ describe('startAction', () => {
       });
       const result = startAction(makeAction({ minTier: 'primary' }), state, 1000, 0);
       expect(result.success).toBe(false);
-      expect(result.error).toContain('无空闲槽位');
+      if (!result.success) {
+        expect(result.error).toContain('无空闲槽位');
+      }
     });
 
     it('secondary 行动可放主要或次要', () => {
       const state = makeSlotState();
       const result = startAction(makeAction({ minTier: 'secondary' }), state, 1000, 0);
       expect(result.success).toBe(true);
-      expect(result.tierKey).toBe('primary');
+      if (result.success) {
+        expect(result.tierKey).toBe('primary');
+      }
     });
   });
 
@@ -106,7 +121,9 @@ describe('startAction', () => {
     it('预算不足时拒绝', () => {
       const result = startAction(makeAction({ budgetDelta: 100 }), makeSlotState(), 50, 0);
       expect(result.success).toBe(false);
-      expect(result.error).toContain('预算不足');
+      if (!result.success) {
+        expect(result.error).toContain('预算不足');
+      }
     });
 
     it('预算刚好够时通过', () => {
@@ -126,7 +143,9 @@ describe('startAction', () => {
       });
       const result = startAction(makeAction(), state, 1000, 0);
       expect(result.success).toBe(false);
-      expect(result.error).toContain('已在执行中');
+      if (!result.success) {
+        expect(result.error).toContain('已在执行中');
+      }
     });
 
     it('同一行动在不同部门先执行时不能重复启动', () => {
@@ -144,7 +163,9 @@ describe('startAction', () => {
       });
       const result = startAction(makeAction(), state, 1000, 0);
       expect(result.success).toBe(false);
-      expect(result.error).toContain('已在执行中');
+      if (!result.success) {
+        expect(result.error).toContain('已在执行中');
+      }
     });
 
     it('不同行动可以同时执行', () => {

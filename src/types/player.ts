@@ -20,6 +20,9 @@ import type {
   TimeGranularity,
 } from './enums';
 
+/** 槽位等级 key */
+export type SlotTierKey = 'primary' | 'secondary' | 'reserve';
+
 /** 槽位占用记录 */
 export interface SlotOccupant {
   actionId: string;
