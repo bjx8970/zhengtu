@@ -46,23 +46,27 @@ export interface TimeAdvanceResult {
   triggers: TimeTrigger[];
 }
 
-/** 单个行动执行结果 */
-export interface ActionResult {
+/** 行动启动结果（放入槽位时的校验结果） */
+export interface StartActionResult {
   success: boolean;
-  /** 失败时填充原因 */
   error?: string;
-  /** 实际消耗的槽位数 */
-  slotCost: number;
-  /** 额外资金消耗 */
-  budgetDelta: number;
-  /** 各 KPI 指标变化 */
+  /** 放入的槽位等级 */
+  tierKey?: 'primary' | 'secondary' | 'reserve';
+  /** 槽位索引 */
+  slotIndex?: number;
+}
+
+/** 单个行动完成后的效果 */
+export interface CompletedActionEffect {
+  actionName: string;
+  deptName: string;
   kpiChanges: { indicatorId: string; delta: number }[];
-  /** 各玩家属性变化 */
   playerChanges: { attr: string; delta: number }[];
-  /** 更新后的冷却记录 */
-  newCooldown: { actionId: string; expiresAt: number };
-  /** 消耗的游戏天数 */
-  daysAdvanced: number;
+}
+
+/** 槽位完成检查结果 */
+export interface CompleteActionsResult {
+  completed: CompletedActionEffect[];
 }
 
 /** 单个行动效果的解析结果 */

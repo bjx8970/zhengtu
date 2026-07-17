@@ -33,8 +33,8 @@ const ActionSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),
-  slotCost: z.number().int().min(1).max(6),
-  cooldownDays: z.number().int().min(0),
+  durationDays: z.number().int().min(1),
+  minTier: z.enum(['primary', 'secondary', 'reserve']),
   budgetDelta: z.number(),
   effects: z.array(EffectSchema).min(1),
   unlockLevel: z.number().optional(),
@@ -201,7 +201,12 @@ for (const [eventId, event] of Object.entries(events) as [string, z.infer<typeof
 console.log('\n--- 常量配置校验 ---\n');
 
 const ConstantsSchema = z.object({
-  slotLimits: z.object({ day: z.number(), week: z.number(), month: z.number() }),
+  slotTiers: z.object({
+    primary: z.object({ label: z.string(), count: z.number(), description: z.string() }),
+    secondary: z.object({ label: z.string(), count: z.number(), description: z.string() }),
+    reserve: z.object({ label: z.string(), count: z.number(), description: z.string() }),
+  }),
+  reservePenalty: z.object({ health: z.number(), demoralization: z.number() }),
   daysPerMonth: z.number().min(1),
   monthsPerYear: z.number().min(1),
   retirementAge: z.number().min(1),
@@ -215,7 +220,6 @@ const ConstantsSchema = z.object({
   attributeBounds: z.record(z.tuple([z.number(), z.number()])),
   kpiTierThresholds: z.object({ excellent: z.number(), competent: z.number(), basic: z.number() }),
   completionRateCap: z.number().positive(),
-  daysPerSlotUnit: z.number().positive(),
   sentimentMinLevel: z.number().min(1),
   incompetentFrozenPeriods: z.number().min(0),
   consecutiveFailureThreshold: z.number().min(1),

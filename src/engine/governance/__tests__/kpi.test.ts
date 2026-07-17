@@ -24,7 +24,6 @@ function makeDeptState(kpiValues: Record<string, number>): DepartmentState {
     kpiValues,
     monthlyConsumption: 50,
     cumulativeConsumption: 0,
-    actionCooldowns: {},
     lastActionDay: 0,
   };
 }

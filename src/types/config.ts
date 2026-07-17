@@ -28,10 +28,10 @@ export interface ActionTemplate {
   id: string;
   name: string;
   description?: string;
-  /** 消耗槽位数 */
-  slotCost: number;
-  /** 冷却天数（按游戏内天数计算） */
-  cooldownDays: number;
+  /** 执行所需天数 */
+  durationDays: number;
+  /** 最低槽位等级: primary | secondary | reserve */
+  minTier: 'primary' | 'secondary' | 'reserve';
   /** 行动消耗预算（万元） */
   budgetDelta: number;
   /** 执行后对 KPI/属性的影响列表 */
@@ -133,12 +133,15 @@ export interface PositionConfig {
   annualBudget: number;
 }
 
-/** 各粒度下的槽位上限 */
-export interface SlotConfig {
-  day: number;
-  week: number;
-  month: number;
+/** 单个槽位等级配置 */
+export interface SlotTierConfig {
+  label: string;
+  count: number;
+  description: string;
 }
+
+/** 各等级槽位配置 */
+export type SlotTiersConfig = Record<'primary' | 'secondary' | 'reserve', SlotTierConfig>;
 
 /** 晋升引擎配置常量 */
 export interface PromotionConfig {
@@ -179,7 +182,8 @@ export interface PromotionConfig {
 
 /** 全局游戏配置常量（从 constants.json 读取） */
 export interface GameConfig {
-  slotLimits: SlotConfig;
+  slotTiers: SlotTiersConfig;
+  reservePenalty: { health: number; demoralization: number };
   daysPerMonth: number;
   monthsPerYear: number;
   retirementAge: number;
@@ -201,8 +205,6 @@ export interface GameConfig {
   kpiTierThresholds: { excellent: number; competent: number; basic: number };
   /** 完成率上限（防止溢出） */
   completionRateCap: number;
-  /** 每槽位对应的天数折算系数 */
-  daysPerSlotUnit: number;
   /** 触发舆情生成的最低级别 */
   sentimentMinLevel: number;
   /** 不称职处罚冻结届数 */

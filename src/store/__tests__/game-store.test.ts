@@ -1,15 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import { createInitialState, createTestStore, dispatch } from '../game-store';
-import type { PlayerSave } from '../../types/player';
+import type { PlayerSave, SlotOccupant } from '../../types/player';
 import { CareerLine, PromotionStage } from '../../types/enums';
+
+function occ(
+  actionId: string,
+  deptId = 'd',
+  actionName = 'A',
+  startedAtDay = 0,
+  durationDays = 3,
+): SlotOccupant {
+  return { actionId, deptId, actionName, startedAtDay, durationDays };
+}
 
 describe('createInitialState', () => {
   it('creates valid default state', () => {
     const state = createInitialState();
     expect(state.currentLevel).toBe(1);
     expect(state.currentCareerLine).toBe(CareerLine.Administrative);
-    expect(state.slots.available).toBe(3);
-    expect(state.slots.max).toBe(3);
     expect(state.time.year).toBe(2012);
     expect(state.time.month).toBe(1);
     expect(state.time.day).toBe(1);
@@ -23,7 +31,6 @@ describe('createInitialState', () => {
     });
     expect(state.characterName).toBe('测试角色');
     expect(state.currentLevel).toBe(3);
-    expect(state.slots.available).toBe(3);
   });
 
   it('initializes faction reputation to zero', () => {
@@ -41,14 +48,11 @@ describe('createInitialState', () => {
   });
 });
 
-describe('dispatch - EXECUTE_ACTION', () => {
-  // 使用行政线 L3 镇长职位（id: admin_l3_0）和其城建部门（id: admin_l3_0_dept_0）
+describe('dispatch - START_ACTION', () => {
   const POSITION_ID = 'admin_l3_0';
   const LINE = CareerLine.Administrative;
   const LEVEL = 3;
 
-  // 根据实际配置：镇长有 5 个部门，第一个是 urban_dev（城建）
-  // dept id = admin_l3_0_dept_0, action id = approve_project
   const deptId = 'admin_l3_0_dept_0';
   const actionId = 'approve_project';
 
@@ -58,62 +62,39 @@ describe('dispatch - EXECUTE_ACTION', () => {
       currentLevel: LEVEL,
       currentCareerLine: LINE,
       remainingBudget: 10000,
-      slots: { max: 3, available: 3 },
       time: { year: 2024, month: 6, day: 15, granularity: 'day' },
       ...overrides,
     });
   }
 
   describe('successful execution', () => {
-    it('消耗槽位', () => {
+    it('增加总行动计数', () => {
       const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId });
       const state = getRawState();
-      expect(state.slots.available).toBe(2);
       expect(state.totalActions).toBe(1);
     });
 
     it('扣减预算', () => {
       const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId });
       const state = getRawState();
       expect(state.remainingBudget).toBeLessThan(10000);
     });
 
-    it('更新部门 KPI 值', () => {
+    it('将行动放入槽位', () => {
       const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId });
       const state = getRawState();
-      const dept = state.departmentStates[deptId];
-      expect(dept).toBeDefined();
-      // approve_project 影响 project_completion
-      expect(dept!.kpiValues['project_completion']).toBeGreaterThan(0);
+      const occupants = state.slots.primary.occupants;
+      expect(occupants.some((o) => o?.actionId === actionId)).toBe(true);
     });
 
-    it('设置行动冷却', () => {
+    it('多次执行不同行动累计计数', () => {
       const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId: 'approve_project' });
+      dispatch({ type: 'START_ACTION', deptId, actionId: 'urban_planning' });
       const state = getRawState();
-      const dept = state.departmentStates[deptId];
-      // approve_project cooldownDays = 3, totalDaysPlayed = daysAdvanced(2) after execution
-      expect(dept!.actionCooldowns[actionId]).toBeGreaterThan(0);
-    });
-
-    it('推进游戏天数', () => {
-      const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
-      const state = getRawState();
-      // slotCost=1 → daysAdvanced=ceil(1*1.5)=2
-      expect(state.totalDaysPlayed).toBeGreaterThan(0);
-    });
-
-    it('多次执行不同行动累计槽位消耗', () => {
-      const { dispatch, getRawState } = createStoreWithPosition();
-      // approve_project (slotCost=1) 和 urban_planning (slotCost=1) 的冷却互不影响
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId: 'approve_project' });
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId: 'urban_planning' });
-      const state = getRawState();
-      expect(state.slots.available).toBe(1);
       expect(state.totalActions).toBe(2);
     });
   });
@@ -121,101 +102,29 @@ describe('dispatch - EXECUTE_ACTION', () => {
   describe('validation failures', () => {
     it('槽位不足时不执行', () => {
       const { dispatch, getRawState } = createStoreWithPosition({
-        slots: { max: 3, available: 0 },
+        slots: {
+          primary: {
+            label: '主要',
+            count: 3,
+            occupants: [occ('a'), occ('b'), occ('c')],
+          },
+          secondary: { label: '次要', count: 2, occupants: [null, null] },
+          reserve: { label: '备用', count: 1, occupants: [null] },
+        },
       });
       const before = getRawState();
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId });
       expect(getRawState()).toEqual(before);
-    });
-
-    it('冷却中时不执行', () => {
-      const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
-      const afterFirst = getRawState();
-      // 立即再次执行同一行动 → 应被冷却阻止
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
-      const afterSecond = getRawState();
-      expect(afterSecond.totalActions).toBe(afterFirst.totalActions);
     });
 
     it('预算不足时不执行', () => {
       const { dispatch, getRawState } = createStoreWithPosition({
-        remainingBudget: 10, // approve_project 消耗 50
+        remainingBudget: 10,
       });
       const before = getRawState();
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId });
       expect(getRawState()).toEqual(before);
     });
-  });
-
-  describe('player attribute changes', () => {
-    it('带 player 效果的属性正确变更', () => {
-      // urban_dev 的 staff_meeting 行动影响 player.competence
-      const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'EXECUTE_ACTION', deptId: 'admin_l3_0_dept_0', actionId: 'staff_meeting' });
-      const state = getRawState();
-      // staff_meeting 第一个 effect 是 dept.kpi，第二个是 player.competence +1
-      expect(state.competence).toBeGreaterThanOrEqual(50);
-    });
-  });
-
-  describe('time advance triggers', () => {
-    it('跨越月底时触发月度结算', () => {
-      // 使用月末日期：6月30日
-      const { dispatch, getRawState } = createStoreWithPosition({
-        time: { year: 2024, month: 6, day: 30, granularity: 'day' },
-      });
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
-      const state = getRawState();
-      // 推进2天，跨到7月
-      expect(state.time.month).toBe(7);
-      // 部门消耗已扣除
-      const dept = state.departmentStates[deptId];
-      expect(dept!.cumulativeConsumption).toBeGreaterThan(0);
-    });
-
-    it('跨越年底时触发年度考核', () => {
-      const { dispatch, getRawState } = createStoreWithPosition({
-        time: { year: 2024, month: 12, day: 30, granularity: 'day' },
-        yearsInCurrentPosition: 2,
-      });
-      dispatch({ type: 'EXECUTE_ACTION', deptId, actionId });
-      const state = getRawState();
-      expect(state.time.year).toBe(2025);
-      expect(state.annualAssessments.length).toBe(1);
-      expect(state.yearsInCurrentPosition).toBe(3);
-    });
-  });
-});
-
-describe('dispatch - ADVANCE_TIME', () => {
-  it('推进一天：日期 +1，槽位重置，totalDaysPlayed 增加', () => {
-    const store = createTestStore({
-      currentPositionId: 'admin_l3_0',
-      currentLevel: 3,
-      currentCareerLine: CareerLine.Administrative,
-      time: { year: 2024, month: 6, day: 15, granularity: 'day' },
-      slots: { max: 3, available: 1 },
-    });
-    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
-    const state = store.getRawState();
-    expect(state.time.day).toBe(16);
-    expect(state.slots.available).toBe(3);
-    expect(state.totalDaysPlayed).toBe(1);
-  });
-
-  it('推进一周', () => {
-    const store = createTestStore({
-      currentPositionId: 'admin_l3_0',
-      currentLevel: 3,
-      currentCareerLine: CareerLine.Administrative,
-      time: { year: 2024, month: 6, day: 15, granularity: 'week' },
-      slots: { max: 4, available: 2 },
-    });
-    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'week' });
-    const state = store.getRawState();
-    expect(state.totalDaysPlayed).toBe(7);
-    expect(state.slots.available).toBe(4);
   });
 });
 
@@ -338,7 +247,6 @@ describe('dispatch - persistence (localStorage)', () => {
           kpiValues: { some_kpi: 100 },
           monthlyConsumption: 50,
           cumulativeConsumption: 500,
-          actionCooldowns: {},
           lastActionDay: 10,
         },
       },
@@ -370,7 +278,6 @@ describe('dispatch - persistence (localStorage)', () => {
         kpiValues: {},
         monthlyConsumption: 0,
         cumulativeConsumption: 0,
-        actionCooldowns: {},
         lastActionDay: 0,
       },
     });
