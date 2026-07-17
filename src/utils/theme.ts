@@ -73,16 +73,17 @@ export const pageBase = {
   color: colors.textPrimary,
 } as const;
 
-/** 页面头部基础样式 */
-export const headerBase = {
-  display: 'flex',
-  'justify-content': 'space-between',
-  'align-items': 'center',
-  'padding-bottom': space.md,
-  'border-bottom': `1px solid ${colors.bgCard}`,
-  'background-color': colors.bgMain,
-  padding: space.md,
-} as const;
+/**
+ * 进度条颜色计算函数。
+ *
+ * @param rate 完成率（0~∞）
+ * @returns 对应的进度条颜色
+ */
+export function progressBarColor(rate: number): string {
+  if (rate >= 1) return colors.success;
+  if (rate >= 0.6) return colors.primary;
+  return colors.danger;
+}
 
 /**
  * 亮色卡片样式，悬浮于深色背景上。

@@ -13,7 +13,6 @@
 
 import { createMemo, Show, Switch, Match, For } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
-import type { PlayerSave } from '../../types/player';
 import { navigate } from '../../router';
 import { PromotionStage } from '../../types/enums';
 import { colors, radius, font, pageBase, darkCardStyle } from '../../utils/theme';
@@ -42,7 +41,7 @@ const ACTIVE_STAGES: PromotionStage[] = [
 ];
 
 export function Promotion() {
-  const { state, dispatch, getRawState } = useGameStore();
+  const { state, dispatch } = useGameStore();
 
   const stageLabel = createMemo(() => STAGE_LABELS[state.promotionStage] ?? '未知阶段');
   const hasChoices = createMemo(
@@ -154,14 +153,7 @@ export function Promotion() {
                 </button>
                 <button
                   onClick={() => {
-                    const snap = getRawState();
-                    dispatch({
-                      type: 'LOAD_SAVE',
-                      save: {
-                        ...snap,
-                        promotionStage: PromotionStage.Idle,
-                      } as PlayerSave,
-                    });
+                    dispatch({ type: 'RESET_PROMOTION' });
                     handleStart();
                   }}
                   style={{

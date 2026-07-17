@@ -145,6 +145,7 @@ export type GameAction =
   | { type: 'CHOOSE_EVENT_OPTION'; eventId: string; optionIndex: number }
   | { type: 'PROCESS_DOCUMENT'; docId: string; action: FileAction }
   | { type: 'START_PROMOTION' }
+  | { type: 'RESET_PROMOTION' }
   | {
       type: 'PROMOTION_RESOLVE_STAGE';
       choices?: { useConnections?: boolean; influenceInspectors?: boolean };
@@ -411,6 +412,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
     case 'NEW_GAME': {
       const fresh = createInitialState();
       Object.assign(draft, fresh, action.data);
+      break;
+    }
+    case 'RESET_PROMOTION': {
+      draft.promotionStage = PromotionStage.Idle;
+      draft.promotionState = null;
       break;
     }
     case 'START_PROMOTION': {

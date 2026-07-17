@@ -12,7 +12,7 @@ import { getConfigLoader } from '../../config/loader';
 import { navigate } from '../../router';
 import { formatCurrency } from '../../utils/format';
 import type { PageProps } from '../../router';
-import { colors, radius, pageBase, darkCardStyle } from '../../utils/theme';
+import { colors, radius, pageBase, darkCardStyle, progressBarColor } from '../../utils/theme';
 
 /** 判断行动是否可执行 */
 function canExecute(
@@ -32,9 +32,7 @@ function canExecute(
 }
 
 function kpiBarColor(rate: number): string {
-  if (rate >= 1) return colors.success;
-  if (rate >= 0.6) return colors.primary;
-  return colors.danger;
+  return progressBarColor(rate);
 }
 
 export function PositionDept(props: PageProps) {

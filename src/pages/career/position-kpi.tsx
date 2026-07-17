@@ -14,7 +14,7 @@ import { formatPercent } from '../../utils/format';
 import { createMemo, For, Show } from 'solid-js';
 import type { KPIResult } from '../../types/game';
 import { KPITier } from '../../types/enums';
-import { colors, radius, pageBase, darkCardStyle } from '../../utils/theme';
+import { colors, radius, pageBase, darkCardStyle, progressBarColor } from '../../utils/theme';
 
 /** 等次颜色映射 */
 function tierStyle(tier: KPITier) {
@@ -32,9 +32,7 @@ function tierStyle(tier: KPITier) {
 
 /** 进度条颜色 */
 function barColor(rate: number): string {
-  if (rate >= 1) return colors.success;
-  if (rate >= 0.6) return colors.primary;
-  return colors.danger;
+  return progressBarColor(rate);
 }
 
 export function PositionKPI() {
