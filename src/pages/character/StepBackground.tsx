@@ -2,7 +2,7 @@
  * Step 5 — 家庭背景 × 晋升通道（双列选择 + 加成预览）
  */
 import { For, createMemo } from 'solid-js';
-import { colors, radius, font, cardStyle } from '../../utils/theme';
+import { colors, radius, font, cardStyle, ATTR_LABELS } from '../../utils/theme';
 import type { CharacterData } from '../../types/character';
 import type { FamilyBackgroundItem, PromotionPathItem } from '../../types/config';
 
@@ -135,7 +135,7 @@ export function StepBackground(props: StepBackgroundProps) {
                   'font-size': '0.8rem',
                 }}
               >
-                {key} +{val}
+                {ATTR_LABELS[key] ?? key} +{val}
               </span>
             )}
           </For>
