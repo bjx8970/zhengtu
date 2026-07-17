@@ -365,7 +365,7 @@ describe('dispatch - persistence (localStorage)', () => {
     ]);
 
     expect(state.departmentStates).toMatchObject({
-      'admin_l2_0_dept_1': {
+      admin_l2_0_dept_1: {
         id: 'admin_l2_0_dept_1',
         kpiValues: {},
         monthlyConsumption: 0,
