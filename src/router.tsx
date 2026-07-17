@@ -50,6 +50,7 @@ export function createRouter(routes: Route[]) {
 
     const params: Record<string, string> = {};
     for (let i = 0; i < patternParts.length; i++) {
+      // 安全：patternParts 和 pathParts 长度已在 L49 验证相等，索引 i 始终有效
       const pp = patternParts[i]!;
       const pathp = pathParts[i]!;
       if (pp.startsWith(':')) {
