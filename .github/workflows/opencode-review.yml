@@ -64,8 +64,21 @@ jobs:
             - 新增文件是否包含文件头 JSDoc（描述用途、作者、日期）？
             - 导出的函数/类/接口是否有完整 JSDoc？
 
-            ## 6. 测试完整性
-            - 新增引擎函数是否配套测试？修改现有函数是否同步更新测试？
+            ## 6. 测试
+            - 新增引擎函数是否有配套测试（正常路径 + 边界）
+            - 测试文件是否使用 createTestStore() 隔离，而非导入模块级 dispatch()
+            - 覆盖率门槛：engine ≥90% lines、config ≥80%、store ≥70%
+
+            ## 7. 引擎文件长度
+            - src/engine/ 下单个文件是否超过 200 行，超过则建议拆分
+
+            ## 8. SolidJS 规范
+            - 列表渲染是否使用 <For each={list}> 而非 Array.map()
+            - 是否误用了 React hooks（useState、useEffect、useContext 等）
+            - 状态管理是否使用 createStore + produce，而非自建响应式
+
+            ## 9. Commit 信息
+            - 是否符合 Conventional Commits 格式（feat/fix/refactor/test/docs/chore + scope）
 
             ## 输出要求
             - 仅列出实际存在的问题，按严重等级标注：🔴 阻塞（必须修复）、🟡 建议（推荐优化）
