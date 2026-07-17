@@ -364,13 +364,15 @@ describe('dispatch - persistence (localStorage)', () => {
       'admin_l2_0_dept_3',
     ]);
 
-    // safe: departmentStates['admin_l2_0_dept_1'] verified non-null by `toEqual` above
-    const sampleDept = state.departmentStates['admin_l2_0_dept_1']!;
-    expect(sampleDept.id).toBe('admin_l2_0_dept_1');
-    expect(sampleDept.kpiValues).toEqual({});
-    expect(sampleDept.monthlyConsumption).toBe(0);
-    expect(sampleDept.cumulativeConsumption).toBe(0);
-    expect(sampleDept.actionCooldowns).toEqual({});
-    expect(sampleDept.lastActionDay).toBe(0);
+    expect(state.departmentStates).toMatchObject({
+      'admin_l2_0_dept_1': {
+        id: 'admin_l2_0_dept_1',
+        kpiValues: {},
+        monthlyConsumption: 0,
+        cumulativeConsumption: 0,
+        actionCooldowns: {},
+        lastActionDay: 0,
+      },
+    });
   });
 });

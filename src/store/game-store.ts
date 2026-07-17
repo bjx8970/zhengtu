@@ -190,7 +190,11 @@ function extractPositionIndex(positionId: string): number {
   return Number.isNaN(idx) ? 0 : idx;
 }
 
-/** 初始化当前职位的所有部门运行时状态 */
+/**
+ * 初始化当前职位的所有部门运行时状态。
+ *
+ * @param draft 当前游戏状态（mutable produce draft）
+ */
 function initializeDepartmentStates(draft: PlayerSave): void {
   const idx = extractPositionIndex(draft.currentPositionId);
   const pos = getConfigLoader().getPosition(draft.currentCareerLine, draft.currentLevel, idx);
