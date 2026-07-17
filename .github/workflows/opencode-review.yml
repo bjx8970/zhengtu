@@ -21,10 +21,8 @@ jobs:
       - uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-          GITHUB_TOKEN: ${{ github.token }}
         with:
           model: opencode/big-pickle
-          use_github_token: true
           prompt: |
             请审查此 Pull Request，严格基于 Git Diff 中实际变更的文件进行检查。按以下优先级逐项审查，仅报告与变更相关的问题：
 
