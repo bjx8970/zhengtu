@@ -16,6 +16,9 @@ import deptExtra from '../src/config/templates/departments-extra.json' with { ty
 import kpis from '../src/config/templates/kpis.json' with { type: 'json' };
 import events from '../src/config/templates/events.json' with { type: 'json' };
 import admin from '../src/config/career-lines/administrative.json' with { type: 'json' };
+import regionData from '../src/config/templates/regions.json' with { type: 'json' };
+import universityData from '../src/config/templates/universities.json' with { type: 'json' };
+import backgroundData from '../src/config/templates/backgrounds.json' with { type: 'json' };
 
 const departments = { ...deptCore, ...deptExtra };
 
@@ -268,6 +271,84 @@ if (!cResult.success) {
   }
 } else {
   console.log('   ✅ constants.json 格式校验通过');
+}
+
+console.log('\n--- 建档数据校验 ---\n');
+
+const RegionSchema = z.object({
+  provinces: z.array(
+    z.object({
+      name: z.string().min(1),
+      type: z.enum(['province', 'municipality', 'autonomous']),
+      scoreDistribution: z.object({
+        mean: z.number(),
+        stddev: z.number().positive(),
+        minScore: z.number(),
+        maxScore: z.number(),
+      }),
+      gaokaoThresholds: z.record(z.string(), z.number()),
+      ethnicBonus: z.number().min(0),
+      hasPreparatoryProgram: z.boolean(),
+      cities: z.array(z.string().min(1)).min(2),
+    }),
+  ),
+});
+
+const rResult = RegionSchema.safeParse(regionData);
+if (!rResult.success) {
+  for (const issue of rResult.error.issues) {
+    console.error(`❌ regions.json [${issue.path.join('.')}] ${issue.message}`);
+    errors++;
+  }
+} else {
+  console.log(`   ✅ regions.json (${regionData.provinces.length} 个省份)`);
+}
+
+const UniversitySchema = z.object({
+  tiers: z.record(z.string(), z.array(z.string().min(1)).min(1)),
+});
+const uResult = UniversitySchema.safeParse(universityData);
+if (!uResult.success) {
+  for (const issue of uResult.error.issues) {
+    console.error(`❌ universities.json [${issue.path.join('.')}] ${issue.message}`);
+    errors++;
+  }
+} else {
+  const totalSchools = Object.values(universityData.tiers).reduce(
+    (sum, arr) => sum + arr.length,
+    0,
+  );
+  console.log(
+    `   ✅ universities.json (${Object.keys(universityData.tiers).length} 档, ${totalSchools} 所)`,
+  );
+}
+
+const BackgroundSchema = z.object({
+  familyBackgrounds: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      bonuses: z.record(z.string(), z.number()),
+    }),
+  ),
+  promotionPaths: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      bonuses: z.record(z.string(), z.number()),
+    }),
+  ),
+});
+const bResult = BackgroundSchema.safeParse(backgroundData);
+if (!bResult.success) {
+  for (const issue of bResult.error.issues) {
+    console.error(`❌ backgrounds.json [${issue.path.join('.')}] ${issue.message}`);
+    errors++;
+  }
+} else {
+  console.log(
+    `   ✅ backgrounds.json (${backgroundData.familyBackgrounds.length} 背景 + ${backgroundData.promotionPaths.length} 通道)`,
+  );
 }
 
 if (errors > 0) {

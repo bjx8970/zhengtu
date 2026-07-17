@@ -71,12 +71,15 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     userId: '',
     characterName: '',
     gender: '男',
-    birthPlace: '',
-    birthYear: 1990,
-    education: '本科',
-    motivation: '为民服务',
-    personality: '稳健型',
-    familyBackground: '普通家庭',
+    birthPlace: { province: '', city: '' },
+    birthYear: cfg.startYear - cfg.defaultStartingAge,
+    gaokaoScore: 0,
+    gaokaoTier: '本科',
+    university: '',
+    universityTier: '本科',
+    familyBackground: 'worker',
+    promotionPath: 'gongwuyuan',
+    isPreparatory: false,
     currentPositionId: '',
     currentLevel: 1,
     currentCareerLine: 'admin' as CareerLine,
@@ -412,6 +415,43 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
     case 'NEW_GAME': {
       const fresh = createInitialState();
       Object.assign(draft, fresh, action.data);
+
+      // 应用家庭背景 + 晋升通道的属性加成
+      const bgId = (action.data as Record<string, unknown>).familyBackground as string | undefined;
+      const pathId = (action.data as Record<string, unknown>).promotionPath as string | undefined;
+      if (bgId || pathId) {
+        const loader = getConfigLoader();
+        const bonuses: Record<string, number> = {};
+        if (bgId) {
+          const bg = loader.getFamilyBackground(bgId);
+          if (bg) Object.assign(bonuses, bg.bonuses);
+        }
+        if (pathId) {
+          const path = loader.getPromotionPath(pathId);
+          if (path) Object.assign(bonuses, path.bonuses);
+        }
+        for (const [key, delta] of Object.entries(bonuses)) {
+          switch (key) {
+            case 'politicalCapital':
+              draft.politicalCapital = clamp(draft.politicalCapital + delta, 0, 500);
+              break;
+            case 'superiorFavor':
+              draft.superiorFavor = clamp(draft.superiorFavor + delta, 0, 100);
+              break;
+            case 'reform':
+            case 'pragmatic':
+            case 'conservative':
+              draft.factions.reputation[key] = clamp(
+                (draft.factions.reputation[key] ?? 0) + delta,
+                0,
+                100,
+              );
+              break;
+            default:
+              applyPlayerAttr(draft, key, delta, getConfigLoader().getGameConfig().attributeBounds);
+          }
+        }
+      }
       break;
     }
     case 'RESET_PROMOTION': {

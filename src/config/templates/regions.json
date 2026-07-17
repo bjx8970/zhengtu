@@ -1,0 +1,283 @@
+{
+  "provinces": [
+    {
+      "name": "北京市",
+      "type": "municipality",
+      "scoreDistribution": { "mean": 430, "stddev": 85, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 575, "211": 510, "本科": 400, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["东城区", "西城区", "朝阳区", "海淀区", "丰台区"]
+    },
+    {
+      "name": "天津市",
+      "type": "municipality",
+      "scoreDistribution": { "mean": 425, "stddev": 85, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 565, "211": 500, "本科": 390, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["和平区", "南开区", "河西区", "滨海新区", "武清区"]
+    },
+    {
+      "name": "上海市",
+      "type": "municipality",
+      "scoreDistribution": { "mean": 420, "stddev": 80, "minScore": 200, "maxScore": 730 },
+      "gaokaoThresholds": { "985": 545, "211": 480, "本科": 370, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["黄浦区", "徐汇区", "浦东新区", "静安区", "闵行区"]
+    },
+    {
+      "name": "重庆市",
+      "type": "municipality",
+      "scoreDistribution": { "mean": 440, "stddev": 85, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 600, "211": 535, "本科": 420, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["渝中区", "江北区", "沙坪坝区", "九龙坡区", "南岸区"]
+    },
+    {
+      "name": "河北省",
+      "type": "province",
+      "scoreDistribution": { "mean": 455, "stddev": 90, "minScore": 200, "maxScore": 750 },
+      "gaokaoThresholds": { "985": 620, "211": 550, "本科": 440, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["石家庄市", "唐山市", "保定市", "邯郸市", "秦皇岛市"]
+    },
+    {
+      "name": "山西省",
+      "type": "province",
+      "scoreDistribution": { "mean": 440, "stddev": 85, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 600, "211": 530, "本科": 420, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["太原市", "大同市", "阳泉市", "长治市", "晋中市"]
+    },
+    {
+      "name": "河南省",
+      "type": "province",
+      "scoreDistribution": { "mean": 470, "stddev": 95, "minScore": 200, "maxScore": 750 },
+      "gaokaoThresholds": { "985": 635, "211": 560, "本科": 450, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["郑州市", "洛阳市", "南阳市", "开封市", "新乡市"]
+    },
+    {
+      "name": "山东省",
+      "type": "province",
+      "scoreDistribution": { "mean": 460, "stddev": 90, "minScore": 200, "maxScore": 750 },
+      "gaokaoThresholds": { "985": 625, "211": 550, "本科": 440, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["济南市", "青岛市", "烟台市", "潍坊市", "临沂市"]
+    },
+    {
+      "name": "江苏省",
+      "type": "province",
+      "scoreDistribution": { "mean": 460, "stddev": 90, "minScore": 200, "maxScore": 750 },
+      "gaokaoThresholds": { "985": 620, "211": 545, "本科": 435, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["南京市", "苏州市", "无锡市", "徐州市", "南通市"]
+    },
+    {
+      "name": "浙江省",
+      "type": "province",
+      "scoreDistribution": { "mean": 455, "stddev": 88, "minScore": 200, "maxScore": 750 },
+      "gaokaoThresholds": { "985": 615, "211": 540, "本科": 435, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["杭州市", "宁波市", "温州市", "嘉兴市", "绍兴市"]
+    },
+    {
+      "name": "安徽省",
+      "type": "province",
+      "scoreDistribution": { "mean": 445, "stddev": 88, "minScore": 200, "maxScore": 750 },
+      "gaokaoThresholds": { "985": 610, "211": 540, "本科": 430, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["合肥市", "芜湖市", "蚌埠市", "安庆市", "黄山市"]
+    },
+    {
+      "name": "福建省",
+      "type": "province",
+      "scoreDistribution": { "mean": 440, "stddev": 85, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 600, "211": 530, "本科": 420, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["福州市", "厦门市", "泉州市", "漳州市", "莆田市"]
+    },
+    {
+      "name": "江西省",
+      "type": "province",
+      "scoreDistribution": { "mean": 435, "stddev": 85, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 595, "211": 525, "本科": 415, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["南昌市", "九江市", "景德镇市", "赣州市", "吉安市"]
+    },
+    {
+      "name": "湖北省",
+      "type": "province",
+      "scoreDistribution": { "mean": 450, "stddev": 88, "minScore": 200, "maxScore": 750 },
+      "gaokaoThresholds": { "985": 610, "211": 535, "本科": 430, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["武汉市", "宜昌市", "襄阳市", "荆州市", "黄石市"]
+    },
+    {
+      "name": "湖南省",
+      "type": "province",
+      "scoreDistribution": { "mean": 445, "stddev": 85, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 605, "211": 530, "本科": 425, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["长沙市", "株洲市", "湘潭市", "岳阳市", "衡阳市"]
+    },
+    {
+      "name": "广东省",
+      "type": "province",
+      "scoreDistribution": { "mean": 445, "stddev": 88, "minScore": 200, "maxScore": 750 },
+      "gaokaoThresholds": { "985": 610, "211": 535, "本科": 430, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["广州市", "深圳市", "东莞市", "佛山市", "珠海市"]
+    },
+    {
+      "name": "四川省",
+      "type": "province",
+      "scoreDistribution": { "mean": 440, "stddev": 85, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 600, "211": 530, "本科": 420, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["成都市", "绵阳市", "德阳市", "南充市", "宜宾市"]
+    },
+    {
+      "name": "贵州省",
+      "type": "province",
+      "scoreDistribution": { "mean": 400, "stddev": 82, "minScore": 200, "maxScore": 720 },
+      "gaokaoThresholds": { "985": 525, "211": 460, "本科": 370, "专科": 200 },
+      "ethnicBonus": 10,
+      "hasPreparatoryProgram": false,
+      "cities": ["贵阳市", "遵义市", "六盘水市", "安顺市", "毕节市"]
+    },
+    {
+      "name": "云南省",
+      "type": "province",
+      "scoreDistribution": { "mean": 395, "stddev": 80, "minScore": 200, "maxScore": 720 },
+      "gaokaoThresholds": { "985": 520, "211": 455, "本科": 365, "专科": 200 },
+      "ethnicBonus": 10,
+      "hasPreparatoryProgram": false,
+      "cities": ["昆明市", "大理市", "丽江市", "曲靖市", "玉溪市"]
+    },
+    {
+      "name": "海南省",
+      "type": "province",
+      "scoreDistribution": { "mean": 415, "stddev": 82, "minScore": 200, "maxScore": 730 },
+      "gaokaoThresholds": { "985": 560, "211": 495, "本科": 385, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["海口市", "三亚市", "儋州市", "琼海市", "文昌市"]
+    },
+    {
+      "name": "陕西省",
+      "type": "province",
+      "scoreDistribution": { "mean": 440, "stddev": 85, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 600, "211": 530, "本科": 420, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["西安市", "宝鸡市", "咸阳市", "渭南市", "延安市"]
+    },
+    {
+      "name": "甘肃省",
+      "type": "province",
+      "scoreDistribution": { "mean": 410, "stddev": 82, "minScore": 200, "maxScore": 720 },
+      "gaokaoThresholds": { "985": 555, "211": 490, "本科": 380, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["兰州市", "天水市", "嘉峪关市", "金昌市", "白银市"]
+    },
+    {
+      "name": "青海省",
+      "type": "province",
+      "scoreDistribution": { "mean": 380, "stddev": 85, "minScore": 200, "maxScore": 700 },
+      "gaokaoThresholds": { "985": 500, "211": 440, "本科": 350, "专科": 200 },
+      "ethnicBonus": 20,
+      "hasPreparatoryProgram": true,
+      "cities": ["西宁市", "海东市", "格尔木市"]
+    },
+    {
+      "name": "辽宁省",
+      "type": "province",
+      "scoreDistribution": { "mean": 445, "stddev": 85, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 605, "211": 535, "本科": 425, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["沈阳市", "大连市", "鞍山市", "抚顺市", "锦州市"]
+    },
+    {
+      "name": "吉林省",
+      "type": "province",
+      "scoreDistribution": { "mean": 435, "stddev": 83, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 595, "211": 525, "本科": 415, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["长春市", "吉林市", "四平市", "延吉市", "通化市"]
+    },
+    {
+      "name": "黑龙江省",
+      "type": "province",
+      "scoreDistribution": { "mean": 435, "stddev": 83, "minScore": 200, "maxScore": 740 },
+      "gaokaoThresholds": { "985": 600, "211": 530, "本科": 420, "专科": 200 },
+      "ethnicBonus": 0,
+      "hasPreparatoryProgram": false,
+      "cities": ["哈尔滨市", "齐齐哈尔市", "牡丹江市", "大庆市", "佳木斯市"]
+    },
+    {
+      "name": "广西壮族自治区",
+      "type": "autonomous",
+      "scoreDistribution": { "mean": 400, "stddev": 82, "minScore": 200, "maxScore": 720 },
+      "gaokaoThresholds": { "985": 530, "211": 460, "本科": 370, "专科": 200 },
+      "ethnicBonus": 15,
+      "hasPreparatoryProgram": false,
+      "cities": ["南宁市", "桂林市", "柳州市", "北海市", "玉林市"]
+    },
+    {
+      "name": "内蒙古自治区",
+      "type": "autonomous",
+      "scoreDistribution": { "mean": 405, "stddev": 82, "minScore": 200, "maxScore": 720 },
+      "gaokaoThresholds": { "985": 520, "211": 450, "本科": 360, "专科": 200 },
+      "ethnicBonus": 15,
+      "hasPreparatoryProgram": false,
+      "cities": ["呼和浩特市", "包头市", "赤峰市", "鄂尔多斯市", "呼伦贝尔市"]
+    },
+    {
+      "name": "宁夏回族自治区",
+      "type": "autonomous",
+      "scoreDistribution": { "mean": 385, "stddev": 82, "minScore": 200, "maxScore": 710 },
+      "gaokaoThresholds": { "985": 510, "211": 440, "本科": 350, "专科": 200 },
+      "ethnicBonus": 20,
+      "hasPreparatoryProgram": false,
+      "cities": ["银川市", "石嘴山市", "吴忠市", "固原市", "中卫市"]
+    },
+    {
+      "name": "新疆维吾尔自治区",
+      "type": "autonomous",
+      "scoreDistribution": { "mean": 370, "stddev": 80, "minScore": 200, "maxScore": 700 },
+      "gaokaoThresholds": { "985": 470, "211": 410, "本科": 330, "专科": 200 },
+      "ethnicBonus": 25,
+      "hasPreparatoryProgram": true,
+      "cities": ["乌鲁木齐市", "克拉玛依市", "喀什市", "伊宁市", "库尔勒市"]
+    },
+    {
+      "name": "西藏自治区",
+      "type": "autonomous",
+      "scoreDistribution": { "mean": 350, "stddev": 80, "minScore": 200, "maxScore": 700 },
+      "gaokaoThresholds": { "985": 440, "211": 390, "本科": 310, "专科": 200 },
+      "ethnicBonus": 30,
+      "hasPreparatoryProgram": true,
+      "cities": ["拉萨市", "日喀则市", "林芝市"]
+    }
+  ]
+}

@@ -3,7 +3,7 @@
   "daysPerMonth": 30,
   "monthsPerYear": 12,
   "retirementAge": 65,
-  "startYear": 2024,
+  "startYear": 2012,
   "congressCycleYears": 5,
   "budgetByLevel": [0, 1000, 2000, 3000, 5000, 8000, 12000, 18000, 25000, 35000, 50000, 70000],
   "budgetMultiplierByLine": { "admin": 1.0, "party": 0.8, "discipline": 1.0, "mass": 0.8 },
@@ -34,7 +34,7 @@
   "incompetentFrozenPeriods": 1,
   "consecutiveFailureThreshold": 2,
   "maxFrozenPeriods": 5,
-  "defaultStartingAge": 30,
+  "defaultStartingAge": 22,
   "initialAttributes": {
     "integrity": 50,
     "stability": 50,

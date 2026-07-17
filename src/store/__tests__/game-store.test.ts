@@ -10,7 +10,7 @@ describe('createInitialState', () => {
     expect(state.currentCareerLine).toBe(CareerLine.Administrative);
     expect(state.slots.available).toBe(3);
     expect(state.slots.max).toBe(3);
-    expect(state.time.year).toBe(2024);
+    expect(state.time.year).toBe(2012);
     expect(state.time.month).toBe(1);
     expect(state.time.day).toBe(1);
     expect(state.time.granularity).toBe('day');
@@ -250,12 +250,15 @@ describe('dispatch - persistence (localStorage)', () => {
       data: {
         characterName: '新角色',
         gender: '男',
-        birthPlace: '北京',
-        education: '本科',
-        motivation: '为民服务',
-        personality: '稳健型',
-        birthYear: 1994,
-        familyBackground: '普通家庭',
+        birthPlace: { province: '北京市', city: '海淀区' },
+        birthYear: 1990,
+        gaokaoScore: 600,
+        gaokaoTier: '211',
+        university: '北京工业大学',
+        universityTier: '211',
+        familyBackground: 'worker',
+        promotionPath: 'gongwuyuan',
+        isPreparatory: false,
         currentPositionId: 'admin_l1_0',
         remainingBudget: 800,
       },

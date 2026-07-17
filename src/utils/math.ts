@@ -41,3 +41,17 @@ export function pickRandom<T>(arr: T[]): T | undefined {
   if (arr.length === 0) return undefined;
   return arr[randomInt(arr.length)];
 }
+
+/**
+ * Box-Muller 变换生成正态分布随机数。
+ *
+ * @param mean   均值
+ * @param stddev 标准差
+ * @returns 符合 N(mean, stddev²) 分布的随机值
+ */
+export function normalRandom(mean: number, stddev: number): number {
+  const u1 = Math.random();
+  const u2 = Math.random();
+  const z = Math.sqrt(-2 * Math.log(Math.max(u1, 0.0001))) * Math.cos(2 * Math.PI * u2);
+  return mean + z * stddev;
+}

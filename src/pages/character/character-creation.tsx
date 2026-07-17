@@ -1,138 +1,143 @@
 /**
- * 建档页面（6 步向导）
+ * 建档页面（5 步向导）
  *
  * 创建游戏角色的向导流程：
- * 1. 姓名 — 文本输入
- * 2. 性别 — 男/女
- * 3. 出生地 — 6 选 1
- * 4. 学历 — 5 选 1
- * 5. 动机 — 3 选 1
- * 6. 性格 — 4 选 1
+ * 1. 基本信息 — 姓名 + 性别
+ * 2. 出生地 — 省份 → 城市级联选择
+ * 3. 高考成绩 — 随机生成 + 可重掷
+ * 4. 院校选择 — 档次 → 院校级联（向下兼容）
+ * 5. 家庭背景 + 晋升通道 — 双列选择 + 加成预览
  *
  * 完成后 dispatch(NEW_GAME) 并跳转仪表盘。
  */
-import { createSignal, For, Show } from 'solid-js';
+import { createSignal, createMemo, Show, For } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { getConfigLoader } from '../../config/loader';
 import { navigate } from '../../router';
 import { CareerLine } from '../../types/enums';
-import type { CharacterData, StepDef } from '../../types/character';
-import { colors, radius, font, pageBase, cardStyle } from '../../utils/theme';
-
-const STEPS: (StepDef & { quote?: string })[] = [
-  { title: '姓名', field: 'characterName', type: 'input', quote: '名者，命也' },
-  { title: '性别', field: 'gender', type: 'options', options: ['男', '女'], quote: '巾帼不让须眉' },
-  {
-    title: '出生地',
-    field: 'birthPlace',
-    type: 'options',
-    options: ['北京', '上海', '省城', '地级市', '县城', '乡镇'],
-    quote: '一方水土养一方人',
-  },
-  {
-    title: '最高学历',
-    field: 'education',
-    type: 'options',
-    options: ['高中', '大专', '本科', '硕士', '博士'],
-    quote: '学而优则仕',
-  },
-  {
-    title: '从政动机',
-    field: 'motivation',
-    type: 'options',
-    options: ['为民服务', '个人抱负', '家族期望'],
-    quote: '为天地立心，为生民立命',
-  },
-  {
-    title: '性格特质',
-    field: 'personality',
-    type: 'options',
-    options: ['廉洁型', '务实型', '改革型', '稳健型'],
-    quote: '江山易改，秉性难移',
-  },
-];
+import type { CharacterData } from '../../types/character';
+import { generateGaokaoScore } from '../../utils/gaokao';
+import { colors, radius, font, pageBase } from '../../utils/theme';
+import type { ProvinceConfig } from '../../types/config';
+import { StepBasicInfo } from './StepBasicInfo';
+import { StepBirthplace } from './StepBirthplace';
+import { StepGaokao } from './StepGaokao';
+import { StepSchool } from './StepSchool';
+import { StepBackground } from './StepBackground';
 
 const INITIAL_DATA: CharacterData = {
   characterName: '',
   gender: '男',
-  birthPlace: '',
-  education: '本科',
-  motivation: '为民服务',
-  personality: '稳健型',
+  province: '',
+  city: '',
+  gaokaoScore: 0,
+  gaokaoTier: '本科',
+  university: '',
+  universityTier: '本科',
+  familyBackground: 'worker',
+  promotionPath: 'gongwuyuan',
+  isPreparatory: false,
 };
 
 export function CharacterCreation() {
   const { state, dispatch } = useGameStore();
 
-  // 已有存档时跳过建档，直接进入仪表盘
   if (state.characterName) {
     navigate('/dashboard');
     return null;
   }
+
   const [step, setStep] = createSignal(0);
   const [data, setData] = createSignal<CharacterData>({ ...INITIAL_DATA });
+  const TOTAL = 5;
 
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- step() 始终在 STEPS 索引范围内
-  const currentStep = () => STEPS[step()]!;
-  const isFirst = () => step() === 0;
-  const isLast = () => step() === STEPS.length - 1;
+  const loader = getConfigLoader();
+  const provinces = createMemo(() => loader.getRegions().provinces);
+  const universities = createMemo(() => loader.getUniversities());
+  const backgrounds = createMemo(() => loader.getFamilyBackgrounds());
+  const paths = createMemo(() => loader.getPromotionPaths());
+  const gaokaoYear = createMemo(() => loader.getGameConfig().startYear - 4);
 
-  /** 当前步骤是否有有效输入 */
-  const canProceed = () => {
-    const s = currentStep();
-    const value = data()[s.field];
-    if (s.type === 'input') return (value as string).trim().length > 0;
-    return value !== '';
-  };
+  function updateField<K extends keyof CharacterData>(field: K, value: CharacterData[K]) {
+    setData((prev) => ({ ...prev, [field]: value }));
+  }
 
-  function updateField(value: string) {
-    setData((prev) => ({ ...prev, [currentStep().field]: value }));
+  function rollGaokao(province: ProvinceConfig) {
+    const result = generateGaokaoScore(province);
+    setData((prev) => ({
+      ...prev,
+      gaokaoScore: result.rawScore,
+      gaokaoTier: result.tier,
+      isPreparatory: false,
+    }));
   }
 
   function handleNext() {
-    if (isLast()) {
-      handleComplete();
-      return;
-    }
-    setStep((s) => s + 1);
+    if (step() < TOTAL - 1) setStep((s) => s + 1);
   }
-
   function handlePrev() {
     setStep((s) => Math.max(0, s - 1));
   }
 
   function handleComplete() {
-    const cfg = getConfigLoader().getGameConfig();
+    const cfg = loader.getGameConfig();
     const startLine = CareerLine.Administrative;
-    const startLevel = 1;
-    const startIndex = 0;
-    const DEFAULT_START_POS_ID = `${startLine}_l${startLevel}_${startIndex}`;
-    const startPos = getConfigLoader().getPosition(startLine, startLevel, startIndex);
+    const startPos = loader.getPosition(startLine, 1, 0);
+    const startYear = cfg.startYear + (data().isPreparatory ? 1 : 0);
+
     dispatch({
       type: 'NEW_GAME',
       data: {
-        ...data(),
-        birthYear: cfg.startYear - cfg.defaultStartingAge,
-        familyBackground: '普通家庭',
-        currentPositionId: startPos?.id ?? DEFAULT_START_POS_ID,
-        remainingBudget: startPos?.annualBudget ?? cfg.budgetByLevel[startLevel] ?? 0,
+        characterName: data().characterName,
+        gender: data().gender,
+        birthPlace: { province: data().province, city: data().city },
+        birthYear: startYear - cfg.defaultStartingAge,
+        gaokaoScore: data().gaokaoScore,
+        gaokaoTier: data().gaokaoTier,
+        university: data().university,
+        universityTier: data().universityTier,
+        familyBackground: data().familyBackground,
+        promotionPath: data().promotionPath,
+        isPreparatory: data().isPreparatory,
+        currentPositionId: startPos?.id ?? 'admin_l1_0',
+        remainingBudget: startPos?.annualBudget ?? cfg.budgetByLevel[1] ?? 0,
       },
     });
     navigate('/dashboard');
   }
+
+  const canNext = createMemo(() => {
+    const d = data();
+    switch (step()) {
+      case 0:
+        return d.characterName.trim().length >= 2;
+      case 1:
+        return !!d.province && !!d.city;
+      case 2:
+        return d.gaokaoScore > 0;
+      case 3:
+        return !!d.university && !!d.universityTier;
+      case 4:
+        return !!d.familyBackground && !!d.promotionPath;
+      default:
+        return false;
+    }
+  });
+
+  const selectedProvince = createMemo(() => provinces().find((p) => p.name === data().province));
 
   return (
     <div style={pageBase}>
       {/* 进度条 */}
       <div style={{ padding: '1.5rem 1.5rem 0' }}>
         <div style={{ display: 'flex', gap: '0.3rem', 'margin-bottom': '0.5rem' }}>
-          <For each={STEPS}>
-            {(_, idx) => (
+          <For each={Array.from({ length: TOTAL }, (_, i) => i)}>
+            {(i) => (
               <div
                 style={{
                   flex: 1,
                   height: '3px',
-                  'background-color': idx() <= step() ? colors.primary : colors.border,
+                  'background-color': i <= step() ? colors.primary : colors.border,
                   'border-radius': radius.sm,
                   transition: 'background 0.3s',
                 }}
@@ -141,11 +146,11 @@ export function CharacterCreation() {
           </For>
         </div>
         <div style={{ 'font-size': '0.8rem', color: colors.textSecondary }}>
-          第 {step() + 1}/{STEPS.length} 步 · {currentStep().title}
+          第 {step() + 1}/{TOTAL} 步
         </div>
       </div>
 
-      {/* 表单区域 — 白色卡片居中 */}
+      {/* 内容区 */}
       <div
         style={{
           flex: 1,
@@ -153,111 +158,47 @@ export function CharacterCreation() {
           'flex-direction': 'column',
           'align-items': 'center',
           'justify-content': 'center',
-          padding: '1.5rem',
+          padding: '1rem 1.5rem',
+          overflow: 'hidden',
         }}
       >
-        <div
-          style={{
-            ...cardStyle('2rem'),
-            width: '100%',
-            'max-width': '320px',
-            'text-align': 'center',
-          }}
-        >
-          <h2
-            style={{
-              'margin-bottom': '0.5rem',
-              'font-size': '1.4rem',
-              'font-weight': 'normal',
-            }}
-          >
-            {currentStep().title}
-          </h2>
-
-          <Show when={currentStep().quote}>
-            <div
-              style={{
-                'font-size': '0.85rem',
-                color: colors.primary,
-                opacity: 0.7,
-                'margin-bottom': '1.5rem',
-                'font-family': font.title,
-              }}
-            >
-              —— {currentStep().quote} ——
-            </div>
-          </Show>
-
-          <Show when={currentStep().type === 'input'}>
-            <input
-              type="text"
-              placeholder="输入姓名"
-              value={data().characterName}
-              onInput={(e) => updateField(e.currentTarget.value)}
-              style={{
-                padding: '0.8rem 1rem',
-                'font-size': '1.1rem',
-                'border-radius': radius.md,
-                border: `1px solid ${colors.borderLight}`,
-                'background-color': colors.bgInput,
-                color: colors.textDark,
-                width: '100%',
-                'text-align': 'center',
-                outline: 'none',
-              }}
-              autofocus
+        <Show when={step() === 0}>
+          <StepBasicInfo data={data()} updateField={updateField} />
+        </Show>
+        <Show when={step() === 1}>
+          <StepBirthplace
+            data={data()}
+            provinces={provinces}
+            selectedProvince={selectedProvince}
+            updateField={updateField}
+          />
+        </Show>
+        <Show when={step() === 2 && selectedProvince()}>
+          {(prov) => (
+            <StepGaokao
+              data={data()}
+              province={prov()}
+              gaokaoYear={gaokaoYear()}
+              rollGaokao={rollGaokao}
             />
-          </Show>
-
-          <Show when={currentStep().type === 'options' && currentStep().options}>
-            <div
-              style={{
-                display: 'flex',
-                'flex-direction': 'column',
-                gap: '0.6rem',
-                width: '100%',
-              }}
-            >
-              {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- 仅 options 类型步骤渲染此 For */}
-              <For each={currentStep().options!}>
-                {(opt) => {
-                  const selected = data()[currentStep().field] === opt;
-                  return (
-                    <div
-                      onClick={() => updateField(opt)}
-                      style={{
-                        padding: '0.8rem 1rem',
-                        'font-size': '1rem',
-                        'background-color': selected ? colors.primary : colors.bgInput,
-                        color: selected ? colors.primaryText : colors.textDark,
-                        border: selected
-                          ? `1px solid ${colors.primary}`
-                          : `1px solid ${colors.borderLight}`,
-                        'border-radius': radius.md,
-                        cursor: 'pointer',
-                        'text-align': 'center',
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      {opt}
-                    </div>
-                  );
-                }}
-              </For>
-            </div>
-          </Show>
-        </div>
+          )}
+        </Show>
+        <Show when={step() === 3}>
+          <StepSchool data={data()} universities={universities()} updateField={updateField} />
+        </Show>
+        <Show when={step() === 4}>
+          <StepBackground
+            data={data()}
+            backgrounds={backgrounds()}
+            paths={paths()}
+            updateField={updateField}
+          />
+        </Show>
       </div>
 
       {/* 底部导航 */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.8rem',
-          padding: '1rem 1.5rem 1.5rem',
-        }}
-      >
-        <Show when={!isFirst()}>
+      <div style={{ display: 'flex', gap: '0.8rem', padding: '1rem 1.5rem 1.5rem' }}>
+        <Show when={step() > 0}>
           <button
             onClick={handlePrev}
             style={{
@@ -274,23 +215,43 @@ export function CharacterCreation() {
             上一步
           </button>
         </Show>
-        <button
-          onClick={handleNext}
-          disabled={!canProceed()}
-          style={{
-            flex: 1,
-            padding: '0.8rem',
-            'font-size': '1rem',
-            'background-color': canProceed() ? colors.primary : colors.border,
-            color: canProceed() ? colors.primaryText : colors.textMuted,
-            border: 'none',
-            'border-radius': radius.md,
-            cursor: canProceed() ? 'pointer' : 'not-allowed',
-            transition: 'background 0.2s',
-          }}
-        >
-          {isLast() ? '开始仕途' : '下一步'}
-        </button>
+        <Show when={step() < TOTAL - 1}>
+          <button
+            onClick={handleNext}
+            disabled={!canNext()}
+            style={{
+              flex: 1,
+              padding: '0.8rem',
+              'font-size': '1rem',
+              'background-color': canNext() ? colors.primary : colors.border,
+              color: canNext() ? colors.primaryText : colors.textMuted,
+              border: 'none',
+              'border-radius': radius.md,
+              cursor: canNext() ? 'pointer' : 'not-allowed',
+            }}
+          >
+            下一步
+          </button>
+        </Show>
+        <Show when={step() === TOTAL - 1}>
+          <button
+            onClick={handleComplete}
+            disabled={!canNext()}
+            style={{
+              flex: 1,
+              padding: '0.8rem',
+              'font-size': '1rem',
+              'background-color': canNext() ? colors.primary : colors.border,
+              color: canNext() ? colors.primaryText : colors.textMuted,
+              border: 'none',
+              'border-radius': radius.md,
+              cursor: canNext() ? 'pointer' : 'not-allowed',
+              'font-family': font.title,
+            }}
+          >
+            开始仕途
+          </button>
+        </Show>
       </div>
     </div>
   );

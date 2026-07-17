@@ -1,0 +1,51 @@
+{
+  "familyBackgrounds": [
+    {
+      "id": "peasant",
+      "name": "农民家庭",
+      "bonuses": { "stability": 5 }
+    },
+    {
+      "id": "worker",
+      "name": "工人家庭",
+      "bonuses": { "stability": 5, "competence": 5 }
+    },
+    {
+      "id": "merchant",
+      "name": "商人家庭",
+      "bonuses": { "politicalCapital": 20, "charisma": 5 }
+    },
+    {
+      "id": "cadre",
+      "name": "干部家庭",
+      "bonuses": { "superiorFavor": 15, "politicalCapital": 10, "reform": 5 }
+    },
+    {
+      "id": "academic",
+      "name": "知识分子家庭",
+      "bonuses": { "competence": 10, "integrity": 5 }
+    }
+  ],
+  "promotionPaths": [
+    {
+      "id": "xuandiao",
+      "name": "选调生",
+      "bonuses": { "superiorFavor": 10, "pragmatic": 10 }
+    },
+    {
+      "id": "gongwuyuan",
+      "name": "公务员考试",
+      "bonuses": { "integrity": 5, "stability": 5 }
+    },
+    {
+      "id": "junzhuan",
+      "name": "军转干",
+      "bonuses": { "stability": 10, "charisma": 5, "conservative": 5 }
+    },
+    {
+      "id": "guoqi",
+      "name": "国企调任",
+      "bonuses": { "politicalCapital": 10, "reform": 5, "pragmatic": 5 }
+    }
+  ]
+}

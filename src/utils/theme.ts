@@ -111,3 +111,16 @@ export function darkCardStyle(pad?: string) {
     border: `1px solid ${colors.border}`,
   };
 }
+
+/** 属性名到中文显示名的映射 */
+export const ATTR_LABELS: Record<string, string> = {
+  stability: '稳定',
+  competence: '能力',
+  integrity: '廉洁',
+  charisma: '魅力',
+  politicalCapital: '政治资本',
+  superiorFavor: '上司好感',
+  reform: '改革派声望',
+  pragmatic: '务实派声望',
+  conservative: '保守派声望',
+};

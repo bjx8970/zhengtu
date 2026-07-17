@@ -18,6 +18,12 @@ import type {
   KPITemplate,
   PositionConfig,
   GameConfig,
+  RegionConfig,
+  UniversityConfig,
+  BackgroundConfig,
+  ProvinceConfig,
+  FamilyBackgroundItem,
+  PromotionPathItem,
 } from '../types/config';
 import deptTemplateData from './templates/departments.json' with { type: 'json' };
 import deptExtraData from './templates/departments-extra.json' with { type: 'json' };
@@ -28,6 +34,9 @@ import partyData from './career-lines/party.json' with { type: 'json' };
 import disciplineData from './career-lines/discipline.json' with { type: 'json' };
 import massData from './career-lines/mass.json' with { type: 'json' };
 import constantsData from './constants.json' with { type: 'json' };
+import regionData from './templates/regions.json' with { type: 'json' };
+import universityData from './templates/universities.json' with { type: 'json' };
+import backgroundData from './templates/backgrounds.json' with { type: 'json' };
 import type { GameEvent } from '../types/game';
 import type { DepartmentTemplate } from '../types/config';
 
@@ -61,6 +70,9 @@ class ConfigLoader {
   private kpiTemplates: Record<string, KPITemplate>;
   private events: Record<string, GameEvent>;
   private lines: Record<string, CareerLineConfig>;
+  private regionConfig: RegionConfig;
+  private universityConfig: UniversityConfig;
+  private backgroundConfig: BackgroundConfig;
   readonly gameConfig: GameConfig;
 
   constructor() {
@@ -69,6 +81,9 @@ class ConfigLoader {
     this.events = ALL_EVENTS;
     this.lines = LINE_CONFIGS;
     this.gameConfig = constantsData as unknown as GameConfig;
+    this.regionConfig = regionData as unknown as RegionConfig;
+    this.universityConfig = universityData as unknown as UniversityConfig;
+    this.backgroundConfig = backgroundData as unknown as BackgroundConfig;
   }
 
   /** 查询完整职业线配置 */
@@ -105,6 +120,41 @@ class ConfigLoader {
   /** 按 ID 获取单个事件 */
   getEventById(id: string): GameEvent | null {
     return this.events[id] ?? null;
+  }
+
+  /** 获取全部省份/地区数据 */
+  getRegions(): RegionConfig {
+    return this.regionConfig;
+  }
+
+  /** 按名称查找省份配置 */
+  getProvince(name: string): ProvinceConfig | null {
+    return this.regionConfig.provinces.find((p) => p.name === name) ?? null;
+  }
+
+  /** 获取所有院校数据 */
+  getUniversities(): UniversityConfig {
+    return this.universityConfig;
+  }
+
+  /** 获取所有家庭背景 */
+  getFamilyBackgrounds(): FamilyBackgroundItem[] {
+    return this.backgroundConfig.familyBackgrounds;
+  }
+
+  /** 获取所有晋升通道 */
+  getPromotionPaths(): PromotionPathItem[] {
+    return this.backgroundConfig.promotionPaths;
+  }
+
+  /** 按 ID 查找家庭背景 */
+  getFamilyBackground(id: string): FamilyBackgroundItem | null {
+    return this.backgroundConfig.familyBackgrounds.find((b) => b.id === id) ?? null;
+  }
+
+  /** 按 ID 查找晋升通道 */
+  getPromotionPath(id: string): PromotionPathItem | null {
+    return this.backgroundConfig.promotionPaths.find((p) => p.id === id) ?? null;
   }
 
   /** 获取全局游戏常量 */
