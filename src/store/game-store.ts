@@ -5,11 +5,11 @@
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 状态变更后组件自动细粒度响应（Solid 字段级追踪）
- * 4. 持久化不在此层：推进时间时由调用方触发 saveRepo
+ * 4. 每次 dispatch 实时写入 localStorage；ADVANCE_TIME 额外同步 Supabase
  *
  * 操作阶段 vs 提交阶段：
- * - 操作阶段（执行行动、处理文件、选择事件）：只修改 store，不持久化
- * - 提交阶段（推进时间）：一次性结算 + 保存
+ * - 操作阶段（执行行动、处理文件、选择事件）：修改 store + 实时写入 localStorage
+ * - 提交阶段（推进时间）：结算所有到期行动 + localStorage + Supabase 同步
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
@@ -21,7 +21,12 @@ import {
   FileAction,
 } from '../types/enums';
 import type { TimeGranularity } from '../types/enums';
-import type { PlayerSave, GameTime, SlotOccupant } from '../types/player';
+import type {
+  PlayerSave,
+  GameTime,
+  SlotOccupant,
+  CompletedActionNotification,
+} from '../types/player';
 import type { TimeTrigger } from '../types/game';
 import { startAction, completeActions, resolveActionEffects } from '../engine/core/action';
 import { advanceTime, getGranularityDays } from '../engine/core/time';
@@ -429,12 +434,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       resolveTriggers(draft, timeResult.triggers);
 
       const completed = completeActions(draft.slots, draft.totalDaysPlayed);
-      const notifications: {
-        actionName: string;
-        deptName: string;
-        effects: string[];
-        completedAtDay: number;
-      }[] = [];
+      const notifications: CompletedActionNotification[] = [];
 
       for (const c of completed) {
         const slotOccupant = c.occupant;

@@ -51,25 +51,6 @@ export interface TimeAdvanceResult {
 export type StartActionResult =
   { success: false; error: string } | { success: true; tierKey: SlotTierKey; slotIndex: number };
 
-/** 单个行动完成后的效果 */
-export interface CompletedActionEffect {
-  actionName: string;
-  deptName: string;
-  kpiChanges: { indicatorId: string; delta: number }[];
-  playerChanges: { attr: string; delta: number }[];
-}
-
-/** 槽位完成检查结果 */
-export interface CompleteActionsResult {
-  completed: CompletedActionEffect[];
-}
-
-/** 单个行动效果的解析结果 */
-export interface ActionEffectResult {
-  target: string;
-  delta: number;
-}
-
 /** 随机事件的触发条件 */
 export interface EventCondition {
   minLevel?: number;

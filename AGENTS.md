@@ -77,11 +77,10 @@ Tests use `createTestStore()` for isolation. Never import the module-level `disp
 - Modifying config values: edit JSON, run `pnpm validate:config`, done. No code changes needed.
 - Templates are split across `departments.json` (core 8) and `departments-extra.json` (extra 11). Both are merged at load time.
 
-## Persistence model: phase commit
+## Persistence model: real-time + phase commit
 
-- Actions modify state in memory only.
-- **Only** `ADVANCE_TIME` (push "推进时间") triggers persistence: `unwrap(state)` → Supabase upsert + localStorage backup.
-- `EXECUTE_ACTION` internally calls `advanceTime` but does NOT persist — that happens when user explicitly pushes the advance button.
+- Every action writes to localStorage immediately via `writeLocalSave(unwrap(state))`.
+- `ADVANCE_TIME` (push "推进时间") additionally syncs to Supabase via `upsertSave()`.
 - Load arbitration: `selectNewer(localSave, remoteSave)` compares `updatedAt` timestamps.
 
 ## Slot-based action system (no AP)
