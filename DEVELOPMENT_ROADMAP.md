@@ -510,7 +510,7 @@ progressBarColor(rate) → 进度条颜色（≥1 success, ≥0.6 primary, else 
 
 ## 13. Store 关键文件说明
 
-### 14.1 `src/store/game-store.ts` (674 行)
+### 13.1 `src/store/game-store.ts` (674 行)
 
 ```
 createInitialState(overrides?)     # 创建初始 PlayerSave
@@ -529,7 +529,7 @@ createTestStore(overrides?)        # 隔离测试 store
 useGameStore()                     # 组件 hooks
 ```
 
-### 14.2 关键辅助函数
+### 13.2 关键辅助函数
 
 ```
 canAct(stage)                      # 非 idle/completed/failed 禁止操作
