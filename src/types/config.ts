@@ -222,3 +222,44 @@ export interface GameConfig {
   /** 晋升引擎阈值配置 */
   promotion: PromotionConfig;
 }
+
+/** 省份/地区配置（regions.json） */
+export interface ProvinceConfig {
+  name: string;
+  type: 'province' | 'municipality' | 'autonomous';
+  scoreDistribution: { mean: number; stddev: number; minScore: number; maxScore: number };
+  gaokaoThresholds: { [tier: string]: number };
+  ethnicBonus: number;
+  hasPreparatoryProgram: boolean;
+  cities: string[];
+}
+
+/** 地区配置容器 */
+export interface RegionConfig {
+  provinces: ProvinceConfig[];
+}
+
+/** 院校配置（universities.json） */
+export interface UniversityConfig {
+  tiers: Record<string, string[]>;
+}
+
+/** 家庭背景配置项 */
+export interface FamilyBackgroundItem {
+  id: string;
+  name: string;
+  bonuses: Record<string, number>;
+}
+
+/** 晋升通道配置项 */
+export interface PromotionPathItem {
+  id: string;
+  name: string;
+  bonuses: Record<string, number>;
+}
+
+/** 背景配置容器（backgrounds.json） */
+export interface BackgroundConfig {
+  familyBackgrounds: FamilyBackgroundItem[];
+  promotionPaths: PromotionPathItem[];
+}

@@ -144,13 +144,24 @@ export interface PlayerSave {
   userId: string;
   characterName: string;
   gender: '男' | '女';
-  birthPlace: string;
+  /** 出生地 */
+  birthPlace: { province: string; city: string };
   /** 游戏内出生年份，用于计算年龄和退休 */
   birthYear: number;
-  education: '高中' | '大专' | '本科' | '硕士' | '博士';
-  motivation: '为民服务' | '个人抱负' | '家族期望';
-  personality: '廉洁型' | '务实型' | '改革型' | '稳健型';
-  familyBackground: '普通家庭' | '干部家庭' | '商人家庭';
+  /** 高考分数（2008年） */
+  gaokaoScore: number;
+  /** 高考录取档次 */
+  gaokaoTier: string;
+  /** 毕业院校名称 */
+  university: string;
+  /** 院校档次选择 */
+  universityTier: string;
+  /** 家庭背景 */
+  familyBackground: '农民家庭' | '工人家庭' | '商人家庭' | '干部家庭' | '知识分子家庭';
+  /** 晋升通道 */
+  promotionPath: '选调生' | '公务员考试' | '军转干' | '国企调任';
+  /** 是否为少数民族预科班 */
+  isPreparatory: boolean;
 
   // ===== 当前职位 =====
   currentPositionId: string;
