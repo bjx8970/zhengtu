@@ -31,10 +31,6 @@ function canExecute(
   return { ok: true, reason: '' };
 }
 
-function kpiBarColor(rate: number): string {
-  return progressBarColor(rate);
-}
-
 export function PositionDept(props: PageProps) {
   const { state, dispatch } = useGameStore();
   const deptIndex = parseInt(props.deptIndex ?? '0', 10);
@@ -350,7 +346,7 @@ export function PositionDept(props: PageProps) {
                                     style={{
                                       height: '100%',
                                       width: `${Math.min(rate * 100, 100)}%`,
-                                      'background-color': kpiBarColor(rate),
+                                      'background-color': progressBarColor(rate),
                                       'border-radius': radius.sm,
                                     }}
                                   />

@@ -30,11 +30,6 @@ function tierStyle(tier: KPITier) {
   }
 }
 
-/** 进度条颜色 */
-function barColor(rate: number): string {
-  return progressBarColor(rate);
-}
-
 export function PositionKPI() {
   const { state } = useGameStore();
 
@@ -198,7 +193,7 @@ export function PositionKPI() {
                           style={{
                             height: '100%',
                             width: `${Math.min(indicator.completionRate * 100, 100)}%`,
-                            'background-color': barColor(indicator.completionRate),
+                            'background-color': progressBarColor(indicator.completionRate),
                             'border-radius': radius.sm,
                           }}
                         />
