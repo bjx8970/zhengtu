@@ -18,11 +18,3 @@ export interface CharacterData {
   promotionPath: string;
   isPreparatory: boolean;
 }
-
-/** 建档向导的单个步骤定义 */
-export interface StepDef {
-  title: string;
-  field: keyof CharacterData;
-  type:
-    'input' | 'gender' | 'province' | 'city' | 'gaokao' | 'tier' | 'school' | 'background' | 'path';
-}

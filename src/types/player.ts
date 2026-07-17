@@ -157,9 +157,9 @@ export interface PlayerSave {
   /** 院校档次选择 */
   universityTier: string;
   /** 家庭背景 */
-  familyBackground: '农民家庭' | '工人家庭' | '商人家庭' | '干部家庭' | '知识分子家庭';
+  familyBackground: 'peasant' | 'worker' | 'merchant' | 'cadre' | 'academic';
   /** 晋升通道 */
-  promotionPath: '选调生' | '公务员考试' | '军转干' | '国企调任';
+  promotionPath: 'xuandiao' | 'gongwuyuan' | 'junzhuan' | 'guoqi';
   /** 是否为少数民族预科班 */
   isPreparatory: boolean;
 
