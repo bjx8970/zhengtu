@@ -127,6 +127,32 @@ describe('dispatch - START_ACTION', () => {
       dispatch({ type: 'START_ACTION', deptId, actionId });
       expect(getRawState()).toEqual(before);
     });
+
+    // approve_project 的 minTier 为 'secondary'，仅允许 primary(0)/secondary(1)，
+    // 不允许 reserve(2)。当 primary 和 secondary 全满时，action 不会溢出到 reserve。
+    it('primary + secondary 满时不会溢出到 reserve', () => {
+      const { dispatch, getRawState } = createStoreWithPosition({
+        slots: {
+          primary: {
+            label: '主要',
+            count: 3,
+            occupants: [occ('a'), occ('b'), occ('c')],
+          },
+          secondary: {
+            label: '次要',
+            count: 2,
+            occupants: [occ('d'), occ('e')],
+          },
+          reserve: { label: '备用', count: 1, occupants: [null] },
+        },
+      });
+      const before = getRawState();
+      dispatch({ type: 'START_ACTION', deptId, actionId });
+      // 状态不变——因为 reserve 对 minTier: 'secondary' 不可达
+      expect(getRawState()).toEqual(before);
+      // reserve 槽位仍为空
+      expect(getRawState().slots.reserve.occupants[0]).toBeNull();
+    });
   });
 });
 

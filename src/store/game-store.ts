@@ -200,8 +200,22 @@ function applyPlayerAttr(
   bounds: Record<string, [number, number]>,
 ): void {
   if (!PLAYER_NUMERIC_ATTRS.has(attr)) return;
-  const d = draft as unknown as Record<string, number>;
-  d[attr] = clampAttr(attr, (d[attr] ?? 0) + delta, bounds);
+  const cur = (draft as unknown as Record<string, number>)[attr] ?? 0;
+  setPlayerAttrDirect(draft, attr, cur + delta, bounds);
+}
+
+/**
+ * 直接设置玩家数值属性（含边界钳位）。
+ * 用于 multiply/set 等非加法操作，"加性"操作请用 applyPlayerAttr。
+ */
+function setPlayerAttrDirect(
+  draft: PlayerSave,
+  attr: string,
+  value: number,
+  bounds: Record<string, [number, number]>,
+): void {
+  if (!PLAYER_NUMERIC_ATTRS.has(attr)) return;
+  (draft as unknown as Record<string, number>)[attr] = clampAttr(attr, value, bounds);
 }
 
 /** 从 positionId（如 "admin_l3_0"）提取职位索引 */
@@ -462,10 +476,9 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
               applyPlayerAttr(draft, change.attr, change.delta, cfgAdv.attributeBounds);
             } else if (change.operation === 'multiply' || change.operation === 'set') {
               if (!PLAYER_NUMERIC_ATTRS.has(change.attr)) continue;
-              const d = draft as unknown as Record<string, number>;
-              const cur = d[change.attr] ?? 0;
+              const cur = (draft as unknown as Record<string, number>)[change.attr] ?? 0;
               const newVal = change.operation === 'multiply' ? cur * change.delta : change.delta;
-              d[change.attr] = clampAttr(change.attr, newVal, cfgAdv.attributeBounds);
+              setPlayerAttrDirect(draft, change.attr, newVal, cfgAdv.attributeBounds);
             }
           }
 
