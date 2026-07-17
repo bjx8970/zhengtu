@@ -228,7 +228,7 @@ export function CharacterCreation() {
                       style={{
                         padding: '0.8rem 1rem',
                         'font-size': '1rem',
-                        'background-color': selected ? colors.primary : '#f8f7f5',
+                        'background-color': selected ? colors.primary : colors.bgInput,
                         color: selected ? colors.primaryText : colors.textDark,
                         border: selected
                           ? `1px solid ${colors.primary}`

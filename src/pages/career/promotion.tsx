@@ -11,8 +11,9 @@
  * 晋升中锁定其他操作（ADVANCE_TIME / EXECUTE_ACTION 被 gate 拦截）。
  */
 
-import { createMemo, Show, Switch, Match } from 'solid-js';
+import { createMemo, Show, Switch, Match, For } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
+import type { PlayerSave } from '../../types/player';
 import { navigate } from '../../router';
 import { PromotionStage } from '../../types/enums';
 import { colors, radius, font, pageBase, darkCardStyle } from '../../utils/theme';
@@ -158,7 +159,7 @@ export function Promotion() {
                       save: {
                         ...state,
                         promotionStage: PromotionStage.Idle,
-                      } as unknown as typeof state,
+                      } as PlayerSave,
                     });
                     handleStart();
                   }}
@@ -222,29 +223,31 @@ export function Promotion() {
                   'margin-bottom': '1.2rem',
                 }}
               >
-                {ACTIVE_STAGES.map((_s, i) => (
-                  <div
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      'border-radius': '50%',
-                      'background-color':
-                        i < stageIndex()
-                          ? colors.success
-                          : i === stageIndex()
-                            ? colors.primary
-                            : colors.border,
-                      color: i <= stageIndex() ? colors.primaryText : colors.textMuted,
-                      display: 'flex',
-                      'align-items': 'center',
-                      'justify-content': 'center',
-                      'font-size': '0.7rem',
-                      'font-weight': 'bold',
-                    }}
-                  >
-                    {i + 1}
-                  </div>
-                ))}
+                <For each={ACTIVE_STAGES}>
+                  {(_s, i) => (
+                    <div
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        'border-radius': '50%',
+                        'background-color':
+                          i() < stageIndex()
+                            ? colors.success
+                            : i() === stageIndex()
+                              ? colors.primary
+                              : colors.border,
+                        color: i() <= stageIndex() ? colors.primaryText : colors.textMuted,
+                        display: 'flex',
+                        'align-items': 'center',
+                        'justify-content': 'center',
+                        'font-size': '0.7rem',
+                        'font-weight': 'bold',
+                      }}
+                    >
+                      {i() + 1}
+                    </div>
+                  )}
+                </For>
               </div>
 
               <div
