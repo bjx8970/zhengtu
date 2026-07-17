@@ -85,9 +85,11 @@ Tests use `createTestStore()` for isolation. Never import the module-level `disp
 
 ## Slot-based action system (no AP)
 
-- Slot limits: day=3, week=4, month=6 (configurable in `src/config/constants.json`).
-- Each action has `slotCost` (1 for normal, 2 for heavy). Cooldown (`cooldownDays`) is the real frequency control.
-- `executeAction()` uses `gameDay` as absolute day counter (`draft.totalDaysPlayed`) for cooldown tracking.
+- Slots: primary=3, secondary=2, reserve=1 (configurable in `src/config/constants.json`).
+- Each action has `durationDays`（执行所需天数）and `minTier`（最低槽位等级）。
+- `startAction()` validates budget/duplicates and places actions into slots.
+- `completeActions()` checks slots after time advance and collects completed actions.
+- Reserve slot = overtime, costs health + demoralization penalty.
 
 ## Testing
 
