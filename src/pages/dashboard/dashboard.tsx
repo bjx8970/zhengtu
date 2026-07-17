@@ -19,7 +19,7 @@ import { getConfigLoader } from '../../config/loader';
 interface DashboardEntry {
   label: string;
   path: string;
-  desc: string;
+  desc: () => string;
   show: () => boolean;
 }
 
@@ -45,19 +45,19 @@ export function Dashboard() {
     {
       label: '考核指标',
       path: '/kpi',
-      desc: 'KPI 完成率与等次',
+      desc: () => 'KPI 完成率与等次',
       show: () => !!state.currentPositionId,
     },
     {
       label: '部门行动',
       path: '/dept/0',
-      desc: '执行行政事务',
+      desc: () => '执行行政事务',
       show: () => !!state.currentPositionId,
     },
     {
       label: '晋升提名',
       path: '/promotion',
-      desc:
+      desc: () =>
         state.promotionStage === PromotionStage.Idle
           ? '可启动'
           : state.promotionStage === PromotionStage.Completed
@@ -70,25 +70,25 @@ export function Dashboard() {
     {
       label: '上级关系',
       path: '/superior',
-      desc: `${state.superiorFavor} 好感`,
+      desc: () => `${state.superiorFavor} 好感`,
       show: () => true,
     },
     {
       label: '人脉网络',
       path: '/relations',
-      desc: '社交关系管理',
+      desc: () => '社交关系管理',
       show: () => true,
     },
     {
       label: '个人生活',
       path: '/personal',
-      desc: '住房/子女/健康',
+      desc: () => '住房/子女/健康',
       show: () => true,
     },
     {
       label: '档案成就',
       path: '/archives',
-      desc: `${state.achievements.length} 项`,
+      desc: () => `${state.achievements.length} 项`,
       show: () => true,
     },
   ];
@@ -318,7 +318,7 @@ export function Dashboard() {
               >
                 {entry.label}
               </div>
-              <div style={{ 'font-size': '0.78rem', color: colors.textMuted }}>{entry.desc}</div>
+              <div style={{ 'font-size': '0.78rem', color: colors.textMuted }}>{entry.desc()}</div>
             </div>
           )}
         </For>

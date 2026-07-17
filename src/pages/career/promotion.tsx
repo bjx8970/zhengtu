@@ -42,7 +42,7 @@ const ACTIVE_STAGES: PromotionStage[] = [
 ];
 
 export function Promotion() {
-  const { state, dispatch } = useGameStore();
+  const { state, dispatch, getRawState } = useGameStore();
 
   const stageLabel = createMemo(() => STAGE_LABELS[state.promotionStage] ?? '未知阶段');
   const hasChoices = createMemo(
@@ -154,10 +154,11 @@ export function Promotion() {
                 </button>
                 <button
                   onClick={() => {
+                    const snap = getRawState();
                     dispatch({
                       type: 'LOAD_SAVE',
                       save: {
-                        ...state,
+                        ...snap,
                         promotionStage: PromotionStage.Idle,
                       } as PlayerSave,
                     });
