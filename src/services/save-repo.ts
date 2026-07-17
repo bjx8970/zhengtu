@@ -16,12 +16,26 @@ const TABLE_NAME = 'game_saves';
 const SLOT_NAME = 'main';
 const LOCAL_KEY = 'zhengtu_autosave';
 
+/**
+ * 校验 JSON 解析结果是否为合法的 PlayerSave 对象。
+ */
+function isValidPlayerSave(data: unknown): data is PlayerSave {
+  if (!data || typeof data !== 'object') return false;
+  const obj = data as Record<string, unknown>;
+  return (
+    typeof obj.currentPositionId === 'string' &&
+    typeof obj.currentLevel === 'number' &&
+    typeof obj.characterName === 'string'
+  );
+}
+
 /** 从 localStorage 读取本地存档 */
 export function readLocalSave(): PlayerSave | null {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as PlayerSave;
+    const parsed = JSON.parse(raw);
+    return isValidPlayerSave(parsed) ? parsed : null;
   } catch {
     return null;
   }

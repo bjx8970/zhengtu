@@ -164,7 +164,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
  */
 export type GameAction =
   | { type: 'START_ACTION'; deptId: string; actionId: string }
-  | { type: 'ADVANCE_TIME'; granularity: TimeGranularity }
+  | { type: 'ADVANCE_TIME'; granularity: TimeGranularity; _rng?: () => number }
   | { type: 'CHOOSE_EVENT_OPTION'; eventId: string; optionIndex: number }
   | { type: 'PROCESS_DOCUMENT'; docId: string; action: FileAction }
   | { type: 'START_PROMOTION' }
@@ -443,7 +443,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
         const deptName = deptCfg?.name ?? slotOccupant.deptId;
 
         if (aCfg) {
-          const effects = resolveActionEffects(aCfg);
+          const effects = resolveActionEffects(aCfg, action._rng);
           const deptState = draft.departmentStates[slotOccupant.deptId];
           if (deptState) {
             for (const kpi of effects.kpiChanges) {

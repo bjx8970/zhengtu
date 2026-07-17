@@ -130,6 +130,87 @@ describe('dispatch - START_ACTION', () => {
   });
 });
 
+describe('dispatch - ADVANCE_TIME (integration)', () => {
+  const POSITION_ID = 'admin_l3_0';
+  const LINE = CareerLine.Administrative;
+  const LEVEL = 3;
+  const deptId = 'admin_l3_0_dept_0';
+  const actionId = 'approve_project';
+
+  function mkStore(overrides?: Partial<PlayerSave>) {
+    return createTestStore({
+      currentPositionId: POSITION_ID,
+      currentLevel: LEVEL,
+      currentCareerLine: LINE,
+      remainingBudget: 10000,
+      totalDaysPlayed: 0,
+      time: { year: 2024, month: 6, day: 15, granularity: 'day' },
+      departmentStates: {
+        [deptId]: {
+          id: deptId,
+          kpiValues: {},
+          monthlyConsumption: 0,
+          cumulativeConsumption: 0,
+          lastActionDay: 0,
+        },
+      },
+      ...overrides,
+    });
+  }
+
+  it('ADVANCE_TIME 后已完成行动清空槽位', () => {
+    const { dispatch, getRawState } = mkStore({
+      slots: {
+        primary: {
+          label: '主要',
+          count: 3,
+          occupants: [occ(actionId, deptId, 'A', 0, 1), null, null],
+        },
+        secondary: { label: '次要', count: 2, occupants: [null, null] },
+        reserve: { label: '备用', count: 1, occupants: [null] },
+      },
+    });
+    dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+    expect(getRawState().slots.primary.occupants[0]).toBeNull();
+  });
+
+  it('ADVANCE_TIME 后 KPI 增加值', () => {
+    const { dispatch, getRawState } = mkStore({
+      slots: {
+        primary: {
+          label: '主要',
+          count: 3,
+          occupants: [occ(actionId, deptId, 'A', 0, 1), null, null],
+        },
+        secondary: { label: '次要', count: 2, occupants: [null, null] },
+        reserve: { label: '备用', count: 1, occupants: [null] },
+      },
+    });
+    dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+    const state = getRawState();
+    expect(state.departmentStates[deptId]?.kpiValues['project_completion'] ?? 0).toBe(10);
+  });
+
+  it('ADVANCE_TIME 后生成通知', () => {
+    const { dispatch, getRawState } = mkStore({
+      slots: {
+        primary: {
+          label: '主要',
+          count: 3,
+          occupants: [occ(actionId, deptId, 'A', 0, 1), null, null],
+        },
+        secondary: { label: '次要', count: 2, occupants: [null, null] },
+        reserve: { label: '备用', count: 1, occupants: [null] },
+      },
+    });
+    dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+    const notifications = getRawState().lastCompletedActions;
+    expect(notifications.length).toBeGreaterThan(0);
+    expect(notifications[0]!.actionName).toBe('A');
+    expect(notifications[0]!.effects.length).toBeGreaterThan(0);
+  });
+});
+
 describe('dispatch - persistence (localStorage)', () => {
   const SAVE_KEY = 'zhengtu_autosave';
 

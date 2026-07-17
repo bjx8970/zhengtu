@@ -92,9 +92,13 @@ export function completeActions(
  * 解析行动模板的效果，生成 KPI 变更和属性变更。
  *
  * @param actionConfig - 已完成行动的模板
+ * @param _rng - 可选的随机数生成器（仅测试用，默认 Math.random）
  * @returns KPI 增量列表 + 玩家属性增量列表，含操作模式
  */
-export function resolveActionEffects(actionConfig: ActionTemplate): {
+export function resolveActionEffects(
+  actionConfig: ActionTemplate,
+  _rng?: () => number,
+): {
   kpiChanges: { indicatorId: string; operation: 'add' | 'multiply' | 'set'; delta: number }[];
   playerChanges: { attr: string; operation: 'add' | 'multiply' | 'set'; delta: number }[];
 } {
@@ -107,8 +111,9 @@ export function resolveActionEffects(actionConfig: ActionTemplate): {
     [];
 
   for (const effect of actionConfig.effects) {
+    const rand = _rng ?? Math.random;
     const delta = effect.range
-      ? Math.floor(Math.random() * (effect.range.max - effect.range.min + 1)) + effect.range.min
+      ? Math.floor(rand() * (effect.range.max - effect.range.min + 1)) + effect.range.min
       : effect.value;
 
     if (effect.target.startsWith('dept.kpi.')) {

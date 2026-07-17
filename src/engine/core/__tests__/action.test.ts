@@ -284,4 +284,26 @@ describe('resolveActionEffects', () => {
     expect(result.kpiChanges).toHaveLength(0);
     expect(result.playerChanges).toHaveLength(0);
   });
+
+  it('range 效果使用注入的 RNG 确定值', () => {
+    const action = makeAction({
+      effects: [
+        { target: 'dept.kpi.gdp', operation: 'add', value: 0, range: { min: 10, max: 20 } },
+      ],
+    });
+    // 注入 RNG 返回 0（映射为 min=10）
+    const result = resolveActionEffects(action, () => 0);
+    expect(result.kpiChanges[0]!.delta).toBe(10);
+  });
+
+  it('range 效果使用注入的 RNG 确定值（上界）', () => {
+    const action = makeAction({
+      effects: [
+        { target: 'dept.kpi.gdp', operation: 'add', value: 0, range: { min: 10, max: 20 } },
+      ],
+    });
+    // 注入 RNG 返回 0.9999（映射为 max=20）
+    const result = resolveActionEffects(action, () => 0.9999);
+    expect(result.kpiChanges[0]!.delta).toBe(20);
+  });
 });
