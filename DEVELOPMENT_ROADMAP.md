@@ -2,7 +2,7 @@
 
 > 本文档供 AI 编码会话延续使用，包含完整的项目状态、架构约定、待开发功能和实现指南。
 > 最后更新：2026-07-17
-> 当前状态：PR #21 已合并 → main
+> 当前状态：PR #24 (effect-test) + #25 (init-dept-states) 已合并 → main
 
 ---
 
@@ -12,14 +12,14 @@
 
 | 指标 | 数值 |
 |------|------|
-| 已合并 PR | 11 个 (#1-#10, #16, #21) |
+| 已合并 PR | 14 个 (#1-#10, #16, #21, #23, #24, #25) |
 | 开放 PR | 0 |
-| 开放 Issue | 11 个 |
+| 开放 Issue | 9 个 |
 | 源文件总数 | 39 个 |
 | 引擎文件 | 10 个 |
 | 页面文件 | 12 个（7 页 + 5 个建档子组件） |
-| 测试文件 | 9 个 |
-| 测试用例 | 159 个 |
+| 测试文件 | 10 个 |
+| 测试用例 | 175 个 |
 
 ### 1.2 技术栈
 
@@ -107,7 +107,7 @@ src/engine/
 ├── core/           ✅ 3/3
 │   ├── time.ts        # 时间推进 + 周期检测
 │   ├── action.ts      # 行动执行 + 校验
-│   └── effect.ts      # 效果解析 (⚠️ 缺测试)
+│   └── effect.ts      # 效果解析
 ├── governance/     ✅ 3/3
 │   ├── kpi.ts         # KPI 完成率 + 等次
 │   ├── budget.ts      # 月度消耗 + 结算
@@ -169,7 +169,7 @@ src/engine/
 | 建档 | `/character` | `pages/character/character-creation.tsx` + 5 子组件 | ✅ v2 (PR #21) |
 | 仪表盘 | `/dashboard` | `pages/dashboard/dashboard.tsx` | ✅ |
 | KPI | `/kpi` | `pages/career/position-kpi.tsx` | ✅ |
-| 部门行动 | `/dept/:idx` | `pages/career/position-dept.tsx` | ⚠️ 有 blank page bug (#17) |
+| 部门行动 | `/dept/:idx` | `pages/career/position-dept.tsx` | ✅ |
 | 晋升 | `/promotion` | `pages/career/promotion.tsx` | ✅ |
 
 ### 4.2 待开发页面 (~9)
@@ -240,7 +240,6 @@ Splash → Login(跳过) → 建档(5步) → NEW_GAME
 
 | 问题 | Issue | 说明 |
 |------|-------|------|
-| 部门页面空白 | #17 | `deptState` 首次访问返回 null，Show 条件阻断 |
 | L4+ 无配置 | #18 | 晋升到 L3 后无目标，游戏循环终止 |
 
 ---
@@ -461,56 +460,49 @@ progressBarColor(rate) → 进度条颜色（≥1 success, ≥0.6 primary, else 
 
 | Issue | 标题 | 严重度 | 状态 |
 |-------|------|--------|------|
-| #17 | 部门行动页面首次访问空白 — deptState 懒初始化为 null | 🔴 bug | Open |
 | #18 | 行政线配置仅填充 L1-L3 | 🟡 content | Open |
 | #19 | 核心游戏流程缺少集成测试覆盖 | 🟡 quality | Open |
 | #20 | 仪表盘 4 个子系统入口路由未注册，点击 404 | 🟡 feature | Open |
-| #11 | effect.ts 缺少测试（引擎层 ≥90% 覆盖率门槛） | 🟡 bug | Open |
 | #12 | 晋升引擎硬编码 10 处数值 | 🟡 bug | Open |
 | #13 | 代码规范违反：GameAction + JSDoc + non-null | 🟡 bug | Open |
 | #14 | AGENTS.md 持久化策略描述与实际行为矛盾 | 🟡 bug | Open |
 | #15 | 清理未使用依赖及废弃 ESLint 参数 | 🟡 chore | Open |
-| #7 | 建档阶段选择按钮显示异常 | 🟡 bug | Open |
+| #17 | 部门行动页面首次访问空白 — deptState 懒初始化为 null | 🔴 bug | ✅ 已修复 (PR #25) |
+| #11 | effect.ts 缺少测试（引擎层 ≥90% 覆盖率门槛） | 🟡 bug | ✅ 已修复 (PR #24) |
+| #7 | 建档阶段选择按钮显示异常 | 🟡 bug | Closed |
 
 ---
 
 ## 12. 后续开发优先级 (建议顺序)
 
-### P0 — Critical (应立即修复)
-
-1. **#17 部门页面空白 bug** — `deptState` 改为返回零值默认状态
-   - 文件: `src/pages/career/position-dept.tsx:53`
-   - `return state.departmentStates[cfg.id] ?? null` → `?? { id: ..., kpiValues: {}, ... }`
-
 ### P1 — 核心循环 (解锁游戏可玩性)
 
-2. **#18 行政线 L4-L11 配置补全** — `administrative.json` 加 ~30 个职位
-3. **#20 404 入口处理** — 隐藏或实现未完成的子系统入口
+1. **#18 行政线 L4-L11 配置补全** — `administrative.json` 加 ~30 个职位
+2. **#20 404 入口处理** — 隐藏或实现未完成的子系统入口
 
 ### P2 — 引擎扩展 (增加系统深度)
 
-4. **social/relations.ts + superior.ts** — 人脉 + 上级互动
-5. **career/transfer.ts + reserve.ts** — 转职引擎 + 后备干部池
-6. **#12 晋升引擎硬编码外移** — 将引擎中 10 处数值迁移到 constants.json
+3. **social/relations.ts + superior.ts** — 人脉 + 上级互动
+4. **career/transfer.ts + reserve.ts** — 转职引擎 + 后备干部池
+5. **#12 晋升引擎硬编码外移** — 将引擎中 10 处数值迁移到 constants.json
 
 ### P3 — 子系统 UI (增加页面)
 
-7. **/superior 页面** — 上级互动 UI
-8. **/relations 页面** — 人脉网络 UI
-9. **secretary 页面** — 秘书处 (5 Tab 设计)
-10. **personal/life page** — 个人生活
+6. **/superior 页面** — 上级互动 UI
+7. **/relations 页面** — 人脉网络 UI
+8. **secretary 页面** — 秘书处 (5 Tab 设计)
+9. **personal/life page** — 个人生活
 
 ### P4 — 打磨
 
-11. **#11 effect.ts 补测试** — 覆盖率门槛
-12. **#13 代码规范** — 统一 GameAction 类型位置 + JSDoc
-13. **#15 清理** — 依赖和 ESLint
+10. **#13 代码规范** — 统一 GameAction 类型位置 + JSDoc
+11. **#15 清理** — 依赖和 ESLint
 
 ---
 
 ## 13. Store 关键文件说明
 
-### 13.1 `src/store/game-store.ts` (674 行)
+### 13.1 `src/store/game-store.ts` (738 行)
 
 ```
 createInitialState(overrides?)     # 创建初始 PlayerSave
@@ -536,6 +528,7 @@ canAct(stage)                      # 非 idle/completed/failed 禁止操作
 buildPromotionContext(draft)       # 从 draft 提取晋升上下文
 resolveTriggers(draft, triggers)   # 处理周期事件 (月度/年度)
 applyPlayerAttr(draft, attr, delta, bounds)  # 带 clamp 的属性变更
+initializeDepartmentStates(draft)  # 按当前职位初始化所有部门运行时状态
 ```
 
 ---
@@ -584,7 +577,8 @@ formatCurrency(amount)             # 货币格式化
 
 | 分支 | 状态 | PR | 说明 |
 |------|------|----|------|
-| 无 | — | — | 所有分支已合并，当前在 main |
+| `fix/init-department-states` | 已合并 | #25 | 初始化部门运行时状态，修复 #17 页面空白 |
+| `test/effect-coverage` | 已合并 | #24 | 补充 effect.ts 单元测试（13 用例，覆盖率 0%→100%） |
 
 ---
 
