@@ -10,7 +10,7 @@
  *
  * 完成后 dispatch(NEW_GAME) 并跳转仪表盘。
  */
-import { createSignal, createMemo, Show } from 'solid-js';
+import { createSignal, createMemo, Show, For } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { getConfigLoader } from '../../config/loader';
 import { navigate } from '../../router';
@@ -131,17 +131,19 @@ export function CharacterCreation() {
       {/* 进度条 */}
       <div style={{ padding: '1.5rem 1.5rem 0' }}>
         <div style={{ display: 'flex', gap: '0.3rem', 'margin-bottom': '0.5rem' }}>
-          {Array.from({ length: TOTAL }, (_, i) => (
-            <div
-              style={{
-                flex: 1,
-                height: '3px',
-                'background-color': i <= step() ? colors.primary : colors.border,
-                'border-radius': radius.sm,
-                transition: 'background 0.3s',
-              }}
-            />
-          ))}
+          <For each={Array.from({ length: TOTAL }, (_, i) => i)}>
+            {(i) => (
+              <div
+                style={{
+                  flex: 1,
+                  height: '3px',
+                  'background-color': i <= step() ? colors.primary : colors.border,
+                  'border-radius': radius.sm,
+                  transition: 'background 0.3s',
+                }}
+              />
+            )}
+          </For>
         </div>
         <div style={{ 'font-size': '0.8rem', color: colors.textSecondary }}>
           第 {step() + 1}/{TOTAL} 步
