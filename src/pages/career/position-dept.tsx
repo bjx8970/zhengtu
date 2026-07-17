@@ -12,6 +12,7 @@ import { getConfigLoader } from '../../config/loader';
 import { navigate } from '../../router';
 import { formatCurrency } from '../../utils/format';
 import type { PageProps } from '../../router';
+import { colors, radius, pageBase, darkCardStyle } from '../../utils/theme';
 
 /** 判断行动是否可执行 */
 function canExecute(
@@ -30,11 +31,16 @@ function canExecute(
   return { ok: true, reason: '' };
 }
 
+function kpiBarColor(rate: number): string {
+  if (rate >= 1) return colors.success;
+  if (rate >= 0.6) return colors.primary;
+  return colors.danger;
+}
+
 export function PositionDept(props: PageProps) {
   const { state, dispatch } = useGameStore();
   const deptIndex = parseInt(props.deptIndex ?? '0', 10);
 
-  /** 当前职位配置 */
   const positionConfig = createMemo(() => {
     const posId = state.currentPositionId;
     if (!posId) return null;
@@ -42,39 +48,27 @@ export function PositionDept(props: PageProps) {
     return getConfigLoader().getPosition(state.currentCareerLine, state.currentLevel, idx);
   });
 
-  /** 当前位置下的所有部门列表 */
   const allDepts = createMemo(() => positionConfig()?.departments ?? []);
 
-  /** 当前部门配置 */
   const deptConfig = createMemo(() => allDepts()[deptIndex] ?? null);
 
-  /** 当前部门运行时状态 */
   const deptState = createMemo(() => {
     const cfg = deptConfig();
     if (!cfg) return null;
     return state.departmentStates[cfg.id] ?? null;
   });
 
-  /** 跳转到指定部门 */
   function goToDept(idx: number) {
     navigate(`/dept/${idx}`);
   }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        'flex-direction': 'column',
-        height: '100%',
-        'background-color': '#1a1a2e',
-        color: '#e0e0e0',
-      }}
-    >
+    <div style={pageBase}>
       {/* 顶部导航栏 */}
       <header
         style={{
           padding: '0.8rem 1rem',
-          'border-bottom': '1px solid #333',
+          'border-bottom': `1px solid ${colors.border}`,
           display: 'flex',
           'align-items': 'center',
           gap: '0.8rem',
@@ -84,20 +78,24 @@ export function PositionDept(props: PageProps) {
           onClick={() => navigate('/dashboard')}
           style={{
             background: 'none',
-            color: '#888',
+            color: colors.textSecondary,
             border: 'none',
             'font-size': '1.2rem',
             cursor: 'pointer',
+            padding: 0,
           }}
         >
           ←
         </button>
         <div style={{ flex: 1 }}>
-          <Show when={deptConfig()} fallback={<span style={{ color: '#888' }}>无部门数据</span>}>
+          <Show
+            when={deptConfig()}
+            fallback={<span style={{ color: colors.textSecondary }}>无部门数据</span>}
+          >
             {(dept) => (
               <>
                 <div style={{ 'font-size': '1.1rem', 'font-weight': 'bold' }}>{dept().name}</div>
-                <div style={{ 'font-size': '0.75rem', color: '#888' }}>
+                <div style={{ 'font-size': '0.75rem', color: colors.textSecondary }}>
                   {positionConfig()?.name} · {allDepts().length} 个部门
                 </div>
               </>
@@ -106,14 +104,14 @@ export function PositionDept(props: PageProps) {
         </div>
       </header>
 
-      {/* 部门标签导航（横向滚动） */}
+      {/* 部门标签导航 */}
       <Show when={allDepts().length > 1}>
         <div
           style={{
             display: 'flex',
             'overflow-x': 'auto',
-            'border-bottom': '1px solid #333',
-            gap: '0.3rem',
+            'border-bottom': `1px solid ${colors.border}`,
+            gap: '0.2rem',
             padding: '0.5rem 0.5rem 0',
           }}
         >
@@ -124,10 +122,10 @@ export function PositionDept(props: PageProps) {
                 style={{
                   padding: '0.4rem 0.8rem',
                   'font-size': '0.85rem',
-                  'background-color': idx() === deptIndex ? '#4A6FA5' : '#2a2a4a',
-                  color: '#fff',
+                  'background-color': idx() === deptIndex ? colors.primary : colors.bgCard,
+                  color: idx() === deptIndex ? colors.primaryText : colors.textSecondary,
                   border: 'none',
-                  'border-radius': '6px 6px 0 0',
+                  'border-radius': `${radius.md} ${radius.md} 0 0`,
                   cursor: 'pointer',
                   'white-space': 'nowrap',
                 }}
@@ -143,7 +141,9 @@ export function PositionDept(props: PageProps) {
         <Show
           when={deptConfig() && deptState()}
           fallback={
-            <div style={{ 'text-align': 'center', color: '#888', 'margin-top': '3rem' }}>
+            <div
+              style={{ 'text-align': 'center', color: colors.textSecondary, 'margin-top': '3rem' }}
+            >
               暂无部门数据，请先在仪表盘中分配职位。
             </div>
           }
@@ -159,29 +159,23 @@ export function PositionDept(props: PageProps) {
 
                   return (
                     <>
-                      {/* 槽位 + 资金状态栏 */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: '0.8rem',
-                          'margin-bottom': '1.2rem',
-                        }}
-                      >
+                      {/* 槽位 + 资金状态 */}
+                      <div style={{ display: 'flex', gap: '0.8rem', 'margin-bottom': '1rem' }}>
                         <div
                           style={{
+                            ...darkCardStyle('0.6rem'),
                             flex: 1,
-                            padding: '0.6rem',
-                            'background-color': '#16213e',
-                            'border-radius': '8px',
                             'text-align': 'center',
                           }}
                         >
-                          <div style={{ 'font-size': '0.75rem', color: '#888' }}>槽位</div>
+                          <div style={{ 'font-size': '0.75rem', color: colors.textSecondary }}>
+                            槽位
+                          </div>
                           <div
                             style={{
                               'font-size': '1.2rem',
                               'font-weight': 'bold',
-                              color: '#4A6FA5',
+                              color: colors.primary,
                             }}
                           >
                             {state.slots.available}/{state.slots.max}
@@ -189,19 +183,19 @@ export function PositionDept(props: PageProps) {
                         </div>
                         <div
                           style={{
+                            ...darkCardStyle('0.6rem'),
                             flex: 2,
-                            padding: '0.6rem',
-                            'background-color': '#16213e',
-                            'border-radius': '8px',
                             'text-align': 'center',
                           }}
                         >
-                          <div style={{ 'font-size': '0.75rem', color: '#888' }}>月度消耗</div>
+                          <div style={{ 'font-size': '0.75rem', color: colors.textSecondary }}>
+                            月度消耗
+                          </div>
                           <div
                             style={{
                               'font-size': '1.2rem',
                               'font-weight': 'bold',
-                              color: '#FF9800',
+                              color: colors.warning,
                             }}
                           >
                             {budgetInfo().monthly}
@@ -210,11 +204,7 @@ export function PositionDept(props: PageProps) {
                       </div>
 
                       {/* 行动列表 */}
-                      <div
-                        style={{
-                          'margin-bottom': '1.2rem',
-                        }}
-                      >
+                      <div style={{ 'margin-bottom': '1.2rem' }}>
                         <div
                           style={{
                             'font-size': '0.9rem',
@@ -241,9 +231,7 @@ export function PositionDept(props: PageProps) {
                             return (
                               <div
                                 style={{
-                                  padding: '0.8rem 1rem',
-                                  'background-color': '#16213e',
-                                  'border-radius': '8px',
+                                  ...darkCardStyle('0.8rem 1rem'),
                                   'margin-bottom': '0.5rem',
                                 }}
                               >
@@ -270,12 +258,14 @@ export function PositionDept(props: PageProps) {
                                     style={{
                                       padding: '0.3rem 1rem',
                                       'font-size': '0.85rem',
-                                      'background-color': status.ok ? '#4CAF50' : '#555',
-                                      color: '#fff',
+                                      'background-color': status.ok
+                                        ? colors.primary
+                                        : colors.border,
+                                      color: status.ok ? colors.primaryText : colors.textMuted,
                                       border: 'none',
-                                      'border-radius': '6px',
+                                      'border-radius': radius.md,
                                       cursor: status.ok ? 'pointer' : 'not-allowed',
-                                      opacity: status.ok ? 1 : 0.5,
+                                      opacity: status.ok ? 1 : 0.7,
                                     }}
                                   >
                                     {remaining > 0
@@ -288,7 +278,7 @@ export function PositionDept(props: PageProps) {
                                 <div
                                   style={{
                                     'font-size': '0.75rem',
-                                    color: '#888',
+                                    color: colors.textSecondary,
                                     display: 'flex',
                                     gap: '1rem',
                                   }}
@@ -301,7 +291,7 @@ export function PositionDept(props: PageProps) {
                                   <div
                                     style={{
                                       'font-size': '0.75rem',
-                                      color: '#666',
+                                      color: colors.textMuted,
                                       'margin-top': '0.2rem',
                                     }}
                                   >
@@ -332,9 +322,7 @@ export function PositionDept(props: PageProps) {
                             return (
                               <div
                                 style={{
-                                  padding: '0.6rem 1rem',
-                                  'background-color': '#16213e',
-                                  'border-radius': '6px',
+                                  ...darkCardStyle('0.6rem 1rem'),
                                   'margin-bottom': '0.4rem',
                                 }}
                               >
@@ -346,7 +334,7 @@ export function PositionDept(props: PageProps) {
                                   }}
                                 >
                                   <span>{kpi.name}</span>
-                                  <span style={{ color: '#888' }}>
+                                  <span style={{ color: colors.textSecondary }}>
                                     {value} / {kpi.targetValue}
                                     {kpi.unit}
                                   </span>
@@ -354,8 +342,8 @@ export function PositionDept(props: PageProps) {
                                 <div
                                   style={{
                                     height: '4px',
-                                    'background-color': '#2a2a4a',
-                                    'border-radius': '2px',
+                                    'background-color': colors.border,
+                                    'border-radius': radius.sm,
                                     overflow: 'hidden',
                                     'margin-top': '0.3rem',
                                   }}
@@ -364,9 +352,8 @@ export function PositionDept(props: PageProps) {
                                     style={{
                                       height: '100%',
                                       width: `${Math.min(rate * 100, 100)}%`,
-                                      'background-color':
-                                        rate >= 1 ? '#4CAF50' : rate >= 0.6 ? '#4A6FA5' : '#C44D4D',
-                                      'border-radius': '2px',
+                                      'background-color': kpiBarColor(rate),
+                                      'border-radius': radius.sm,
                                     }}
                                   />
                                 </div>

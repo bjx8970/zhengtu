@@ -1,0 +1,98 @@
+/**
+ * 全局设计令牌 — CSS 变量定义
+ *
+ * 政务色 + 暗色沉浸的混合风格：
+ * - 主色：中国红 #be2d2d（权力操作）
+ * - 二级：藏蓝 #2B4E6E（信息查看）
+ * - 底色：深蓝黑 #1a1a2e（沉浸感）
+ * - 卡片：白色 / 深色两种
+ * - 圆角：4px（正式感）
+ */
+
+:root {
+  /* 背景 */
+  --bg-main: #1a1a2e;
+  --bg-card: #0f0f23;
+  --bg-card-light: #ffffff;
+  --bg-header: #141428;
+
+  /* 文字 */
+  --text-primary: #e8e6e3;
+  --text-secondary: #8b8680;
+  --text-dark: #1a1a1a;
+  --text-muted: #6b6560;
+
+  /* 主色：中国红 */
+  --color-primary: #be2d2d;
+  --color-primary-hover: #a02020;
+  --color-primary-light: rgba(190, 45, 45, 0.15);
+  --color-primary-text: #ffffff;
+
+  /* 二级：藏蓝 */
+  --color-secondary: #2b4e6e;
+  --color-secondary-light: rgba(43, 78, 110, 0.15);
+  --color-secondary-text: #e8e6e3;
+
+  /* 功能色 */
+  --color-success: #4caf50;
+  --color-success-light: rgba(76, 175, 80, 0.15);
+  --color-warning: #e6a817;
+  --color-warning-light: rgba(230, 168, 23, 0.15);
+  --color-danger: #c44d4d;
+
+  /* 边框 */
+  --border-color: #3a3540;
+  --border-color-light: #d4c5b9;
+
+  /* 圆角 */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* 间距 */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+
+  /* 字体 */
+  --font-title: 'STKaiti', 'KaiTi', '楷体', serif;
+  --font-body:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', sans-serif;
+}
+
+/* 全局基础样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-main);
+  color: var(--text-primary);
+}
+
+#root {
+  height: 100%;
+}
+
+/* 加载画面 */
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 1.2rem;
+  color: var(--text-secondary);
+}

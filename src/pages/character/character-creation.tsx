@@ -17,33 +17,38 @@ import { getConfigLoader } from '../../config/loader';
 import { navigate } from '../../router';
 import { CareerLine } from '../../types/enums';
 import type { CharacterData, StepDef } from '../../types/character';
+import { colors, radius, pageBase, cardStyle } from '../../utils/theme';
 
-const STEPS: StepDef[] = [
-  { title: '姓名', field: 'characterName', type: 'input' },
-  { title: '性别', field: 'gender', type: 'options', options: ['男', '女'] },
+const STEPS: (StepDef & { quote?: string })[] = [
+  { title: '姓名', field: 'characterName', type: 'input', quote: '名者，命也' },
+  { title: '性别', field: 'gender', type: 'options', options: ['男', '女'], quote: '巾帼不让须眉' },
   {
     title: '出生地',
     field: 'birthPlace',
     type: 'options',
     options: ['北京', '上海', '省城', '地级市', '县城', '乡镇'],
+    quote: '一方水土养一方人',
   },
   {
     title: '最高学历',
     field: 'education',
     type: 'options',
     options: ['高中', '大专', '本科', '硕士', '博士'],
+    quote: '学而优则仕',
   },
   {
     title: '从政动机',
     field: 'motivation',
     type: 'options',
     options: ['为民服务', '个人抱负', '家族期望'],
+    quote: '为天地立心，为生民立命',
   },
   {
     title: '性格特质',
     field: 'personality',
     type: 'options',
     options: ['廉洁型', '务实型', '改革型', '稳健型'],
+    quote: '江山易改，秉性难移',
   },
 ];
 
@@ -117,43 +122,30 @@ export function CharacterCreation() {
   }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        'flex-direction': 'column',
-        height: '100%',
-        'background-color': '#1a1a2e',
-        color: '#e0e0e0',
-      }}
-    >
+    <div style={pageBase}>
       {/* 进度条 */}
-      <div style={{ padding: '1rem 1rem 0' }}>
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.3rem',
-            'margin-bottom': '0.5rem',
-          }}
-        >
+      <div style={{ padding: '1.5rem 1.5rem 0' }}>
+        <div style={{ display: 'flex', gap: '0.3rem', 'margin-bottom': '0.5rem' }}>
           <For each={STEPS}>
             {(_, idx) => (
               <div
                 style={{
                   flex: 1,
-                  height: '4px',
-                  'background-color': idx() <= step() ? '#4A6FA5' : '#333',
-                  'border-radius': '2px',
+                  height: '3px',
+                  'background-color': idx() <= step() ? colors.primary : colors.border,
+                  'border-radius': radius.sm,
+                  transition: 'background 0.3s',
                 }}
               />
             )}
           </For>
         </div>
-        <div style={{ 'font-size': '0.8rem', color: '#888' }}>
+        <div style={{ 'font-size': '0.8rem', color: colors.textSecondary }}>
           第 {step() + 1}/{STEPS.length} 步 · {currentStep().title}
         </div>
       </div>
 
-      {/* 表单区域 */}
+      {/* 表单区域 — 白色卡片居中 */}
       <div
         style={{
           flex: 1,
@@ -161,67 +153,100 @@ export function CharacterCreation() {
           'flex-direction': 'column',
           'align-items': 'center',
           'justify-content': 'center',
-          padding: '1rem',
+          padding: '1.5rem',
         }}
       >
-        <h2 style={{ 'margin-bottom': '1.5rem', 'font-size': '1.3rem', 'font-weight': 'normal' }}>
-          {currentStep().title}
-        </h2>
-
-        <Show when={currentStep().type === 'input'}>
-          <input
-            type="text"
-            placeholder="输入姓名"
-            value={data().characterName}
-            onInput={(e) => updateField(e.currentTarget.value)}
+        <div
+          style={{
+            ...cardStyle('2rem'),
+            width: '100%',
+            'max-width': '320px',
+            'text-align': 'center',
+          }}
+        >
+          <h2
             style={{
-              padding: '0.8rem 1rem',
-              'font-size': '1.1rem',
-              'border-radius': '8px',
-              border: '1px solid #555',
-              'background-color': '#16213e',
-              color: '#e0e0e0',
-              width: '260px',
-              'text-align': 'center',
-            }}
-            autofocus
-          />
-        </Show>
-
-        <Show when={currentStep().type === 'options' && currentStep().options}>
-          <div
-            style={{
-              display: 'flex',
-              'flex-direction': 'column',
-              gap: '0.6rem',
-              width: '260px',
+              'margin-bottom': '0.5rem',
+              'font-size': '1.4rem',
+              'font-weight': 'normal',
             }}
           >
-            {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- 仅 options 类型步骤渲染此 For */}
-            <For each={currentStep().options!}>
-              {(opt) => {
-                const selected = data()[currentStep().field] === opt;
-                return (
-                  <div
-                    onClick={() => updateField(opt)}
-                    style={{
-                      padding: '0.8rem 1rem',
-                      'font-size': '1rem',
-                      'background-color': selected ? '#4A6FA5' : '#16213e',
-                      color: selected ? '#fff' : '#ccc',
-                      border: selected ? '2px solid #6B8FC5' : '1px solid #333',
-                      'border-radius': '8px',
-                      cursor: 'pointer',
-                      'text-align': 'center',
-                    }}
-                  >
-                    {opt}
-                  </div>
-                );
+            {currentStep().title}
+          </h2>
+
+          <Show when={currentStep().quote}>
+            <div
+              style={{
+                'font-size': '0.85rem',
+                color: colors.primary,
+                opacity: 0.7,
+                'margin-bottom': '1.5rem',
+                'font-family': '"STKaiti", "KaiTi", "楷体", serif',
               }}
-            </For>
-          </div>
-        </Show>
+            >
+              —— {currentStep().quote} ——
+            </div>
+          </Show>
+
+          <Show when={currentStep().type === 'input'}>
+            <input
+              type="text"
+              placeholder="输入姓名"
+              value={data().characterName}
+              onInput={(e) => updateField(e.currentTarget.value)}
+              style={{
+                padding: '0.8rem 1rem',
+                'font-size': '1.1rem',
+                'border-radius': radius.md,
+                border: `1px solid ${colors.borderLight}`,
+                'background-color': '#f8f7f5',
+                color: colors.textDark,
+                width: '100%',
+                'text-align': 'center',
+                outline: 'none',
+              }}
+              autofocus
+            />
+          </Show>
+
+          <Show when={currentStep().type === 'options' && currentStep().options}>
+            <div
+              style={{
+                display: 'flex',
+                'flex-direction': 'column',
+                gap: '0.6rem',
+                width: '100%',
+              }}
+            >
+              {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- 仅 options 类型步骤渲染此 For */}
+              <For each={currentStep().options!}>
+                {(opt) => {
+                  const selected = data()[currentStep().field] === opt;
+                  return (
+                    <div
+                      onClick={() => updateField(opt)}
+                      style={{
+                        padding: '0.8rem 1rem',
+                        'font-size': '1rem',
+                        'background-color': selected ? colors.primary : '#f8f7f5',
+                        color: selected ? colors.primaryText : colors.textDark,
+                        border: selected
+                          ? `1px solid ${colors.primary}`
+                          : `1px solid ${colors.borderLight}`,
+                        'border-radius': radius.md,
+                        cursor: 'pointer',
+                        'text-align': 'center',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {opt}
+                    </div>
+                  );
+                }}
+              </For>
+            </div>
+          </Show>
+        </div>
       </div>
 
       {/* 底部导航 */}
@@ -229,8 +254,7 @@ export function CharacterCreation() {
         style={{
           display: 'flex',
           gap: '0.8rem',
-          padding: '1rem',
-          'border-top': '1px solid #333',
+          padding: '1rem 1.5rem 1.5rem',
         }}
       >
         <Show when={!isFirst()}>
@@ -240,10 +264,10 @@ export function CharacterCreation() {
               flex: 1,
               padding: '0.8rem',
               'font-size': '1rem',
-              'background-color': '#2a2a4a',
-              color: '#ccc',
-              border: 'none',
-              'border-radius': '8px',
+              'background-color': colors.bgCard,
+              color: colors.textSecondary,
+              border: `1px solid ${colors.border}`,
+              'border-radius': radius.md,
               cursor: 'pointer',
             }}
           >
@@ -257,11 +281,12 @@ export function CharacterCreation() {
             flex: 1,
             padding: '0.8rem',
             'font-size': '1rem',
-            'background-color': canProceed() ? '#4A6FA5' : '#333',
-            color: canProceed() ? '#fff' : '#666',
+            'background-color': canProceed() ? colors.primary : colors.border,
+            color: canProceed() ? colors.primaryText : colors.textMuted,
             border: 'none',
-            'border-radius': '8px',
+            'border-radius': radius.md,
             cursor: canProceed() ? 'pointer' : 'not-allowed',
+            transition: 'background 0.2s',
           }}
         >
           {isLast() ? '开始仕途' : '下一步'}
