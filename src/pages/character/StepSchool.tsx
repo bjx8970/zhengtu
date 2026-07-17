@@ -1,7 +1,7 @@
 /**
  * Step 4 — 院校选择（档次 → 院校级联）
  */
-import { Show, For } from 'solid-js';
+import { Show, For, createMemo } from 'solid-js';
 import { colors, radius, cardStyle } from '../../utils/theme';
 import { getAvailableTiers } from '../../utils/gaokao';
 import type { CharacterData } from '../../types/character';
@@ -14,9 +14,11 @@ interface StepSchoolProps {
 }
 
 export function StepSchool(props: StepSchoolProps) {
-  const schools = props.data.universityTier
-    ? props.universities.tiers[props.data.universityTier.replace('预科', '本科')]
-    : null;
+  const schools = createMemo(() =>
+    props.data.universityTier
+      ? (props.universities.tiers[props.data.universityTier.replace('预科', '本科')] ?? null)
+      : null,
+  );
 
   return (
     <div
@@ -89,7 +91,7 @@ export function StepSchool(props: StepSchoolProps) {
           选择院校
         </div>
         <Show
-          when={schools}
+          when={schools()}
           fallback={
             <div
               style={{
@@ -116,7 +118,7 @@ export function StepSchool(props: StepSchoolProps) {
             }}
           >
             {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Show guarantees existence */}
-            <For each={schools!}>
+            <For each={schools()!}>
               {(school) => (
                 <div
                   onClick={() => props.updateField('university', school)}
