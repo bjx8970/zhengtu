@@ -322,5 +322,296 @@
       }
     ],
     "kpiTemplateIds": ["women_rights_score", "livelihood_score"]
+  },
+  "ndrc": {
+    "name": "发改委",
+    "consumptionCoefficient": 2.0,
+    "baseConsumption": 200,
+    "actions": [
+      {
+        "id": "major_project",
+        "name": "重大项目立项",
+        "description": "审批重大基础设施和产业项目，推动区域经济增长",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 80,
+        "effects": [
+          { "target": "dept.kpi.project_approval", "operation": "add", "value": 10 },
+          { "target": "dept.kpi.gdp_growth", "operation": "add", "value": 5 }
+        ]
+      },
+      {
+        "id": "five_year_plan",
+        "name": "五年规划编制",
+        "description": "编制区域经济社会发展五年规划纲要",
+        "slotCost": 2,
+        "cooldownDays": 14,
+        "budgetDelta": 50,
+        "effects": [
+          { "target": "dept.kpi.industrial_output", "operation": "add", "value": 8 },
+          { "target": "dept.kpi.fiscal_revenue", "operation": "add", "value": 5 },
+          { "target": "player.performance", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["project_approval", "gdp_growth"]
+  },
+  "commerce": {
+    "name": "商务局",
+    "consumptionCoefficient": 1.3,
+    "baseConsumption": 120,
+    "actions": [
+      {
+        "id": "investment_promo",
+        "name": "招商引资推介",
+        "description": "组织招商推介活动，吸引外来投资落地",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 60,
+        "effects": [
+          { "target": "dept.kpi.investment_attraction", "operation": "add", "value": 12 },
+          { "target": "dept.kpi.business_env", "operation": "add", "value": 5 }
+        ]
+      },
+      {
+        "id": "biz_environment",
+        "name": "营商环境优化",
+        "description": "简化审批流程、降低企业制度性成本",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 25,
+        "effects": [
+          { "target": "dept.kpi.business_env", "operation": "add", "value": 8 },
+          { "target": "dept.kpi.enterprise_svc", "operation": "add", "value": 5 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["investment_attraction", "business_env"]
+  },
+  "industry_it": {
+    "name": "工信局",
+    "consumptionCoefficient": 1.5,
+    "baseConsumption": 150,
+    "actions": [
+      {
+        "id": "industry_subsidy",
+        "name": "产业扶持补贴",
+        "description": "为规上企业提供技术改造和转型升级补贴",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 100,
+        "effects": [
+          { "target": "dept.kpi.industrial_output", "operation": "add", "value": 10 },
+          { "target": "dept.kpi.gdp_growth", "operation": "add", "value": 5 }
+        ]
+      },
+      {
+        "id": "tech_upgrade",
+        "name": "企业技改审批",
+        "description": "加快企业技术改造项目审批，推动产业升级",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 35,
+        "effects": [
+          { "target": "dept.kpi.industrial_output", "operation": "add", "value": 6 },
+          { "target": "dept.kpi.enterprise_svc", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["industrial_output", "enterprise_svc"]
+  },
+  "land_resources": {
+    "name": "自然资源局",
+    "consumptionCoefficient": 1.8,
+    "baseConsumption": 180,
+    "actions": [
+      {
+        "id": "land_auction",
+        "name": "土地出让",
+        "description": "组织国有土地使用权招拍挂，增加土地财政收入",
+        "slotCost": 2,
+        "cooldownDays": 7,
+        "budgetDelta": 40,
+        "effects": [
+          { "target": "dept.kpi.land_revenue", "operation": "add", "value": 12 },
+          { "target": "dept.kpi.fiscal_revenue", "operation": "add", "value": 6 }
+        ]
+      },
+      {
+        "id": "land_planning",
+        "name": "用地规划审批",
+        "description": "编制和审批城市建设用地规划方案",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 20,
+        "effects": [
+          { "target": "dept.kpi.project_approval", "operation": "add", "value": 6 },
+          { "target": "dept.kpi.infrastructure", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["land_revenue", "project_approval"]
+  },
+  "admin_approval": {
+    "name": "行政审批局",
+    "consumptionCoefficient": 0.8,
+    "baseConsumption": 80,
+    "actions": [
+      {
+        "id": "one_stop_service",
+        "name": "一站式审批",
+        "description": "推行一站式政务服务，压缩审批时限",
+        "slotCost": 1,
+        "cooldownDays": 2,
+        "budgetDelta": 15,
+        "effects": [
+          { "target": "dept.kpi.enterprise_svc", "operation": "add", "value": 8 },
+          { "target": "dept.kpi.business_env", "operation": "add", "value": 4 }
+        ]
+      },
+      {
+        "id": "reform_fangguanfu",
+        "name": "放管服改革",
+        "description": "推进简政放权、放管结合、优化服务改革",
+        "slotCost": 2,
+        "cooldownDays": 7,
+        "budgetDelta": 30,
+        "effects": [
+          { "target": "dept.kpi.business_env", "operation": "add", "value": 8 },
+          { "target": "dept.kpi.digital_gov", "operation": "add", "value": 5 },
+          { "target": "player.competence", "operation": "add", "value": 1 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["enterprise_svc", "business_env"]
+  },
+  "transport": {
+    "name": "交通局",
+    "consumptionCoefficient": 1.8,
+    "baseConsumption": 180,
+    "actions": [
+      {
+        "id": "road_construction",
+        "name": "道路建设",
+        "description": "推进干线公路和城市道路新建/改建",
+        "slotCost": 2,
+        "cooldownDays": 7,
+        "budgetDelta": 120,
+        "effects": [
+          { "target": "dept.kpi.infrastructure", "operation": "add", "value": 10 },
+          { "target": "dept.kpi.project_approval", "operation": "add", "value": 5 }
+        ]
+      },
+      {
+        "id": "public_transit",
+        "name": "公交线路优化",
+        "description": "新增和优化公共交通线路，提升出行便利度",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 40,
+        "effects": [
+          { "target": "dept.kpi.urban_mgmt", "operation": "add", "value": 6 },
+          { "target": "player.charisma", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["infrastructure", "urban_mgmt"]
+  },
+  "health_commission": {
+    "name": "卫健委",
+    "consumptionCoefficient": 1.2,
+    "baseConsumption": 120,
+    "actions": [
+      {
+        "id": "medical_reform",
+        "name": "医改推进",
+        "description": "推动分级诊疗和公立医院综合改革",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 60,
+        "effects": [
+          { "target": "dept.kpi.healthcare_cov", "operation": "add", "value": 10 },
+          { "target": "dept.kpi.livelihood_score", "operation": "add", "value": 5 }
+        ]
+      },
+      {
+        "id": "public_health",
+        "name": "公共卫生应急",
+        "description": "健全突发公共卫生事件应急体系",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 30,
+        "effects": [
+          { "target": "dept.kpi.healthcare_cov", "operation": "add", "value": 6 },
+          { "target": "player.stability", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["healthcare_cov", "livelihood_score"]
+  },
+  "poverty_relief": {
+    "name": "乡村振兴局",
+    "consumptionCoefficient": 1.5,
+    "baseConsumption": 150,
+    "actions": [
+      {
+        "id": "industry_poverty",
+        "name": "产业扶贫",
+        "description": "发展特色产业带动脱贫人口稳定增收",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 70,
+        "effects": [
+          { "target": "dept.kpi.poverty_alleviation", "operation": "add", "value": 10 },
+          { "target": "dept.kpi.agricultural_output", "operation": "add", "value": 6 }
+        ]
+      },
+      {
+        "id": "relocation_housing",
+        "name": "易地搬迁安置",
+        "description": "推进易地扶贫搬迁后续扶持和基础设施建设",
+        "slotCost": 2,
+        "cooldownDays": 7,
+        "budgetDelta": 100,
+        "effects": [
+          { "target": "dept.kpi.poverty_alleviation", "operation": "add", "value": 12 },
+          { "target": "dept.kpi.infrastructure", "operation": "add", "value": 6 },
+          { "target": "player.charisma", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["poverty_alleviation", "livelihood_score"]
+  },
+  "data_gov": {
+    "name": "大数据局",
+    "consumptionCoefficient": 1.0,
+    "baseConsumption": 100,
+    "actions": [
+      {
+        "id": "digital_platform",
+        "name": "数字政府平台",
+        "description": "建设一体化政务服务平台，推进一网通办",
+        "slotCost": 2,
+        "cooldownDays": 5,
+        "budgetDelta": 80,
+        "effects": [
+          { "target": "dept.kpi.digital_gov", "operation": "add", "value": 10 },
+          { "target": "dept.kpi.enterprise_svc", "operation": "add", "value": 5 }
+        ]
+      },
+      {
+        "id": "data_sharing",
+        "name": "政务数据共享",
+        "description": "打破信息孤岛，推进跨部门数据互通",
+        "slotCost": 1,
+        "cooldownDays": 3,
+        "budgetDelta": 25,
+        "effects": [
+          { "target": "dept.kpi.digital_gov", "operation": "add", "value": 6 },
+          { "target": "dept.kpi.office_efficiency", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["digital_gov", "office_efficiency"]
   }
 }
