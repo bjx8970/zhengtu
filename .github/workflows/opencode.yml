@@ -25,6 +25,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Configure git identity
+        run: |
+          git config user.name "opencode-bot"
+          git config user.email "opencode@github.com"
+
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
         env:
