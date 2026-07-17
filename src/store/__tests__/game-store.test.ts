@@ -364,7 +364,7 @@ describe('dispatch - persistence (localStorage)', () => {
       'admin_l2_0_dept_3',
     ]);
 
-    // safe: departmentStates['admin_l2_0_dept_1'] verified non-null by `arrayContaining` above
+    // safe: departmentStates['admin_l2_0_dept_1'] verified non-null by `toEqual` above
     const sampleDept = state.departmentStates['admin_l2_0_dept_1']!;
     expect(sampleDept.id).toBe('admin_l2_0_dept_1');
     expect(sampleDept.kpiValues).toEqual({});
