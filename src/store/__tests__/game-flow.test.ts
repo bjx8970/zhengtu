@@ -16,7 +16,8 @@ const cfg = getConfigLoader().getGameConfig();
 const POSITION_ID = 'admin_l3_0';
 const LINE = CareerLine.Administrative;
 const LEVEL = 3;
-const DEPT_ID = 'admin_l3_0_dept_0';
+// 镇长部门：[ndrc, finance, commerce, land_resources, urban_dev]，urban_dev=dept_4
+const DEPT_ID = 'admin_l3_0_dept_4';
 const ACTION_ID = 'approve_project';
 
 function createPositionedStore(overrides?: Record<string, unknown>) {

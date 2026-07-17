@@ -42,14 +42,13 @@ describe('createInitialState', () => {
 });
 
 describe('dispatch - EXECUTE_ACTION', () => {
-  // 使用行政线 L3 镇长职位（id: admin_l3_0）和其城建部门（id: admin_l3_0_dept_0）
+  // 使用行政线 L3 镇长职位（id: admin_l3_0）
+  // 镇长部门：[ndrc, finance, commerce, land_resources, urban_dev]
+  // dept id = admin_l3_0_dept_4 (urban_dev), action id = approve_project
   const POSITION_ID = 'admin_l3_0';
   const LINE = CareerLine.Administrative;
   const LEVEL = 3;
-
-  // 根据实际配置：镇长有 5 个部门，第一个是 urban_dev（城建）
-  // dept id = admin_l3_0_dept_0, action id = approve_project
-  const deptId = 'admin_l3_0_dept_0';
+  const deptId = 'admin_l3_0_dept_4';
   const actionId = 'approve_project';
 
   function createStoreWithPosition(overrides?: Partial<PlayerSave>) {
@@ -362,6 +361,7 @@ describe('dispatch - persistence (localStorage)', () => {
       'admin_l2_0_dept_1',
       'admin_l2_0_dept_2',
       'admin_l2_0_dept_3',
+      'admin_l2_0_dept_4',
     ]);
 
     expect(state.departmentStates).toMatchObject({

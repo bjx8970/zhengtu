@@ -211,6 +211,20 @@ export interface PromotionConfig {
   factionPenalty: FactionPenaltyConfig;
 }
 
+/** 行政线专属配置常量 */
+export interface AdminLineConfig {
+  /** 招商引资的标准收益率 */
+  investmentYieldRate: number;
+  /** 项目完��的基础推进率 */
+  projectCompletionBaseRate: number;
+  /** 土地出让收入的倍率系数 */
+  landRevenueMultiplier: number;
+  /** 产业园区的增长速率 */
+  parkGrowthRate: number;
+  /** 财政收支平衡的达标阈值 */
+  fiscalBalanceThreshold: number;
+}
+
 /** 全局游戏配置常量（从 constants.json 读取） */
 export interface GameConfig {
   slotLimits: SlotConfig;
@@ -255,6 +269,8 @@ export interface GameConfig {
   completionBarThresholds: { excellent: number; good: number };
   /** 晋升引擎阈值配置 */
   promotion: PromotionConfig;
+  /** 行政线专属配置 */
+  adminLine: AdminLineConfig;
 }
 
 /** 省份/地区配置（regions.json） */

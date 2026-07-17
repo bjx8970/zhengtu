@@ -103,5 +103,12 @@
       "reputationDivisor": 100,
       "maxPenalty": 15
     }
+  },
+  "adminLine": {
+    "investmentYieldRate": 0.05,
+    "projectCompletionBaseRate": 0.15,
+    "landRevenueMultiplier": 0.02,
+    "parkGrowthRate": 0.08,
+    "fiscalBalanceThreshold": 0.9
   }
 }
