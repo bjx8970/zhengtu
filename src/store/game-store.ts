@@ -447,12 +447,26 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           const deptState = draft.departmentStates[slotOccupant.deptId];
           if (deptState) {
             for (const kpi of effects.kpiChanges) {
-              deptState.kpiValues[kpi.indicatorId] =
-                (deptState.kpiValues[kpi.indicatorId] ?? 0) + kpi.delta;
+              const cur = deptState.kpiValues[kpi.indicatorId] ?? 0;
+              if (kpi.operation === 'multiply') {
+                deptState.kpiValues[kpi.indicatorId] = cur * kpi.delta;
+              } else if (kpi.operation === 'set') {
+                deptState.kpiValues[kpi.indicatorId] = kpi.delta;
+              } else {
+                deptState.kpiValues[kpi.indicatorId] = cur + kpi.delta;
+              }
             }
           }
           for (const change of effects.playerChanges) {
-            applyPlayerAttr(draft, change.attr, change.delta, cfgAdv.attributeBounds);
+            if (change.operation === 'add') {
+              applyPlayerAttr(draft, change.attr, change.delta, cfgAdv.attributeBounds);
+            } else if (change.operation === 'multiply' || change.operation === 'set') {
+              if (!PLAYER_NUMERIC_ATTRS.has(change.attr)) continue;
+              const d = draft as unknown as Record<string, number>;
+              const cur = d[change.attr] ?? 0;
+              const newVal = change.operation === 'multiply' ? cur * change.delta : change.delta;
+              d[change.attr] = clampAttr(change.attr, newVal, cfgAdv.attributeBounds);
+            }
           }
 
           notifications.push({
@@ -466,7 +480,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           });
         }
 
-        draft.slots[c.tierKey as keyof typeof draft.slots].occupants[c.slotIndex] = null;
+        draft.slots[c.tierKey].occupants[c.slotIndex] = null;
       }
 
       if (notifications.length > 0) {

@@ -231,6 +231,7 @@ describe('resolveActionEffects', () => {
     const result = resolveActionEffects(action);
     expect(result.kpiChanges).toHaveLength(1);
     expect(result.kpiChanges[0]!.indicatorId).toBe('gdp');
+    expect(result.kpiChanges[0]!.operation).toBe('add');
     expect(result.kpiChanges[0]!.delta).toBe(10);
     expect(result.playerChanges).toHaveLength(0);
   });
@@ -242,8 +243,27 @@ describe('resolveActionEffects', () => {
     const result = resolveActionEffects(action);
     expect(result.playerChanges).toHaveLength(1);
     expect(result.playerChanges[0]!.attr).toBe('competence');
+    expect(result.playerChanges[0]!.operation).toBe('add');
     expect(result.playerChanges[0]!.delta).toBe(5);
     expect(result.kpiChanges).toHaveLength(0);
+  });
+
+  it('透传 multiply 操作', () => {
+    const action = makeAction({
+      effects: [{ target: 'dept.kpi.gdp', operation: 'multiply', value: 1.5 }],
+    });
+    const result = resolveActionEffects(action);
+    expect(result.kpiChanges[0]!.operation).toBe('multiply');
+    expect(result.kpiChanges[0]!.delta).toBe(1.5);
+  });
+
+  it('透传 set 操作', () => {
+    const action = makeAction({
+      effects: [{ target: 'player.competence', operation: 'set', value: 80 }],
+    });
+    const result = resolveActionEffects(action);
+    expect(result.playerChanges[0]!.operation).toBe('set');
+    expect(result.playerChanges[0]!.delta).toBe(80);
   });
 
   it('混合效果', () => {

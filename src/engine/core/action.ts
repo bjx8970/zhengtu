@@ -70,8 +70,8 @@ export function startAction(
 export function completeActions(
   slotState: SlotState,
   currentDay: number,
-): { tierKey: string; slotIndex: number; occupant: SlotOccupant }[] {
-  const completed: { tierKey: string; slotIndex: number; occupant: SlotOccupant }[] = [];
+): { tierKey: SlotTierKey; slotIndex: number; occupant: SlotOccupant }[] {
+  const completed: { tierKey: SlotTierKey; slotIndex: number; occupant: SlotOccupant }[] = [];
 
   for (const tierKey of TIER_ORDER) {
     const tier = slotState[tierKey];
@@ -92,24 +92,37 @@ export function completeActions(
  * 解析行动模板的效果，生成 KPI 变更和属性变更。
  *
  * @param actionConfig - 已完成行动的模板
- * @returns KPI 增量列表 + 玩家属性增量列表
+ * @returns KPI 增量列表 + 玩家属性增量列表，含操作模式
  */
 export function resolveActionEffects(actionConfig: ActionTemplate): {
-  kpiChanges: { indicatorId: string; delta: number }[];
-  playerChanges: { attr: string; delta: number }[];
+  kpiChanges: { indicatorId: string; operation: 'add' | 'multiply' | 'set'; delta: number }[];
+  playerChanges: { attr: string; operation: 'add' | 'multiply' | 'set'; delta: number }[];
 } {
-  const kpiChanges: { indicatorId: string; delta: number }[] = [];
-  const playerChanges: { attr: string; delta: number }[] = [];
+  const kpiChanges: {
+    indicatorId: string;
+    operation: 'add' | 'multiply' | 'set';
+    delta: number;
+  }[] = [];
+  const playerChanges: { attr: string; operation: 'add' | 'multiply' | 'set'; delta: number }[] =
+    [];
 
   for (const effect of actionConfig.effects) {
-    const value = effect.range
+    const delta = effect.range
       ? Math.floor(Math.random() * (effect.range.max - effect.range.min + 1)) + effect.range.min
       : effect.value;
 
     if (effect.target.startsWith('dept.kpi.')) {
-      kpiChanges.push({ indicatorId: effect.target.replace('dept.kpi.', ''), delta: value });
+      kpiChanges.push({
+        indicatorId: effect.target.replace('dept.kpi.', ''),
+        operation: effect.operation,
+        delta,
+      });
     } else if (effect.target.startsWith('player.')) {
-      playerChanges.push({ attr: effect.target.replace('player.', ''), delta: value });
+      playerChanges.push({
+        attr: effect.target.replace('player.', ''),
+        operation: effect.operation,
+        delta,
+      });
     }
   }
 
