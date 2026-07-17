@@ -1,7 +1,7 @@
 /**
  * Step 2 — 出生地选择（省份 → 城市级联）
  */
-import { Show, For, createMemo } from 'solid-js';
+import { Show, For } from 'solid-js';
 import { colors, radius, cardStyle } from '../../utils/theme';
 import type { CharacterData } from '../../types/character';
 import type { ProvinceConfig } from '../../types/config';
@@ -14,8 +14,6 @@ interface StepBirthplaceProps {
 }
 
 export function StepBirthplace(props: StepBirthplaceProps) {
-  const selectedCity = createMemo(() => props.data.city);
-
   return (
     <div
       style={{
@@ -123,10 +121,10 @@ export function StepBirthplace(props: StepBirthplaceProps) {
                       'font-size': '0.9rem',
                       cursor: 'pointer',
                       'background-color':
-                        selectedCity() === c ? colors.primaryLight : 'transparent',
-                      color: selectedCity() === c ? colors.primary : colors.textDark,
+                        props.data.city === c ? colors.primaryLight : 'transparent',
+                      color: props.data.city === c ? colors.primary : colors.textDark,
                       'border-left':
-                        selectedCity() === c
+                        props.data.city === c
                           ? `3px solid ${colors.primary}`
                           : '3px solid transparent',
                     }}

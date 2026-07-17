@@ -71,6 +71,7 @@ export function determineTier(
     if (effectiveScore >= (thresholds[t] ?? 0)) {
       tier = t;
       tierThreshold = thresholds[t] ?? 0;
+      break;
     }
   }
 

@@ -164,7 +164,12 @@ export function CharacterCreation() {
           <StepBasicInfo data={data()} updateField={updateField} />
         </Show>
         <Show when={step() === 1}>
-          <StepBirthplace data={data()} provinces={provinces} selectedProvince={selectedProvince} updateField={updateField} />
+          <StepBirthplace
+            data={data()}
+            provinces={provinces}
+            selectedProvince={selectedProvince}
+            updateField={updateField}
+          />
         </Show>
         <Show when={step() === 2 && selectedProvince()}>
           {(prov) => (

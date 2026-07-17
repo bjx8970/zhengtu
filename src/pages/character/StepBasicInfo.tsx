@@ -1,6 +1,7 @@
 /**
  * Step 1 — 基本信息（姓名 + 性别）
  */
+import { For } from 'solid-js';
 import { colors, radius, font, cardStyle } from '../../utils/theme';
 import type { CharacterData } from '../../types/character';
 
@@ -48,26 +49,28 @@ export function StepBasicInfo(props: StepBasicInfoProps) {
         autofocus
       />
       <div style={{ display: 'flex', gap: '0.8rem' }}>
-        {(['男', '女'] as const).map((g) => (
-          <button
-            onClick={() => props.updateField('gender', g)}
-            style={{
-              flex: 1,
-              padding: '0.7rem',
-              'font-size': '1rem',
-              'background-color': props.data.gender === g ? colors.primary : colors.bgInput,
-              color: props.data.gender === g ? colors.primaryText : colors.textDark,
-              border:
-                props.data.gender === g
-                  ? `1px solid ${colors.primary}`
-                  : `1px solid ${colors.borderLight}`,
-              'border-radius': radius.md,
-              cursor: 'pointer',
-            }}
-          >
-            {g}
-          </button>
-        ))}
+        <For each={['男', '女'] as const}>
+          {(g) => (
+            <button
+              onClick={() => props.updateField('gender', g)}
+              style={{
+                flex: 1,
+                padding: '0.7rem',
+                'font-size': '1rem',
+                'background-color': props.data.gender === g ? colors.primary : colors.bgInput,
+                color: props.data.gender === g ? colors.primaryText : colors.textDark,
+                border:
+                  props.data.gender === g
+                    ? `1px solid ${colors.primary}`
+                    : `1px solid ${colors.borderLight}`,
+                'border-radius': radius.md,
+                cursor: 'pointer',
+              }}
+            >
+              {g}
+            </button>
+          )}
+        </For>
       </div>
     </div>
   );

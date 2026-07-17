@@ -14,7 +14,6 @@ interface StepSchoolProps {
 }
 
 export function StepSchool(props: StepSchoolProps) {
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Show guarantees existence
   const schools = props.data.universityTier
     ? props.universities.tiers[props.data.universityTier.replace('预科', '本科')]
     : null;
@@ -116,6 +115,7 @@ export function StepSchool(props: StepSchoolProps) {
               border: `1px solid ${colors.borderLight}`,
             }}
           >
+            {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Show guarantees existence */}
             <For each={schools!}>
               {(school) => (
                 <div
