@@ -43,7 +43,7 @@ export function resolveJointReview(
     if (dept === '纪委') {
       opinions[dept] = ctx.corruptionRisk < jr.disciplineCorruptionThreshold;
     } else if (dept === '信访') {
-      opinions[dept] = rng() < 1 - ctx.corruptionRisk / 200;
+      opinions[dept] = rng() < 1 - ctx.corruptionRisk / jr.complaintNormalizer;
     } else {
       opinions[dept] = rng() < jr.otherDepartmentsPassRate;
     }
@@ -94,10 +94,12 @@ export function resolveCommitteeVote(
     Object.values(ctx.factionReputation).reduce((a, b) => a + b, 0) /
     Math.max(Object.keys(ctx.factionReputation).length, 1);
 
-  const approvalRate = (avgReputation + ctx.superiorFavor) / 200;
+  const approvalRate = (avgReputation + ctx.superiorFavor) / comm.approvalDivisor;
 
-  const factionPenalty = calculateFactionPenalty(ctx.factionReputation) / 100;
-  const finalRate = Math.max(approvalRate - factionPenalty, 0.1);
+  const factionPenalty =
+    calculateFactionPenalty(ctx.factionReputation, cfg.promotion.factionPenalty) /
+    comm.factionPenaltyDivisor;
+  const finalRate = Math.max(approvalRate - factionPenalty, comm.minApprovalRate);
 
   let forVotes = 0;
   for (let i = 0; i < committeeSize; i++) {
@@ -185,7 +187,7 @@ export function resolveProbation(
   detail: string;
 } {
   const probation = cfg.promotion.probation;
-  const score = ctx.competence * 0.5 + ctx.playerScore * 0.3 + rng() * 20;
+  const score = ctx.competence * 0.5 + ctx.playerScore * 0.3 + rng() * probation.randomFactorMax;
   const passed = score >= probation.passThreshold;
 
   return {
