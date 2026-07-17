@@ -340,9 +340,7 @@ export function Dashboard() {
             {(dept) => (
               <For each={dept().actions}>
                 {(action) => {
-                  const tiers = Object.values(state.slots) as {
-                    occupants: (SlotOccupant | null)[];
-                  }[];
+                  const tiers = [state.slots.primary, state.slots.secondary, state.slots.reserve];
                   const running = tiers.some((tier) =>
                     tier.occupants.some((o: SlotOccupant | null) => o?.actionId === action.id),
                   );

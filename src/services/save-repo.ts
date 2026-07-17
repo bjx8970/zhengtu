@@ -22,10 +22,17 @@ const LOCAL_KEY = 'zhengtu_autosave';
 function isValidPlayerSave(data: unknown): data is PlayerSave {
   if (!data || typeof data !== 'object') return false;
   const obj = data as Record<string, unknown>;
+  const slots = obj.slots as Record<string, unknown> | undefined;
+  const time = obj.time as Record<string, unknown> | undefined;
   return (
     typeof obj.currentPositionId === 'string' &&
     typeof obj.currentLevel === 'number' &&
-    typeof obj.characterName === 'string'
+    typeof obj.characterName === 'string' &&
+    typeof slots?.primary === 'object' &&
+    typeof slots?.secondary === 'object' &&
+    typeof slots?.reserve === 'object' &&
+    Array.isArray((slots.primary as Record<string, unknown>)?.occupants) &&
+    typeof time?.year === 'number'
   );
 }
 
@@ -66,7 +73,7 @@ export async function fetchRemoteSave(userId: string): Promise<PlayerSave | null
 
   if (error || !data) return null;
 
-  return data.save_data as PlayerSave;
+  return isValidPlayerSave(data.save_data) ? (data.save_data as PlayerSave) : null;
 }
 
 /**

@@ -578,8 +578,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       if (!lineCfg) break;
       const nextLevelCfg = lineCfg.levels.find((l) => l.level === nextLevel);
       if (!nextLevelCfg || nextLevelCfg.positions.length === 0) break;
-      // 安全：上一行已 guard length === 0，positions[0] 必然非空
-      const targetPos = nextLevelCfg.positions[0]!;
+      const targetPos = nextLevelCfg.positions[0];
+      if (!targetPos) break;
 
       draft.promotionAttempts += 1;
 
