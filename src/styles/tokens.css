@@ -40,6 +40,9 @@
   --color-warning-light: rgba(230, 168, 23, 0.15);
   --color-danger: #c44d4d;
 
+  /* 输入框 */
+  --bg-input: #f8f7f5;
+
   /* 边框 */
   --border-color: #3a3540;
   --border-color-light: #d4c5b9;

@@ -17,7 +17,7 @@ import { getConfigLoader } from '../../config/loader';
 import { navigate } from '../../router';
 import { CareerLine } from '../../types/enums';
 import type { CharacterData, StepDef } from '../../types/character';
-import { colors, radius, pageBase, cardStyle } from '../../utils/theme';
+import { colors, radius, font, pageBase, cardStyle } from '../../utils/theme';
 
 const STEPS: (StepDef & { quote?: string })[] = [
   { title: '姓名', field: 'characterName', type: 'input', quote: '名者，命也' },
@@ -181,7 +181,7 @@ export function CharacterCreation() {
                 color: colors.primary,
                 opacity: 0.7,
                 'margin-bottom': '1.5rem',
-                'font-family': '"STKaiti", "KaiTi", "楷体", serif',
+                'font-family': font.title,
               }}
             >
               —— {currentStep().quote} ——
@@ -199,7 +199,7 @@ export function CharacterCreation() {
                 'font-size': '1.1rem',
                 'border-radius': radius.md,
                 border: `1px solid ${colors.borderLight}`,
-                'background-color': '#f8f7f5',
+                'background-color': colors.bgInput,
                 color: colors.textDark,
                 width: '100%',
                 'text-align': 'center',

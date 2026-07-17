@@ -24,7 +24,7 @@ function tierStyle(tier: KPITier) {
     case KPITier.Competent:
       return { bg: colors.secondaryLight, fg: colors.secondary };
     case KPITier.Basic:
-      return { bg: 'rgba(230, 168, 23, 0.15)', fg: colors.warning };
+      return { bg: colors.warningLight, fg: colors.warning };
     default:
       return { bg: colors.primaryLight, fg: colors.primary };
   }

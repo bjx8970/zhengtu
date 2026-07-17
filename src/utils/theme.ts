@@ -31,10 +31,14 @@ export const colors = {
   success: '#4caf50',
   successLight: 'rgba(76, 175, 80, 0.15)',
   warning: '#e6a817',
+  warningLight: 'rgba(230, 168, 23, 0.15)',
   danger: '#c44d4d',
 
   border: '#3a3540',
   borderLight: '#d4c5b9',
+
+  /** 亮色输入框底色 */
+  bgInput: '#f8f7f5',
 
   white: '#ffffff',
   black: '#000000',
