@@ -185,6 +185,199 @@
         "politicalConditions": ["无党纪处分记录"],
         "specialConditions": ["grassroots"]
       }
+    },
+    {
+      "level": 4,
+      "label": "副处",
+      "positions": [
+        {
+          "id": "admin_l4_0",
+          "name": "副县长",
+          "departmentTemplateIds": [
+            "urban_dev",
+            "finance",
+            "public_safety",
+            "civil_affairs",
+            "agriculture"
+          ],
+          "kpiTemplateIds": [
+            "gdp_growth",
+            "fiscal_revenue",
+            "livelihood_score",
+            "project_completion",
+            "safety"
+          ],
+          "annualBudget": 12000
+        },
+        {
+          "id": "admin_l4_1",
+          "name": "县委常委",
+          "departmentTemplateIds": [
+            "party_org",
+            "propaganda_dept",
+            "human_resources",
+            "discipline_inspect"
+          ],
+          "kpiTemplateIds": [
+            "party_building",
+            "propaganda_score",
+            "staff_satisfaction",
+            "anti_corruption"
+          ],
+          "annualBudget": 10000
+        },
+        {
+          "id": "admin_l4_2",
+          "name": "市级局副局长",
+          "departmentTemplateIds": ["urban_dev", "finance", "human_resources", "statistics"],
+          "kpiTemplateIds": ["gdp_growth", "fiscal_revenue", "staff_satisfaction", "data_accuracy"],
+          "annualBudget": 15000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 4,
+        "minAssessmentPasses": 4,
+        "politicalConditions": ["无党纪处分记录", "人事档案合规"],
+        "specialConditions": ["grassroots", "multi_region"]
+      }
+    },
+    {
+      "level": 5,
+      "label": "正处",
+      "positions": [
+        {
+          "id": "admin_l5_0",
+          "name": "县长",
+          "departmentTemplateIds": [
+            "urban_dev",
+            "finance",
+            "public_safety",
+            "civil_affairs",
+            "agriculture"
+          ],
+          "kpiTemplateIds": [
+            "gdp_growth",
+            "fiscal_revenue",
+            "livelihood_score",
+            "project_completion",
+            "safety"
+          ],
+          "annualBudget": 25000
+        },
+        {
+          "id": "admin_l5_1",
+          "name": "县委书记",
+          "departmentTemplateIds": [
+            "party_org",
+            "propaganda_dept",
+            "human_resources",
+            "discipline_inspect",
+            "general_office"
+          ],
+          "kpiTemplateIds": [
+            "party_building",
+            "propaganda_score",
+            "staff_satisfaction",
+            "anti_corruption",
+            "office_efficiency"
+          ],
+          "annualBudget": 20000
+        },
+        {
+          "id": "admin_l5_2",
+          "name": "市级局局长",
+          "departmentTemplateIds": [
+            "urban_dev",
+            "finance",
+            "human_resources",
+            "environment",
+            "statistics"
+          ],
+          "kpiTemplateIds": [
+            "gdp_growth",
+            "fiscal_revenue",
+            "staff_satisfaction",
+            "environment_score",
+            "data_accuracy"
+          ],
+          "annualBudget": 22000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 4,
+        "minAssessmentPasses": 4,
+        "politicalConditions": ["无党纪处分记录", "无重大问责记录"],
+        "specialConditions": ["grassroots", "multi_region"]
+      }
+    },
+    {
+      "level": 6,
+      "label": "副厅",
+      "positions": [
+        {
+          "id": "admin_l6_0",
+          "name": "副市长",
+          "departmentTemplateIds": [
+            "urban_dev",
+            "finance",
+            "public_safety",
+            "civil_affairs",
+            "agriculture"
+          ],
+          "kpiTemplateIds": [
+            "gdp_growth",
+            "fiscal_revenue",
+            "livelihood_score",
+            "project_completion",
+            "safety"
+          ],
+          "annualBudget": 50000
+        },
+        {
+          "id": "admin_l6_1",
+          "name": "市委常委",
+          "departmentTemplateIds": [
+            "party_org",
+            "propaganda_dept",
+            "human_resources",
+            "discipline_inspect",
+            "general_office"
+          ],
+          "kpiTemplateIds": [
+            "party_building",
+            "propaganda_score",
+            "staff_satisfaction",
+            "anti_corruption",
+            "office_efficiency"
+          ],
+          "annualBudget": 40000
+        },
+        {
+          "id": "admin_l6_2",
+          "name": "省级厅副厅长",
+          "departmentTemplateIds": [
+            "urban_dev",
+            "finance",
+            "human_resources",
+            "environment",
+            "statistics"
+          ],
+          "kpiTemplateIds": [
+            "gdp_growth",
+            "fiscal_revenue",
+            "staff_satisfaction",
+            "environment_score",
+            "data_accuracy"
+          ],
+          "annualBudget": 45000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 5,
+        "minAssessmentPasses": 5,
+        "politicalConditions": ["无党纪处分记录", "无重大问责记录", "个人事项如实申报"],
+        "specialConditions": ["grassroots", "multi_region"]
+      }
     }
   ]
 }
