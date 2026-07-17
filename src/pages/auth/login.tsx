@@ -8,6 +8,7 @@
 
 import { navigate } from '../../router';
 import { createSignal } from 'solid-js';
+import { colors, radius, pageBase } from '../../utils/theme';
 
 export function LoginPage() {
   const [phone, setPhone] = createSignal('');
@@ -17,17 +18,14 @@ export function LoginPage() {
   return (
     <div
       style={{
-        display: 'flex',
-        'flex-direction': 'column',
+        ...pageBase,
         'align-items': 'center',
         'justify-content': 'center',
-        height: '100%',
-        'background-color': '#1a1a2e',
-        color: '#e0e0e0',
         gap: '1rem',
       }}
     >
       <div style={{ 'font-size': '1.5rem', 'margin-bottom': '2rem' }}>登录</div>
+
       <input
         type="tel"
         placeholder="手机号"
@@ -36,36 +34,39 @@ export function LoginPage() {
         style={{
           padding: '0.6rem 1rem',
           'font-size': '1rem',
-          'border-radius': '6px',
-          border: '1px solid #555',
-          'background-color': '#16213e',
-          color: '#e0e0e0',
+          'border-radius': radius.md,
+          border: `1px solid ${colors.border}`,
+          'background-color': colors.bgCard,
+          color: colors.textPrimary,
           width: '260px',
+          outline: 'none',
         }}
       />
+
       <button
         onClick={goToCharacter}
         style={{
           padding: '0.6rem 2rem',
           'font-size': '1rem',
-          'background-color': '#4A6FA5',
-          color: '#fff',
+          'background-color': colors.primary,
+          color: colors.primaryText,
           border: 'none',
-          'border-radius': '6px',
+          'border-radius': radius.md,
           cursor: 'pointer',
           width: '260px',
         }}
       >
         获取验证码
       </button>
-      <div style={{ 'margin-top': '1rem' }}>
+
+      <div style={{ 'margin-top': '0.5rem' }}>
         <a
           href="#"
           onClick={(e) => {
             e.preventDefault();
             goToCharacter();
           }}
-          style={{ color: '#888', 'font-size': '0.9rem' }}
+          style={{ color: colors.textSecondary, 'font-size': '0.9rem' }}
         >
           跳过登录（开发模式）
         </a>

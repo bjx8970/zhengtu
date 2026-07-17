@@ -14,16 +14,25 @@ import { formatPercent } from '../../utils/format';
 import { createMemo, For, Show } from 'solid-js';
 import type { KPIResult } from '../../types/game';
 import { KPITier } from '../../types/enums';
+import { colors, radius, pageBase, darkCardStyle, progressBarColor } from '../../utils/theme';
 
-/** 等次颜色映射（从配置读取） */
-function tierColor(tier: KPITier): string {
-  return getConfigLoader().getGameConfig().kpiTierColors[tier] ?? '#888';
+/** 等次颜色映射 */
+function tierStyle(tier: KPITier) {
+  switch (tier) {
+    case KPITier.Excellent:
+      return { bg: colors.successLight, fg: colors.success };
+    case KPITier.Competent:
+      return { bg: colors.secondaryLight, fg: colors.secondary };
+    case KPITier.Basic:
+      return { bg: colors.warningLight, fg: colors.warning };
+    default:
+      return { bg: colors.primaryLight, fg: colors.primary };
+  }
 }
 
 export function PositionKPI() {
   const { state } = useGameStore();
 
-  /** 获取当前职位配置，缺失时返回 null */
   const positionConfig = createMemo(() => {
     const posId = state.currentPositionId;
     if (!posId) return null;
@@ -34,7 +43,6 @@ export function PositionKPI() {
     );
   });
 
-  /** 计算 KPI 考核结果 */
   const kpiResult = createMemo(() => {
     const pos = positionConfig();
     if (!pos) return null;
@@ -45,43 +53,36 @@ export function PositionKPI() {
     );
   });
 
+  const posName = createMemo(() => positionConfig()?.name ?? '未分配职位');
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        'flex-direction': 'column',
-        height: '100%',
-        'background-color': '#1a1a2e',
-        color: '#e0e0e0',
-      }}
-    >
+    <div style={pageBase}>
       {/* 顶部导航栏 */}
       <header
         style={{
           display: 'flex',
           'align-items': 'center',
           padding: '0.8rem 1rem',
-          'border-bottom': '1px solid #333',
+          'border-bottom': `1px solid ${colors.border}`,
           gap: '0.8rem',
         }}
       >
         <button
           onClick={() => navigate('/dashboard')}
           style={{
-            'background-color': 'transparent',
-            color: '#888',
+            background: 'none',
+            color: colors.textSecondary,
             border: 'none',
             'font-size': '1.2rem',
             cursor: 'pointer',
+            padding: 0,
           }}
         >
           ←
         </button>
         <div>
-          <div style={{ 'font-size': '0.75rem', color: '#888' }}>
-            {positionConfig()?.name ?? '未分配职位'}
-          </div>
-          <div style={{ 'font-size': '1rem', 'font-weight': 'bold' }}>考核指标</div>
+          <div style={{ 'font-size': '0.75rem', color: colors.textSecondary }}>{posName()}</div>
+          <div style={{ 'font-size': '1rem', 'font-weight': 'bold' }}>KPI 考核</div>
         </div>
       </header>
 
@@ -89,61 +90,80 @@ export function PositionKPI() {
         <Show
           when={positionConfig()}
           fallback={
-            <div style={{ 'text-align': 'center', color: '#888', 'margin-top': '3rem' }}>
+            <div
+              style={{ 'text-align': 'center', color: colors.textSecondary, 'margin-top': '3rem' }}
+            >
               尚未分配职位，无法显示考核指标。
             </div>
           }
         >
-          {/* 综合评分 */}
+          {/* 综合评分卡片 */}
           <Show when={kpiResult()}>
-            {(result) => (
-              <div
-                style={{
-                  display: 'flex',
-                  'justify-content': 'space-around',
-                  'margin-bottom': '1.5rem',
-                  padding: '1rem',
-                  'background-color': '#16213e',
-                  'border-radius': '10px',
-                }}
-              >
-                <div style={{ 'text-align': 'center' }}>
-                  <div style={{ 'font-size': '0.75rem', color: '#888', 'margin-bottom': '0.3rem' }}>
-                    综合得分
+            {(result) => {
+              const tierColors = tierStyle(result().tier);
+              return (
+                <div
+                  style={{
+                    ...darkCardStyle('1.2rem'),
+                    display: 'flex',
+                    'justify-content': 'space-around',
+                    'margin-bottom': '1.2rem',
+                  }}
+                >
+                  <div style={{ 'text-align': 'center' }}>
+                    <div
+                      style={{
+                        'font-size': '0.75rem',
+                        color: colors.textSecondary,
+                        'margin-bottom': '0.4rem',
+                      }}
+                    >
+                      综合得分
+                    </div>
+                    <div
+                      style={{ 'font-size': '2rem', 'font-weight': 'bold', color: colors.primary }}
+                    >
+                      {result().totalScore.toFixed(0)}
+                    </div>
                   </div>
-                  <div style={{ 'font-size': '2rem', 'font-weight': 'bold', color: '#4A6FA5' }}>
-                    {result().totalScore.toFixed(0)}
+                  <div style={{ 'text-align': 'center' }}>
+                    <div
+                      style={{
+                        'font-size': '0.75rem',
+                        color: colors.textSecondary,
+                        'margin-bottom': '0.4rem',
+                      }}
+                    >
+                      考核等次
+                    </div>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        'font-size': '1rem',
+                        'font-weight': 'bold',
+                        padding: '0.25rem 0.8rem',
+                        'border-radius': radius.md,
+                        background: tierColors.bg,
+                        color: tierColors.fg,
+                      }}
+                    >
+                      {result().tier}
+                    </span>
                   </div>
                 </div>
-                <div style={{ 'text-align': 'center' }}>
-                  <div style={{ 'font-size': '0.75rem', color: '#888', 'margin-bottom': '0.3rem' }}>
-                    考核等次
-                  </div>
-                  <div
-                    style={{
-                      'font-size': '1.5rem',
-                      'font-weight': 'bold',
-                      color: tierColor(result().tier),
-                    }}
-                  >
-                    {result().tier}
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            }}
           </Show>
 
           {/* 指标列表 */}
           <Show when={kpiResult()}>
             {(result) => (
-              <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.5rem' }}>
                 <For each={result().indicators}>
                   {(indicator: KPIResult) => (
                     <div
                       style={{
-                        padding: '0.8rem 1rem',
-                        'background-color': '#16213e',
-                        'border-radius': '8px',
+                        ...darkCardStyle('0.8rem 1rem'),
                       }}
                     >
                       <div
@@ -151,22 +171,21 @@ export function PositionKPI() {
                           display: 'flex',
                           'justify-content': 'space-between',
                           'align-items': 'center',
-                          'margin-bottom': '0.4rem',
+                          'margin-bottom': '0.5rem',
                         }}
                       >
                         <span style={{ 'font-size': '0.9rem' }}>{indicator.name}</span>
-                        <span style={{ 'font-size': '0.85rem', color: '#888' }}>
+                        <span style={{ 'font-size': '0.8rem', color: colors.textSecondary }}>
                           {indicator.currentValue}
-                          {indicator.weight > 0 ? ' / ' : ''}
-                          {indicator.weight > 0 ? indicator.targetValue : ''}
+                          {indicator.weight > 0 ? ` / ${indicator.targetValue}` : ''}
                         </span>
                       </div>
                       {/* 完成率进度条 */}
                       <div
                         style={{
-                          height: '6px',
-                          'background-color': '#2a2a4a',
-                          'border-radius': '3px',
+                          height: '5px',
+                          'background-color': colors.border,
+                          'border-radius': radius.sm,
                           overflow: 'hidden',
                         }}
                       >
@@ -174,13 +193,8 @@ export function PositionKPI() {
                           style={{
                             height: '100%',
                             width: `${Math.min(indicator.completionRate * 100, 100)}%`,
-                            'background-color':
-                              indicator.completionRate >= 1
-                                ? '#4CAF50'
-                                : indicator.completionRate >= 0.6
-                                  ? '#4A6FA5'
-                                  : '#C44D4D',
-                            'border-radius': '3px',
+                            'background-color': progressBarColor(indicator.completionRate),
+                            'border-radius': radius.sm,
                           }}
                         />
                       </div>
@@ -188,9 +202,9 @@ export function PositionKPI() {
                         style={{
                           display: 'flex',
                           'justify-content': 'space-between',
-                          'margin-top': '0.3rem',
+                          'margin-top': '0.4rem',
                           'font-size': '0.75rem',
-                          color: '#888',
+                          color: colors.textSecondary,
                         }}
                       >
                         <span>完成率 {formatPercent(indicator.completionRate)}</span>
