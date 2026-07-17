@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createInitialState, createTestStore, dispatch } from '../game-store';
 import type { PlayerSave } from '../../types/player';
-import { CareerLine } from '../../types/enums';
+import { CareerLine, PromotionStage } from '../../types/enums';
 
 describe('createInitialState', () => {
   it('creates valid default state', () => {
@@ -282,5 +282,95 @@ describe('dispatch - persistence (localStorage)', () => {
 
     store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
     expect(localStorage.getItem(SAVE_KEY)).toBeNull();
+  });
+
+  it('NEW_GAME 初始化当前职位的所有部门', () => {
+    const store = createTestStore();
+    store.dispatch({
+      type: 'NEW_GAME',
+      data: {
+        characterName: '测试角色',
+        currentPositionId: 'admin_l1_0',
+        currentLevel: 1,
+        currentCareerLine: CareerLine.Administrative,
+      },
+    });
+
+    const deptIds = Object.keys(store.getRawState().departmentStates);
+    expect(deptIds).toEqual([
+      'admin_l1_0_dept_0',
+      'admin_l1_0_dept_1',
+      'admin_l1_0_dept_2',
+      'admin_l1_0_dept_3',
+    ]);
+  });
+
+  it('NEW_GAME 职位不存在时 departmentStates 保持空', () => {
+    const store = createTestStore();
+    store.dispatch({
+      type: 'NEW_GAME',
+      data: {
+        characterName: '测试角色',
+        currentPositionId: 'nonexistent',
+        currentLevel: 99,
+      },
+    });
+
+    expect(store.getRawState().departmentStates).toEqual({});
+  });
+
+  it('晋升成功后重置部门状态为新职位部门', () => {
+    const store = createTestStore({
+      currentCareerLine: CareerLine.Administrative,
+      currentLevel: 1,
+      currentPositionId: 'admin_l1_0',
+      competence: 100,
+      promotionStage: PromotionStage.Appointment,
+      promotionState: {
+        currentStage: PromotionStage.Appointment,
+        targetPositionId: 'admin_l2_0',
+        targetLevel: 2,
+        stageResults: {},
+      },
+      departmentStates: {
+        old_dept: {
+          id: 'old_dept',
+          kpiValues: { some_kpi: 100 },
+          monthlyConsumption: 50,
+          cumulativeConsumption: 500,
+          actionCooldowns: {},
+          lastActionDay: 10,
+        },
+      },
+    });
+
+    store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE' });
+    expect(store.getRawState().promotionStage).toBe(PromotionStage.Probation);
+
+    store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE', _rng: () => 1 });
+
+    const state = store.getRawState();
+    expect(state.promotionStage).toBe(PromotionStage.Completed);
+    expect(state.currentPositionId).toBe('admin_l2_0');
+    expect(state.currentLevel).toBe(2);
+
+    expect(state.departmentStates['old_dept']).toBeUndefined();
+
+    const newDeptIds = Object.keys(state.departmentStates);
+    expect(newDeptIds).toEqual([
+      'admin_l2_0_dept_0',
+      'admin_l2_0_dept_1',
+      'admin_l2_0_dept_2',
+      'admin_l2_0_dept_3',
+    ]);
+
+    // safe: departmentStates['admin_l2_0_dept_1'] verified non-null by `arrayContaining` above
+    const sampleDept = state.departmentStates['admin_l2_0_dept_1']!;
+    expect(sampleDept.id).toBe('admin_l2_0_dept_1');
+    expect(sampleDept.kpiValues).toEqual({});
+    expect(sampleDept.monthlyConsumption).toBe(0);
+    expect(sampleDept.cumulativeConsumption).toBe(0);
+    expect(sampleDept.actionCooldowns).toEqual({});
+    expect(sampleDept.lastActionDay).toBe(0);
   });
 });

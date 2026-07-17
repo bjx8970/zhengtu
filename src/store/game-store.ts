@@ -190,6 +190,24 @@ function extractPositionIndex(positionId: string): number {
   return Number.isNaN(idx) ? 0 : idx;
 }
 
+/** 初始化当前职位的所有部门运行时状态 */
+function initializeDepartmentStates(draft: PlayerSave): void {
+  const idx = extractPositionIndex(draft.currentPositionId);
+  const pos = getConfigLoader().getPosition(draft.currentCareerLine, draft.currentLevel, idx);
+  if (!pos) return;
+  draft.departmentStates = {};
+  for (const dept of pos.departments) {
+    draft.departmentStates[dept.id] = {
+      id: dept.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      actionCooldowns: {},
+      lastActionDay: 0,
+    };
+  }
+}
+
 /** 非 idle/completed/failed 时禁止执行其他操作 */
 function canAct(stage: PromotionStage): boolean {
   return (
@@ -452,6 +470,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           }
         }
       }
+      initializeDepartmentStates(draft);
       break;
     }
     case 'RESET_PROMOTION': {
@@ -648,6 +667,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
               0,
               500,
             );
+            initializeDepartmentStates(draft);
             draft.promotionStage = PromotionStage.Completed;
             ps.currentStage = PromotionStage.Completed;
           } else {
