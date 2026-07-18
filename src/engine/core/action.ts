@@ -10,7 +10,12 @@
 
 import type { ActionTemplate } from '../../types/config';
 import type { SlotState, SlotTierKey } from '../../types/player';
-import type { StartActionResult, CompletedSlotAction } from '../../types/game';
+import type {
+  StartActionResult,
+  CompletedSlotAction,
+  KPIEffectChange,
+  PlayerEffectChange,
+} from '../../types/game';
 
 const TIER_ORDER: SlotTierKey[] = ['primary', 'secondary', 'reserve'];
 
@@ -96,16 +101,11 @@ export function resolveActionEffects(
   actionConfig: ActionTemplate,
   _rng?: () => number,
 ): {
-  kpiChanges: { indicatorId: string; operation: 'add' | 'multiply' | 'set'; delta: number }[];
-  playerChanges: { attr: string; operation: 'add' | 'multiply' | 'set'; delta: number }[];
+  kpiChanges: KPIEffectChange[];
+  playerChanges: PlayerEffectChange[];
 } {
-  const kpiChanges: {
-    indicatorId: string;
-    operation: 'add' | 'multiply' | 'set';
-    delta: number;
-  }[] = [];
-  const playerChanges: { attr: string; operation: 'add' | 'multiply' | 'set'; delta: number }[] =
-    [];
+  const kpiChanges: KPIEffectChange[] = [];
+  const playerChanges: PlayerEffectChange[] = [];
 
   for (const effect of actionConfig.effects) {
     const rand = _rng ?? Math.random;

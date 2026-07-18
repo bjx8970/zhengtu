@@ -58,6 +58,20 @@ export interface CompletedSlotAction {
   occupant: SlotOccupant;
 }
 
+/** 单个 KPI 指标的效果变更 */
+export interface KPIEffectChange {
+  indicatorId: string;
+  operation: 'add' | 'multiply' | 'set';
+  delta: number;
+}
+
+/** 单个玩家属性的效果变更 */
+export interface PlayerEffectChange {
+  attr: string;
+  operation: 'add' | 'multiply' | 'set';
+  delta: number;
+}
+
 /** 随机事件的触发条件 */
 export interface EventCondition {
   minLevel?: number;
