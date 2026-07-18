@@ -223,6 +223,8 @@ export interface AdminLineConfig {
   parkGrowthRate: number;
   /** 财政收支平衡的达标阈值 */
   fiscalBalanceThreshold: number;
+  /** 项目审批充分完成的基准天数（审批超过此天数视为审批充分） */
+  projectApprovalBaselineDays: number;
 }
 
 /** 全局游戏配置常量（从 constants.json 读取） */

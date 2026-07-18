@@ -109,6 +109,7 @@
     "projectCompletionBaseRate": 0.15,
     "landRevenueMultiplier": 0.02,
     "parkGrowthRate": 0.08,
-    "fiscalBalanceThreshold": 0.9
+    "fiscalBalanceThreshold": 0.9,
+    "projectApprovalBaselineDays": 120
   }
 }

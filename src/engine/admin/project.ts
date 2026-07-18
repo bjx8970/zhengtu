@@ -25,20 +25,22 @@ const MILESTONE_THRESHOLDS: Record<ProjectMilestone, number> = {
 /**
  * 计算项目完成进度。
  *
- * 公式：min(审批天数 / 120, 1.0) × 资金到位率 × 人力配置系数
- * > 120 天视为审批已充分完成。
+ * 公式：min(审批天数 / approvalBaselineDays, 1.0) × 资金到位率 × 人力配置系数
+ * approvalBaselineDays 取自 config.projectApprovalBaselineDays，默认 120 天。
  *
- * @param approvalDays 已审批耗时（天）
- * @param budgetRatio  资金到位率（0~1）
- * @param staffing     人力配置系数（0~1，1 为满编）
+ * @param approvalDays   已审批耗时（天）
+ * @param budgetRatio    资金到位率（0~1）
+ * @param staffing       人力配置系数（0~1，1 为满编）
+ * @param config         行政线配置常量
  * @returns 项目进度（0.0 ~ 1.0）
  */
 export function calculateProjectProgress(
   approvalDays: number,
   budgetRatio: number,
   staffing: number,
+  config: AdminLineConfig,
 ): number {
-  const approvalFactor = Math.min(approvalDays / 120, 1.0);
+  const approvalFactor = Math.min(approvalDays / config.projectApprovalBaselineDays, 1.0);
   return Math.min(approvalFactor * Math.max(budgetRatio, 0) * Math.max(staffing, 0), 1.0);
 }
 

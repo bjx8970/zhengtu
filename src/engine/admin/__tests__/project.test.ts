@@ -14,29 +14,30 @@ const config: AdminLineConfig = {
   landRevenueMultiplier: 0.02,
   parkGrowthRate: 0.08,
   fiscalBalanceThreshold: 0.9,
+  projectApprovalBaselineDays: 120,
 };
 
 describe('calculateProjectProgress', () => {
   it('审批 0 天 → 进度 0', () => {
-    expect(calculateProjectProgress(0, 1.0, 1.0)).toBe(0);
+    expect(calculateProjectProgress(0, 1.0, 1.0, config)).toBe(0);
   });
 
   it('审批充分 + 资金满 + 人力满 → 进度 1.0', () => {
-    expect(calculateProjectProgress(120, 1.0, 1.0)).toBe(1.0);
+    expect(calculateProjectProgress(120, 1.0, 1.0, config)).toBe(1.0);
   });
 
   it('资金断裂 → 进度为 0', () => {
-    expect(calculateProjectProgress(120, 0, 1.0)).toBe(0);
+    expect(calculateProjectProgress(120, 0, 1.0, config)).toBe(0);
   });
 
   it('人力不足 → 进度打折', () => {
-    const full = calculateProjectProgress(120, 1.0, 1.0);
-    const half = calculateProjectProgress(120, 1.0, 0.5);
+    const full = calculateProjectProgress(120, 1.0, 1.0, config);
+    const half = calculateProjectProgress(120, 1.0, 0.5, config);
     expect(half).toBeCloseTo(full * 0.5, 4);
   });
 
   it('审批 60 天 → 进度约半', () => {
-    const result = calculateProjectProgress(60, 1.0, 1.0);
+    const result = calculateProjectProgress(60, 1.0, 1.0, config);
     expect(result).toBeCloseTo(0.5, 2);
   });
 });

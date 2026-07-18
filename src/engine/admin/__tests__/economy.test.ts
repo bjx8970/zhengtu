@@ -14,6 +14,7 @@ const config: AdminLineConfig = {
   landRevenueMultiplier: 0.02,
   parkGrowthRate: 0.08,
   fiscalBalanceThreshold: 0.9,
+  projectApprovalBaselineDays: 120,
 };
 
 describe('calculateGDPGrowth', () => {

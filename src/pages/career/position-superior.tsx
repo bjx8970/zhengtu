@@ -9,6 +9,7 @@
 
 import type { JSX } from 'solid-js';
 import { pageBase } from '../../utils/theme';
+import { navigate } from '../../router';
 
 /**
  * 上级关系页面组件（占位）
@@ -35,6 +36,10 @@ export function PositionSuperior(): JSX.Element {
       </p>
       <a
         href="#/dashboard"
+        onClick={(e) => {
+          e.preventDefault();
+          navigate('/dashboard');
+        }}
         style={{
           color: '#4A6FA5',
           'text-decoration': 'none',

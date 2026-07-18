@@ -11,6 +11,14 @@
 
 import type { AdminLineConfig } from '../../types/config';
 
+/** 经济引擎依赖的 KPI 指标 ID 常量 */
+const KPI_IDS = {
+  INVESTMENT_ATTRACTION: 'investment_attraction',
+  INDUSTRIAL_OUTPUT: 'industrial_output',
+  LAND_REVENUE: 'land_revenue',
+  FISCAL_REVENUE: 'fiscal_revenue',
+} as const;
+
 /**
  * 计算 GDP 增长率。
  *
@@ -106,10 +114,10 @@ export function getEconomicSnapshot(
   investmentRate: number;
   industrialOutput: number;
 } {
-  const investmentRate = kpiValues['investment_attraction'] ?? 0;
-  const industrialOutput = kpiValues['industrial_output'] ?? 0;
-  const landRevenue = kpiValues['land_revenue'] ?? 0;
-  const fiscalRevenue = kpiValues['fiscal_revenue'] ?? 0;
+  const investmentRate = kpiValues[KPI_IDS.INVESTMENT_ATTRACTION] ?? 0;
+  const industrialOutput = kpiValues[KPI_IDS.INDUSTRIAL_OUTPUT] ?? 0;
+  const landRevenue = kpiValues[KPI_IDS.LAND_REVENUE] ?? 0;
+  const fiscalRevenue = kpiValues[KPI_IDS.FISCAL_REVENUE] ?? 0;
 
   const gdpGrowth = calculateGDPGrowth(
     investmentRate,
