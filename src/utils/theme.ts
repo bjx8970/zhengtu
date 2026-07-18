@@ -9,22 +9,22 @@
  */
 
 export const colors = {
-  bgMain: '#1a1a2e',
-  bgCard: '#0f0f23',
+  bgMain: '#eeece6',
+  bgCard: '#fffdf8',
   bgCardLight: '#ffffff',
-  bgHeader: '#141428',
+  bgHeader: '#172b45',
 
-  textPrimary: '#e8e6e3',
-  textSecondary: '#8b8680',
+  textPrimary: '#202a35',
+  textSecondary: '#657080',
   textDark: '#1a1a1a',
-  textMuted: '#6b6560',
+  textMuted: '#8d939b',
 
-  primary: '#be2d2d',
-  primaryHover: '#a02020',
+  primary: '#b3262d',
+  primaryHover: '#8f1f25',
   primaryLight: 'rgba(190, 45, 45, 0.15)',
   primaryText: '#ffffff',
 
-  secondary: '#2b4e6e',
+  secondary: '#284b70',
   secondaryLight: 'rgba(43, 78, 110, 0.15)',
   secondaryText: '#e8e6e3',
 
@@ -34,8 +34,8 @@ export const colors = {
   warningLight: 'rgba(230, 168, 23, 0.15)',
   danger: '#c44d4d',
 
-  border: '#3a3540',
-  borderLight: '#d4c5b9',
+  border: '#d8d4cc',
+  borderLight: '#e8e4dc',
 
   /** 亮色输入框底色 */
   bgInput: '#f8f7f5',
