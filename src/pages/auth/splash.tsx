@@ -7,7 +7,6 @@
 import { Show } from 'solid-js';
 import { navigate } from '../../router';
 import { readLocalSave } from '../../services/save-repo';
-import { useGameStore } from '../../store/game-store';
 import { formatDate } from '../../utils/format';
 import { font } from '../../utils/theme';
 
@@ -18,13 +17,6 @@ import { font } from '../../utils/theme';
  */
 export function SplashPage() {
   const saved = readLocalSave();
-  const { dispatch } = useGameStore();
-
-  const continueGame = () => {
-    if (!saved) return;
-    dispatch({ type: 'LOAD_SAVE', save: saved });
-    navigate('/dashboard');
-  };
 
   return (
     <main class="document-page" style={{ display: 'grid', 'place-items': 'center' }}>
@@ -110,7 +102,7 @@ export function SplashPage() {
                   <div style={{ display: 'flex', gap: '0.65rem', 'margin-top': '0.8rem' }}>
                     <button
                       class="primary-action"
-                      onClick={continueGame}
+                      onClick={() => navigate('/dashboard')}
                       style={{ padding: '0.8rem 1.5rem' }}
                     >
                       继续游戏 →
