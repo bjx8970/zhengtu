@@ -182,7 +182,6 @@ class ConfigLoader {
 
     // 展开 KPI 模板引用
     const kpiIndicators = raw.kpiTemplateIds.map((kpiId) => ({
-      // 安全：所有 kpiTemplateId 已在 validateConfig 中校验存在于 kpiTemplates
       ...this.kpiTemplates[kpiId]!,
     }));
 
@@ -218,7 +217,7 @@ class ConfigLoader {
       consumptionCoefficient: merged.consumptionCoefficient,
       baseConsumption: merged.baseConsumption,
       actions: merged.actions.map((a) => ({ ...a })),
-      kpiIndicators: merged.kpiTemplateIds.map((kpiId) => ({ ...this.kpiTemplates[kpiId]! })), // 安全：模板引用已在构造时校验
+      kpiIndicators: merged.kpiTemplateIds.map((kpiId) => ({ ...this.kpiTemplates[kpiId]! })),
     };
   }
 }

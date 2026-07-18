@@ -2,7 +2,7 @@
   "id": "admin",
   "name": "行政线",
   "color": "#4A6FA5",
-  "description": "以经济发展、招商引资、项目建设和民生治理为核心的行政管理路线",
+  "description": "以经济发展、民生服务和社会治理为核心的行政管理路线",
   "privileges": ["经济管理权", "行政审批权", "财政支配权"],
   "levels": [
     {
@@ -69,20 +69,8 @@
         {
           "id": "admin_l2_0",
           "name": "副镇长",
-          "departmentTemplateIds": [
-            "urban_dev",
-            "finance",
-            "commerce",
-            "land_resources",
-            "civil_affairs"
-          ],
-          "kpiTemplateIds": [
-            "gdp_growth",
-            "fiscal_revenue",
-            "project_approval",
-            "enterprise_svc",
-            "safety"
-          ],
+          "departmentTemplateIds": ["urban_dev", "finance", "public_safety", "civil_affairs"],
+          "kpiTemplateIds": ["gdp_growth", "fiscal_revenue", "safety", "livelihood_score"],
           "annualBudget": 2000
         },
         {
@@ -91,13 +79,13 @@
           "departmentTemplateIds": [
             "general_office",
             "human_resources",
-            "admin_approval",
+            "propaganda_dept",
             "logistics"
           ],
           "kpiTemplateIds": [
             "office_efficiency",
             "staff_satisfaction",
-            "enterprise_svc",
+            "propaganda_score",
             "cost_control"
           ],
           "annualBudget": 1500
@@ -133,25 +121,36 @@
         {
           "id": "admin_l3_0",
           "name": "镇长",
-          "departmentTemplateIds": ["ndrc", "finance", "commerce", "land_resources", "urban_dev"],
+          "departmentTemplateIds": [
+            "urban_dev",
+            "finance",
+            "public_safety",
+            "civil_affairs",
+            "agriculture"
+          ],
           "kpiTemplateIds": [
             "gdp_growth",
             "fiscal_revenue",
-            "investment_attraction",
-            "land_revenue",
-            "project_approval"
+            "livelihood_score",
+            "project_completion",
+            "safety"
           ],
           "annualBudget": 5000
         },
         {
           "id": "admin_l3_1",
-          "name": "县发改委副主任",
-          "departmentTemplateIds": ["ndrc", "admin_approval", "statistics", "environment"],
+          "name": "乡镇党委委员",
+          "departmentTemplateIds": [
+            "party_org",
+            "propaganda_dept",
+            "human_resources",
+            "discipline_inspect"
+          ],
           "kpiTemplateIds": [
-            "project_approval",
-            "industrial_output",
-            "fiscal_revenue",
-            "environment_score"
+            "party_building",
+            "propaganda_score",
+            "staff_satisfaction",
+            "anti_corruption"
           ],
           "annualBudget": 3500
         },
@@ -169,9 +168,14 @@
         },
         {
           "id": "admin_l3_3",
-          "name": "县商务局局长",
-          "departmentTemplateIds": ["commerce", "industry_it", "transport", "public_safety"],
-          "kpiTemplateIds": ["investment_attraction", "enterprise_svc", "infrastructure", "safety"],
+          "name": "副乡镇党委书记",
+          "departmentTemplateIds": [
+            "party_org",
+            "general_office",
+            "public_safety",
+            "civil_affairs"
+          ],
+          "kpiTemplateIds": ["party_building", "office_efficiency", "safety", "livelihood_score"],
           "annualBudget": 4000
         }
       ],
@@ -180,176 +184,6 @@
         "minAssessmentPasses": 3,
         "politicalConditions": ["无党纪处分记录"],
         "specialConditions": ["grassroots"]
-      }
-    },
-    {
-      "level": 4,
-      "label": "副处",
-      "positions": [
-        {
-          "id": "admin_l4_0",
-          "name": "副县长",
-          "departmentTemplateIds": ["ndrc", "finance", "commerce", "industry_it", "land_resources"],
-          "kpiTemplateIds": [
-            "gdp_growth",
-            "fiscal_revenue",
-            "investment_attraction",
-            "business_env",
-            "industrial_output"
-          ],
-          "annualBudget": 12000
-        },
-        {
-          "id": "admin_l4_1",
-          "name": "市发改委副主任",
-          "departmentTemplateIds": ["ndrc", "industry_it", "admin_approval", "data_gov"],
-          "kpiTemplateIds": [
-            "project_approval",
-            "industrial_output",
-            "digital_gov",
-            "infrastructure"
-          ],
-          "annualBudget": 10000
-        },
-        {
-          "id": "admin_l4_2",
-          "name": "市级局副局长",
-          "departmentTemplateIds": ["urban_dev", "finance", "human_resources", "statistics"],
-          "kpiTemplateIds": ["gdp_growth", "fiscal_revenue", "staff_satisfaction", "data_accuracy"],
-          "annualBudget": 15000
-        }
-      ],
-      "promotionRequirements": {
-        "minYearsInService": 4,
-        "minAssessmentPasses": 4,
-        "politicalConditions": ["无党纪处分记录", "人事档案合规"],
-        "specialConditions": ["grassroots", "multi_region"]
-      }
-    },
-    {
-      "level": 5,
-      "label": "正处",
-      "positions": [
-        {
-          "id": "admin_l5_0",
-          "name": "县长",
-          "departmentTemplateIds": ["ndrc", "finance", "commerce", "industry_it", "land_resources"],
-          "kpiTemplateIds": [
-            "gdp_growth",
-            "fiscal_revenue",
-            "digital_gov",
-            "infrastructure",
-            "urban_mgmt"
-          ],
-          "annualBudget": 25000
-        },
-        {
-          "id": "admin_l5_1",
-          "name": "市发改委主任",
-          "departmentTemplateIds": [
-            "ndrc",
-            "industry_it",
-            "data_gov",
-            "admin_approval",
-            "transport"
-          ],
-          "kpiTemplateIds": [
-            "project_approval",
-            "industrial_output",
-            "digital_gov",
-            "infrastructure",
-            "fiscal_balance"
-          ],
-          "annualBudget": 20000
-        },
-        {
-          "id": "admin_l5_2",
-          "name": "市级局局长",
-          "departmentTemplateIds": [
-            "urban_dev",
-            "finance",
-            "human_resources",
-            "environment",
-            "statistics"
-          ],
-          "kpiTemplateIds": [
-            "gdp_growth",
-            "fiscal_revenue",
-            "staff_satisfaction",
-            "environment_score",
-            "data_accuracy"
-          ],
-          "annualBudget": 22000
-        }
-      ],
-      "promotionRequirements": {
-        "minYearsInService": 4,
-        "minAssessmentPasses": 4,
-        "politicalConditions": ["无党纪处分记录", "无重大问责记录"],
-        "specialConditions": ["grassroots", "multi_region"]
-      }
-    },
-    {
-      "level": 6,
-      "label": "副厅",
-      "positions": [
-        {
-          "id": "admin_l6_0",
-          "name": "副市长",
-          "departmentTemplateIds": ["ndrc", "finance", "commerce", "industry_it", "land_resources"],
-          "kpiTemplateIds": [
-            "gdp_growth",
-            "fiscal_revenue",
-            "fiscal_balance",
-            "urban_mgmt",
-            "infrastructure"
-          ],
-          "annualBudget": 50000
-        },
-        {
-          "id": "admin_l6_1",
-          "name": "省发改委副主任",
-          "departmentTemplateIds": [
-            "ndrc",
-            "industry_it",
-            "data_gov",
-            "health_commission",
-            "poverty_relief"
-          ],
-          "kpiTemplateIds": [
-            "project_approval",
-            "industrial_output",
-            "digital_gov",
-            "healthcare_cov",
-            "poverty_alleviation"
-          ],
-          "annualBudget": 40000
-        },
-        {
-          "id": "admin_l6_2",
-          "name": "省级厅副厅长",
-          "departmentTemplateIds": [
-            "urban_dev",
-            "finance",
-            "human_resources",
-            "environment",
-            "statistics"
-          ],
-          "kpiTemplateIds": [
-            "gdp_growth",
-            "fiscal_revenue",
-            "staff_satisfaction",
-            "environment_score",
-            "data_accuracy"
-          ],
-          "annualBudget": 45000
-        }
-      ],
-      "promotionRequirements": {
-        "minYearsInService": 5,
-        "minAssessmentPasses": 5,
-        "politicalConditions": ["无党纪处分记录", "无重大问责记录", "个人事项如实申报"],
-        "specialConditions": ["grassroots", "multi_region"]
       }
     }
   ]

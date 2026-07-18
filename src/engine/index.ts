@@ -14,5 +14,3 @@ export * from './governance/assessment';
 export * from './career/promotion';
 export * from './career/promotion-final';
 export * from './career/faction-penalty';
-export * from './admin/economy';
-export * from './admin/project';

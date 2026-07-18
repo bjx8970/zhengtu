@@ -131,17 +131,3 @@ export enum InvestigationEvidence {
 
 /** 时间推进粒度：玩家可选择按天/按周/按月推进 */
 export type TimeGranularity = 'day' | 'week' | 'month';
-
-/** 项目里程碑阶段（行政线专属） */
-export enum ProjectMilestone {
-  /** 项目刚开工 */
-  Groundbreaking = '开工',
-  /** 项目主体建设中 */
-  MidConstruction = '建设中',
-  /** 项目主体结构封顶 */
-  ToppedOff = '主体封顶',
-  /** 项目竣工交付 */
-  Completed = '竣工',
-  /** 项目因资金/政策等原因停工 */
-  Abandoned = '烂尾',
-}

@@ -70,11 +70,13 @@ export function advanceTime(
 }
 
 /** 判断是否跨越了月（新日=1 且 旧日>1） */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function isCrossMonth(_current: TimeState, _newDay: number): boolean {
   return _newDay === 1 && _current.day > _newDay;
 }
 
 /** 判断结果年 > 当前年 */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function isCrossYear(_current: TimeState, _result: TimeState): boolean {
   return _result.year > _current.year;
 }
