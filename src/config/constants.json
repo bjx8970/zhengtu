@@ -57,35 +57,58 @@
     "democraticVote": {
       "passThreshold": 60,
       "connectionsBonus": 10,
-      "connectionsRiskProbability": 0.3
+      "connectionsRiskProbability": 0.3,
+      "scoreWeight": 0.4,
+      "charismaWeight": 0.3,
+      "superiorFavorWeight": 0.3
     },
     "orgInspection": {
       "excellentThreshold": 80,
       "qualifiedThreshold": 60,
       "suspendedThreshold": 40,
       "influencePoliticalCost": 20,
-      "influenceScoreBonus": 8
+      "influenceScoreBonus": 8,
+      "performanceWeight": 0.3,
+      "competenceWeight": 0.3,
+      "scoreWeight": 0.2,
+      "integrityWeight": 0.2
     },
     "jointReview": {
       "disciplineCorruptionThreshold": 50,
-      "otherDepartmentsPassRate": 0.85
+      "otherDepartmentsPassRate": 0.85,
+      "complaintNormalizer": 200
     },
     "committeeVote": {
       "minSize": 7,
       "maxSize": 13,
-      "sizePerLevelInterval": 2
+      "sizePerLevelInterval": 2,
+      "approvalDivisor": 200,
+      "factionPenaltyDivisor": 100,
+      "minApprovalRate": 0.1
     },
     "publicNotice": {
       "complaintProbPerRisk": 0.005,
       "sentimentProbPerRisk": 0.003
     },
     "probation": {
-      "passThreshold": 55
+      "passThreshold": 55,
+      "randomFactorMax": 20
     },
     "progression": {
       "demoralizationOnFail": 5,
       "demoralizationOnRejected": 8,
       "politicalCapitalBonusOnSuccess": 10
+    },
+    "factionPenalty": {
+      "reputationDivisor": 100,
+      "maxPenalty": 15
     }
+  },
+  "adminLine": {
+    "investmentYieldRate": 0.05,
+    "projectCompletionBaseRate": 0.15,
+    "landRevenueMultiplier": 0.02,
+    "parkGrowthRate": 0.08,
+    "fiscalBalanceThreshold": 0.9
   }
 }

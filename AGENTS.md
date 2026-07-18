@@ -77,18 +77,20 @@ Tests use `createTestStore()` for isolation. Never import the module-level `disp
 - Modifying config values: edit JSON, run `pnpm validate:config`, done. No code changes needed.
 - Templates are split across `departments.json` (core 8) and `departments-extra.json` (extra 11). Both are merged at load time.
 
-## Persistence model: phase commit
+## Persistence model: per-dispatch write
 
-- Actions modify state in memory only.
-- **Only** `ADVANCE_TIME` (push "推进时间") triggers persistence: `unwrap(state)` → Supabase upsert + localStorage backup.
-- `EXECUTE_ACTION` internally calls `advanceTime` but does NOT persist — that happens when user explicitly pushes the advance button.
+- Every `dispatch()` call writes the full state to `localStorage` via `writeLocalSave(unwrap(state))`.
+- Supabase sync (upsert) is also triggered per dispatch when the Supabase client is configured.
+- `ADVANCE_TIME` remains the canonical "phase commit" action that carries gameplay meaning, but the technical persistence is not exclusive to it.
+- `createTestStore()` does NOT trigger persistence — only the production `dispatch()` does.
 - Load arbitration: `selectNewer(localSave, remoteSave)` compares `updatedAt` timestamps.
 
-## Slot-based action system (no AP)
+## Slot-based action system (no AP) — 待 PR #27 合并后更新
 
 - Slot limits: day=3, week=4, month=6 (configurable in `src/config/constants.json`).
 - Each action has `slotCost` (1 for normal, 2 for heavy). Cooldown (`cooldownDays`) is the real frequency control.
 - `executeAction()` uses `gameDay` as absolute day counter (`draft.totalDaysPlayed`) for cooldown tracking.
+- ⚠️ PR #27 (`feat/slot-queue-system`) 将此系统重构为三级槽位队列模式（主要/次要/备用）。合并后本段落需更新。
 
 ## Testing
 
