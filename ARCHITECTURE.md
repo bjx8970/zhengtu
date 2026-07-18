@@ -14,7 +14,7 @@
 | 样式   | `src/styles/tokens.css` 设计令牌 + 组件样式；`src/utils/theme.ts` 提供 TS 镜像 |
 | 路由   | `src/router.tsx` 自建 Hash Router；路由声明集中在 `src/app.tsx`                |
 | 配置   | JSON 模板 + `ConfigLoader` 运行时展开 + zod 完整性校验                         |
-| 持久化 | 每次 action 写 localStorage；`ADVANCE_TIME` 额外写 Supabase                    |
+| 持久化 | 每次 action 写 localStorage；远程同步暂时停用                                  |
 | 测试   | Vitest、jsdom、Solid Testing Library、V8 coverage                              |
 | 部署   | GitHub Actions → GitHub Pages                                                  |
 
@@ -26,7 +26,7 @@ src/
 ├── app.tsx                  # 根组件与当前路由声明
 ├── router.tsx               # Hash Router
 ├── components/              # 共享 UI 与后续功能接入矩阵
-├── pages/                   # loading/login/character/dashboard
+├── pages/                   # loading/character/dashboard；login 暂不注册
 ├── styles/                  # 全局 CSS 与设计令牌
 ├── types/                   # config/game/player/ui/enums 类型
 ├── utils/                   # 格式化、数学、主题等工具
@@ -93,7 +93,6 @@ Dashboard ADVANCE_TIME
   → 应用行动效果、月度预算与年度考核
   → 推进晋升阶段并更新通知
   → writeLocalSave()
-  → upsertSave()（Supabase 可用时）
 ```
 
 槽位不会因“推进一次”整体重置；每个 occupant 到达 `completesAtDay` 后才释放。引擎返回结果，store reducer 负责把结果写回 draft。
@@ -117,9 +116,9 @@ PositionConfig（部门、行动、KPI）
 ## 持久化语义
 
 - 每次 `dispatch` 完成后立即把最新快照写入 localStorage，降低刷新或离线时的数据损失。
-- `ADVANCE_TIME` 在本地写入之外额外调用 Supabase `upsertSave()`。
-- 加载仲裁由 `selectNewer(localSave, remoteSave)` 比较 `updatedAt`；远程认证与完整加载流程仍待后续接入。
-- 未配置 Supabase 时保持纯本地可玩，远程写入失败不应破坏本地状态。
+- 启动时读取本地存档；有效存档在首页展示摘要并可继续游戏。
+- 登录路由和运行时 Supabase 同步暂时停用，当前流程不依赖用户身份或网络。
+- `fetchRemoteSave()`、`upsertSave()` 和 `selectNewer()` 仅作为后续云存档接入点保留。
 
 ## 扩展约束
 
