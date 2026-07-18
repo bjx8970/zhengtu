@@ -1,288 +1,133 @@
 # 政途人生 v3.0 — 架构文档
 
+## 当前范围
+
+当前版本是可运行的单机重写原型，已实现角色创建、行政线 L1–L3、部门行动、时间推进、KPI 与晋升流程。关系、秘书、个人生活、调查和档案等入口仅作为后续接入标识展示，不应跳转到占位页面。
+
 ## 技术栈
 
-| 层 | 技术 |
-|---|------|
-| 框架 | SolidJS 1.9 (Vite 6 + vite-plugin-solid) |
-| 状态管理 | `createStore` + `produce` (Solid 内置) |
-| 语言 | TypeScript 5.7 (strict) |
-| 样式 | 内联 style (Phase 0)；后续可选 Tailwind |
-| 路由 | 自建 Hash Router (~100 行) |
-| 后端 | Supabase (Auth + Database) |
-| 持久化 | localStorage (即时备份) + Supabase upsert (推进时提交) |
-| 配置 | JSON 模板 + ConfigLoader 运行时展开 |
-| 测试 | Vitest + @solidjs/testing-library |
-| 校验 | zod schema (`scripts/validate-config.ts`) |
-| CI/CD | GitHub Actions (ci.yml + deploy.yml → GitHub Pages) |
+| 层     | 技术                                                                           |
+| ------ | ------------------------------------------------------------------------------ |
+| UI     | SolidJS 1.9、Vite 6、`vite-plugin-solid`                                       |
+| 状态   | Solid `createStore` + `produce`，通过 `dispatch(action)` 修改                  |
+| 语言   | TypeScript strict mode                                                         |
+| 样式   | `src/styles/tokens.css` 设计令牌 + 组件样式；`src/utils/theme.ts` 提供 TS 镜像 |
+| 路由   | `src/router.tsx` 自建 Hash Router；路由声明集中在 `src/app.tsx`                |
+| 配置   | JSON 模板 + `ConfigLoader` 运行时展开 + zod 完整性校验                         |
+| 持久化 | 每次 action 写 localStorage；远程同步暂时停用                                  |
+| 测试   | Vitest、jsdom、Solid Testing Library、V8 coverage                              |
+| 部署   | GitHub Actions → GitHub Pages                                                  |
 
-## 目录结构
+## 实际目录
 
-```
+```text
 src/
-├── main.tsx                    # 入口
-├── app.tsx                     # 根组件 + 路由出口
-├── router.tsx                  # Hash router
-│
-├── types/                      # TypeScript 类型
-│   ├── enums.ts                # 全部枚举
-│   ├── config.ts               # 配置数据类型
-│   ├── player.ts               # PlayerSave
-│   └── game.ts                 # 运行时类型
-│
-├── config/                     # 纯 JSON 数据（与代码分离）
-│   ├── templates/              # 可复用模板
-│   │   ├── departments.json    # 部门模板（合并 departments-extra.json）
-│   │   ├── kpis.json           # KPI 指标模板
-│   │   └── events.json         # 随机事件模板
-│   ├── career-lines/           # 4 条职业线定义
-│   │   ├── administrative.json
-│   │   ├── party.json
-│   │   ├── discipline.json
-│   │   └── mass.json
-│   ├── constants.json          # 全局常量
-│   └── loader.ts              # ConfigLoader 单例
-│
-├── engine/                     # 游戏引擎（纯函数，不引用 UI）
-│   ├── core/                   # 核心循环
-│   │   ├── time.ts             # 时间推进 + 周期检测
-│   │   ├── action.ts           # 行动执行 + 校验
-│   │   └── effect.ts           # 效果解析工具
-│   ├── governance/             # 治理域 (kpi / budget / assessment)
-│   ├── career/                 # 职业域 (promotion / transfer / reserve)
-│   ├── social/                 # 社交域 (relations / factions / superior)
-│   ├── office/                 # 办公域 (secretary / documents / sentiment)
-│   ├── risk/                   # 风险域 (investigation / corruption / patrol)
-│   ├── legacy/                 # 高级系统 (successor/think-tank/mentor/…)
-│   ├── personal/               # 个人域 (life / calendar / archives)
-│   ├── proposal.ts             # 重大议案
-│   ├── retirement.ts           # 卸任时机
-│   ├── events.ts               # 随机事件
-│   └── index.ts                # 聚合导出
-│
-├── store/
-│   └── game-store.ts           # 单一 store (createStore + dispatch)
-│
-├── services/
-│   ├── supabase.ts             # Supabase client 单例
-│   └── save-repo.ts            # 存档读写 + 本地/远程仲裁
-│
-├── pages/                      # 页面组件（按功模块分目录）
-├── components/                 # 共享 UI 组件
-└── utils/                      # 纯工具函数 (math / format / debounce)
+├── main.tsx                 # 清空挂载点并启动 Solid 应用
+├── app.tsx                  # 根组件与当前路由声明
+├── router.tsx               # Hash Router
+├── components/              # 共享 UI 与后续功能接入矩阵
+├── pages/                   # loading/character/dashboard；login 暂不注册
+├── styles/                  # 全局 CSS 与设计令牌
+├── types/                   # config/game/player/ui/enums 类型
+├── utils/                   # 格式化、数学、主题等工具
+├── config/
+│   ├── career-lines/        # 当前已接入 administrative.json
+│   ├── templates/           # 部门、KPI 等复用模板
+│   ├── constants.json       # 时间、槽位、晋升等常量
+│   └── loader.ts            # ConfigLoader
+├── engine/
+│   ├── core/                # action/effect/time 纯函数
+│   ├── governance/          # assessment/budget/kpi 纯函数
+│   ├── career/              # promotion/faction-penalty 纯函数
+│   └── index.ts             # 引擎聚合导出
+├── store/game-store.ts      # 唯一运行时状态与 reducer
+└── services/
+    ├── supabase.ts          # 可选 Supabase client
+    └── save-repo.ts         # 本地/远程存档与仲裁
 ```
 
-## 分层架构
+未出现在上述目录中的领域模块尚未实现。后续模块应按阶段新增，不能先以空路由伪装为可用功能。
 
-```
-UI 层 (Preact/Solid)  ←→  Store 层 (createStore)  ←→  引擎层 (纯函数)  ←→  数据层 (ConfigRepo / SaveRepo)
-       ↑                       ↑                         ↑                      ↑
-   只能调用 Store           桥接引擎和 UI           不引用 UI/DOM            纯 JSON + Supabase
+## 分层与依赖
+
+```text
+UI（页面/组件） → Store（dispatch/reducer） → Engine（纯函数） → Config（JSON/loader）
+                                  ↓
+                         SaveRepo（持久化边界）
 ```
 
-**依赖规则**：上层可调下层，下层不可调上层。
+- UI 读取 store，并只通过 `dispatch(action)` 发起状态修改。
+- `reduceGameState(draft, action)` 是生产 store 与 `createTestStore()` 共用的唯一 action 处理入口。
+- Engine 不读取 DOM、全局 store 或持久化服务；接收数据并返回结果。
+- ConfigLoader 展开模板引用；业务代码不复制 JSON 配置。
+- 类型集中在 `src/types/`，避免在业务模块散落跨层模型。
 
 ## 核心数据流
 
-### 行动 → 推进 → 保存完整链路
+### 启动行动
 
-```
- 玩家点击"执行行动"              玩家点击"推进一周"
-        │                               │
-        ▼                               ▼
-  ┌─────────────┐               ┌──────────────┐
-  │ UI 组件      │               │ Dashboard    │
-  │ PositionDept │               │ 推进按钮      │
-  └──────┬───────┘               └──────┬───────┘
-         │ dispatch(                     │ dispatch(
-         │   EXECUTE_ACTION)             │   ADVANCE_TIME)
-         ▼                               ▼
-  ┌─────────────────────────────────────────┐
-  │              game-store.ts              │
-  │  setState(produce(draft => {            │
-  │    actionEngine.execute(draft, ...)     │
-  │    // 校验: 槽位|冷却|预算              │
-  │    // 应用: kpiChanges + playerChanges  │
-  │                                        │
-  │    timeEngine.advance(draft, days)      │
-  │    // 判断: 跨月? 跨年? 5年周期?        │
-  │    // 生成: triggers[]                  │
-  │                                        │
-  │    resolveTriggers(draft, triggers)     │
-  │    // 月度结算: budgetEngine.settle()   │
-  │    // 年度考核: assessmentEngine.run()  │
-  │  }))                                    │
-  └──────────────┬──────────────────────────┘
-                 │
-         ┌───────┴────────┐
-         ▼                ▼
-  ┌──────────┐    ┌──────────────┐
-  │ UI 更新   │    │ saveRepo     │
-  │           │    │ .upsert()    │
-  │ Solid 自动 │    │              │
-  │ 追踪变更   │    │ Supabase     │
-  │ 字段级渲染 │    │ localStorage │
-  └──────────┘    └──────────────┘
+```text
+Dashboard START_ACTION
+  → reducer 查找部门与行动配置
+  → startAction() 校验预算、重复行动、minTier 与空槽位
+  → 写入对应槽位 occupant，扣减预算
+  → writeLocalSave(unwrap(state))
 ```
 
-### 晋升六阶段流程
+行动具有 `durationDays` 和 `minTier`。槽位固定为：
 
-```
- 触发晋升窗口 (年度考核通过)
-        │
-        ▼
-  ┌─ 阶段0：门槛校验 ──────────────────┐
-  │ promotionEngine.checkPrerequisites  │
-  │ 资历 / 考核 / 处分 / 基层经历        │
-  └────────────┬───────────────────────┘
-               │ 通过
-               ▼
-  ┌─ 阶段1：民主推荐 (玩家可干预：拉票) ─┐
-  │ promotionEngine.resolveDemocraticVote│
-  │ 得票前2名 → 进入考察名单            │
-  └────────────┬───────────────────────┘
-               │ 通过
-               ▼
-  ┌─ 阶段2：组织考察 (玩家可干预：引导) ─┐
-  │ promotionEngine.resolveOrgInspection│
-  │ 优秀/合格 → 通过；暂缓/不宜 → 终止  │
-  └────────────┬───────────────────────┘
-               │ 通过
-               ▼
-  ┌─ 阶段3：联审 (自动) ────────────────┐
-  │ promotionEngine.resolveJointReview  │
-  │ 纪委+公安+信访+审计+网信五部门       │
-  └────────────┬───────────────────────┘
-               │ 全部通过
-               ▼
-  ┌─ 阶段4：常委票决 (自动) ────────────┐
-  │ promotionEngine.resolveCommitteeVote│
-  │ 无记名投票，赞成过半通过            │
-  └────────────┬───────────────────────┘
-               │ 通过
-               ▼
-  ┌─ 阶段5：公示 (自动) ────────────────┐
-  │ promotionEngine.resolvePublicNotice │
-  │ 无举报/无舆情发酵 → 通过            │
-  └────────────┬───────────────────────┘
-               │ 通过
-               ▼
-  ┌─ 阶段6：任命+试用期 ───────────────┐
-  │ promotionEngine.resolveProbation   │
-  │ 一年后考核：合格→定岗；不合格→降回  │
-  └────────────────────────────────────┘
+| 等级      | 数量 | 用途                               |
+| --------- | ---: | ---------------------------------- |
+| primary   |    3 | 主要事项                           |
+| secondary |    2 | 次要事项                           |
+| reserve   |    1 | 加班备用；使用时附加健康与士气惩罚 |
+
+`minTier` 表示行动可使用的最末槽位等级。当前配置未提供 `minTier: reserve` 的行动，因此备用槽位在正常配置中暂不可达；这是待接入内容，不应由 UI 绕过引擎限制。
+
+### 推进时间
+
+```text
+Dashboard ADVANCE_TIME
+  → advanceTime() 计算新日期与周期触发器
+  → completeActions() 收集到期行动
+  → 应用行动效果、月度预算与年度考核
+  → 推进晋升阶段并更新通知
+  → writeLocalSave()
 ```
 
-## 行动系统：槽位制
+槽位不会因“推进一次”整体重置；每个 occupant 到达 `completesAtDay` 后才释放。引擎返回结果，store reducer 负责把结果写回 draft。
 
-玩家没有传统"体力值 (AP)"，改用**行动槽位**。
+### 晋升流程
 
-| 推进粒度 | 槽位数 |
-|---------|--------|
-| 按天 | 3 |
-| 按周 | 4 |
-| 按月 | 6 |
+当前阶段依次为：门槛校验 → 民主推荐 → 组织考察 → 多部门联审 → 常委会票决 → 任前公示 → 正式任命 → 试用期。民主推荐和组织考察允许玩家选择策略，其余阶段按配置和引擎规则自动结算。
 
-- 每个行动有 `slotCost`（通常为 1，重要行动为 2）
-- 真正的频率控制是**冷却时间 (cooldownDays)**，按游戏内天数计算
-- 推进时间后槽位重置，冷却按推进天数自动过期
-- 所有操作在推进前不持久化，推进时一次性保存
+## 配置模型
 
-## 配置数据：模板继承
-
-### 数据流
-
-```
-departments.json (模板定义)
-    +
-career-lines/administrative.json (引用模板名 + 差异覆盖)
-    ↓
-ConfigLoader.getPosition()
-    ↓
-完整 PositionConfig (展开后的 departments + kpiIndicators)
+```text
+templates/departments*.json + templates/kpis.json
+                    ↓ 引用
+career-lines/administrative.json
+                    ↓ ConfigLoader 展开
+PositionConfig（部门、行动、KPI）
 ```
 
-### 示例
+修改数值优先编辑 JSON；新增模板或引用后必须运行 `pnpm validate:config`。当前可玩配置是行政线 L1–L3，共 10 个职位；其他职业线属于后续阶段。
 
-```jsonc
-// 模板只定义一次
-{ "urban_dev": { "name": "城建部门", "actions": [...], "kpiTemplateIds": [...] } }
+## 持久化语义
 
-// 职位配置只引用模板名
-{ "id": "admin_l3_0", "name": "镇长", "departmentTemplateIds": ["urban_dev", "finance", ...] }
-```
+- 每次 `dispatch` 完成后立即把最新快照写入 localStorage，降低刷新或离线时的数据损失。
+- 启动时读取本地存档；有效存档在首页展示摘要并可继续游戏。
+- 登录路由和运行时 Supabase 同步暂时停用，当前流程不依赖用户身份或网络。
+- `fetchRemoteSave()`、`upsertSave()` 和 `selectNewer()` 仅作为后续云存档接入点保留。
 
-修改数值只需编辑 JSON，不需要改代码。配置校验脚本保证引用完整性。
+## 扩展约束
 
-## 状态管理：createStore + produce
+1. 新 Engine 函数保持纯函数并添加同级 `__tests__/*.test.ts`。
+2. 新 action 先扩展 `GameAction`，再只在 `reduceGameState` 增加分支，并用 `createTestStore()` 测试。
+3. Engine 文件超过 200 行时按职责拆分，并在 `src/engine/index.ts` 注册导出。
+4. 未实现功能使用 `// Phase N 实现` 标记或 `FeatureRoadmap` 的 `planned` 状态。
+5. 所有导出函数补充包含 `@param` 和 `@returns` 的 JSDoc。
 
-```typescript
-// 一个大 store，嵌套追踪
-const [state, setState] = createStore<GameState>(initial);
+## 质量与性能目标
 
-// dispatch 修改 state
-dispatch({ type: 'ADVANCE_TIME', granularity: 'week' }) {
-  setState(produce(draft => {
-    // 直接修改 draft，produce 自动追踪变更
-    draft.slots.available = draft.slots.max;
-    draft.time = timeEngine.advance(draft.time, 7);
-  }));
-}
-
-// 序列化
-const snapshot = unwrap(state); // 一键取纯对象，用于存档
-```
-
-引擎函数直接操作 draft，不需要返回中间对象。
-
-## 持久化：阶段提交
-
-```
-[操作阶段：内存]            [推进时间：提交]
-│                           │
-├─ 执行行动 × N             ├─ 计算推进天数
-├─ 处理文件批示              ├─ 月度/年度结算
-├─ 选择事件选项              ├─ unwrap(state)
-└─ 所有修改只在 store        ├─ Supabase upsert
-                            └─ localStorage.setItem
-```
-
-加载时仲裁：比较本地与远程的 `updatedAt`，取较新的。
-
-## 引擎模块设计规范
-
-每个引擎文件：
-
-1. **一个文件一个职责**，禁止合并无关功能
-2. **纯函数**：接收数据、返回数据，不引用 DOM 或 `state`
-3. **禁止超长文件**：单个文件 >200 行时拆分
-4. **参数化依赖**：所有外部状态通过参数传入
-
-```typescript
-// ✅ 可测试
-export function advanceTime(current: TimeState, days: number, birthYear: number): TimeAdvanceResult
-
-// ❌ 不可测试
-export function advanceTime(days: number): void  // 隐式读取全局 state
-```
-
-## 职业枚举值使用英文 key
-
-所有枚举值使用英文作为内部 key，中文用于显示：
-
-```typescript
-export enum Faction {
-  Reform = 'reform',           // 内部标识
-  Pragmatic = 'pragmatic',
-  Conservative = 'conservative',
-}
-```
-
-## 性能预算
-
-| 指标 | 目标 |
-|------|------|
-| 首屏 JS | < 200KB gzipped |
-| 首屏加载 | < 2s (4G) |
-| 行动响应 | < 100ms |
-| 存档保存 | < 500ms |
+提交前运行 `pnpm run ci`，顺序为 format、lint、typecheck、coverage test、config validation、build。覆盖率门槛为 Engine 90%、Config 80%、Store 70%。生产构建继续以首屏 JS 小于 200 KB gzip、交互响应小于 100 ms 为目标。

@@ -1,12 +1,8 @@
 /**
  * 存档仓库
  *
- * 提供游戏存档的读写和仲裁逻辑：
- * - 本地存储（localStorage）：作为即时恢复备份
- * - 远程存储（Supabase game_saves 表）：作为权威数据源
- *
- * 持久化发生时点：在阶段提交（玩家点击"推进时间"）后调用 upsertSave()
- * 加载仲裁逻辑：比较本地与远程的 updatedAt，取较新的版本
+ * 当前运行时仅使用 localStorage 实时保存和恢复。
+ * Supabase 读写及本地/远程仲裁函数保留给后续云存档阶段，当前 UI 与 store 不调用。
  */
 
 import type { PlayerSave } from '../types/player';

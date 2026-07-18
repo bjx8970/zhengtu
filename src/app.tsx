@@ -12,14 +12,12 @@
 import type { JSX } from 'solid-js';
 import { createRouter, type Route } from './router';
 import { SplashPage } from './pages/auth/splash';
-import { LoginPage } from './pages/auth/login';
 import { Dashboard } from './pages/dashboard/dashboard';
 import { CharacterCreation } from './pages/character/character-creation';
 
 /** 全局路由表 */
 const routes: Route[] = [
   { path: '/', component: SplashPage },
-  { path: '/login', component: LoginPage },
   { path: '/character', component: CharacterCreation },
   { path: '/dashboard', component: Dashboard },
 ];

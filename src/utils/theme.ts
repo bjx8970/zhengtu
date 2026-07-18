@@ -25,7 +25,7 @@ export const colors = {
   primaryText: '#ffffff',
 
   secondary: '#284b70',
-  secondaryLight: 'rgba(43, 78, 110, 0.15)',
+  secondaryLight: 'rgba(40, 75, 112, 0.15)',
   secondaryText: '#e8e6e3',
 
   success: '#4caf50',

@@ -5,11 +5,11 @@
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 状态变更后组件自动细粒度响应（Solid 字段级追踪）
- * 4. 每次 dispatch 实时写入 localStorage；ADVANCE_TIME 额外同步 Supabase
+ * 4. 每次 dispatch 实时写入 localStorage
  *
  * 操作阶段 vs 提交阶段：
  * - 操作阶段（执行行动、处理文件、选择事件）：修改 store + 实时写入 localStorage
- * - 提交阶段（推进时间）：结算所有到期行动 + localStorage + Supabase 同步
+ * - 提交阶段（推进时间）：结算所有到期行动 + localStorage
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
@@ -40,7 +40,7 @@ import { calculateKPI } from '../engine/governance/kpi';
 import { annualAssessment as runAnnualAssessment } from '../engine/governance/assessment';
 import { getConfigLoader } from '../config/loader';
 import { clamp, clampAttr } from '../utils/math';
-import { writeLocalSave, upsertSave } from '../services/save-repo';
+import { writeLocalSave } from '../services/save-repo';
 import {
   checkPrerequisites,
   resolveDemocraticVote,
@@ -831,11 +831,6 @@ export function dispatch(action: GameAction): void {
 
   // 每次操作实时写入本地
   writeLocalSave(unwrap(state));
-
-  // 推进时间时同步到 Supabase
-  if (action.type === 'ADVANCE_TIME') {
-    upsertSave(unwrap(state)).catch((e: unknown) => console.warn('Supabase sync failed:', e));
-  }
 }
 
 /**

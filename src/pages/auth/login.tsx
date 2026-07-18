@@ -1,9 +1,8 @@
 /**
- * 登录页（Phase 0 占位）
+ * 登录页（Phase 5 预留）
  *
- * 当前为开发模式跳过登录的占位页面。
- * Phase 1 将接入 Supabase Auth（手机号 + 验证码）。
- * 点击按钮跳转到建档系统。
+ * 当前路由未注册，游戏仅使用本地存档。
+ * Phase 5 接入 Supabase Auth 时重新设计并启用。
  */
 
 import { navigate } from '../../router';

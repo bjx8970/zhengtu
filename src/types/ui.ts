@@ -6,11 +6,11 @@
 
 export interface FeatureEntry {
   /** 稳定标识，后续注册路由时保持不变。 */
-  id: string;
-  label: string;
-  description: string;
-  icon: string;
-  status: 'available' | 'planned';
-  route?: string;
-  phase: string;
+  readonly id: string;
+  readonly label: string;
+  readonly description: string;
+  readonly icon: string;
+  readonly status: 'available' | 'planned';
+  readonly route?: string;
+  readonly phase: string;
 }

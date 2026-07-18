@@ -5,8 +5,8 @@
  * 注意：SolidJS render() 追加内容而非替换，必须先清空容器
  * 否则 index.html 中的 loading 占位会与 App 叠加显示。
  *
- * 启动流程：localStorage 有存档 → LOAD_SAVE → 仪表盘
- *          localStorage 无存档 → 空状态 → 登录 → 建档
+ * 启动流程：localStorage 有存档 → LOAD_SAVE → 启动页可继续游戏
+ *          localStorage 无存档 → 启动页 → 建档
  */
 
 import { render } from 'solid-js/web';
