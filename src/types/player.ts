@@ -20,11 +20,38 @@ import type {
   TimeGranularity,
 } from './enums';
 
-/** 行动冷却项：actionId 对应冷却到期日 */
-export interface ActionCooldown {
+/** 槽位等级 key */
+export type SlotTierKey = 'primary' | 'secondary' | 'reserve';
+
+/** 槽位占用记录 */
+export interface SlotOccupant {
   actionId: string;
-  /** 冷却到期的游戏内天数（绝对日数） */
-  expiresAtDay: number;
+  deptId: string;
+  actionName: string;
+  startedAtDay: number;
+  durationDays: number;
+}
+
+/** 单个槽位等级组 */
+export interface SlotTierGroup {
+  label: string;
+  count: number;
+  occupants: (SlotOccupant | null)[];
+}
+
+/** 行动槽位状态（三级：主要/次要/备用） */
+export interface SlotState {
+  primary: SlotTierGroup;
+  secondary: SlotTierGroup;
+  reserve: SlotTierGroup;
+}
+
+/** 行动完成通知 */
+export interface CompletedActionNotification {
+  actionName: string;
+  deptName: string;
+  effects: string[];
+  completedAtDay: number;
 }
 
 /** 单个部门的运行时状态 */
@@ -34,8 +61,6 @@ export interface DepartmentState {
   kpiValues: Record<string, number>;
   monthlyConsumption: number;
   cumulativeConsumption: number;
-  /** 行动冷却：actionId → 冷却到期日 */
-  actionCooldowns: Record<string, number>;
   /** 最近一次行动的日期（用于活跃度追踪，Phase 2 引入） */
   lastActionDay: number;
 }
@@ -124,14 +149,6 @@ export interface PromotionState {
   flaggedForRisk?: boolean;
 }
 
-/** 行动槽位状态 */
-export interface SlotState {
-  /** 当前粒度的最大槽位数 */
-  max: number;
-  /** 当前剩余可用槽位数 */
-  available: number;
-}
-
 /**
  * 玩家存档（完整游戏状态）
  *
@@ -169,8 +186,10 @@ export interface PlayerSave {
   currentCareerLine: CareerLine;
   yearsInCurrentPosition: number;
 
-  // ===== 资源（槽位制） =====
+  // ===== 资源（行动队列 + 属性） =====
   slots: SlotState;
+  /** 健康值（0~100），备用槽位扣减 */
+  health: number;
   /** 政治资本（0~500） */
   politicalCapital: number;
   /** 剩余预算（万元） */
@@ -236,6 +255,8 @@ export interface PlayerSave {
   achievements: string[];
   totalActions: number;
   totalDaysPlayed: number;
+  /** 最近完成的行动通知列表（最多保留 5 条） */
+  lastCompletedActions: CompletedActionNotification[];
 
   // ===== 元数据 =====
   /** Unix 时间戳，用于本地/远程存档仲裁 */

@@ -17,6 +17,7 @@ import type {
   InvestigationEvidence,
 } from './enums';
 import type { KPITier } from './enums';
+import type { SlotTierKey, SlotOccupant } from './player';
 
 /** 时间推进后触发的周期事件 */
 export interface TimeTrigger {
@@ -46,28 +47,28 @@ export interface TimeAdvanceResult {
   triggers: TimeTrigger[];
 }
 
-/** 单个行动执行结果 */
-export interface ActionResult {
-  success: boolean;
-  /** 失败时填充原因 */
-  error?: string;
-  /** 实际消耗的槽位数 */
-  slotCost: number;
-  /** 额外资金消耗 */
-  budgetDelta: number;
-  /** 各 KPI 指标变化 */
-  kpiChanges: { indicatorId: string; delta: number }[];
-  /** 各玩家属性变化 */
-  playerChanges: { attr: string; delta: number }[];
-  /** 更新后的冷却记录 */
-  newCooldown: { actionId: string; expiresAt: number };
-  /** 消耗的游戏天数 */
-  daysAdvanced: number;
+/** 行动启动结果（放入槽位时的校验结果） */
+export type StartActionResult =
+  { success: false; error: string } | { success: true; tierKey: SlotTierKey; slotIndex: number };
+
+/** 槽位完成结果：已到期的行动记录 */
+export interface CompletedSlotAction {
+  tierKey: SlotTierKey;
+  slotIndex: number;
+  occupant: SlotOccupant;
 }
 
-/** 单个行动效果的解析结果 */
-export interface ActionEffectResult {
-  target: string;
+/** 单个 KPI 指标的效果变更 */
+export interface KPIEffectChange {
+  indicatorId: string;
+  operation: 'add' | 'multiply' | 'set';
+  delta: number;
+}
+
+/** 单个玩家属性的效果变更 */
+export interface PlayerEffectChange {
+  attr: string;
+  operation: 'add' | 'multiply' | 'set';
   delta: number;
 }
 
@@ -250,13 +251,4 @@ export interface RetirementOption {
   label: string;
   description: string;
   risk?: string;
-}
-
-/** 上级互动行为定义 */
-export interface SuperiorAction {
-  id: string;
-  name: string;
-  slotCost: number;
-  favorGain: number;
-  description: string;
 }

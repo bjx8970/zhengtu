@@ -424,7 +424,7 @@ describe('store integration', () => {
     expect(getRawState().time.year).toBe(yearBefore);
   });
 
-  it('晋升中拒绝 EXECUTE_ACTION', () => {
+  it('晋升中拒绝 START_ACTION', () => {
     const { dispatch, getRawState } = createTestStore({
       currentLevel: 2,
       currentPositionId: 'admin_l2_0',
@@ -437,7 +437,7 @@ describe('store integration', () => {
     });
     dispatch({ type: 'START_PROMOTION' });
     const actionsBefore = getRawState().totalActions;
-    dispatch({ type: 'EXECUTE_ACTION', deptId: 'dummy', actionId: 'dummy' });
+    dispatch({ type: 'START_ACTION', deptId: 'dummy', actionId: 'dummy' });
     expect(getRawState().totalActions).toBe(actionsBefore);
   });
 });

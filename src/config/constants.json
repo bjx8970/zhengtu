@@ -1,5 +1,10 @@
 {
-  "slotLimits": { "day": 3, "week": 4, "month": 6 },
+  "slotTiers": {
+    "primary": { "label": "主要", "count": 3, "description": "核心工作槽位" },
+    "secondary": { "label": "次要", "count": 2, "description": "常规工作槽位" },
+    "reserve": { "label": "备用", "count": 1, "description": "加班槽位，消耗健康" }
+  },
+  "reservePenalty": { "health": -5, "demoralization": 3 },
   "daysPerMonth": 30,
   "monthsPerYear": 12,
   "retirementAge": 65,
@@ -25,11 +30,11 @@
     "corruptionRisk": [0, 100],
     "superiorFavor": [0, 100],
     "politicalCapital": [0, 500],
-    "demoralization": [0, 100]
+    "demoralization": [0, 100],
+    "health": [0, 100]
   },
   "kpiTierThresholds": { "excellent": 90, "competent": 75, "basic": 60 },
   "completionRateCap": 1.5,
-  "daysPerSlotUnit": 1.5,
   "sentimentMinLevel": 4,
   "incompetentFrozenPeriods": 1,
   "consecutiveFailureThreshold": 2,
@@ -44,7 +49,8 @@
     "corruptionRisk": 0,
     "superiorFavor": 20,
     "politicalCapital": 0,
-    "demoralization": 0
+    "demoralization": 0,
+    "health": 100
   },
   "kpiTierColors": {
     "优秀": "#4CAF50",

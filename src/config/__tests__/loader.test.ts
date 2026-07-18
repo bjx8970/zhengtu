@@ -126,9 +126,9 @@ describe('ConfigLoader', () => {
   describe('game config', () => {
     it('loads slot config correctly', () => {
       const cfg = loader.getGameConfig();
-      expect(cfg.slotLimits.day).toBe(3);
-      expect(cfg.slotLimits.week).toBe(4);
-      expect(cfg.slotLimits.month).toBe(6);
+      expect(cfg.slotTiers.primary.count).toBe(3);
+      expect(cfg.slotTiers.secondary.count).toBe(2);
+      expect(cfg.slotTiers.reserve.count).toBe(1);
     });
 
     it('has correct retirement age', () => {

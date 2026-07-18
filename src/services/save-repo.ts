@@ -16,12 +16,33 @@ const TABLE_NAME = 'game_saves';
 const SLOT_NAME = 'main';
 const LOCAL_KEY = 'zhengtu_autosave';
 
+/**
+ * 校验 JSON 解析结果是否为合法的 PlayerSave 对象。
+ */
+function isValidPlayerSave(data: unknown): data is PlayerSave {
+  if (!data || typeof data !== 'object') return false;
+  const obj = data as Record<string, unknown>;
+  const slots = obj.slots as Record<string, unknown> | undefined;
+  const time = obj.time as Record<string, unknown> | undefined;
+  return (
+    typeof obj.currentPositionId === 'string' &&
+    typeof obj.currentLevel === 'number' &&
+    typeof obj.characterName === 'string' &&
+    typeof slots?.primary === 'object' &&
+    typeof slots?.secondary === 'object' &&
+    typeof slots?.reserve === 'object' &&
+    Array.isArray((slots.primary as Record<string, unknown>)?.occupants) &&
+    typeof time?.year === 'number'
+  );
+}
+
 /** 从 localStorage 读取本地存档 */
 export function readLocalSave(): PlayerSave | null {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as PlayerSave;
+    const parsed = JSON.parse(raw);
+    return isValidPlayerSave(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -52,7 +73,7 @@ export async function fetchRemoteSave(userId: string): Promise<PlayerSave | null
 
   if (error || !data) return null;
 
-  return data.save_data as PlayerSave;
+  return isValidPlayerSave(data.save_data) ? (data.save_data as PlayerSave) : null;
 }
 
 /**

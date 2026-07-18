@@ -1,140 +1,132 @@
 /**
- * 行动执行引擎
+ * 行动队列引擎
  *
  * 核心职责：
- * 1. 校验行动是否可执行（槽位、冷却、预算）
- * 2. 解析行动效果为 KPI 变化和玩家属性变化
- * 3. 返回 ActionResult 供 store 层应用到 state
+ * 1. startAction — 校验并将行动放入槽位（扣预算、占槽位）
+ * 2. completeActions — 推进时间后检查到期行动并返回效果
  *
- * 纯函数，不修改输入参数。所有校验和计算均通过参数化进行。
+ * 纯函数，不修改输入参数。
  */
 
-import type { ActionResult, ActionEffectResult } from '../../types/game';
-import type { ActionTemplate, GameConfig } from '../../types/config';
-import type { DepartmentState } from '../../types/player';
+import type { ActionTemplate } from '../../types/config';
+import type { SlotState, SlotTierKey } from '../../types/player';
+import type {
+  StartActionResult,
+  CompletedSlotAction,
+  KPIEffectChange,
+  PlayerEffectChange,
+} from '../../types/game';
+
+const TIER_ORDER: SlotTierKey[] = ['primary', 'secondary', 'reserve'];
 
 /**
- * 执行一个行动。校验前置条件并计算效果。
+ * 校验预算/重复性/槽位，将行动放入合适的槽位。
  *
- * @param actionConfig    行动配置
- * @param deptState       部门当前状态（用于检查冷却）
- * @param slotAvailable   当前剩余槽位数
- * @param remainingBudget 当前剩余预算
- * @param gameDay         当前游戏日（用于冷却计算）
- * @param config          游戏配置常量
- * @returns 执行结果，success=false 时 error 字段说明原因
+ * @param actionConfig - 行动模板
+ * @param slotState - 当前槽位状态
+ * @param remainingBudget - 剩余预算
+ * @param _currentDay - 当前游戏天数（预留）
+ * @returns 成功时返回槽位位置；失败时返回错误信息
  */
-export function executeAction(
+export function startAction(
   actionConfig: ActionTemplate,
-  deptState: DepartmentState,
-  slotAvailable: number,
+  slotState: SlotState,
   remainingBudget: number,
-  gameDay: number,
-  config: GameConfig,
-): ActionResult {
-  // 校验：槽位
-  if (slotAvailable < actionConfig.slotCost) {
-    return emptyResult(false, `槽位不足（需${actionConfig.slotCost}，剩${slotAvailable}）`);
-  }
-
-  // 校验：冷却
-  const cooldownEnd = deptState.actionCooldowns[actionConfig.id] ?? 0;
-  if (gameDay < cooldownEnd) {
-    const remaining = cooldownEnd - gameDay;
-    return emptyResult(false, `冷却中，剩余${remaining}天`);
-  }
-
-  // 校验：预算
+  _currentDay: number,
+): StartActionResult {
   if (remainingBudget < actionConfig.budgetDelta) {
-    return emptyResult(false, '预算不足');
+    return { success: false, error: '预算不足' };
   }
 
-  // 解析每个 effect 的目标和数值
-  const kpiChanges: { indicatorId: string; delta: number }[] = [];
-  const playerChanges: { attr: string; delta: number }[] = [];
-
-  for (const effect of actionConfig.effects) {
-    const value = resolveEffectValue(effect, actionConfig);
-
-    if (effect.target.startsWith('dept.kpi.')) {
-      const kpiId = effect.target.replace('dept.kpi.', '');
-      kpiChanges.push({ indicatorId: kpiId, delta: value });
-    } else if (effect.target.startsWith('player.')) {
-      const attr = effect.target.replace('player.', '');
-      playerChanges.push({ attr, delta: value });
+  for (const tierKey of TIER_ORDER) {
+    const tier = slotState[tierKey];
+    if (tier?.occupants.some((o) => o?.actionId === actionConfig.id)) {
+      return { success: false, error: '该行动已在执行中' };
     }
   }
 
-  // 天数消耗：每 slotCost 约 1.5 天
-  const daysAdvanced = Math.max(1, Math.ceil(actionConfig.slotCost * config.daysPerSlotUnit));
+  const minTierIdx = TIER_ORDER.indexOf(actionConfig.minTier);
 
-  return {
-    success: true,
-    slotCost: actionConfig.slotCost,
-    budgetDelta: actionConfig.budgetDelta,
-    kpiChanges,
-    playerChanges,
-    newCooldown: {
-      actionId: actionConfig.id,
-      expiresAt: gameDay + actionConfig.cooldownDays,
-    },
-    daysAdvanced,
-  };
-}
+  for (const tierKey of TIER_ORDER) {
+    const tierIdx = TIER_ORDER.indexOf(tierKey);
+    if (tierIdx > minTierIdx) continue;
+    const tier = slotState[tierKey];
+    if (!tier) continue;
+    const idx = tier.occupants.findIndex((o) => o === null);
+    if (idx === -1) continue;
 
-/** 解析效果值：有 range 时随机，否则返回固定值 */
-function resolveEffectValue(
-  effect: { value: number; range?: { min: number; max: number } },
-  _actionConfig: ActionTemplate,
-): number {
-  if (effect.range) {
-    return Math.floor(Math.random() * (effect.range.max - effect.range.min + 1)) + effect.range.min;
+    return {
+      success: true,
+      tierKey,
+      slotIndex: idx,
+    };
   }
-  return effect.value;
-}
 
-/** 构建失败结果 */
-function emptyResult(success: boolean, error: string): ActionResult {
-  return {
-    success,
-    error,
-    slotCost: 0,
-    budgetDelta: 0,
-    kpiChanges: [],
-    playerChanges: [],
-    newCooldown: { actionId: '', expiresAt: 0 },
-    daysAdvanced: 0,
-  };
+  return { success: false, error: '无空闲槽位' };
 }
 
 /**
- * 合并多个 ActionEffectResult 为聚合的 KPI/玩家变化。
- * 按 target 分组汇总，供 store 层一次性应用。
+ * 推进时间后检查所有槽位，收集已完成的行动。
  *
- * @deprecated Phase 2 实现：后续多行动并行执行时启用
+ * @param slotState - 当前槽位状态
+ * @param currentDay - 推进后的游戏天数
+ * @returns 已完成行动的列表（含槽位位置 + 占用记录）
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function resolveEffects(_effects: ActionEffectResult[]): {
-  kpiChanges: Record<string, number>;
-  playerChanges: Record<string, number>;
-} {
-  const kpiChanges: Record<string, number> = {};
-  const playerChanges: Record<string, number> = {};
+export function completeActions(slotState: SlotState, currentDay: number): CompletedSlotAction[] {
+  const completed: CompletedSlotAction[] = [];
 
-  for (const eff of _effects) {
-    if (eff.target.startsWith('dept.kpi.')) {
-      const kpiId = eff.target.replace('dept.kpi.', '');
-      kpiChanges[kpiId] = (kpiChanges[kpiId] ?? 0) + eff.delta;
-    } else if (eff.target.startsWith('player.')) {
-      const attr = eff.target.replace('player.', '');
-      playerChanges[attr] = (playerChanges[attr] ?? 0) + eff.delta;
+  for (const tierKey of TIER_ORDER) {
+    const tier = slotState[tierKey];
+    if (!tier) continue;
+    for (let i = 0; i < tier.occupants.length; i++) {
+      const occupant = tier.occupants[i];
+      if (!occupant) continue;
+      if (currentDay - occupant.startedAtDay >= occupant.durationDays) {
+        completed.push({ tierKey, slotIndex: i, occupant });
+      }
+    }
+  }
+
+  return completed;
+}
+
+/**
+ * 解析行动模板的效果，生成 KPI 变更和属性变更。
+ *
+ * @param actionConfig - 已完成行动的模板
+ * @param _rng - 可选的随机数生成器（仅测试用，默认 Math.random）
+ * @returns KPI 增量列表 + 玩家属性增量列表，含操作模式
+ */
+export function resolveActionEffects(
+  actionConfig: ActionTemplate,
+  _rng?: () => number,
+): {
+  kpiChanges: KPIEffectChange[];
+  playerChanges: PlayerEffectChange[];
+} {
+  const kpiChanges: KPIEffectChange[] = [];
+  const playerChanges: PlayerEffectChange[] = [];
+
+  for (const effect of actionConfig.effects) {
+    const rand = _rng ?? Math.random;
+    const delta = effect.range
+      ? Math.floor(rand() * (effect.range.max - effect.range.min + 1)) + effect.range.min
+      : effect.value;
+
+    if (effect.target.startsWith('dept.kpi.')) {
+      kpiChanges.push({
+        indicatorId: effect.target.replace('dept.kpi.', ''),
+        operation: effect.operation,
+        delta,
+      });
+    } else if (effect.target.startsWith('player.')) {
+      playerChanges.push({
+        attr: effect.target.replace('player.', ''),
+        operation: effect.operation,
+        delta,
+      });
     }
   }
 
   return { kpiChanges, playerChanges };
-}
-
-/** 获取指定推进粒度下的最大槽位数 */
-export function getSlotLimits(granularity: 'day' | 'week' | 'month', config: GameConfig): number {
-  return config.slotLimits[granularity];
 }

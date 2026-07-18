@@ -5,11 +5,11 @@
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 状态变更后组件自动细粒度响应（Solid 字段级追踪）
- * 4. 持久化不在此层：推进时间时由调用方触发 saveRepo
+ * 4. 每次 dispatch 实时写入 localStorage；ADVANCE_TIME 额外同步 Supabase
  *
  * 操作阶段 vs 提交阶段：
- * - 操作阶段（执行行动、处理文件、选择事件）：只修改 store，不持久化
- * - 提交阶段（推进时间）：一次性结算 + 保存
+ * - 操作阶段（执行行动、处理文件、选择事件）：修改 store + 实时写入 localStorage
+ * - 提交阶段（推进时间）：结算所有到期行动 + localStorage + Supabase 同步
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
@@ -21,9 +21,14 @@ import {
   FileAction,
 } from '../types/enums';
 import type { TimeGranularity } from '../types/enums';
-import type { PlayerSave, GameTime } from '../types/player';
+import type {
+  PlayerSave,
+  GameTime,
+  SlotOccupant,
+  CompletedActionNotification,
+} from '../types/player';
 import type { TimeTrigger } from '../types/game';
-import { getSlotLimits, executeAction } from '../engine/core/action';
+import { startAction, completeActions, resolveActionEffects } from '../engine/core/action';
 import { advanceTime, getGranularityDays } from '../engine/core/time';
 import { monthlySettlement } from '../engine/governance/budget';
 import { calculateKPI } from '../engine/governance/kpi';
@@ -53,6 +58,23 @@ function getInitialTime(): GameTime {
   return { year: cfg.startYear, month: 1, day: 1, granularity: 'day' };
 }
 
+function makeEmptySlots(cfg: { slotTiers: Record<string, { count: number; label: string }> }) {
+  const tiers = cfg.slotTiers as unknown as Record<
+    'primary' | 'secondary' | 'reserve',
+    { count: number; label: string }
+  >;
+  const makeTier = (key: 'primary' | 'secondary' | 'reserve') => ({
+    label: tiers[key].label,
+    count: tiers[key].count,
+    occupants: new Array(tiers[key].count).fill(null) as (SlotOccupant | null)[],
+  });
+  return {
+    primary: makeTier('primary'),
+    secondary: makeTier('secondary'),
+    reserve: makeTier('reserve'),
+  };
+}
+
 /**
  * 创建初始游戏状态。
  *
@@ -61,10 +83,7 @@ function getInitialTime(): GameTime {
  */
 export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave {
   const cfg = getConfigLoader().getGameConfig();
-  const slots = (() => {
-    const m = getSlotLimits('day', cfg);
-    return { max: m, available: m };
-  })();
+  const slots = makeEmptySlots(cfg);
 
   return {
     saveId: '',
@@ -85,6 +104,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     currentCareerLine: 'admin' as CareerLine,
     yearsInCurrentPosition: 0,
     slots,
+    health: cfg.initialAttributes['health'] ?? 100,
     politicalCapital: cfg.initialAttributes['politicalCapital'] ?? 0,
     remainingBudget: 1000,
     comprehensiveScore: 0,
@@ -131,6 +151,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     achievements: [],
     totalActions: 0,
     totalDaysPlayed: 0,
+    lastCompletedActions: [],
     updatedAt: Date.now(),
     ...overrides,
   };
@@ -142,9 +163,8 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
  * 新增系统时在此 union 中添加对应的 action type。
  */
 export type GameAction =
-  | { type: 'EXECUTE_ACTION'; deptId: string; actionId: string }
-  | { type: 'ADVANCE_TIME'; granularity: TimeGranularity }
-  | { type: 'SET_GRANULARITY'; granularity: TimeGranularity }
+  | { type: 'START_ACTION'; deptId: string; actionId: string }
+  | { type: 'ADVANCE_TIME'; granularity: TimeGranularity; _rng?: () => number }
   | { type: 'CHOOSE_EVENT_OPTION'; eventId: string; optionIndex: number }
   | { type: 'PROCESS_DOCUMENT'; docId: string; action: FileAction }
   | { type: 'START_PROMOTION' }
@@ -180,8 +200,28 @@ function applyPlayerAttr(
   bounds: Record<string, [number, number]>,
 ): void {
   if (!PLAYER_NUMERIC_ATTRS.has(attr)) return;
-  const d = draft as unknown as Record<string, number>;
-  d[attr] = clampAttr(attr, (d[attr] ?? 0) + delta, bounds);
+  const cur = (draft as unknown as Record<string, number>)[attr] ?? 0;
+  setPlayerAttrDirect(draft, attr, cur + delta, bounds);
+}
+
+/**
+ * 直接设置玩家数值属性（含边界钳位）。
+ * 用于 multiply/set 等非加法操作，"加性"操作请用 applyPlayerAttr。
+ */
+function setPlayerAttrDirect(
+  draft: PlayerSave,
+  attr: string,
+  value: number,
+  bounds: Record<string, [number, number]>,
+): void {
+  if (!PLAYER_NUMERIC_ATTRS.has(attr)) return;
+  (draft as unknown as Record<string, number>)[attr] = clampAttr(attr, value, bounds);
+}
+
+/** 读取玩家数值属性当前值 */
+function getPlayerAttr(draft: PlayerSave, attr: string): number {
+  if (!PLAYER_NUMERIC_ATTRS.has(attr)) return 0;
+  return (draft as unknown as Record<string, number>)[attr] ?? 0;
 }
 
 /** 从 positionId（如 "admin_l3_0"）提取职位索引 */
@@ -206,7 +246,6 @@ function initializeDepartmentStates(draft: PlayerSave): void {
       kpiValues: {},
       monthlyConsumption: 0,
       cumulativeConsumption: 0,
-      actionCooldowns: {},
       lastActionDay: 0,
     };
   }
@@ -332,15 +371,7 @@ export function getRawState(): PlayerSave {
  */
 function reduceGameState(draft: PlayerSave, action: GameAction): void {
   switch (action.type) {
-    case 'SET_GRANULARITY': {
-      const cfg = getConfigLoader().getGameConfig();
-      const max = getSlotLimits(action.granularity, cfg);
-      draft.time.granularity = action.granularity;
-      draft.slots.max = max;
-      draft.slots.available = max;
-      break;
-    }
-    case 'EXECUTE_ACTION': {
+    case 'START_ACTION': {
       if (!canAct(draft.promotionStage)) break;
       const loader = getConfigLoader();
       const cfg = loader.getGameConfig();
@@ -357,76 +388,135 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       const actionConfig = deptConfig.actions.find((a) => a.id === action.actionId);
       if (!actionConfig) break;
 
-      const deptState = draft.departmentStates[action.deptId] ?? {
-        id: action.deptId,
-        kpiValues: {},
-        monthlyConsumption: 0,
-        cumulativeConsumption: 0,
-        actionCooldowns: {},
-        lastActionDay: 0,
-      };
-      if (!draft.departmentStates[action.deptId]) {
-        draft.departmentStates[action.deptId] = deptState;
-      }
-
-      const result = executeAction(
+      const result = startAction(
         actionConfig,
-        deptState,
-        draft.slots.available,
+        draft.slots,
         draft.remainingBudget,
         draft.totalDaysPlayed,
-        cfg,
       );
 
       if (!result.success) break;
 
-      for (const kpi of result.kpiChanges) {
-        deptState.kpiValues[kpi.indicatorId] =
-          (deptState.kpiValues[kpi.indicatorId] ?? 0) + kpi.delta;
-      }
+      const occupant: SlotOccupant = {
+        actionId: actionConfig.id,
+        deptId: action.deptId,
+        actionName: actionConfig.name,
+        startedAtDay: draft.totalDaysPlayed,
+        durationDays: actionConfig.durationDays,
+      };
 
-      for (const change of result.playerChanges) {
-        applyPlayerAttr(draft, change.attr, change.delta, cfg.attributeBounds);
-      }
+      const tierKey = result.tierKey;
+      const slotIdx = result.slotIndex;
+      draft.slots[tierKey].occupants[slotIdx] = occupant;
 
-      deptState.actionCooldowns[result.newCooldown.actionId] = result.newCooldown.expiresAt;
-      deptState.lastActionDay = draft.totalDaysPlayed;
-
-      draft.slots.available -= result.slotCost;
-      draft.remainingBudget -= result.budgetDelta;
-
-      const timeResult = advanceTime(
-        draft.time,
-        result.daysAdvanced,
-        draft.birthYear,
-        draft.currentLevel,
-        cfg,
-      );
-      draft.time.year = timeResult.newState.year;
-      draft.time.month = timeResult.newState.month;
-      draft.time.day = timeResult.newState.day;
-      draft.totalDaysPlayed += result.daysAdvanced;
-      resolveTriggers(draft, timeResult.triggers);
-
+      draft.remainingBudget -= actionConfig.budgetDelta;
       draft.totalActions += 1;
+
+      if (tierKey === 'reserve') {
+        const penalty = cfg.reservePenalty;
+        draft.health = clampAttr(
+          'health',
+          (draft.health ?? 100) + penalty.health,
+          cfg.attributeBounds,
+        );
+        draft.demoralization = clampAttr(
+          'demoralization',
+          (draft.demoralization ?? 0) + penalty.demoralization,
+          cfg.attributeBounds,
+        );
+      }
+
+      const deptState = draft.departmentStates[action.deptId];
+      if (deptState) {
+        deptState.lastActionDay = draft.totalDaysPlayed;
+      }
       break;
     }
     case 'ADVANCE_TIME': {
       if (!canAct(draft.promotionStage)) break;
       const cfgAdv = getConfigLoader().getGameConfig();
+      const posIdx = extractPositionIndex(draft.currentPositionId);
+      const currentPosition = getConfigLoader().getPosition(
+        draft.currentCareerLine,
+        draft.currentLevel,
+        posIdx,
+      );
       const days = getGranularityDays(action.granularity, cfgAdv);
       const timeResult = advanceTime(draft.time, days, draft.birthYear, draft.currentLevel, cfgAdv);
 
-      draft.time.year = timeResult.newState.year;
-      draft.time.month = timeResult.newState.month;
-      draft.time.day = timeResult.newState.day;
+      draft.time = {
+        ...draft.time,
+        year: timeResult.newState.year,
+        month: timeResult.newState.month,
+        day: timeResult.newState.day,
+      };
       draft.totalDaysPlayed += days;
       resolveTriggers(draft, timeResult.triggers);
 
-      const max = getSlotLimits(action.granularity, cfgAdv);
-      draft.slots.max = max;
-      draft.slots.available = max;
-      draft.time.granularity = action.granularity;
+      const completed = completeActions(draft.slots, draft.totalDaysPlayed);
+      const notifications: CompletedActionNotification[] = [];
+
+      for (const c of completed) {
+        const slotOccupant = c.occupant;
+        const deptCfg = currentPosition?.departments.find((d) => d.id === slotOccupant.deptId);
+        const aCfg = deptCfg?.actions.find((a) => a.id === slotOccupant.actionId);
+        const deptName = deptCfg?.name ?? slotOccupant.deptId;
+
+        if (aCfg) {
+          const effects = resolveActionEffects(aCfg, action._rng);
+          const deptState = draft.departmentStates[slotOccupant.deptId];
+          if (deptState) {
+            for (const kpi of effects.kpiChanges) {
+              const cur = deptState.kpiValues[kpi.indicatorId] ?? 0;
+              if (kpi.operation === 'multiply') {
+                deptState.kpiValues[kpi.indicatorId] = cur * kpi.delta;
+              } else if (kpi.operation === 'set') {
+                deptState.kpiValues[kpi.indicatorId] = kpi.delta;
+              } else {
+                deptState.kpiValues[kpi.indicatorId] = cur + kpi.delta;
+              }
+            }
+          }
+          for (const change of effects.playerChanges) {
+            if (change.operation === 'add') {
+              applyPlayerAttr(draft, change.attr, change.delta, cfgAdv.attributeBounds);
+            } else if (change.operation === 'multiply' || change.operation === 'set') {
+              const cur = getPlayerAttr(draft, change.attr);
+              const newVal = change.operation === 'multiply' ? cur * change.delta : change.delta;
+              setPlayerAttrDirect(draft, change.attr, newVal, cfgAdv.attributeBounds);
+            }
+          }
+
+          notifications.push({
+            actionName: slotOccupant.actionName,
+            deptName,
+            effects: [
+              ...effects.kpiChanges.map((k) =>
+                k.operation === 'multiply'
+                  ? `KPI×${k.delta}`
+                  : k.operation === 'set'
+                    ? `KPI=${k.delta}`
+                    : `KPI${k.delta >= 0 ? '+' : ''}${k.delta}`,
+              ),
+              ...effects.playerChanges.map((p) =>
+                p.operation === 'multiply'
+                  ? `${p.attr}×${p.delta}`
+                  : p.operation === 'set'
+                    ? `${p.attr}=${p.delta}`
+                    : `${p.attr}${p.delta >= 0 ? '+' : ''}${p.delta}`,
+              ),
+            ],
+            completedAtDay: draft.totalDaysPlayed,
+          });
+        }
+
+        draft.slots[c.tierKey].occupants[c.slotIndex] = null;
+      }
+
+      if (notifications.length > 0) {
+        draft.lastCompletedActions = [...notifications, ...draft.lastCompletedActions].slice(0, 5);
+      }
+
       draft.updatedAt = Date.now();
       break;
     }
@@ -493,8 +583,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       if (!lineCfg) break;
       const nextLevelCfg = lineCfg.levels.find((l) => l.level === nextLevel);
       if (!nextLevelCfg || nextLevelCfg.positions.length === 0) break;
-      // 安全：上一行已 guard length === 0，positions[0] 必然非空
-      const targetPos = nextLevelCfg.positions[0]!;
+      const targetPos = nextLevelCfg.positions[0];
+      if (!targetPos) break;
 
       draft.promotionAttempts += 1;
 
