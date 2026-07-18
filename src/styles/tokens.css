@@ -1,36 +1,32 @@
 /**
  * 全局设计令牌 — CSS 变量定义
  *
- * 政务色 + 暗色沉浸的混合风格：
- * - 主色：中国红 #be2d2d（权力操作）
- * - 二级：藏蓝 #2B4E6E（信息查看）
- * - 底色：深蓝黑 #1a1a2e（沉浸感）
- * - 卡片：白色 / 深色两种
- * - 圆角：4px（正式感）
+ * 政务公文风格：暖灰纸张底色、藏蓝标题栏与中国红操作色。
+ * TypeScript 中需要使用的令牌由 src/utils/theme.ts 镜像，并由测试确保一致。
  */
 
 :root {
   /* 背景 */
-  --bg-main: #1a1a2e;
-  --bg-card: #0f0f23;
+  --bg-main: #eeece6;
+  --bg-card: #fffdf8;
   --bg-card-light: #ffffff;
-  --bg-header: #141428;
+  --bg-header: #172b45;
 
   /* 文字 */
-  --text-primary: #e8e6e3;
-  --text-secondary: #8b8680;
+  --text-primary: #202a35;
+  --text-secondary: #657080;
   --text-dark: #1a1a1a;
-  --text-muted: #6b6560;
+  --text-muted: #8d939b;
 
   /* 主色：中国红 */
-  --color-primary: #be2d2d;
-  --color-primary-hover: #a02020;
+  --color-primary: #b3262d;
+  --color-primary-hover: #8f1f25;
   --color-primary-light: rgba(190, 45, 45, 0.15);
   --color-primary-text: #ffffff;
 
   /* 二级：藏蓝 */
-  --color-secondary: #2b4e6e;
-  --color-secondary-light: rgba(43, 78, 110, 0.15);
+  --color-secondary: #284b70;
+  --color-secondary-light: rgba(40, 75, 112, 0.15);
   --color-secondary-text: #e8e6e3;
 
   /* 功能色 */
@@ -44,8 +40,8 @@
   --bg-input: #f8f7f5;
 
   /* 边框 */
-  --border-color: #3a3540;
-  --border-color-light: #d4c5b9;
+  --border-color: #d8d4cc;
+  --border-color-light: #e8e4dc;
 
   /* 圆角 */
   --radius-sm: 2px;
@@ -84,10 +80,76 @@ body {
   font-family: var(--font-body);
   background: var(--bg-main);
   color: var(--text-primary);
+  background-image:
+    linear-gradient(rgba(31, 49, 69, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 49, 69, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
 #root {
   height: 100%;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgba(179, 38, 45, 0.28);
+  outline-offset: 2px;
+}
+
+.document-page {
+  min-height: 100%;
+  overflow-y: auto;
+  padding: clamp(1rem, 4vw, 3rem);
+}
+.document-shell {
+  width: min(100%, 1080px);
+  margin: 0 auto;
+}
+.document-card {
+  background: rgba(255, 253, 248, 0.96);
+  border: 1px solid var(--border-color);
+  border-top: 3px solid var(--color-primary);
+  box-shadow: 0 18px 50px rgba(30, 42, 55, 0.09);
+}
+.eyebrow {
+  color: var(--color-primary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.primary-action {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  transition:
+    transform 150ms ease,
+    background 150ms ease;
+}
+.primary-action:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+  .document-page {
+    padding: 0;
+  }
+  .document-card {
+    min-height: 100%;
+    border-left: 0;
+    border-right: 0;
+    box-shadow: none;
+  }
 }
 
 /* 加载画面 */

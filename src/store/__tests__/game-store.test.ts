@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createInitialState, createTestStore, dispatch } from '../game-store';
 // 模块级 dispatch（而非 createTestStore）在此文件中用于持久化测项，
-// 因为 createTestStore 的 dispatch 故意不触发 localStorage/Supabase 写入。
+// 因为 createTestStore 的 dispatch 故意不触发 localStorage 写入。
 import type { PlayerSave, SlotOccupant } from '../../types/player';
 import { CareerLine, PromotionStage } from '../../types/enums';
 
@@ -190,6 +190,38 @@ describe('dispatch - ADVANCE_TIME (integration)', () => {
       ...overrides,
     });
   }
+
+  describe('旧存档迁移', () => {
+    it('载入时按当前配置补齐行动分类、冷却天数和部门冷却表', () => {
+      const legacySave = structuredClone(mkStore().getRawState());
+      const occupant = occ(actionId, deptId, '审批项目', 0, 3);
+      const legacyOccupant = occupant as unknown as Record<string, unknown>;
+      delete legacyOccupant['category'];
+      delete legacyOccupant['cooldownDays'];
+      legacySave.slots.primary.occupants[0] = occupant;
+
+      const legacyDepartment = legacySave.departmentStates[deptId] as unknown as Record<
+        string,
+        unknown
+      >;
+      delete legacyDepartment['actionCooldownUntilDays'];
+
+      const store = createTestStore();
+      store.dispatch({ type: 'LOAD_SAVE', save: legacySave });
+
+      const migrated = store.getRawState();
+      expect(migrated.slots.primary.occupants[0]).toMatchObject({
+        category: 'minor',
+        cooldownDays: 7,
+      });
+      expect(migrated.departmentStates[deptId]?.actionCooldownUntilDays).toEqual({});
+
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'week' });
+      expect(store.getRawState().departmentStates[deptId]?.actionCooldownUntilDays[actionId]).toBe(
+        10,
+      );
+    });
+  });
 
   it('ADVANCE_TIME 后已完成行动清空槽位', () => {
     const { dispatch, getRawState } = mkStore({

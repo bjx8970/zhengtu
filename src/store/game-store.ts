@@ -5,11 +5,11 @@
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 状态变更后组件自动细粒度响应（Solid 字段级追踪）
- * 4. 每次 dispatch 实时写入 localStorage；ADVANCE_TIME 额外同步 Supabase
+ * 4. 每次 dispatch 实时写入 localStorage
  *
  * 操作阶段 vs 提交阶段：
  * - 操作阶段（执行行动、处理文件、选择事件）：修改 store + 实时写入 localStorage
- * - 提交阶段（推进时间）：结算所有到期行动 + localStorage + Supabase 同步
+ * - 提交阶段（推进时间）：结算所有到期行动 + localStorage
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
@@ -41,7 +41,7 @@ import { calculateKPI } from '../engine/governance/kpi';
 import { annualAssessment as runAnnualAssessment } from '../engine/governance/assessment';
 import { getConfigLoader } from '../config/loader';
 import { clamp, clampAttr } from '../utils/math';
-import { writeLocalSave, upsertSave } from '../services/save-repo';
+import { writeLocalSave } from '../services/save-repo';
 import {
   checkPrerequisites,
   resolveDemocraticVote,
@@ -258,6 +258,42 @@ function initializeDepartmentStates(draft: PlayerSave): void {
   }
 }
 
+/**
+ * 补齐旧版本本地存档中尚不存在的行动分类与冷却字段。
+ *
+ * @param draft 已载入的可变游戏状态
+ */
+function migrateActionState(draft: PlayerSave): void {
+  const position = getConfigLoader().getPosition(
+    draft.currentCareerLine,
+    draft.currentLevel,
+    extractPositionIndex(draft.currentPositionId),
+  );
+
+  for (const departmentState of Object.values(draft.departmentStates)) {
+    departmentState.actionCooldownUntilDays ??= {};
+  }
+
+  const tierKeys: SlotTierKey[] = ['primary', 'secondary', 'reserve'];
+  for (const tierKey of tierKeys) {
+    for (const occupant of draft.slots[tierKey].occupants) {
+      if (!occupant) continue;
+
+      const legacyOccupant = occupant as unknown as Record<string, unknown>;
+      const actionConfig = position?.departments
+        .find((department) => department.id === occupant.deptId)
+        ?.actions.find((configuredAction) => configuredAction.id === occupant.actionId);
+
+      if (legacyOccupant['category'] === undefined) {
+        occupant.category = actionConfig?.category ?? 'routine';
+      }
+      if (legacyOccupant['cooldownDays'] === undefined) {
+        occupant.cooldownDays = actionConfig?.cooldownDays ?? 0;
+      }
+    }
+  }
+}
+
 /** 非 idle/completed/failed 时禁止执行其他操作 */
 function canAct(stage: PromotionStage): boolean {
   return (
@@ -403,7 +439,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
         currentDay: draft.totalDaysPlayed,
         deptId: action.deptId,
         tierKey: action.tierKey,
-        cooldownUntilDay: deptState?.actionCooldownUntilDays[action.actionId] ?? 0,
+        cooldownUntilDay: deptState?.actionCooldownUntilDays?.[action.actionId] ?? 0,
       });
 
       if (!result.success) break;
@@ -538,6 +574,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
     }
     case 'LOAD_SAVE': {
       Object.assign(draft, action.save);
+      migrateActionState(draft);
       break;
     }
     case 'NEW_GAME': {
@@ -842,11 +879,6 @@ export function dispatch(action: GameAction): void {
 
   // 每次操作实时写入本地
   writeLocalSave(unwrap(state));
-
-  // 推进时间时同步到 Supabase
-  if (action.type === 'ADVANCE_TIME') {
-    upsertSave(unwrap(state)).catch((e: unknown) => console.warn('Supabase sync failed:', e));
-  }
 }
 
 /**
