@@ -1,743 +1,294 @@
-# 政途人生 v3.0 — 开发路线图
+# 政途人生 v3.0 开发路线图
 
-> 本文档供 AI 编码会话延续使用，包含完整的项目状态、架构约定、待开发功能和实现指南。
-> 最后更新：2026-07-17
-> 当前状态：PR #24 (effect-test) + #25 (init-dept-states) 已合并 → main
+> 本文档记录当前可验证的实现基线和后续开发顺序。
+> 最后校准：2026-07-18，基于 `main` 合并 PR #27、#43 后的状态。
 
----
+## 1. 产品基线
 
-## 1. 项目当前状态
+### 1.1 当前目标
 
-### 1.1 运行统计
+当前阶段以**本地单机优先、行政线 L1-L3 可完整体验**为目标。先打通并打磨一个纵向切片，再扩展行政高等级、其他职业线和云端能力。
 
-| 指标 | 数值 |
-|------|------|
-| 已合并 PR | 14 个 (#1-#10, #16, #21, #23, #24, #25) |
-| 开放 PR | 0 |
-| 开放 Issue | 9 个 |
-| 源文件总数 | 39 个 |
-| 引擎文件 | 10 个 |
-| 页面文件 | 12 个（7 页 + 5 个建档子组件） |
-| 测试文件 | 10 个 |
-| 测试用例 | 175 个 |
+当前范围包括：
 
-### 1.2 技术栈
+- 五步角色建档。
+- 行政线 L1-L3（科员、副科、正科）。
+- Dashboard 中的部门行动排期、时间推进、KPI、年度考核和晋升。
+- localStorage 实时自动存档。
 
+不属于当前完成范围：
+
+- 行政线 L4-L11。
+- 党务、纪检、群团职业线的可玩内容。
+- Supabase Auth、启动时远程加载和完整云存档流程。
+- 关系、上级互动、风险、个人生活、秘书和历史评价等扩展系统。
+
+### 1.2 当前配置
+
+| 配置     | 当前实现                                      |
+| -------- | --------------------------------------------- |
+| 职业线   | 4 个配置文件；仅行政线包含职位                |
+| 行政等级 | L1-L3                                         |
+| 行政职位 | 10 个配置职位；职位选择逻辑固定取每级首个职位 |
+| 部门模板 | 核心与扩展模板合并后共 19 个                  |
+| KPI 模板 | 32 个                                         |
+| 行动模板 | 38 个                                         |
+
+L3 没有下一等级配置，因此无法启动通往 L4 的晋升。当前 UI 在首次晋升完成后还会停留在 `Completed`，缺少重置并开始下一次晋升的入口，因此尚不能通过正常页面流程连续晋升至 L3。
+
+### 1.3 当前页面
+
+实际注册路由以 `src/app.tsx` 为准：
+
+| 路由         | 页面           | 状态                   |
+| ------------ | -------------- | ---------------------- |
+| `/`          | Splash         | 可用                   |
+| `/login`     | 登录           | 开发占位，直接进入建档 |
+| `/character` | 五步建档       | 可用                   |
+| `/dashboard` | 综合 Dashboard | 可用                   |
+
+部门行动、KPI 和晋升交互已经合并到 Dashboard。`src/pages/career/` 下的独立页面目前不是可达路由，不应作为已完成页面宣传。
+
+## 2. 当前游戏循环
+
+```text
+Splash → 占位登录 → 五步建档 → NEW_GAME → Dashboard
+  ↓
+选择部门行动 → START_ACTION
+  ↓
+校验预算、重复行动、最低槽位等级和空位
+  ↓
+占用槽位并立即扣除预算
+  ↓
+推进 1 / 7 / 30 天 → ADVANCE_TIME
+  ↓
+到期行动结算 KPI 与玩家属性效果，并释放槽位
+  ↓
+月度预算结算 / 年度 KPI 考核
+  ↓
+满足条件后进入一次晋升流程
+  ↓
+成功后停留在 Completed（待支持重置并继续晋升）
 ```
-框架: SolidJS + TypeScript + Vite
-状态: createStore + produce (Solid built-in)
-路由: 自建 hash router
-样式: 内联 style 对象 + CSS 变量 design tokens
-后端: Supabase（Auth + Database）
-配置: JSON 文件，ConfigLoader 单例加载
-校验: zod schema (scripts/validate-config.ts)
+
+### 2.1 槽位模型
+
+| 槽位等级 | 数量 | 用途                         |
+| -------- | ---- | ---------------------------- |
+| 主要     | 3    | 核心工作                     |
+| 次要     | 2    | 常规工作                     |
+| 备用     | 1    | 加班槽位，附带健康和消沉惩罚 |
+
+槽位数量固定，不随推进粒度变化。行动通过 `durationDays` 决定完成日期，通过 `minTier` 决定可进入的最低槽位等级。
+
+当前 38 个行动的 `minTier` 都是 `primary` 或 `secondary`。现有分配算法不会将这些行动放入 `reserve`，因此备用槽和对应惩罚在正常游戏中不可达，需要在近期实现中修正。
+
+### 2.2 晋升流程
+
+晋升状态依次经历：
+
+1. 民主推荐。
+2. 组织考察。
+3. 联审。
+4. 常委会票决。
+5. 公示。
+6. 任命。
+7. 试用期。
+
+晋升期间会锁定普通行动和时间推进，仅允许处理当前晋升阶段要求的交互。
+
+## 3. 技术基线
+
+### 3.1 技术栈
+
+```text
+框架：SolidJS + TypeScript + Vite
+状态：createStore + produce
+路由：自建 hash router
+测试：Vitest
+配置：JSON + ConfigLoader + zod 完整性校验
+存储：localStorage；Supabase 远程存档代码尚未贯通产品流程
+部署：GitHub Pages
 ```
 
-### 1.3 质量门禁命令
+### 3.2 分层架构
+
+```text
+UI（Solid 页面/组件）
+  → Store（createStore + dispatch）
+    → Engine（纯函数）
+      → Config（JSON + loader）
+```
+
+关键约束：
+
+- Engine 不访问 DOM、全局状态或 Store。
+- 所有游戏状态变更通过 `dispatch(action)` 和 `reduceGameState()`。
+- Store 逻辑测试使用 `createTestStore()` 隔离；持久化集成测试可以使用模块级 `dispatch()`。
+- 玩家数值变更通过 `applyPlayerAttr()` 校验并钳位。
+- 游戏数值优先放在 JSON 配置中。
+- Solid 列表渲染使用 `<For>`，不使用 JSX 中的 `Array.map()`。
+
+### 3.3 存档现状
+
+- 模块级 `dispatch()` 每次操作后写入 localStorage。
+- `ADVANCE_TIME` 额外尝试调用 Supabase `upsertSave()`。
+- 未配置 Supabase 或远程写入失败时，游戏继续使用本地存档。
+- 应用启动只读取 localStorage。
+- `fetchRemoteSave()` 和 `selectNewer()` 已实现，但尚未接入启动流程。
+- 登录页尚未接入 Supabase Auth，当前不能视为用户级云存档已完成。
+
+## 4. 质量门禁
+
+本地提交 PR 前按以下顺序执行质量门禁：
 
 ```bash
-pnpm format:check    # Prettier
-pnpm lint            # ESLint v9 flat config (0 errors required)
-pnpm typecheck       # tsc --noEmit (strict mode)
-pnpm test            # vitest run
-pnpm validate:config # tsx scripts/validate-config.ts
-pnpm build           # vite build
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm validate:config
+pnpm build
 ```
 
-### 1.4 分支工作流
+可使用 `pnpm run ci` 依次运行完整门禁；GitHub Actions 中的检查以独立 job 并行执行。不要使用裸 `pnpm ci`，后者是 pnpm 自带命令。
 
-```
-1. git checkout -b <type>/<desc> from main    # 从 main 新建分支
-2. 编写代码 + 测试
-3. git push + 创建 PR
-4. CI 全部通过 + OpenCode review 通过
-5. Squash Merge 到 main
+当前测试基线为 10 个测试文件、187 个用例。该数字仅用于本次校准，后续以实际测试输出为准，不作为长期规模指标。
 
-分支命名: feat/<name> | fix/<name> | refactor/<name> | docs/<name> | chore/<name>
-```
+覆盖率门槛：
 
-**禁止直接 push main。**
+- Engine：行覆盖率不低于 90%。
+- Config：行覆盖率不低于 80%。
+- Store：行覆盖率不低于 70%。
 
----
+## 5. 开发阶段
 
-## 2. 架构约定
+### 阶段 0：工作流与项目基线
 
-### 2.1 分层架构（自顶向下）
+状态：进行中。
 
-```
-UI (Solid pages/components)
-  → Store (createStore + dispatch)
-    → Engine (pure functions)
-      → Config (JSON + loader)
-```
+已完成：
 
-- **引擎函数必须纯函数**：无 DOM、无全局状态、无 store 引用
-- **引擎文件 ≤ 200 行**
-- **所有类型放在 `src/types/`**
-- **状态变更唯一入口**：`dispatch(action)` → `reduceGameState(draft, action)`
-- **测试用 `createTestStore()` 隔离**，不 import 模块级 store
-- **JSON 配置优先**：游戏数值修改只改 JSON，不改代码
+- 工作流最小权限和不可变 Action SHA。
+- `/oc`、`/opencode` 评论命令的触发身份限制。
+- Pages 仅部署通过 `main` CI 的精确提交。
+- README 与路线图按当前实现校准。
 
-### 2.2 关键约定
+后续文档任务：
 
-- `<For each={list}>` 替代 `Array.map()`（ESLint `solid/prefer-for` 强制）
-- `玩家属性变更` 用 `applyPlayerAttr()` 会校验 clamp
-- `non-null !` 必须带安全说明注释
-- `familyBackground/promotionPath` 存储英文 ID（`'worker'`），UI 显示中文名
-- `PromotionStage` 等枚举用英文值 key，中文值 value
+- 单独校准 `ARCHITECTURE.md` 和 `CONTRIBUTING.md` 中的旧槽位及存档描述。
 
-### 2.3 文件命名
+### 阶段 1：完成行政 L1-L3 纵向切片
 
-```
-源文件: kebab-case.ts
-页面组件: kebab-case.tsx
-测试文件: *.test.ts (非 .spec.ts)
-引擎 domain: src/engine/<domain>/<module>.ts
-引擎测试:   src/engine/<domain>/__tests__/<module>.test.ts
-```
+目标：从建档到 L3 封顶的流程清晰、稳定、可恢复。
 
----
+1. 完善 Dashboard 摘要，并提供清晰的 KPI、晋升详情体验。
+2. 修正首次晋升完成后的状态重置和继续晋升入口。
+3. 修正备用槽可达性、槽位等级选择和 UI 可用性判断。
+4. 修复本地存档恢复后的默认落点和继续游戏入口。
+5. 为到达 L3 增加明确的阶段完成反馈，而不是表现为无响应。
+6. 清理或重新接入不可达的职业独立页面。
 
-## 3. 现有引擎模块
+完成标准：
 
-### 3.1 已完成 (10/29)
+- 新玩家可从建档连续游玩到 L3。
+- 刷新页面后可明确继续已有游戏。
+- 行动排期、预算、到期结算、年度考核和晋升均有可理解反馈。
+- L3 封顶状态有明确说明。
 
-```
-src/engine/
-├── core/           ✅ 3/3
-│   ├── time.ts        # 时间推进 + 周期检测
-│   ├── action.ts      # 行动执行 + 校验
-│   └── effect.ts      # 效果解析
-├── governance/     ✅ 3/3
-│   ├── kpi.ts         # KPI 完成率 + 等次
-│   ├── budget.ts      # 月度消耗 + 结算
-│   └── assessment.ts  # 年度考核 + 晋升资格
-├── career/         ✅ 3/3
-│   ├── promotion.ts         # 晋升阶段 0-2
-│   ├── promotion-final.ts   # 晋升阶段 3-6
-│   └── faction-penalty.ts   # 派系惩罚计算
-└── index.ts       ✅
-```
+### 阶段 2：核心流程测试与缺陷清理
 
-### 3.2 待开发 (19/29)
+目标：在扩充内容前稳定现有行为。
 
-```
-⬜ social/        0/3
-   relations.ts      # 人脉网络管理（关系值变化、网络扩展）
-   factions.ts       # 派系博弈（声望计算、派系对抗）
-   superior.ts       # 上级互动（好感度、汇报、请示）
+1. 增加建档 → 行动 → 推进时间 → 考核 → 晋升的 Store/集成测试（Issue #19）。
+2. 补齐新槽位系统的预算、重复行动、备用槽惩罚和跨周期结算测试。
+3. 处理已知代码规范问题（Issue #13）。
+4. 清理未使用依赖和废弃配置（Issue #15）。
+5. 将仍在引擎中的晋升数值迁移到配置（Issue #12）。
 
-⬜ office/        0/3
-   secretary.ts      # 秘书管理（经验值、等级晋升）
-   documents.ts      # 文件批示（公文生成、审批效果）
-   sentiment.ts      # 舆情管理（舆情生成、热度衰减、应对）
+### 阶段 3：扩展行政线 L4-L11
 
-⬜ risk/          0/3
-   investigation.ts  # 双规审查（证据收集、定罪判定）
-   corruption.ts     # 贪腐风险（risk 增长/衰减、触发阈值）
-   patrol.ts         # 巡视组（随机检查、问题反馈）
+目标：解除 L3 职业进度封顶。
 
-⬜ legacy/        0/6
-   successor.ts      # 接班人培养
-   think-tank.ts     # 智囊团
-   mentor.ts         # 导师系统
-   opportunity.ts    # 历史机遇
-   constitution.ts   # 修宪
-   history-eval.ts   # 历史评价
+1. 为 L4-L11 设计职位、部门、KPI、预算与晋升条件。
+2. 逐级校验引用完整性和经济数值。
+3. 增加高等级阶段内容与结束条件。
+4. 避免一次提交全部占位数据，按可验证等级段分批交付。
 
-⬜ personal/      0/3
-   life.ts           # 个人生活（住房、子女教育、健康）
-   calendar.ts       # 日历事件
-   archives.ts       # 档案查询
+### 阶段 4：扩展系统
 
-⬜ 杂项/          0/3
-   events.ts         # 随机事件引擎
-   proposals.ts      # 重大议案
-   retirement.ts     # 退休结算
-```
+在行政主循环稳定后，依次考虑：
 
----
+1. 上级互动与人脉网络。
+2. 转职与后备干部体系。
+3. 秘书、公文和舆情。
+4. 风险、调查与廉政系统。
+5. 个人生活、退休和历史评价。
 
-## 4. 现有页面模块
+### 阶段 5：认证与云存档
 
-### 4.1 已完成页面 (7)
+目标：在本地体验稳定后提供可恢复的用户级远程存档。
 
-| 页面 | 路由 | 文件 | 状态 |
-|------|------|------|------|
-| Splash | `/` | `pages/auth/splash.tsx` | ✅ |
-| Login | `/login` | `pages/auth/login.tsx` | ✅ Phase 0 占位 |
-| 建档 | `/character` | `pages/character/character-creation.tsx` + 5 子组件 | ✅ v2 (PR #21) |
-| 仪表盘 | `/dashboard` | `pages/dashboard/dashboard.tsx` | ✅ |
-| KPI | `/kpi` | `pages/career/position-kpi.tsx` | ✅ |
-| 部门行动 | `/dept/:idx` | `pages/career/position-dept.tsx` | ✅ |
-| 晋升 | `/promotion` | `pages/career/promotion.tsx` | ✅ |
+1. 接入 Supabase Auth。
+2. 定义用户 ID、匿名存档和登录后存档迁移规则。
+3. 启动时并行加载本地和远程存档。
+4. 使用 `updatedAt` 仲裁，并处理时钟偏差和冲突。
+5. 增加离线、失败重试和用户可见的同步状态。
 
-### 4.2 待开发页面 (~9)
+## 6. 当前问题
 
-| 页面 | 路由 | 优先级 | 说明 |
-|------|------|--------|------|
-| 上级关系 | `/superior` | 中 | Dashboard 入口已注册，#20 |
-| 人脉网络 | `/relations` | 中 | Dashboard 入口已注册，#20 |
-| 个人生活 | `/personal` | 中 | Dashboard 入口已注册，#20 |
-| 档案成就 | `/archives` | 低 | Dashboard 入口已注册，#20 |
-| 秘书处 | `/secretary` | 中 | 设计文档 §7.7 |
-| 转职 | `/transfer` | 中 | career/transfer.ts |
-| 双规审查 | `/investigation` | 低 | risk/investigation.ts |
-| 议案 | `/proposals` | 低 | proposals.ts |
-| 结局 | `/ending` | 低 | retirement.ts |
+以下问题来自当前代码核对，应进入对应阶段处理：
 
----
+| 问题                         | 影响                     | 计划阶段 |
+| ---------------------------- | ------------------------ | -------- |
+| L3 没有下一等级配置          | 晋升封顶                 | 阶段 3   |
+| 核心游戏流程缺少集成测试     | 回归风险较高             | 阶段 2   |
+| 首次晋升后无法继续下一次晋升 | 无法通过正常 UI 到达 L3  | 阶段 1   |
+| 备用槽对现有行动不可达       | 三级槽位体验不完整       | 阶段 1   |
+| 登录仅为占位实现             | 无真实用户身份           | 阶段 5   |
+| 启动时不读取远程存档         | 云存档无法恢复           | 阶段 5   |
+| 存档恢复后的页面落点不明确   | 继续游戏体验不完整       | 阶段 1   |
+| 独立 KPI/晋升页面未注册      | 页面结构与遗留文件不一致 | 阶段 1   |
+| 事件配置未接入运行时处理     | 配置内容不可玩           | 阶段 4   |
 
-## 5. 配置文件结构
+## 7. 开发约定
 
-### 5.1 目录结构
+### 7.1 分支与 PR
 
-```
-src/config/
-├── constants.json                      # 全局常量（阈值、属性边界）
-├── loader.ts                          # ConfigLoader 单例
-├── templates/
-│   ├── departments.json               # 19 个部门模板
-│   ├── departments-extra.json         # 额外 11 个部门模板
-│   ├── kpis.json                      # 32 个 KPI 指标模板
-│   ├── events.json                    # 3 个随机事件
-│   ├── regions.json                   # 31 省（2008 分数线 + 城市）
-│   ├── universities.json              # 4 档 40 所院校
-│   └── backgrounds.json               # 5 家庭背景 + 4 晋升通道
-└── career-lines/
-    ├── administrative.json            # 行政线 L1-L3 (10 职位) ⚠️ 缺 L4-L11
-    ├── party.json                     # 党务线（空壳）
-    ├── discipline.json                # 纪检线（空壳）
-    └── mass.json                      # 群团线（空壳）
+```text
+1. 从 main 创建 type/description 分支
+2. 编写代码和测试
+3. 按顺序通过质量门禁
+4. 推送分支并创建 PR
+5. CI 和 OpenCode Review 通过后 Squash Merge
 ```
 
-### 5.2 JSON 修改规则
+禁止直接推送 `main`。分支使用 `feat/`、`fix/`、`refactor/`、`docs/` 或 `chore/` 前缀。
 
-修改数值直接编辑对应 JSON，然后运行 `pnpm validate:config` 验证即可，不需要改代码。
+提交信息与 PR 标题、正文使用中文，保留 Conventional Commits 类型和可选 scope，例如：
 
----
-
-## 6. 可玩的游戏流程
-
-### 6.1 当前流程
-
-```
-Splash → Login(跳过) → 建档(5步) → NEW_GAME
-  → 仪表盘
-    ├─ /dept/:idx → EXECUTE_ACTION → KPI 变化 + 时间推进
-    ├─ 推进时间 → 月度结算 + 年度考核 → frozenPeriods
-    ├─ /kpi → 查看 KPI 等次
-    └─ /promotion → START_PROMOTION
-        → 6 阶段 → 成功(L++)
-        → 失败(消沉)
-              ↓
-         回到仪表盘继续循环
-              ↓
-        L3→L4: 无配置 → 循环终止
+```text
+feat(store): 完善备用槽行动调度
+fix(save): 恢复存档后进入仪表盘
+docs: 校准项目开发路线图
 ```
 
-### 6.2 当前阻塞 (Critical)
+### 7.2 变更检查清单
 
-| 问题 | Issue | 说明 |
-|------|-------|------|
-| L4+ 无配置 | #18 | 晋升到 L3 后无目标，游戏循环终止 |
+- 新增 Engine 函数：添加同域单元测试，并从 `src/engine/index.ts` 导出。
+- 新增 Store action：先更新 `GameAction`，再在 `reduceGameState()` 增加分支和测试。
+- 修改 `PlayerSave`：同步默认状态、存档校验和相关测试。
+- 修改 JSON 结构：同步 TypeScript 类型、zod schema、loader 和配置校验。
+- 修改 JSON 数值：运行 `pnpm validate:config`。
+- 修改 UI：验证桌面和移动端，并保持 SolidJS 项目约定。
 
----
+## 8. 长期设计目标
 
-## 7. 玩家属性参考
+完整设计仍以 `zhengtu-v3-design.md` 为参考，包括：
 
-### 7.1 五大核心属性
+- 行政、党务、纪检、群团四条职业线。
+- L1-L11 职业等级。
+- 社交、办公室、风险、个人生活与历史评价系统。
+- 更丰富的职位、部门、行动和随机事件。
 
-| 属性 | 字段 | 范围 | 初始值 | 说明 |
-|------|------|------|--------|------|
-| 廉洁 | `integrity` | 0~100 | 50 | 抵抗腐败 |
-| 稳定 | `stability` | 0~100 | 50 | 抗压能力 |
-| 政绩 | `performance` | 0~9999 | 0 | 累计工作成果 |
-| 魅力 | `charisma` | 0~100 | 50 | 社交影响力 |
-| 能力 | `competence` | 0~100 | 50 | 业务水平 |
-
-### 7.2 资源类
-
-| 属性 | 字段 | 范围 | 说明 |
-|------|------|------|------|
-| 政治资本 | `politicalCapital` | 0~500 | 政治资源（晋升/引导考察消耗） |
-| 预算 | `remainingBudget` | — | 部门经费（万元），来自职位年度预算 |
-| 槽位 | `slots.available/max` | 3/4/6 | 按日/周/月粒度，行动消耗 |
-
-### 7.3 关系类
-
-| 属性 | 字段 | 范围 | 说明 |
-|------|------|------|------|
-| 上司好感 | `superiorFavor` | 0~100 | 直属上级的好感度 |
-| 派系声望 | `factions.reputation[reform/pragmatic/conservative]` | 0~100 | 三大派系的关系值 |
-| 人脉网络 | `relations.*` | — | 6 类联系人关系值（classmates/colleagues/business/academic/media/central） |
-
-### 7.4 状态类
-
-| 属性 | 字段 | 范围 | 说明 |
-|------|------|------|------|
-| 消沉值 | `demoralization` | 0~100 | 晋升失败累积，影响考核 |
-| 贪腐风险 | `corruptionRisk` | 0~100 | 越高越易被双规 |
-| 冻结期 | `frozenPeriods` | 0~5 | 不称职处罚，期间禁晋升 |
-| 综合分 | `comprehensiveScore` | — | 年度考核累计得分 |
-| 考核履历 | `annualAssessments[]` | — | 历年考核记录 |
-
-### 7.5 背景类（建档确定，不变）
-
-| 属性 | 说明 |
-|------|------|
-| `birthPlace.province/city` | 影响高考分数线/民族加分 |
-| `gaokaoScore/gaokaoTier` | 建档随机生成（2008 年模拟） |
-| `university/universityTier` | 决定毕业学历档次 |
-| `familyBackground` | 5 种初始属性加成 |
-| `promotionPath` | 4 种初始属性加成 |
-| `isPreparatory` | 少数民族预科班（入职延迟 1 年） |
-
-### 7.6 属性计算关系
-
-```
-建档时:
-  家庭背景 bonuses + 晋升通道 bonuses
-    → politicalCapital / superiorFavor / factions.reputation / stability / competence / integrity / charisma
-
-游戏时:
-  EXECUTE_ACTION → KPI 变化 + applyPlayerAttr(属性 delta + clamp)
-  ADVANCE_TIME   → monthlySettlement(预算消耗)
-                 → calculateKPI + annualAssessment → comprehensiveScore / promotionEligible / frozenPeriods
-  START_PROMOTION → checkPrerequisites(年限 / 考核次数 / 基层經驗 / 处分)
-```
-
----
-
-## 8. 建档系统 v2 (PR #21 — 已合并)
-
-### 8.1 5 步流程
-
-| 步 | 内容 | 数据源 |
-|----|------|--------|
-| 1 | 姓名 + 性别 | — |
-| 2 | 省份 → 城市（级联滚动列表） | `regions.json` (31 省, 2008 分数线) |
-| 3 | 高三成绩（Box-Muller 正态随机 + 无限重掷） | 各省独立 `scoreDistribution` |
-| 4 | 档次 → 院校（向下兼容：985 可选 211→本科） | `universities.json` (4 档 40 所) |
-| 5 | 家庭背景 + 晋升通道（双列 + 加成预览） | `backgrounds.json` (5+4) |
-
-### 8.2 特殊规则
-
-- **民族加分**：7 个自治区 `ethnicBonus: 10-30`，加到有效分
-- **预科班**：西藏/新疆/青海，额外降 50 分，入职延迟 1 年
-- **分数线**：各省独立设定 4 条线（2008 年实际值），直接写死在 regions.json 不用计算
-- **分数分布**：各省独立 `mean/stddev`（如河南 mean=470 stddev=95，北京 mean=430 stddev=85）
-
-### 8.3 关键类型
-
-```typescript
-// CharacterData (src/types/character.ts)
-interface CharacterData {
-  characterName: string;
-  gender: '男' | '女';
-  province: string;
-  city: string;
-  gaokaoScore: number;
-  gaokaoTier: string;      // '985' | '211' | '本科' | '专科'
-  university: string;
-  universityTier: string;
-  familyBackground: string; // 'peasant' | 'worker' | 'merchant' | 'cadre' | 'academic'
-  promotionPath: string;    // 'xuandiao' | 'gongwuyuan' | 'junzhuan' | 'guoqi'
-  isPreparatory: boolean;
-}
-
-// PlayerSave 关键变更 (src/types/player.ts)
-// 删除: education, motivation, personality
-// 新增: gaokaoScore, gaokaoTier, university, universityTier, promotionPath, isPreparatory
-// birthPlace: string → { province: string; city: string }
-// familyBackground union: 中文名 → 英文 ID
-// startYear: 2024 → 2012
-// defaultStartingAge: 30 → 22
-// birthYear = startYear - defaultStartingAge = 1990
-```
-
-### 8.4 子组件位置
-
-```
-src/pages/character/
-├── character-creation.tsx   # 主组件（258 行, 导航 + 5 步容器）
-├── StepBasicInfo.tsx        # Step 1: 姓名 + 性别 (76 行)
-├── StepBirthplace.tsx       # Step 2: 省份→城市级联 (142 行)
-├── StepGaokao.tsx           # Step 3: 高考成绩 (101 行)
-├── StepSchool.tsx           # Step 4: 档次→院校 (148 行)
-└── StepBackground.tsx       # Step 5: 背景×通道 (157 行)
-```
-
-### 8.5 PR #21 审查历史（已合并）
-
-| 轮次 | 发现数 | 严重度分布 | 状态 |
-|------|--------|-----------|------|
-| 1 | 4 | 🔴1 (ID/name 不匹配) + 🟡3 | ✅ 修复 |
-| 2 | 6 | 🟡5 + bugfix1 (determineTier) | ✅ 修复 |
-| 3 | 1 | 🔴1 (schools 非 createMemo) | ✅ 修复 |
-| 4 | 2 | 🟡2 | ✅ 1修复 + 1转Issue #22 |
-| 5 | 2 | 🟡2 (Array.from + ROADMAP) | ✅ 修复 |
-| 6 | 0 | 确认全部修复 | ✅ 合并 |
-
----
-
-## 9. 设计令牌系统 (PR #10)
-
-### 9.1 全局配色
-
-```typescript
-// 文件: src/utils/theme.ts + src/styles/tokens.css
-colors = {
-  primary: '#be2d2d',        // 中国红（权力操作）
-  secondary: '#2b4e6e',      // 藏蓝（信息查看）
-  bgMain: '#1a1a2e',         // 深蓝黑底色
-  bgCard: '#0f0f23',         // 深色卡片
-  bgCardLight: '#ffffff',    // 亮色卡片
-  bgInput: '#f8f7f5',        // 输入框底色
-  textPrimary: '#e8e6e3',    // 正文
-  textSecondary: '#8b8680',  // 弱化文字
-  textDark: '#1a1a1a',       // 亮卡文字
-  success: '#4caf50',        // 正向
-  warning: '#e6a817',        // 警告
-  danger: '#c44d4d',         // 危险
-  border: '#3a3540',         // 深色分隔
-  borderLight: '#d4c5b9',    // 亮色分隔
-}
-radius = { sm: '2px', md: '4px', lg: '8px', xl: '12px' }
-font = { title: '楷体', body: '系统 sans-serif' }
-```
-
-### 9.2 工具函数
-
-```typescript
-// src/utils/theme.ts
-cardStyle(pad?)      → 亮色卡片样式对象
-darkCardStyle(pad?)  → 暗色卡片样式对象
-pageBase             → 页面容器基础样式
-progressBarColor(rate) → 进度条颜色（≥1 success, ≥0.6 primary, else danger）
-```
-
----
-
-## 10. 晋升引擎详解 (PR #9)
-
-### 10.1 六阶段状态机
-
-```
-① democratic_vote  → ② org_inspection → ③ joint_review
-④ committee_vote   → ⑤ public_notice  → ⑥ probation
-```
-
-### 10.2 关键流程
-
-- `START_PROMOTION` → `checkPrerequisites()` → 阶段 0（门槛）
-- `PROMOTION_RESOLVE_STAGE` → 各阶段引擎函数 + 玩家选择
-- 晋升中锁定 ADVANCE_TIME / EXECUTE_ACTION
-- Store gate: `canAct(stage)` 只有 idle/completed/failed 时允许操作
-
-### 10.3 测试确定性
-
-- 引擎函数 `rng` 参数可注入（默认 Math.random）
-- Store `PROMOTION_RESOLVE_STAGE` 支持 `_rng` 字段注入
-
-### 10.4 配置 (`constants.json.promotion`)
-
-```json
-"promotion": {
-  "democraticVote": { "passThreshold": 60, "connectionsBonus": 10, "connectionsRiskProbability": 0.3 },
-  "orgInspection": { "excellentThreshold": 80, "qualifiedThreshold": 60, "suspendedThreshold": 40, "influencePoliticalCost": 20, "influenceScoreBonus": 8 },
-  "jointReview": { "disciplineCorruptionThreshold": 50, "otherDepartmentsPassRate": 0.85 },
-  "committeeVote": { "minSize": 7, "maxSize": 13, "sizePerLevelInterval": 2 },
-  "publicNotice": { "complaintProbPerRisk": 0.005, "sentimentProbPerRisk": 0.003 },
-  "probation": { "passThreshold": 55 },
-  "progression": { "demoralizationOnFail": 5, "demoralizationOnRejected": 8, "politicalCapitalBonusOnSuccess": 10 }
-}
-```
-
----
-
-## 11. 已知 Bugs & Issues
-
-| Issue | 标题 | 严重度 | 状态 |
-|-------|------|--------|------|
-| #18 | 行政线配置仅填充 L1-L3 | 🟡 content | Open |
-| #19 | 核心游戏流程缺少集成测试覆盖 | 🟡 quality | Open |
-| #20 | 仪表盘 4 个子系统入口路由未注册，点击 404 | 🟡 feature | Open |
-| #12 | 晋升引擎硬编码 10 处数值 | 🟡 bug | Open |
-| #13 | 代码规范违反：GameAction + JSDoc + non-null | 🟡 bug | Open |
-| #14 | AGENTS.md 持久化策略描述与实际行为矛盾 | 🟡 bug | Open |
-| #15 | 清理未使用依赖及废弃 ESLint 参数 | 🟡 chore | Open |
-| #17 | 部门行动页面首次访问空白 — deptState 懒初始化为 null | 🔴 bug | ✅ 已修复 (PR #25) |
-| #11 | effect.ts 缺少测试（引擎层 ≥90% 覆盖率门槛） | 🟡 bug | ✅ 已修复 (PR #24) |
-| #7 | 建档阶段选择按钮显示异常 | 🟡 bug | Closed |
-
----
-
-## 12. 后续开发优先级 (建议顺序)
-
-### P1 — 核心循环 (解锁游戏可玩性)
-
-1. **#18 行政线 L4-L11 配置补全** — `administrative.json` 加 ~30 个职位
-2. **#20 404 入口处理** — 隐藏或实现未完成的子系统入口
-
-### P2 — 引擎扩展 (增加系统深度)
-
-3. **social/relations.ts + superior.ts** — 人脉 + 上级互动
-4. **career/transfer.ts + reserve.ts** — 转职引擎 + 后备干部池
-5. **#12 晋升引擎硬编码外移** — 将引擎中 10 处数值迁移到 constants.json
-
-### P3 — 子系统 UI (增加页面)
-
-6. **/superior 页面** — 上级互动 UI
-7. **/relations 页面** — 人脉网络 UI
-8. **secretary 页面** — 秘书处 (5 Tab 设计)
-9. **personal/life page** — 个人生活
-
-### P4 — 打磨
-
-10. **#13 代码规范** — 统一 GameAction 类型位置 + JSDoc
-11. **#15 清理** — 依赖和 ESLint
-
----
-
-## 13. Store 关键文件说明
-
-### 13.1 `src/store/game-store.ts` (738 行)
-
-```
-createInitialState(overrides?)     # 创建初始 PlayerSave
-GameAction union type              # 所有 action 类型定义 (共 11 个)
-reduceGameState(draft, action)     # 唯一的状态 reducer
-  ├─ SET_GRANULARITY              # 切换推进粒度
-  ├─ EXECUTE_ACTION               # 执行部门行动
-  ├─ ADVANCE_TIME                 # 推进时间（触发持久化）
-  ├─ START_PROMOTION              # 启动晋升
-  ├─ RESET_PROMOTION              # 重置晋升状态
-  ├─ PROMOTION_RESOLVE_STAGE      # 晋升阶段推进
-  ├─ LOAD_SAVE                    # 加载存档
-  └─ NEW_GAME                     # 新游戏（含背景+通道加成）
-dispatch(action)                   # 派发动作（写 localStorage + Supabase）
-createTestStore(overrides?)        # 隔离测试 store
-useGameStore()                     # 组件 hooks
-```
-
-### 13.2 关键辅助函数
-
-```
-canAct(stage)                      # 非 idle/completed/failed 禁止操作
-buildPromotionContext(draft)       # 从 draft 提取晋升上下文
-resolveTriggers(draft, triggers)   # 处理周期事件 (月度/年度)
-applyPlayerAttr(draft, attr, delta, bounds)  # 带 clamp 的属性变更
-initializeDepartmentStates(draft)  # 按当前职位初始化所有部门运行时状态
-```
-
----
-
-## 14. 工具文件
-
-### 14.1 `src/utils/gaokao.ts` (高考分数引擎)
-
-```typescript
-generateGaokaoScore(province)      # Box-Muller 正态随机 + 档次判定
-determineTier(raw, effective, bonus, province)  # 分数判定档次
-getAvailableTiers(earnedTier)      # 获取可选的向下档次列表
-```
-
-### 14.2 `src/utils/math.ts`
-
-```typescript
-clamp(value, min, max)             # 钳位
-clampAttr(key, value, bounds)      # 按属性名钳位
-normalRandom(mean, stddev)         # Box-Muller 正态随机
-weightedRandom(min, max)           # 均匀随机整数
-randomInt(max)                     # 0~max-1 随机
-pickRandom(arr)                    # 随机选取
-```
-
-### 14.3 `src/utils/theme.ts`
-
-```typescript
-colors / radius / space / font     # 设计令牌常量
-pageBase / cardStyle / darkCardStyle  # 样式工具函数
-progressBarColor(rate)             # 进度条颜色
-```
-
-### 14.4 `src/utils/format.ts`
-
-```typescript
-formatDate(year, month, day)       # 日期格式化
-formatGranularity(g)               # 推进粒度格式化
-formatPercent(rate)                # 百分比格式化
-formatCurrency(amount)             # 货币格式化
-```
-
----
-
-## 15. 活动分支
-
-| 分支 | 状态 | PR | 说明 |
-|------|------|----|------|
-| `fix/init-department-states` | 已合并 | #25 | 初始化部门运行时状态，修复 #17 页面空白 |
-| `test/effect-coverage` | 已合并 | #24 | 补充 effect.ts 单元测试（13 用例，覆盖率 0%→100%） |
-
----
-
-## 16. 新会话快速启动指南
-
-```bash
-# 1. 切换到项目目录
-cd /root/github/zhengtu
-
-# 2. 从 main 创建新分支
-git checkout main && git checkout -b feat/<your-feature>
-
-# 3. 初始化 Node 环境
-export NVM_DIR="/root/.nvm" && . "$NVM_DIR/nvm.sh"
-export PNPM_HOME="/root/.local/share/pnpm" && export PATH="$PNPM_HOME:$PATH"
-
-# 4. 运行测试确认基线
-pnpm typecheck && pnpm test && pnpm build
-
-# 5. 开始开发...
-```
-
-### 常用命令速查
-
-```bash
-pnpm format:check          # 检查格式
-pnpm prettier --write 'src/**/*.{ts,tsx,json}'  # 修复格式
-pnpm lint                  # ESLint 检查
-pnpm typecheck             # TypeScript 检查
-pnpm test                  # 运行所有测试
-pnpm test -- --reporter=verbose <file>  # 运行单个测试文件
-pnpm validate:config       # 配置校验
-pnpm build                 # 生产构建
-pnpm run ci                # 全量 CI
-
-# 查看 PR/Issue
-gh pr list --state merged
-gh issue list
-
-# Git 操作
-git log origin/main --oneline -10
-git add . && git commit -m "type(scope): description"
-git push -u origin <branch>
-gh pr create --title "..." --body "..." --base main
-```
-
----
-
-## 17. 引擎伪代码概要 (未来开发参考)
-
-### 17.1 social/relations.ts (~80 行)
-
-```typescript
-// 关系值变化 - 纯函数
-export function modifyRelation(relations: RelationState, category: string, npcId: string, delta: number): RelationState
-// 添加新联系人
-export function addContact(relations: RelationState, category: string, npcId: string, initialValue: number): RelationState
-// 获取最高关系值联系人
-export function getTopContacts(relations: RelationState, category: string, topN: number): { id: string; value: number }[]
-```
-
-### 17.2 social/superior.ts (~100 行)
-
-```typescript
-// 上级互动 - 纯函数
-export function interactWithSuperior(favor: number, action: SuperiorAction, politicalCapital: number, config: GameConfig): { newFavor: number; capitalCost: number; result: string }
-// 派系对齐度计算
-export function calcAlignment(factionAlignment: string, superiorFaction: string): number
-// 汇报效果计算
-export function reportToSuperior(favor: number, competence: number): { favorGain: number; detail: string }
-```
-
-### 17.3 career/transfer.ts (~120 行)
-
-```typescript
-// 跨线转职 - 纯函数
-export function canTransfer(currentLevel: number, transferCount: number, config: GameConfig): boolean
-export function getTransferOptions(currentLine: CareerLine, currentLevel: number, config: GameConfig): CareerLine[]
-export function executeTransfer(currentLine: CareerLine, targetLine: CareerLine, currentLevel: number): { newPositionId: string; cost: number }
-```
-
-### 17.4 risk/corruption.ts (~90 行)
-
-```typescript
-// 贪腐风险增长/衰减
-export function updateCorruptionRisk(currentRisk: number, actionRisk: number, config: GameConfig): number
-export function checkInvestigationTrigger(risk: number, randomValue: number, config: GameConfig): boolean
-export function calcInvestigationOutcome(evidence: EvidenceStrength, integrity: number): { convicted: boolean; penalty: string }
-```
-
----
-
-## 18. 事件系统 (events.json 当前仅 3 个事件)
-
-### 设计原则
-
-- 事件触发条件: `minLevel`, `maxLevel`, `careerLines`, `minScore`, `requiredFlag`
-- 每个事件 3 个选项，每个选项有 `effects` (target/value pairs)
-- 可选 `risk` 字段（概率 + 风险类型）
-
-### 示例事件结构
-
-```json
-{
-  "id": "evt_inspection_notice",
-  "title": "巡视组进驻通知",
-  "description": "上级纪委巡视组将于下月进驻你所在地区，进行为期三个月的常规巡视。",
-  "triggerCondition": { "minLevel": 3, "careerLines": ["admin"] },
-  "options": [
-    { "label": "积极配合", "description": "主动提供材料，配合巡视工作", "effects": [{"target": "player.integrity", "value": 5}, {"target": "player.superiorFavor", "value": 5}] },
-    { "label": "打招呼", "description": "通过关系打招呼，试图降低检查力度", "effects": [{"target": "player.corruptionRisk", "value": 10}, {"target": "player.politicalCapital", "value": -10}], "risk": {"type": "investigation", "probability": 0.3} },
-    { "label": "置之不理", "description": "正常运作，不特别应对", "effects": [{"target": "player.stability", "value": 3}] }
-  ]
-}
-```
-
-### 事件数量需求
-
-| 级别段 | 事件数 | 说明 |
-|--------|--------|------|
-| L1-L3 (科员-正科) | ~10 | 基础事件 |
-| L4-L6 (副处-副厅) | ~15 | 增加复杂度 |
-| L7-L9 (正厅-副部) | ~10 | 高级政治 |
-| L10-L11 (正部) | ~5 | 顶级政治 |
-| 跨级 | ~10 | 通用事件 |
-
----
-
-## 19. 数据配置补全 (Issue #18)
-
-### 19.1 行政线 L4-L11 职位定义
-
-每级需要 3-4 个职位，每个需要：
-- `id`, `name`, `departmentTemplateIds`, `kpiTemplateIds`, `annualBudget`
-- 对应的 `promotionRequirements`
-
-```
-L4 (副处): 副县长, 市局副局长, 县委副书记, 副调研员
-L5 (正处): 县长, 市局局长, 县委书记, 调研员
-L6 (副厅): 副市长, 省厅副厅长, 市委常委, 副巡视员
-L7 (正厅): 市长, 省厅厅长, 市委副书记, 巡视员
-L8 (副部): 副省长, 部委副部长, 省委常委, 副部级
-L9 (正部): 省长, 部长, 省委书记, 正部级
-L10: 国务院副总理, 国务委员
-L11: 国务院总理
-```
-
-### 19.2 其他职业线 (party/discipline/mass)
-
-各线至少需要 L1-L3 的初始职位定义，后续可逐步扩展。
-
----
-
-## 20. 后续改动时的关键注意点
-
-1. **加新 engine 函数** → 必须在 `src/engine/<domain>/__tests__/` 写测试 → 在 `src/engine/index.ts` export
-2. **加新 action 类型** → 先加 `GameAction` union → 再加 `reduceGameState` case
-3. **改 PlayerSave 字段** → 同步更新 `createInitialState()` 默认值
-4. **改 JSON 配置** → 同步更新 `types/config.ts` 接口 + `validate-config.ts` zod schema + `loader.ts` 加载
-5. **UI 引用新数据** → 通过 `getConfigLoader().getXxx()` 访问，不走全局变量
-6. **改已有类型** → 搜索所有引用并更新测试
-7. **拆分大文件** → engine ≤200 行，UI 建议 ≤300 行
+这些内容是方向，不应在 README 或路线图中表述为当前已实现能力。每个阶段都应以可运行、可测试的纵向结果交付。
