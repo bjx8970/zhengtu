@@ -20,6 +20,16 @@ import type {
 const TIER_ORDER: SlotTierKey[] = ['primary', 'secondary', 'reserve'];
 
 /**
+ * 判断是否存在尚未完成的行动。
+ *
+ * @param slotState - 当前槽位状态
+ * @returns 任一槽位被占用时返回 true
+ */
+export function hasActiveActions(slotState: SlotState): boolean {
+  return TIER_ORDER.some((tierKey) => slotState[tierKey].occupants.some((occupant) => occupant));
+}
+
+/**
  * 校验预算/重复性/槽位，将行动放入合适的槽位。
  *
  * @param actionConfig - 行动模板

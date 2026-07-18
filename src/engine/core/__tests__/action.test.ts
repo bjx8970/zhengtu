@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { startAction, completeActions, resolveActionEffects } from '../action';
+import { startAction, completeActions, hasActiveActions, resolveActionEffects } from '../action';
 import type { ActionTemplate } from '../../../types/config';
 import type { SlotState, SlotOccupant } from '../../../types/player';
 
@@ -34,6 +34,19 @@ function occ(
 ): SlotOccupant {
   return { actionId, deptId, actionName, startedAtDay, durationDays };
 }
+
+describe('hasActiveActions', () => {
+  it('所有槽位为空时返回 false', () => {
+    expect(hasActiveActions(makeSlotState())).toBe(false);
+  });
+
+  it('任一等级存在行动时返回 true', () => {
+    const state = makeSlotState({
+      reserve: { label: '备用', count: 1, occupants: [occ()] },
+    });
+    expect(hasActiveActions(state)).toBe(true);
+  });
+});
 
 describe('startAction', () => {
   describe('slot allocation', () => {
