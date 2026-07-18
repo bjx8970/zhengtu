@@ -237,6 +237,105 @@ describe('dispatch - ADVANCE_TIME (integration)', () => {
   });
 });
 
+describe('dispatch - promotion lifecycle', () => {
+  const passingAssessments = [
+    { year: 2013, score: 80, tier: '称职' },
+    { year: 2014, score: 82, tier: '称职' },
+    { year: 2015, score: 85, tier: '称职' },
+  ];
+
+  it('存在在途行动时不启动晋升', () => {
+    const store = createTestStore({
+      currentCareerLine: CareerLine.Administrative,
+      currentLevel: 1,
+      currentPositionId: 'admin_l1_0',
+      yearsInCurrentPosition: 3,
+      annualAssessments: passingAssessments,
+      slots: {
+        primary: {
+          label: '主要',
+          count: 3,
+          occupants: [occ('pending'), null, null],
+        },
+        secondary: { label: '次要', count: 2, occupants: [null, null] },
+        reserve: { label: '备用', count: 1, occupants: [null] },
+      },
+    });
+
+    store.dispatch({ type: 'START_PROMOTION' });
+
+    expect(store.getRawState().promotionStage).toBe(PromotionStage.Idle);
+    expect(store.getRawState().promotionAttempts).toBe(0);
+  });
+
+  it('活动阶段不能重置晋升', () => {
+    const store = createTestStore({
+      promotionStage: PromotionStage.DemocraticVote,
+      promotionState: {
+        currentStage: PromotionStage.DemocraticVote,
+        targetPositionId: 'admin_l2_0',
+        targetLevel: 2,
+        stageResults: {},
+      },
+    });
+
+    store.dispatch({ type: 'RESET_PROMOTION' });
+
+    expect(store.getRawState().promotionStage).toBe(PromotionStage.DemocraticVote);
+    expect(store.getRawState().promotionState?.targetLevel).toBe(2);
+  });
+
+  it('完成态重置后可启动下一等级晋升', () => {
+    const store = createTestStore({
+      currentCareerLine: CareerLine.Administrative,
+      currentLevel: 2,
+      currentPositionId: 'admin_l2_0',
+      yearsInCurrentPosition: 3,
+      annualAssessments: passingAssessments,
+      promotionStage: PromotionStage.Completed,
+      promotionState: {
+        currentStage: PromotionStage.Completed,
+        targetPositionId: 'admin_l2_0',
+        targetLevel: 2,
+        stageResults: {},
+      },
+    });
+
+    store.dispatch({ type: 'RESET_PROMOTION' });
+    store.dispatch({ type: 'START_PROMOTION' });
+
+    const state = store.getRawState();
+    expect(state.promotionStage).toBe(PromotionStage.DemocraticVote);
+    expect(state.promotionState?.targetLevel).toBe(3);
+    expect(state.promotionState?.targetPositionId).toBe('admin_l3_0');
+  });
+
+  it('拒绝异常存档中的跨级晋升目标', () => {
+    const store = createTestStore({
+      currentCareerLine: CareerLine.Administrative,
+      currentLevel: 1,
+      currentPositionId: 'admin_l1_0',
+      competence: 100,
+      promotionStage: PromotionStage.Probation,
+      promotionState: {
+        currentStage: PromotionStage.Probation,
+        targetPositionId: 'admin_l3_0',
+        targetLevel: 3,
+        stageResults: {},
+      },
+    });
+
+    store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE', _rng: () => 1 });
+
+    expect(store.getRawState().currentLevel).toBe(1);
+    expect(store.getRawState().currentPositionId).toBe('admin_l1_0');
+    expect(store.getRawState().promotionStage).toBe(PromotionStage.Failed);
+
+    store.dispatch({ type: 'RESET_PROMOTION' });
+    expect(store.getRawState().promotionStage).toBe(PromotionStage.Idle);
+  });
+});
+
 describe('dispatch - persistence (localStorage)', () => {
   const SAVE_KEY = 'zhengtu_autosave';
 
@@ -346,6 +445,13 @@ describe('dispatch - persistence (localStorage)', () => {
       currentLevel: 1,
       currentPositionId: 'admin_l1_0',
       competence: 100,
+      remainingBudget: 125,
+      comprehensiveScore: 88,
+      yearsInCurrentPosition: 3,
+      annualAssessments: [
+        { year: 2013, score: 80, tier: '称职' },
+        { year: 2014, score: 88, tier: '优秀' },
+      ],
       promotionStage: PromotionStage.Appointment,
       promotionState: {
         currentStage: PromotionStage.Appointment,
@@ -373,6 +479,19 @@ describe('dispatch - persistence (localStorage)', () => {
     expect(state.promotionStage).toBe(PromotionStage.Completed);
     expect(state.currentPositionId).toBe('admin_l2_0');
     expect(state.currentLevel).toBe(2);
+    expect(state.yearsInCurrentPosition).toBe(0);
+    expect(state.remainingBudget).toBe(2000);
+    expect(state.comprehensiveScore).toBe(0);
+    expect(state.annualAssessments).toEqual([]);
+    expect(state.careerHistory).toMatchObject([
+      {
+        positionId: 'admin_l1_0',
+        assessmentResults: [
+          { year: 2013, score: 80, tier: '称职' },
+          { year: 2014, score: 88, tier: '优秀' },
+        ],
+      },
+    ]);
 
     expect(state.departmentStates['old_dept']).toBeUndefined();
 

@@ -82,7 +82,7 @@ export interface CareerRecord {
   startYear: number;
   /** null 表示当前在职 */
   endYear: number | null;
-  assessmentResults: string[];
+  assessmentResults: { year: number; score: number; tier: string }[];
   /** 跨线转职后旧线索封存 */
   archived: boolean;
 }
