@@ -20,6 +20,7 @@ import { PromotionStage, KPITier } from '../../types/enums';
 import type { TimeGranularity } from '../../types/enums';
 import { colors, radius, pageBase, darkCardStyle, progressBarColor } from '../../utils/theme';
 import type { KPIResult } from '../../types/game';
+import type { ActionCategory } from '../../types/config';
 import { FeatureRoadmap } from '../../components/feature-roadmap';
 import { parsePositionIndex } from '../../utils/position';
 
@@ -29,13 +30,13 @@ const TIER_COLOR: Record<SlotTierKey, string> = {
   reserve: '#C44D4D',
 };
 
-const CATEGORY_LABEL: Record<string, string> = {
+const CATEGORY_LABEL: Record<ActionCategory, string> = {
   major: '重大',
   minor: '次要',
   routine: '日常',
 };
 
-const CATEGORY_COLOR: Record<string, string> = {
+const CATEGORY_COLOR: Record<ActionCategory, string> = {
   major: '#C44D4D',
   minor: '#E6A817',
   routine: '#6B8E6B',

@@ -19,6 +19,7 @@ import type {
   SecretaryLevel,
   TimeGranularity,
 } from './enums';
+import type { ActionCategory } from './config';
 
 /** 槽位等级 key */
 export type SlotTierKey = 'primary' | 'secondary' | 'reserve';
@@ -29,7 +30,7 @@ export interface SlotOccupant {
   deptId: string;
   actionName: string;
   /** 启动时的行动分类快照，避免执行期间配置变化影响结算 */
-  category: 'major' | 'minor' | 'routine';
+  category: ActionCategory;
   startedAtDay: number;
   durationDays: number;
   /** 启动时的冷却天数快照 */

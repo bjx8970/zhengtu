@@ -17,8 +17,7 @@ import type {
   InvestigationEvidence,
 } from './enums';
 import type { KPITier } from './enums';
-import type { SlotTierKey, SlotOccupant } from './player';
-import type { SlotState } from './player';
+import type { SlotTierKey, SlotOccupant, SlotState } from './player';
 import type { ActionTemplate } from './config';
 
 /** 时间推进后触发的周期事件 */

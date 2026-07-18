@@ -279,15 +279,14 @@ function migrateActionState(draft: PlayerSave): void {
     for (const occupant of draft.slots[tierKey].occupants) {
       if (!occupant) continue;
 
-      const legacyOccupant = occupant as unknown as Record<string, unknown>;
       const actionConfig = position?.departments
         .find((department) => department.id === occupant.deptId)
         ?.actions.find((configuredAction) => configuredAction.id === occupant.actionId);
 
-      if (legacyOccupant['category'] === undefined) {
+      if (!('category' in occupant) || occupant.category === undefined) {
         occupant.category = actionConfig?.category ?? 'routine';
       }
-      if (legacyOccupant['cooldownDays'] === undefined) {
+      if (!('cooldownDays' in occupant) || occupant.cooldownDays === undefined) {
         occupant.cooldownDays = actionConfig?.cooldownDays ?? 0;
       }
     }
