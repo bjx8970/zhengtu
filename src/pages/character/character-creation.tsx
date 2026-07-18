@@ -10,21 +10,20 @@
  *
  * 完成后 dispatch(NEW_GAME) 并跳转仪表盘。
  */
-import { createSignal, createMemo, Show } from 'solid-js';
+import { createSignal, createMemo, Show, For } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { getConfigLoader } from '../../config/loader';
 import { navigate } from '../../router';
 import { CareerLine } from '../../types/enums';
 import type { CharacterData } from '../../types/character';
 import { generateGaokaoScore } from '../../utils/gaokao';
-import { pageBase } from '../../utils/theme';
+import { colors, radius, font, pageBase } from '../../utils/theme';
 import type { ProvinceConfig } from '../../types/config';
 import { StepBasicInfo } from './StepBasicInfo';
 import { StepBirthplace } from './StepBirthplace';
 import { StepGaokao } from './StepGaokao';
 import { StepSchool } from './StepSchool';
 import { StepBackground } from './StepBackground';
-import { StepLayout } from './StepLayout';
 
 const INITIAL_DATA: CharacterData = {
   characterName: '',
@@ -127,56 +126,133 @@ export function CharacterCreation() {
 
   const selectedProvince = createMemo(() => provinces().find((p) => p.name === data().province));
 
-  const stepContent = createMemo(() => {
-    switch (step()) {
-      case 0:
-        return <StepBasicInfo data={data()} updateField={updateField} />;
-      case 1:
-        return (
+  return (
+    <div style={pageBase}>
+      {/* 进度条 */}
+      <div style={{ padding: '1.5rem 1.5rem 0' }}>
+        <div style={{ display: 'flex', gap: '0.3rem', 'margin-bottom': '0.5rem' }}>
+          <For each={Array.from({ length: TOTAL }, (_, i) => i)}>
+            {(i) => (
+              <div
+                style={{
+                  flex: 1,
+                  height: '3px',
+                  'background-color': i <= step() ? colors.primary : colors.border,
+                  'border-radius': radius.sm,
+                  transition: 'background 0.3s',
+                }}
+              />
+            )}
+          </For>
+        </div>
+        <div style={{ 'font-size': '0.8rem', color: colors.textSecondary }}>
+          第 {step() + 1}/{TOTAL} 步
+        </div>
+      </div>
+
+      {/* 内容区 */}
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          'flex-direction': 'column',
+          'align-items': 'center',
+          'justify-content': 'center',
+          padding: '1rem 1.5rem',
+          overflow: 'hidden',
+        }}
+      >
+        <Show when={step() === 0}>
+          <StepBasicInfo data={data()} updateField={updateField} />
+        </Show>
+        <Show when={step() === 1}>
           <StepBirthplace
             data={data()}
             provinces={provinces}
             selectedProvince={selectedProvince}
             updateField={updateField}
           />
-        );
-      case 2:
-        return selectedProvince() ? (
-          <StepGaokao
-            data={data()}
-            province={selectedProvince()!}
-            gaokaoYear={gaokaoYear()}
-            rollGaokao={rollGaokao}
-          />
-        ) : null;
-      case 3:
-        return <StepSchool data={data()} universities={universities()} updateField={updateField} />;
-      case 4:
-        return (
+        </Show>
+        <Show when={step() === 2 && selectedProvince()}>
+          {(prov) => (
+            <StepGaokao
+              data={data()}
+              province={prov()}
+              gaokaoYear={gaokaoYear()}
+              rollGaokao={rollGaokao}
+            />
+          )}
+        </Show>
+        <Show when={step() === 3}>
+          <StepSchool data={data()} universities={universities()} updateField={updateField} />
+        </Show>
+        <Show when={step() === 4}>
           <StepBackground
             data={data()}
             backgrounds={backgrounds()}
             paths={paths()}
             updateField={updateField}
           />
-        );
-      default:
-        return null;
-    }
-  });
+        </Show>
+      </div>
 
-  return (
-    <div style={pageBase}>
-      <StepLayout
-        step={step}
-        total={TOTAL}
-        canNext={canNext}
-        onPrev={handlePrev}
-        onNext={handleNext}
-        onComplete={handleComplete}
-      >
-        <Show when={stepContent()}>{(c) => c()}</Show>
-      </StepLayout>
+      {/* 底部导航 */}
+      <div style={{ display: 'flex', gap: '0.8rem', padding: '1rem 1.5rem 1.5rem' }}>
+        <Show when={step() > 0}>
+          <button
+            onClick={handlePrev}
+            style={{
+              flex: 1,
+              padding: '0.8rem',
+              'font-size': '1rem',
+              'background-color': colors.bgCard,
+              color: colors.textSecondary,
+              border: `1px solid ${colors.border}`,
+              'border-radius': radius.md,
+              cursor: 'pointer',
+            }}
+          >
+            上一步
+          </button>
+        </Show>
+        <Show when={step() < TOTAL - 1}>
+          <button
+            onClick={handleNext}
+            disabled={!canNext()}
+            style={{
+              flex: 1,
+              padding: '0.8rem',
+              'font-size': '1rem',
+              'background-color': canNext() ? colors.primary : colors.border,
+              color: canNext() ? colors.primaryText : colors.textMuted,
+              border: 'none',
+              'border-radius': radius.md,
+              cursor: canNext() ? 'pointer' : 'not-allowed',
+            }}
+          >
+            下一步
+          </button>
+        </Show>
+        <Show when={step() === TOTAL - 1}>
+          <button
+            onClick={handleComplete}
+            disabled={!canNext()}
+            style={{
+              flex: 1,
+              padding: '0.8rem',
+              'font-size': '1rem',
+              'background-color': canNext() ? colors.primary : colors.border,
+              color: canNext() ? colors.primaryText : colors.textMuted,
+              border: 'none',
+              'border-radius': radius.md,
+              cursor: canNext() ? 'pointer' : 'not-allowed',
+              'font-family': font.title,
+            }}
+          >
+            开始仕途
+          </button>
+        </Show>
+      </div>
     </div>
   );
 }

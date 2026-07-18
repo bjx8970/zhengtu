@@ -13,9 +13,16 @@
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
-import { CareerLine, PromotionStage, OrgInspectResult, ReserveCadreTier } from '../types/enums';
+import {
+  CareerLine,
+  PromotionStage,
+  OrgInspectResult,
+  ReserveCadreTier,
+  FileAction,
+} from '../types/enums';
+import type { TimeGranularity } from '../types/enums';
 import type { PlayerSave, GameTime } from '../types/player';
-import type { TimeTrigger, GameAction } from '../types/game';
+import type { TimeTrigger } from '../types/game';
 import { getSlotLimits, executeAction } from '../engine/core/action';
 import { advanceTime, getGranularityDays } from '../engine/core/time';
 import { monthlySettlement } from '../engine/governance/budget';
@@ -129,7 +136,27 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
   };
 }
 
-/** 游戏动作类型 — 定义见 src/types/game.ts 中的 GameAction */
+/**
+ * 全局可派发的动作类型。
+ *
+ * 新增系统时在此 union 中添加对应的 action type。
+ */
+export type GameAction =
+  | { type: 'EXECUTE_ACTION'; deptId: string; actionId: string }
+  | { type: 'ADVANCE_TIME'; granularity: TimeGranularity }
+  | { type: 'SET_GRANULARITY'; granularity: TimeGranularity }
+  | { type: 'CHOOSE_EVENT_OPTION'; eventId: string; optionIndex: number }
+  | { type: 'PROCESS_DOCUMENT'; docId: string; action: FileAction }
+  | { type: 'START_PROMOTION' }
+  | { type: 'RESET_PROMOTION' }
+  | {
+      type: 'PROMOTION_RESOLVE_STAGE';
+      choices?: { useConnections?: boolean; influenceInspectors?: boolean };
+      /** 仅测试用：注入随机数生成器 */
+      _rng?: () => number;
+    }
+  | { type: 'LOAD_SAVE'; save: PlayerSave }
+  | { type: 'NEW_GAME'; data: Record<string, unknown> };
 
 // Solid 响应式 store
 const [state, setState] = createStore<GameState>(createInitialState());

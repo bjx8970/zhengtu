@@ -76,10 +76,7 @@ export function resolveDemocraticVote(
   flaggedForRisk?: boolean;
 } {
   const promo = cfg.promotion.democraticVote;
-  let baseScore =
-    ctx.playerScore * promo.scoreWeight +
-    ctx.charisma * promo.charismaWeight +
-    ctx.superiorFavor * promo.superiorFavorWeight;
+  let baseScore = ctx.playerScore * 0.4 + ctx.charisma * 0.3 + ctx.superiorFavor * 0.3;
 
   let flaggedForRisk = false;
 
@@ -90,10 +87,7 @@ export function resolveDemocraticVote(
     }
   }
 
-  const factionPenalty = calculateFactionPenalty(
-    ctx.factionReputation,
-    cfg.promotion.factionPenalty,
-  );
+  const factionPenalty = calculateFactionPenalty(ctx.factionReputation);
   baseScore -= factionPenalty;
 
   const passed = baseScore >= promo.passThreshold;
@@ -131,10 +125,7 @@ export function resolveOrgInspection(
 } {
   const promo = cfg.promotion.orgInspection;
   let score =
-    ctx.performance * promo.performanceWeight +
-    ctx.competence * promo.competenceWeight +
-    ctx.playerScore * promo.scoreWeight +
-    ctx.integrity * promo.integrityWeight;
+    ctx.performance * 0.3 + ctx.competence * 0.3 + ctx.playerScore * 0.2 + ctx.integrity * 0.2;
 
   let politicalCost = 0;
 

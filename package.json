@@ -9,8 +9,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "lint": "eslint src/ --ext .ts,.tsx",
+    "lint:fix": "eslint src/ --ext .ts,.tsx --fix",
     "format": "prettier --write 'src/**/*.{ts,tsx,json}' 'scripts/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.{ts,tsx,json}' 'scripts/**/*.ts'",
     "typecheck": "tsc --noEmit",
@@ -22,6 +22,8 @@
     "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test -- --coverage && pnpm validate:config && pnpm build"
   },
   "dependencies": {
+    "@preact/signals-core": "^1.8.0",
+    "@solidjs/router": "^0.15.0",
     "@supabase/supabase-js": "^2.49.0",
     "solid-js": "^1.9.0"
   },
@@ -29,6 +31,8 @@
     "@solidjs/testing-library": "^0.8.10",
     "@testing-library/jest-dom": "^6.9.1",
     "@types/node": "^26.1.1",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "@vitest/coverage-v8": "^3.0.0",
     "@vitest/ui": "^3.0.0",
     "eslint": "^9.0.0",
