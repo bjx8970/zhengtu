@@ -9,7 +9,8 @@
         "name": "审批工程项目",
         "description": "审批重大城市建设工程项目，提升项目完成度",
         "durationDays": 3,
-        "minTier": "secondary",
+        "category": "minor",
+        "cooldownDays": 7,
         "budgetDelta": 50,
         "effects": [{ "target": "dept.kpi.project_completion", "operation": "add", "value": 10 }]
       },
@@ -18,7 +19,8 @@
         "name": "城市规划评审",
         "description": "组织城市规划方案评审，优化城市布局",
         "durationDays": 2,
-        "minTier": "secondary",
+        "category": "minor",
+        "cooldownDays": 7,
         "budgetDelta": 20,
         "effects": [{ "target": "dept.kpi.planning_score", "operation": "add", "value": 5 }]
       }
@@ -35,7 +37,8 @@
         "name": "预算审查",
         "description": "审查年度预算方案，提升财政健康度",
         "durationDays": 2,
-        "minTier": "secondary",
+        "category": "minor",
+        "cooldownDays": 7,
         "budgetDelta": 10,
         "effects": [{ "target": "dept.kpi.fiscal_health", "operation": "add", "value": 8 }]
       },
@@ -44,7 +47,8 @@
         "name": "税收征管",
         "description": "加强税收征管力度，提升财政收入",
         "durationDays": 3,
-        "minTier": "secondary",
+        "category": "routine",
+        "cooldownDays": 0,
         "budgetDelta": 30,
         "effects": [{ "target": "dept.kpi.revenue_rate", "operation": "add", "value": 6 }]
       }
@@ -61,7 +65,8 @@
         "name": "文件处理",
         "description": "处理日常公文流转，提升办公效率",
         "durationDays": 1,
-        "minTier": "secondary",
+        "category": "routine",
+        "cooldownDays": 0,
         "budgetDelta": 5,
         "effects": [{ "target": "dept.kpi.office_efficiency", "operation": "add", "value": 5 }]
       },
@@ -70,7 +75,8 @@
         "name": "召开工作会议",
         "description": "组织工作协调会议，提升部门协作",
         "durationDays": 2,
-        "minTier": "secondary",
+        "category": "routine",
+        "cooldownDays": 0,
         "budgetDelta": 10,
         "effects": [
           { "target": "dept.kpi.office_efficiency", "operation": "add", "value": 3 },
@@ -90,7 +96,8 @@
         "name": "民生调研",
         "description": "深入基层调研民生问题，提升民生满意度",
         "durationDays": 2,
-        "minTier": "secondary",
+        "category": "minor",
+        "cooldownDays": 7,
         "budgetDelta": 15,
         "effects": [{ "target": "dept.kpi.livelihood_score", "operation": "add", "value": 6 }]
       },
@@ -99,7 +106,8 @@
         "name": "社会救助",
         "description": "开展社会救助帮扶活动",
         "durationDays": 3,
-        "minTier": "secondary",
+        "category": "routine",
+        "cooldownDays": 0,
         "budgetDelta": 25,
         "effects": [
           { "target": "dept.kpi.livelihood_score", "operation": "add", "value": 4 },
@@ -119,7 +127,8 @@
         "name": "安全生产检查",
         "description": "开展安全生产专项检查，降低事故率",
         "durationDays": 2,
-        "minTier": "secondary",
+        "category": "routine",
+        "cooldownDays": 0,
         "budgetDelta": 20,
         "effects": [{ "target": "dept.kpi.safety", "operation": "add", "value": 8 }]
       },
@@ -128,7 +137,8 @@
         "name": "应急演练",
         "description": "组织公共安全应急演练",
         "durationDays": 7,
-        "minTier": "primary",
+        "category": "major",
+        "cooldownDays": 14,
         "budgetDelta": 40,
         "effects": [
           { "target": "dept.kpi.safety", "operation": "add", "value": 12 },
@@ -148,7 +158,8 @@
         "name": "农业补贴发放",
         "description": "落实农业补贴政策，提升农业产值",
         "durationDays": 2,
-        "minTier": "secondary",
+        "category": "minor",
+        "cooldownDays": 7,
         "budgetDelta": 35,
         "effects": [{ "target": "dept.kpi.agricultural_output", "operation": "add", "value": 7 }]
       },
@@ -157,7 +168,8 @@
         "name": "农田基建",
         "description": "推进农村基础设施建设，改善生产条件",
         "durationDays": 5,
-        "minTier": "primary",
+        "category": "major",
+        "cooldownDays": 14,
         "budgetDelta": 60,
         "effects": [
           { "target": "dept.kpi.agricultural_output", "operation": "add", "value": 10 },
@@ -177,7 +189,8 @@
         "name": "党委会议",
         "description": "召开党委组织工作会议",
         "durationDays": 1,
-        "minTier": "secondary",
+        "category": "routine",
+        "cooldownDays": 0,
         "budgetDelta": 5,
         "effects": [{ "target": "dept.kpi.party_building", "operation": "add", "value": 5 }]
       },
@@ -186,7 +199,8 @@
         "name": "干部培训",
         "description": "组织干部培训学习，提升队伍素质",
         "durationDays": 5,
-        "minTier": "primary",
+        "category": "major",
+        "cooldownDays": 14,
         "budgetDelta": 20,
         "effects": [
           { "target": "dept.kpi.party_building", "operation": "add", "value": 8 },
@@ -206,7 +220,8 @@
         "name": "新闻发布",
         "description": "召开新闻发布会，引导舆论导向",
         "durationDays": 2,
-        "minTier": "secondary",
+        "category": "minor",
+        "cooldownDays": 7,
         "budgetDelta": 10,
         "effects": [
           { "target": "dept.kpi.propaganda_score", "operation": "add", "value": 5 },
@@ -218,7 +233,8 @@
         "name": "文化活动",
         "description": "组织群众性文化活动",
         "durationDays": 5,
-        "minTier": "primary",
+        "category": "major",
+        "cooldownDays": 14,
         "budgetDelta": 30,
         "effects": [
           { "target": "dept.kpi.propaganda_score", "operation": "add", "value": 8 },

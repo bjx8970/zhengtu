@@ -437,7 +437,7 @@ describe('store integration', () => {
     });
     dispatch({ type: 'START_PROMOTION' });
     const actionsBefore = getRawState().totalActions;
-    dispatch({ type: 'START_ACTION', deptId: 'dummy', actionId: 'dummy' });
+    dispatch({ type: 'START_ACTION', deptId: 'dummy', actionId: 'dummy', tierKey: 'primary' });
     expect(getRawState().totalActions).toBe(actionsBefore);
   });
 });

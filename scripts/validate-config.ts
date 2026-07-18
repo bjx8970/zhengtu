@@ -29,16 +29,41 @@ const EffectSchema = z.object({
   range: z.object({ min: z.number(), max: z.number() }).optional(),
 });
 
-const ActionSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string().optional(),
-  durationDays: z.number().int().min(1),
-  minTier: z.enum(['primary', 'secondary', 'reserve']),
-  budgetDelta: z.number(),
-  effects: z.array(EffectSchema).min(1),
-  unlockLevel: z.number().optional(),
-});
+const ActionSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().optional(),
+    durationDays: z.number().int().min(1),
+    category: z.enum(['major', 'minor', 'routine']),
+    cooldownDays: z.number().int().min(0),
+    budgetDelta: z.number(),
+    effects: z.array(EffectSchema).min(1),
+    unlockLevel: z.number().optional(),
+  })
+  .superRefine((action, ctx) => {
+    if (action.category === 'major' && action.cooldownDays !== 14) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cooldownDays'],
+        message: '重大行动的冷却天数必须为 14',
+      });
+    }
+    if (action.category === 'minor' && action.cooldownDays !== 7) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cooldownDays'],
+        message: '次要行动的冷却天数必须为 7',
+      });
+    }
+    if (action.category === 'routine' && action.cooldownDays !== 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cooldownDays'],
+        message: '日常行动的冷却天数必须为 0',
+      });
+    }
+  });
 
 const KPISchema = z.object({
   id: z.string().min(1),
@@ -156,6 +181,21 @@ console.log('\n--- 引用完整性检查 ---\n');
 
 const allDeptIds = new Set(Object.keys(departments));
 const allKpiIds = new Set(Object.keys(kpis));
+const actionOwners = new Map<string, string>();
+
+for (const [deptId, department] of Object.entries(departments)) {
+  for (const action of department.actions) {
+    const existingDeptId = actionOwners.get(action.id);
+    if (existingDeptId) {
+      console.error(
+        `❌ 行动 ID "${action.id}" 在部门模板 "${existingDeptId}" 和 "${deptId}" 中重复`,
+      );
+      errors++;
+    } else {
+      actionOwners.set(action.id, deptId);
+    }
+  }
+}
 
 for (const level of admin.levels) {
   for (const pos of level.positions) {

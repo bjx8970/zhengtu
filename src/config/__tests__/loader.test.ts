@@ -1,6 +1,11 @@
+/**
+ * ConfigLoader 模板展开与配置数据完整性测试。
+ */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getConfigLoader } from '../loader';
 import type { CareerLine } from '../../types/enums';
+import departments from '../templates/departments.json';
+import departmentsExtra from '../templates/departments-extra.json';
 
 let loader: ReturnType<typeof getConfigLoader>;
 
@@ -102,6 +107,23 @@ describe('ConfigLoader', () => {
         if (pos) {
           expect(pos.annualBudget).toBeGreaterThan(0);
         }
+      }
+    });
+
+    it('行动分类和冷却配置完整', () => {
+      const templates = { ...departments, ...departmentsExtra };
+      const actions = Object.values(templates).flatMap((department) => department.actions);
+      const categoryCounts = actions.reduce<Record<string, number>>((counts, action) => {
+        counts[action.category] = (counts[action.category] ?? 0) + 1;
+        return counts;
+      }, {});
+
+      expect(actions).toHaveLength(38);
+      expect(categoryCounts).toEqual({ minor: 12, routine: 12, major: 14 });
+      for (const action of actions) {
+        expect(action.cooldownDays).toBe(
+          action.category === 'major' ? 14 : action.category === 'minor' ? 7 : 0,
+        );
       }
     });
   });

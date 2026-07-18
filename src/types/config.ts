@@ -12,6 +12,9 @@
 import type { CareerLine } from './enums';
 import type { SlotTierKey } from './player';
 
+/** 行动分类，决定行动冷却规则 */
+export type ActionCategory = 'major' | 'minor' | 'routine';
+
 /** 行动效果的单项定义：对某个目标属性施加的操作 */
 export interface ActionEffectDef {
   /** 目标标识，格式 "dept.kpi.xxx" 或 "player.xxx" */
@@ -31,8 +34,10 @@ export interface ActionTemplate {
   description?: string;
   /** 执行所需天数 */
   durationDays: number;
-  /** 最低槽位等级 */
-  minTier: SlotTierKey;
+  /** 行动分类 */
+  category: ActionCategory;
+  /** 行动完成后的冷却天数 */
+  cooldownDays: number;
   /** 行动消耗预算（万元） */
   budgetDelta: number;
   /** 执行后对 KPI/属性的影响列表 */

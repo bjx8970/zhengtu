@@ -8,9 +8,10 @@
  * 纯函数，不修改输入参数。
  */
 
-import type { ActionTemplate } from '../../types/config';
 import type { SlotState, SlotTierKey } from '../../types/player';
+import type { ActionTemplate } from '../../types/config';
 import type {
+  StartActionInput,
   StartActionResult,
   CompletedSlotAction,
   KPIEffectChange,
@@ -30,49 +31,43 @@ export function hasActiveActions(slotState: SlotState): boolean {
 }
 
 /**
- * 校验预算/重复性/槽位，将行动放入合适的槽位。
+ * 校验分类、预算、重复性、冷却和玩家选择的槽位。
  *
- * @param actionConfig - 行动模板
- * @param slotState - 当前槽位状态
- * @param remainingBudget - 剩余预算
- * @param _currentDay - 当前游戏天数（预留）
+ * @param input - 行动、部门、冷却及玩家选择槽位的不可变输入
  * @returns 成功时返回槽位位置；失败时返回错误信息
  */
-export function startAction(
-  actionConfig: ActionTemplate,
-  slotState: SlotState,
-  remainingBudget: number,
-  _currentDay: number,
-): StartActionResult {
-  if (remainingBudget < actionConfig.budgetDelta) {
+export function startAction(input: StartActionInput): StartActionResult {
+  const { action, slotState, remainingBudget, currentDay, deptId, tierKey, cooldownUntilDay } =
+    input;
+
+  if (action.category === 'major' && tierKey !== 'primary') {
+    return { success: false, error: '重大行动只能使用主要槽位' };
+  }
+
+  if (remainingBudget < action.budgetDelta) {
     return { success: false, error: '预算不足' };
   }
 
-  for (const tierKey of TIER_ORDER) {
-    const tier = slotState[tierKey];
-    if (tier?.occupants.some((o) => o?.actionId === actionConfig.id)) {
-      return { success: false, error: '该行动已在执行中' };
+  if (action.category !== 'routine') {
+    const duplicate = TIER_ORDER.some((key) =>
+      slotState[key].occupants.some(
+        (occupant) => occupant?.actionId === action.id && occupant.deptId === deptId,
+      ),
+    );
+    if (duplicate) {
+      return { success: false, error: '该部门的行动已在执行中' };
+    }
+    if (currentDay < cooldownUntilDay) {
+      return { success: false, error: `行动冷却中，需等待至第 ${cooldownUntilDay} 天` };
     }
   }
 
-  const minTierIdx = TIER_ORDER.indexOf(actionConfig.minTier);
-
-  for (const tierKey of TIER_ORDER) {
-    const tierIdx = TIER_ORDER.indexOf(tierKey);
-    if (tierIdx > minTierIdx) continue;
-    const tier = slotState[tierKey];
-    if (!tier) continue;
-    const idx = tier.occupants.findIndex((o) => o === null);
-    if (idx === -1) continue;
-
-    return {
-      success: true,
-      tierKey,
-      slotIndex: idx,
-    };
+  const slotIndex = slotState[tierKey].occupants.findIndex((occupant) => occupant === null);
+  if (slotIndex === -1) {
+    return { success: false, error: '所选槽位等级无空闲槽位' };
   }
 
-  return { success: false, error: '无空闲槽位' };
+  return { success: true, tierKey, slotIndex };
 }
 
 /**

@@ -69,20 +69,27 @@ UI（页面/组件） → Store（dispatch/reducer） → Engine（纯函数） 
 ```text
 Dashboard START_ACTION
   → reducer 查找部门与行动配置
-  → startAction() 校验预算、重复行动、minTier 与空槽位
-  → 写入对应槽位 occupant，扣减预算
+  → startAction() 校验分类、选定槽位、预算、重复行动与冷却
+  → 写入选定等级的第一个空槽，扣减预算
+  → 备用槽额外应用配置化健康与消沉处罚
   → writeLocalSave(unwrap(state))
 ```
 
-行动具有 `durationDays` 和 `minTier`。槽位固定为：
+行动具有 `durationDays`、`category` 和 `cooldownDays`。槽位固定为：
 
 | 等级      | 数量 | 用途                               |
 | --------- | ---: | ---------------------------------- |
-| primary   |    3 | 主要事项                           |
+| primary   |    3 | 核心工作，唯一可执行重大行动       |
 | secondary |    2 | 次要事项                           |
 | reserve   |    1 | 加班备用；使用时附加健康与士气惩罚 |
 
-`minTier` 表示行动可使用的最末槽位等级。当前配置未提供 `minTier: reserve` 的行动，因此备用槽位在正常配置中暂不可达；这是待接入内容，不应由 UI 绕过引擎限制。
+| 分类 | 可用槽位 | 冷却 | 同部门同行动并行 |
+| ---- | -------- | ---- | ---------------- |
+| 重大 | 仅主要   | 14 天 | 禁止             |
+| 次要 | 全部     | 7 天  | 禁止             |
+| 日常 | 全部     | 无    | 允许             |
+
+冷却按部门实例记录绝对截止日，从名义完成日 `startedAtDay + durationDays` 起算。Engine 使用 `StartActionInput` 对象参数且不修改输入。
 
 ### 推进时间
 

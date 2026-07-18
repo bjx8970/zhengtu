@@ -12,7 +12,15 @@ function occ(
   startedAtDay = 0,
   durationDays = 3,
 ): SlotOccupant {
-  return { actionId, deptId, actionName, startedAtDay, durationDays };
+  return {
+    actionId,
+    deptId,
+    actionName,
+    category: 'minor',
+    startedAtDay,
+    durationDays,
+    cooldownDays: 7,
+  };
 }
 
 describe('createInitialState', () => {
@@ -72,21 +80,21 @@ describe('dispatch - START_ACTION', () => {
   describe('successful execution', () => {
     it('增加总行动计数', () => {
       const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'START_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId, tierKey: 'primary' });
       const state = getRawState();
       expect(state.totalActions).toBe(1);
     });
 
     it('扣减预算', () => {
       const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'START_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId, tierKey: 'primary' });
       const state = getRawState();
       expect(state.remainingBudget).toBeLessThan(10000);
     });
 
     it('将行动放入槽位', () => {
       const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'START_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId, tierKey: 'primary' });
       const state = getRawState();
       const occupants = state.slots.primary.occupants;
       expect(occupants.some((o) => o?.actionId === actionId)).toBe(true);
@@ -94,8 +102,8 @@ describe('dispatch - START_ACTION', () => {
 
     it('多次执行不同行动累计计数', () => {
       const { dispatch, getRawState } = createStoreWithPosition();
-      dispatch({ type: 'START_ACTION', deptId, actionId: 'approve_project' });
-      dispatch({ type: 'START_ACTION', deptId, actionId: 'urban_planning' });
+      dispatch({ type: 'START_ACTION', deptId, actionId: 'approve_project', tierKey: 'primary' });
+      dispatch({ type: 'START_ACTION', deptId, actionId: 'urban_planning', tierKey: 'primary' });
       const state = getRawState();
       expect(state.totalActions).toBe(2);
     });
@@ -115,7 +123,7 @@ describe('dispatch - START_ACTION', () => {
         },
       });
       const before = getRawState();
-      dispatch({ type: 'START_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId, tierKey: 'primary' });
       expect(getRawState()).toEqual(before);
     });
 
@@ -124,13 +132,13 @@ describe('dispatch - START_ACTION', () => {
         remainingBudget: 10,
       });
       const before = getRawState();
-      dispatch({ type: 'START_ACTION', deptId, actionId });
+      dispatch({ type: 'START_ACTION', deptId, actionId, tierKey: 'primary' });
       expect(getRawState()).toEqual(before);
     });
 
-    // approve_project 的 minTier 为 'secondary'，仅允许 primary(0)/secondary(1)，
-    // 不允许 reserve(2)。当 primary 和 secondary 全满时，action 不会溢出到 reserve。
-    it('primary + secondary 满时不会溢出到 reserve', () => {
+    // approve_project 的 category 为 'minor'，minors 允许任意槽位。
+    // 当玩家指定 secondary 且 secondary 已满时，action 被拒绝。
+    it('指定等级无空槽时不执行', () => {
       const { dispatch, getRawState } = createStoreWithPosition({
         slots: {
           primary: {
@@ -147,10 +155,8 @@ describe('dispatch - START_ACTION', () => {
         },
       });
       const before = getRawState();
-      dispatch({ type: 'START_ACTION', deptId, actionId });
-      // 状态不变——因为 reserve 对 minTier: 'secondary' 不可达
+      dispatch({ type: 'START_ACTION', deptId, actionId, tierKey: 'secondary' });
       expect(getRawState()).toEqual(before);
-      // reserve 槽位仍为空
       expect(getRawState().slots.reserve.occupants[0]).toBeNull();
     });
   });
@@ -178,11 +184,44 @@ describe('dispatch - ADVANCE_TIME (integration)', () => {
           monthlyConsumption: 0,
           cumulativeConsumption: 0,
           lastActionDay: 0,
+          actionCooldownUntilDays: {},
         },
       },
       ...overrides,
     });
   }
+
+  describe('旧存档迁移', () => {
+    it('载入时按当前配置补齐行动分类、冷却天数和部门冷却表', () => {
+      const legacySave = structuredClone(mkStore().getRawState());
+      const occupant = occ(actionId, deptId, '审批项目', 0, 3);
+      const legacyOccupant = occupant as unknown as Record<string, unknown>;
+      delete legacyOccupant['category'];
+      delete legacyOccupant['cooldownDays'];
+      legacySave.slots.primary.occupants[0] = occupant;
+
+      const legacyDepartment = legacySave.departmentStates[deptId] as unknown as Record<
+        string,
+        unknown
+      >;
+      delete legacyDepartment['actionCooldownUntilDays'];
+
+      const store = createTestStore();
+      store.dispatch({ type: 'LOAD_SAVE', save: legacySave });
+
+      const migrated = store.getRawState();
+      expect(migrated.slots.primary.occupants[0]).toMatchObject({
+        category: 'minor',
+        cooldownDays: 7,
+      });
+      expect(migrated.departmentStates[deptId]?.actionCooldownUntilDays).toEqual({});
+
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'week' });
+      expect(store.getRawState().departmentStates[deptId]?.actionCooldownUntilDays[actionId]).toBe(
+        10,
+      );
+    });
+  });
 
   it('ADVANCE_TIME 后已完成行动清空槽位', () => {
     const { dispatch, getRawState } = mkStore({
@@ -466,6 +505,7 @@ describe('dispatch - persistence (localStorage)', () => {
           monthlyConsumption: 50,
           cumulativeConsumption: 500,
           lastActionDay: 10,
+          actionCooldownUntilDays: {},
         },
       },
     });
@@ -510,7 +550,282 @@ describe('dispatch - persistence (localStorage)', () => {
         monthlyConsumption: 0,
         cumulativeConsumption: 0,
         lastActionDay: 0,
+        actionCooldownUntilDays: {},
       },
+    });
+  });
+});
+
+describe('dispatch - action categories (integration)', () => {
+  const POSITION_ID = 'admin_l3_0';
+  const LINE = CareerLine.Administrative;
+  const LEVEL = 3;
+  const deptId = 'admin_l3_0_dept_2'; // public_safety: has emergency_drill (major)
+  const majorActionId = 'emergency_drill'; // category=major, cooldownDays=14
+  const minorDeptId = 'admin_l3_0_dept_0'; // urban_dev: has approve_project (minor)
+  const minorActionId = 'approve_project'; // category=minor, cooldownDays=7
+  const routineDeptId = 'admin_l3_0_dept_1'; // finance: has tax_collection (routine)
+  const routineActionId = 'tax_collection'; // category=routine, cooldownDays=0
+
+  function mkStore(overrides?: Partial<PlayerSave>) {
+    return createTestStore({
+      currentPositionId: POSITION_ID,
+      currentLevel: LEVEL,
+      currentCareerLine: LINE,
+      remainingBudget: 10000,
+      totalDaysPlayed: 0,
+      time: { year: 2024, month: 6, day: 15, granularity: 'day' },
+      departmentStates: {
+        [deptId]: {
+          id: deptId,
+          kpiValues: {},
+          monthlyConsumption: 0,
+          cumulativeConsumption: 0,
+          lastActionDay: 0,
+          actionCooldownUntilDays: {},
+        },
+        [minorDeptId]: {
+          id: minorDeptId,
+          kpiValues: {},
+          monthlyConsumption: 0,
+          cumulativeConsumption: 0,
+          lastActionDay: 0,
+          actionCooldownUntilDays: {},
+        },
+        [routineDeptId]: {
+          id: routineDeptId,
+          kpiValues: {},
+          monthlyConsumption: 0,
+          cumulativeConsumption: 0,
+          lastActionDay: 0,
+          actionCooldownUntilDays: {},
+        },
+      },
+      ...overrides,
+    });
+  }
+
+  describe('重大行动槽位限制', () => {
+    it('major 只能用 primary', () => {
+      const s = mkStore();
+      s.dispatch({ type: 'START_ACTION', deptId, actionId: majorActionId, tierKey: 'primary' });
+      expect(s.getRawState().slots.primary.occupants[0]?.actionId).toBe(majorActionId);
+    });
+
+    it('major 选 secondary 被拒绝', () => {
+      const s = mkStore();
+      const before = s.getRawState();
+      s.dispatch({ type: 'START_ACTION', deptId, actionId: majorActionId, tierKey: 'secondary' });
+      expect(s.getRawState()).toEqual(before);
+    });
+
+    it('major 选 reserve 被拒绝', () => {
+      const s = mkStore();
+      const before = s.getRawState();
+      s.dispatch({ type: 'START_ACTION', deptId, actionId: majorActionId, tierKey: 'reserve' });
+      expect(s.getRawState()).toEqual(before);
+    });
+  });
+
+  describe('备用槽位处罚', () => {
+    it('minor 选 reserve 成功后扣健康并加消沉', () => {
+      const s = mkStore({ health: 100, demoralization: 0 });
+      s.dispatch({
+        type: 'START_ACTION',
+        deptId: minorDeptId,
+        actionId: minorActionId,
+        tierKey: 'reserve',
+      });
+      const state = s.getRawState();
+      expect(state.slots.reserve.occupants[0]?.actionId).toBe(minorActionId);
+      expect(state.health).toBe(95);
+      expect(state.demoralization).toBe(3);
+    });
+
+    it('处罚受属性边界钳位', () => {
+      const s = mkStore({ health: 2, demoralization: 98 });
+      s.dispatch({
+        type: 'START_ACTION',
+        deptId: minorDeptId,
+        actionId: minorActionId,
+        tierKey: 'reserve',
+      });
+      const state = s.getRawState();
+      expect(state.health).toBeGreaterThanOrEqual(0);
+      expect(state.demoralization).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe('日常行动并行', () => {
+    it('routine 同部门同行动可并行启动', () => {
+      const s = mkStore();
+      s.dispatch({
+        type: 'START_ACTION',
+        deptId: routineDeptId,
+        actionId: routineActionId,
+        tierKey: 'primary',
+      });
+      s.dispatch({
+        type: 'START_ACTION',
+        deptId: routineDeptId,
+        actionId: routineActionId,
+        tierKey: 'primary',
+      });
+      const occs = s.getRawState().slots.primary.occupants;
+      expect(occs[0]?.actionId).toBe(routineActionId);
+      expect(occs[1]?.actionId).toBe(routineActionId);
+    });
+  });
+
+  describe('冷却写入', () => {
+    it('minor 完成后写入 startedAt + duration + cooldown 为绝对截止日', () => {
+      const s = mkStore();
+      s.dispatch({
+        type: 'START_ACTION',
+        deptId: minorDeptId,
+        actionId: minorActionId,
+        tierKey: 'primary',
+      });
+      s.dispatch({ type: 'ADVANCE_TIME', granularity: 'week' });
+      const cooldowns = s.getRawState().departmentStates[minorDeptId]?.actionCooldownUntilDays;
+      expect(cooldowns?.[minorActionId]).toBe(0 + 3 + 7);
+    });
+
+    it('跨大步推进仍按名义完成日起算冷却截止日', () => {
+      const s = mkStore();
+      s.dispatch({
+        type: 'START_ACTION',
+        deptId: minorDeptId,
+        actionId: minorActionId,
+        tierKey: 'primary',
+      });
+      s.dispatch({ type: 'ADVANCE_TIME', granularity: 'month' });
+      const cooldowns = s.getRawState().departmentStates[minorDeptId]?.actionCooldownUntilDays;
+      expect(cooldowns?.[minorActionId]).toBe(0 + 3 + 7);
+    });
+
+    it('冷却截止日当天可重新启动', () => {
+      const s = mkStore({
+        totalDaysPlayed: 10,
+        departmentStates: {
+          [minorDeptId]: {
+            id: minorDeptId,
+            kpiValues: {},
+            monthlyConsumption: 0,
+            cumulativeConsumption: 0,
+            lastActionDay: 0,
+            actionCooldownUntilDays: { [minorActionId]: 10 },
+          },
+          [deptId]: {
+            id: deptId,
+            kpiValues: {},
+            monthlyConsumption: 0,
+            cumulativeConsumption: 0,
+            lastActionDay: 0,
+            actionCooldownUntilDays: {},
+          },
+          [routineDeptId]: {
+            id: routineDeptId,
+            kpiValues: {},
+            monthlyConsumption: 0,
+            cumulativeConsumption: 0,
+            lastActionDay: 0,
+            actionCooldownUntilDays: {},
+          },
+        },
+      });
+      s.dispatch({
+        type: 'START_ACTION',
+        deptId: minorDeptId,
+        actionId: minorActionId,
+        tierKey: 'primary',
+      });
+      expect(s.getRawState().slots.primary.occupants[0]?.actionId).toBe(minorActionId);
+    });
+
+    it('冷却期内被拒绝', () => {
+      const s = mkStore({
+        totalDaysPlayed: 9,
+        departmentStates: {
+          [minorDeptId]: {
+            id: minorDeptId,
+            kpiValues: {},
+            monthlyConsumption: 0,
+            cumulativeConsumption: 0,
+            lastActionDay: 0,
+            actionCooldownUntilDays: { [minorActionId]: 10 },
+          },
+          [deptId]: {
+            id: deptId,
+            kpiValues: {},
+            monthlyConsumption: 0,
+            cumulativeConsumption: 0,
+            lastActionDay: 0,
+            actionCooldownUntilDays: {},
+          },
+          [routineDeptId]: {
+            id: routineDeptId,
+            kpiValues: {},
+            monthlyConsumption: 0,
+            cumulativeConsumption: 0,
+            lastActionDay: 0,
+            actionCooldownUntilDays: {},
+          },
+        },
+      });
+      const before = s.getRawState();
+      s.dispatch({
+        type: 'START_ACTION',
+        deptId: minorDeptId,
+        actionId: minorActionId,
+        tierKey: 'primary',
+      });
+      expect(s.getRawState()).toEqual(before);
+    });
+  });
+
+  describe('失败原子性', () => {
+    it('预算不足时不扣预算、不占槽、不增加计数', () => {
+      const s = mkStore({ remainingBudget: 1 });
+      const before = s.getRawState();
+      s.dispatch({
+        type: 'START_ACTION',
+        deptId: minorDeptId,
+        actionId: minorActionId,
+        tierKey: 'primary',
+      });
+      const after = s.getRawState();
+      expect(after.remainingBudget).toBe(before.remainingBudget);
+      expect(after.totalActions).toBe(before.totalActions);
+      expect(after.slots).toEqual(before.slots);
+    });
+
+    it('major 选错槽位不扣预算', () => {
+      const s = mkStore();
+      const before = s.getRawState();
+      s.dispatch({ type: 'START_ACTION', deptId, actionId: majorActionId, tierKey: 'secondary' });
+      expect(s.getRawState().remainingBudget).toBe(before.remainingBudget);
+      expect(s.getRawState().totalActions).toBe(before.totalActions);
+    });
+  });
+
+  describe('完成通知', () => {
+    it('completedAtDay 使用名义完成日而非当前推进后的天数', () => {
+      const s = mkStore({
+        slots: {
+          primary: {
+            label: '主要',
+            count: 3,
+            occupants: [occ(minorActionId, minorDeptId, '审批', 5, 3), null, null],
+          },
+          secondary: { label: '次要', count: 2, occupants: [null, null] },
+          reserve: { label: '备用', count: 1, occupants: [null] },
+        },
+      });
+      s.dispatch({ type: 'ADVANCE_TIME', granularity: 'month' });
+      const note = s.getRawState().lastCompletedActions[0];
+      expect(note).toBeDefined();
+      expect(note?.completedAtDay).toBe(8);
     });
   });
 });
