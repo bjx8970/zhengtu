@@ -111,4 +111,16 @@ describe('Dashboard promotion panel', () => {
     expect(screen.getByRole('button', { name: '启动晋升' })).toBeDisabled();
     expect(screen.getByText('请先完成当前行动，再启动晋升')).toBeInTheDocument();
   });
+
+  it('职位 ID 格式异常时不回退到首个职位', () => {
+    loadDashboardState({
+      currentCareerLine: CareerLine.Administrative,
+      currentLevel: 1,
+      currentPositionId: 'invalid-position-id',
+    });
+
+    render(() => <Dashboard />);
+
+    expect(screen.getByText('暂无部门数据')).toBeInTheDocument();
+  });
 });

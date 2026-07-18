@@ -1,12 +1,8 @@
 /**
  * 全局设计令牌 — CSS 变量定义
  *
- * 政务色 + 暗色沉浸的混合风格：
- * - 主色：中国红 #be2d2d（权力操作）
- * - 二级：藏蓝 #2B4E6E（信息查看）
- * - 底色：深蓝黑 #1a1a2e（沉浸感）
- * - 卡片：白色 / 深色两种
- * - 圆角：4px（正式感）
+ * 政务公文风格：暖灰纸张底色、藏蓝标题栏与中国红操作色。
+ * TypeScript 中需要使用的令牌由 src/utils/theme.ts 镜像，并由测试确保一致。
  */
 
 :root {
@@ -29,8 +25,8 @@
   --color-primary-text: #ffffff;
 
   /* 二级：藏蓝 */
-  --color-secondary: #2b4e6e;
-  --color-secondary-light: rgba(43, 78, 110, 0.15);
+  --color-secondary: #284b70;
+  --color-secondary-light: rgba(40, 75, 112, 0.15);
   --color-secondary-text: #e8e6e3;
 
   /* 功能色 */

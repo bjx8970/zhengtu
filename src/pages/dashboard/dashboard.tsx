@@ -11,7 +11,7 @@
 
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
-import type { SlotOccupant } from '../../types/player';
+import type { SlotOccupant, SlotTierKey } from '../../types/player';
 import { formatDate } from '../../utils/format';
 import { calculateKPI } from '../../engine/governance/kpi';
 import { hasActiveActions } from '../../engine/core/action';
@@ -22,7 +22,7 @@ import { colors, radius, pageBase, darkCardStyle, progressBarColor } from '../..
 import type { KPIResult } from '../../types/game';
 import { FeatureRoadmap } from '../../components/feature-roadmap';
 
-const TIER_COLOR: Record<string, string> = {
+const TIER_COLOR: Record<SlotTierKey, string> = {
   primary: '#4A6FA5',
   secondary: '#6B8E6B',
   reserve: '#C44D4D',
@@ -86,7 +86,10 @@ export function Dashboard() {
   const positionConfig = createMemo(() => {
     const posId = state.currentPositionId;
     if (!posId) return null;
-    const idx = parseInt(posId.split('_').pop() ?? '0', 10);
+    const match = /_(\d+)$/.exec(posId);
+    const indexText = match?.[1];
+    if (indexText === undefined) return null;
+    const idx = Number.parseInt(indexText, 10);
     return getConfigLoader().getPosition(state.currentCareerLine, state.currentLevel, idx);
   });
 
@@ -236,7 +239,7 @@ export function Dashboard() {
 
         {/* ═══ 行动槽位 ═══ */}
         <CollapsiblePanel title="行动槽位" defaultOpen={true}>
-          <For each={Object.entries(state.slots) as [string, typeof state.slots.primary][]}>
+          <For each={Object.entries(state.slots) as [SlotTierKey, typeof state.slots.primary][]}>
             {([tierKey, tier]) => (
               <div style={{ 'margin-bottom': '0.6rem' }}>
                 <div

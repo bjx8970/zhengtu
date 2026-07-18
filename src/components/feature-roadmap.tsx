@@ -8,7 +8,7 @@ import { For } from 'solid-js';
 import type { FeatureEntry } from '../types/ui';
 import { navigate } from '../router';
 
-const FEATURES: FeatureEntry[] = [
+const FEATURES: readonly FeatureEntry[] = [
   {
     id: 'governance',
     label: '部门施政',
