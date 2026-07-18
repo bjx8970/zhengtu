@@ -12,7 +12,7 @@
  * 使用 createTestStore + 真实 ConfigLoader + 真实 engine 函数，
  * 仅通过 _rng 注入控制随机性，不 mock 任何模块。
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { createInitialState, createTestStore, dispatch } from '../game-store';
 import { getConfigLoader } from '../../config/loader';
 import { CareerLine, PromotionStage, KPITier } from '../../types/enums';
@@ -170,22 +170,22 @@ describe('核心流程集成测试', () => {
 
       // 阶段 7: 试用期考核
       store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE', _rng: allPassRng });
-      const final = store.getRawState();
-      expect(final.promotionStage).toBe(PromotionStage.Completed);
-      expect(final.currentLevel).toBe(2);
-      expect(final.currentPositionId).toBe('admin_l2_0');
-      expect(final.yearsInCurrentPosition).toBe(0);
-      expect(final.careerHistory).toHaveLength(1);
-      expect(final.careerHistory[0]?.positionId).toBe('admin_l1_0');
+      const finalState = store.getRawState();
+      expect(finalState.promotionStage).toBe(PromotionStage.Completed);
+      expect(finalState.currentLevel).toBe(2);
+      expect(finalState.currentPositionId).toBe('admin_l2_0');
+      expect(finalState.yearsInCurrentPosition).toBe(0);
+      expect(finalState.careerHistory).toHaveLength(1);
+      expect(finalState.careerHistory[0]?.positionId).toBe('admin_l1_0');
       // 晋升成功后预算重置为新职位年度预算
-      expect(final.remainingBudget).toBe(2000);
+      expect(finalState.remainingBudget).toBe(2000);
       // 考核记录归档后清空
-      expect(final.annualAssessments).toEqual([]);
-      expect(final.comprehensiveScore).toBe(0);
+      expect(finalState.annualAssessments).toEqual([]);
+      expect(finalState.comprehensiveScore).toBe(0);
       // 政治资本增加
-      expect(final.politicalCapital).toBeGreaterThan(40);
+      expect(finalState.politicalCapital).toBeGreaterThan(40);
       // 部门状态重置为新职位
-      expect(Object.keys(final.departmentStates)).toEqual([
+      expect(Object.keys(finalState.departmentStates)).toEqual([
         'admin_l2_0_dept_0',
         'admin_l2_0_dept_1',
         'admin_l2_0_dept_2',
@@ -196,6 +196,13 @@ describe('核心流程集成测试', () => {
 
   describe('场景 2：存档序列化往返', () => {
     const SAVE_KEY = 'zhengtu_autosave';
+
+    // 场景 2 使用模块级 dispatch 验证 localStorage 写入，
+    // afterEach 重置模块级 store 避免污染后续测试
+    afterEach(() => {
+      dispatch({ type: 'LOAD_SAVE', save: createInitialState() });
+      localStorage.clear();
+    });
 
     it('模块级 dispatch 玩 3 个月后可序列化并恢复', () => {
       localStorage.clear();
