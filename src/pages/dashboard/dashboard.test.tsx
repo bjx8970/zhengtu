@@ -2,7 +2,7 @@
  * Dashboard 晋升状态交互测试。
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@solidjs/testing-library';
 import { Dashboard } from './dashboard';
 import { createInitialState, dispatch, getRawState } from '../../store/game-store';
@@ -25,6 +25,11 @@ function pendingAction(): SlotOccupant {
 
 describe('Dashboard promotion panel', () => {
   beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    dispatch({ type: 'LOAD_SAVE', save: createInitialState() });
     localStorage.clear();
   });
 
