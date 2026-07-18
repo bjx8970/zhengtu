@@ -21,6 +21,7 @@ import type { TimeGranularity } from '../../types/enums';
 import { colors, radius, pageBase, darkCardStyle, progressBarColor } from '../../utils/theme';
 import type { KPIResult } from '../../types/game';
 import { FeatureRoadmap } from '../../components/feature-roadmap';
+import { parsePositionIndex } from '../../utils/position';
 
 const TIER_COLOR: Record<SlotTierKey, string> = {
   primary: '#4A6FA5',
@@ -86,10 +87,8 @@ export function Dashboard() {
   const positionConfig = createMemo(() => {
     const posId = state.currentPositionId;
     if (!posId) return null;
-    const match = /_(\d+)$/.exec(posId);
-    const indexText = match?.[1];
-    if (indexText === undefined) return null;
-    const idx = Number.parseInt(indexText, 10);
+    const idx = parsePositionIndex(posId);
+    if (idx === null) return null;
     return getConfigLoader().getPosition(state.currentCareerLine, state.currentLevel, idx);
   });
 
