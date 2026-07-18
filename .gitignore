@@ -7,3 +7,6 @@ coverage/
 .env.*.local
 .DS_Store
 *.tsbuildinfo
+
+# WorkBuddy 工作区数据（记忆、技能等，不应入库）
+.workbuddy/
