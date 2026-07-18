@@ -61,7 +61,7 @@ summary:  中文，祈使句，不加句号
 
 创建 PR 前确认以下事项：
 
-- [ ] 所有自动化检查通过：运行 `pnpm ci`
+- [ ] 所有自动化检查通过：运行 `pnpm run ci`
 - [ ] 新增/修改的引擎函数有对应测试，覆盖率不低于阈值
 - [ ] 新增 JSON 配置运行过 `pnpm validate:config` 且包含引用完整性验证
 - [ ] Commit 信息符合 Conventional Commits 格式
@@ -85,7 +85,7 @@ pnpm lint            # 检查代码风格
 pnpm typecheck       # TypeScript 类型检查
 pnpm test            # 运行测试
 pnpm validate:config # 校验配置 JSON
-pnpm ci              # 一键全量检查
+pnpm run ci          # 一键全量检查（`pnpm ci` 是 pnpm 的 clean install 命令）
 ```
 
 ### TypeScript
@@ -106,7 +106,7 @@ pnpm ci              # 一键全量检查
 ### 组件 (SolidJS)
 
 - 函数组件 + JSX
-- 无样式依赖（Phase 0 使用内联 style）
+- 优先复用 `src/styles/tokens.css` 设计令牌；需要内联样式常量时使用 `src/utils/theme.ts`
 - 页面组件放在 `src/pages/<domain>/`，共享组件放在 `src/components/`
 - 使用 `createStore` 的单 store，组件通过 `useGameStore()` 获取
 
@@ -153,16 +153,17 @@ export function advanceTime(current: TimeState, days: number, ...): TimeAdvanceR
 
 ```typescript
 export interface SlotState {
-  max: number;       // 当前粒度的最大槽位数
-  available: number; // 当前剩余可用槽位数
+  primary: SlotTierGroup; // 3 个主要槽位
+  secondary: SlotTierGroup; // 2 个次要槽位
+  reserve: SlotTierGroup; // 1 个备用槽位
 }
 ```
 
 **关键逻辑**：非直观的算法、边界条件、设计决策应添加行内注释说明"为什么"。
 
 ```typescript
-// 每天约消耗槽位数的 1.5 倍天数
-const daysAdvanced = Math.max(1, Math.ceil(actionConfig.slotCost * 1.5));
+// 按绝对游戏日判断完成，避免不同推进粒度导致行动耗时漂移
+const completesAtDay = currentTotalDays + actionConfig.durationDays;
 ```
 
 **节点标记**：占位未实现的功能使用 `// Phase N 实现` 标记，方便后续定位。
@@ -176,31 +177,29 @@ case 'EXECUTE_ACTION': {
 
 **不要求注释的情况**：变量名自解释、简单的赋值/返回值、框架样板代码（如 `render(() => <App />, root)`）。
 
-
-
 ## 测试规范
 
 ### 分层
 
-| 层 | 目录 | 框架 | 覆盖率要求 |
-|----|------|------|-----------|
-| Engine | `__tests__/` | Vitest | ≥ 90% lines |
-| Config | `__tests__/` | Vitest | ≥ 80% lines |
-| Store | `__tests__/` | Vitest | ≥ 70% lines |
+| 层        | 目录         | 框架                     | 覆盖率要求     |
+| --------- | ------------ | ------------------------ | -------------- |
+| Engine    | `__tests__/` | Vitest                   | ≥ 90% lines    |
+| Config    | `__tests__/` | Vitest                   | ≥ 80% lines    |
+| Store     | `__tests__/` | Vitest                   | ≥ 70% lines    |
 | Component | `__tests__/` | @solidjs/testing-library | ≥ 40% (软目标) |
 
 ### 何时需要写测试
 
-| 场景 | 是否必须 | 说明 |
-|------|---------|------|
-| 新增引擎函数 | ✅ 必须 | 覆盖率达标后 PR 才能合并 |
-| 修改引擎逻辑 | ✅ 必须 | 如原测试不足，同步补充 |
-| 新增 JSON 配置 | ✅ 结构测试 | `loader.test.ts` 的数据完整性遍历会自动覆盖 |
-| 修改 JSON 数值 | ❌ 不需要 | 数值调整不涉及逻辑变更 |
-| 新增页面组件 | 🔶 建议 | 至少 smoke test（渲染不崩溃）；复杂交互建议写 |
-| 纯重构（不改行为） | ❌ 不需要 | 前提：原测试全部通过 |
-| Store dispatch | ✅ 必须 | 达到 70% lines |
-| 工具函数 (utils/) | ✅ 必须 | 纯函数极易测试，写 1-2 个关键用例即可 |
+| 场景               | 是否必须    | 说明                                          |
+| ------------------ | ----------- | --------------------------------------------- |
+| 新增引擎函数       | ✅ 必须     | 覆盖率达标后 PR 才能合并                      |
+| 修改引擎逻辑       | ✅ 必须     | 如原测试不足，同步补充                        |
+| 新增 JSON 配置     | ✅ 结构测试 | `loader.test.ts` 的数据完整性遍历会自动覆盖   |
+| 修改 JSON 数值     | ❌ 不需要   | 数值调整不涉及逻辑变更                        |
+| 新增页面组件       | 🔶 建议     | 至少 smoke test（渲染不崩溃）；复杂交互建议写 |
+| 纯重构（不改行为） | ❌ 不需要   | 前提：原测试全部通过                          |
+| Store dispatch     | ✅ 必须     | 达到 70% lines                                |
+| 工具函数 (utils/)  | ✅ 必须     | 纯函数极易测试，写 1-2 个关键用例即可         |
 
 ### 引擎测试模板
 
@@ -235,43 +234,43 @@ pnpm test:coverage     # 生成覆盖率报告
 
 ## Quality Gates（CI 强制）
 
-| 检查 | 阻断合并 |
-|------|---------|
-| Prettier format check | ✅ |
-| ESLint (0 errors) | ✅ |
-| TypeScript typecheck | ✅ |
-| Vitest (全部通过) | ✅ |
-| 覆盖率低于阈值 | ✅ |
-| Config 校验 | ✅ |
-| Build 成功 | ✅ |
+| 检查                  | 阻断合并 |
+| --------------------- | -------- |
+| Prettier format check | ✅       |
+| ESLint (0 errors)     | ✅       |
+| TypeScript typecheck  | ✅       |
+| Vitest (全部通过)     | ✅       |
+| 覆盖率低于阈值        | ✅       |
+| Config 校验           | ✅       |
+| Build 成功            | ✅       |
 
 ### CI 流水线说明
 
 提交 PR 后 GitHub Actions 自动运行（`.github/workflows/ci.yml`）：
 
-| 步骤 | 命令 | 说明 |
-|------|------|------|
-| format:check | `prettier --check` | 代码格式一致性；失败时运行 `pnpm format` 自动修复 |
-| lint | `eslint src/` | 代码质量和潜在错误；**0 error 才通过**，warning 不阻断 |
-| typecheck | `tsc --noEmit` | TypeScript 类型检查；类型错误直接阻断 |
-| test | `vitest run --coverage` | 单元/集成测试 + 覆盖率报告；测试失败或覆盖率不达标均阻断 |
-| validate:config | `tsx scripts/validate-config.ts` | JSON 配置 schema 校验 + 模板引用完整性 |
-| build | `vite build` | 生产构建；确保代码可打包 |
+| 步骤            | 命令                             | 说明                                                     |
+| --------------- | -------------------------------- | -------------------------------------------------------- |
+| format:check    | `prettier --check`               | 代码格式一致性；失败时运行 `pnpm format` 自动修复        |
+| lint            | `eslint src/`                    | 代码质量和潜在错误；**0 error 才通过**，warning 不阻断   |
+| typecheck       | `tsc --noEmit`                   | TypeScript 类型检查；类型错误直接阻断                    |
+| test            | `vitest run --coverage`          | 单元/集成测试 + 覆盖率报告；测试失败或覆盖率不达标均阻断 |
+| validate:config | `tsx scripts/validate-config.ts` | JSON 配置 schema 校验 + 模板引用完整性                   |
+| build           | `vite build`                     | 生产构建；确保代码可打包                                 |
 
 合入 main 后触发部署流水线（`.github/workflows/deploy.yml`）：typecheck → test → build → GitHub Pages 部署。
 
 ## 目录命名
 
-| 类型 | 命名 | 示例 |
-|------|------|------|
-| 页面 | `kebab-case` | `position-hub.tsx` |
-| 组件 | `kebab-case` | `action-button.tsx` |
-| 工具 | `kebab-case` | `format-number.ts` |
-| 类型 | `kebab-case` | `player.ts` |
-| 测试 | `*.test.ts` | `time.test.ts` |
-| 引擎 | `kebab-case.ts` | `time-engine.ts` |
-| 配置 | `kebab-case.json` | `administrative.json` |
-| 枚举/常量 | `kebab-case.ts` | `enums.ts` |
+| 类型      | 命名              | 示例                  |
+| --------- | ----------------- | --------------------- |
+| 页面      | `kebab-case`      | `position-hub.tsx`    |
+| 组件      | `kebab-case`      | `action-button.tsx`   |
+| 工具      | `kebab-case`      | `format-number.ts`    |
+| 类型      | `kebab-case`      | `player.ts`           |
+| 测试      | `*.test.ts`       | `time.test.ts`        |
+| 引擎      | `kebab-case.ts`   | `time-engine.ts`      |
+| 配置      | `kebab-case.json` | `administrative.json` |
+| 枚举/常量 | `kebab-case.ts`   | `enums.ts`            |
 
 ## 常见任务
 
@@ -293,9 +292,8 @@ pnpm test:coverage     # 生成覆盖率报告
 ### 新增一个页面
 
 1. 在 `src/pages/<domain>/` 创建 `.tsx`
-2. 在 `src/app.tsx` 添加路由
-3. 在 `src/router.tsx` 的路由表中注册
-4. 在仪表盘添加入口条件 `dashboardEntries`
+2. 在 `src/app.tsx` 的 `<Routes>` 中添加路由
+3. 在 `FeatureRoadmap` 或当前导航组件中添加入口；未完成时保持 `planned` 且不提供路由
 
 ### 修改配置数值
 
