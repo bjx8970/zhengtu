@@ -66,13 +66,14 @@ export function resolveProjectMilestone(progress: number): ProjectMilestone {
  * 判断项目是否已进入烂尾风险区。
  *
  * 烂尾判定逻辑：
- * - 资金到位率 < 0.3 且进度 < 0.5 → 资金链断裂风险
- * - 进度停滞（current == previous）且审批超过 180 天 → 政策搁置风险
+ * - 资金到位率 < abandonedBudgetThreshold 且进度 < abandonedProgressThreshold → 资金链断裂风险
+ * - 进度停滞（current == previous）且审批超过 abandonedStagnationDays 天 → 政策搁置风险
  *
  * @param progress         当前进度
  * @param previousProgress 上一周期的进度
  * @param budgetRatio      资金到位率
  * @param approvalDays     审批天数
+ * @param config           行政线配置常量
  * @returns 是否烂尾
  */
 export function isAbandoned(
@@ -80,15 +81,22 @@ export function isAbandoned(
   previousProgress: number,
   budgetRatio: number,
   approvalDays: number,
+  config: AdminLineConfig,
 ): boolean {
   // 已完成的不会烂尾
   if (progress >= 1.0) return false;
 
-  // 资金链断裂：资金不足 30% 且进度不到一半
-  if (budgetRatio < 0.3 && progress < 0.5) return true;
+  // 资金链断裂：资金不足阈值且进度不到一半
+  if (budgetRatio < config.abandonedBudgetThreshold && progress < config.abandonedProgressThreshold)
+    return true;
 
-  // 政策搁置：停滞超过 180 天且进度仍低于 30%
-  if (progress === previousProgress && approvalDays > 180 && progress < 0.3) return true;
+  // 政策搁置：停滞超过阈值天数且进度仍低于 30%
+  if (
+    progress === previousProgress &&
+    approvalDays > config.abandonedStagnationDays &&
+    progress < config.abandonedBudgetThreshold
+  )
+    return true;
 
   return false;
 }

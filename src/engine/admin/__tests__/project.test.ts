@@ -15,6 +15,10 @@ const config: AdminLineConfig = {
   parkGrowthRate: 0.08,
   fiscalBalanceThreshold: 0.9,
   projectApprovalBaselineDays: 120,
+  abandonedBudgetThreshold: 0.3,
+  abandonedProgressThreshold: 0.5,
+  abandonedStagnationDays: 180,
+  expenditureEstimateRatio: 1.05,
 };
 
 describe('calculateProjectProgress', () => {
@@ -66,23 +70,23 @@ describe('resolveProjectMilestone', () => {
 
 describe('isAbandoned', () => {
   it('已完成项目不烂尾', () => {
-    expect(isAbandoned(1.0, 0.8, 0.1, 200)).toBe(false);
+    expect(isAbandoned(1.0, 0.8, 0.1, 200, config)).toBe(false);
   });
 
   it('资金断裂 → 烂尾', () => {
-    expect(isAbandoned(0.3, 0.3, 0.2, 30)).toBe(true);
+    expect(isAbandoned(0.3, 0.3, 0.2, 30, config)).toBe(true);
   });
 
   it('政策搁置 → 烂尾', () => {
-    expect(isAbandoned(0.2, 0.2, 0.5, 200)).toBe(true);
+    expect(isAbandoned(0.2, 0.2, 0.5, 200, config)).toBe(true);
   });
 
   it('正常进行 → 不烂尾', () => {
-    expect(isAbandoned(0.4, 0.3, 0.8, 60)).toBe(false);
+    expect(isAbandoned(0.4, 0.3, 0.8, 60, config)).toBe(false);
   });
 
   it('刚开工资金充足 → 不烂尾', () => {
-    expect(isAbandoned(0.1, 0.0, 1.0, 10)).toBe(false);
+    expect(isAbandoned(0.1, 0.0, 1.0, 10, config)).toBe(false);
   });
 });
 

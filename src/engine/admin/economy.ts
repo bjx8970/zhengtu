@@ -126,8 +126,8 @@ export function getEconomicSnapshot(
     config.investmentYieldRate,
   );
 
-  // 财政支出按收入的 105% 估算（略有赤字倾向）
-  const estimatedExpenditure = fiscalRevenue * 1.05;
+  // 财政支出按收入 × 估算系数 计算（略 >1 表示赤字倾向）
+  const estimatedExpenditure = fiscalRevenue * config.expenditureEstimateRatio;
   const fiscalBalance = calculateFiscalBalance(fiscalRevenue, estimatedExpenditure);
 
   return {

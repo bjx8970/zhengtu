@@ -225,6 +225,14 @@ export interface AdminLineConfig {
   fiscalBalanceThreshold: number;
   /** 项目审批充分完成的基准天数（审批超过此天数视为审批充分） */
   projectApprovalBaselineDays: number;
+  /** 烂尾判定：资金到位率低于此值且进度不足一半视为资金链断裂 */
+  abandonedBudgetThreshold: number;
+  /** 烂尾判定：资金链断裂/政策搁置进度参考阈值 */
+  abandonedProgressThreshold: number;
+  /** 烂尾判定：政策搁置停滞超过此天数视为烂尾 */
+  abandonedStagnationDays: number;
+  /** 财政支出估算系数（支出 = 收入 × 此系数，略 >1 表示赤字倾向） */
+  expenditureEstimateRatio: number;
 }
 
 /** 全局游戏配置常量（从 constants.json 读取） */

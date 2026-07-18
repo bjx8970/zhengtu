@@ -8,7 +8,7 @@
  */
 
 import type { JSX, Accessor } from 'solid-js';
-import { Show } from 'solid-js';
+import { Show, For } from 'solid-js';
 import { colors, radius, font } from '../../utils/theme';
 
 /** StepLayout 组件的属性 */
@@ -43,17 +43,19 @@ export function StepLayout(props: StepLayoutProps): JSX.Element {
       {/* 进度条 */}
       <div style={{ padding: '1.5rem 1.5rem 0' }}>
         <div style={{ display: 'flex', gap: '0.3rem', 'margin-bottom': '0.5rem' }}>
-          {Array.from({ length: props.total }, (_, i) => (
-            <div
-              style={{
-                flex: 1,
-                height: '3px',
-                'background-color': i <= props.step() ? colors.primary : colors.border,
-                'border-radius': radius.sm,
-                transition: 'background 0.3s',
-              }}
-            />
-          ))}
+          <For each={Array.from({ length: props.total }, (_, i) => i)}>
+            {(i) => (
+              <div
+                style={{
+                  flex: 1,
+                  height: '3px',
+                  'background-color': i <= props.step() ? colors.primary : colors.border,
+                  'border-radius': radius.sm,
+                  transition: 'background 0.3s',
+                }}
+              />
+            )}
+          </For>
         </div>
         <div style={{ 'font-size': '0.8rem', color: colors.textSecondary }}>
           第 {props.step() + 1}/{props.total} 步 — {stepLabels[props.step()]}

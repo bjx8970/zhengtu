@@ -15,6 +15,10 @@ const config: AdminLineConfig = {
   parkGrowthRate: 0.08,
   fiscalBalanceThreshold: 0.9,
   projectApprovalBaselineDays: 120,
+  abandonedBudgetThreshold: 0.3,
+  abandonedProgressThreshold: 0.5,
+  abandonedStagnationDays: 180,
+  expenditureEstimateRatio: 1.05,
 };
 
 describe('calculateGDPGrowth', () => {
