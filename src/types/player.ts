@@ -28,8 +28,12 @@ export interface SlotOccupant {
   actionId: string;
   deptId: string;
   actionName: string;
+  /** 启动时的行动分类快照，避免执行期间配置变化影响结算 */
+  category: 'major' | 'minor' | 'routine';
   startedAtDay: number;
   durationDays: number;
+  /** 启动时的冷却天数快照 */
+  cooldownDays: number;
 }
 
 /** 单个槽位等级组 */
@@ -63,6 +67,8 @@ export interface DepartmentState {
   cumulativeConsumption: number;
   /** 最近一次行动的日期（用于活跃度追踪，Phase 2 引入） */
   lastActionDay: number;
+  /** 行动 ID → 可再次启动的绝对游戏日 */
+  actionCooldownUntilDays: Record<string, number>;
 }
 
 /** 秘书运行时状态 */

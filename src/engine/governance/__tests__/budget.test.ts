@@ -25,6 +25,7 @@ function makeDeptState(overrides?: Partial<DepartmentState>): DepartmentState {
     monthlyConsumption: 50,
     cumulativeConsumption: 0,
     lastActionDay: 0,
+    actionCooldownUntilDays: {},
     ...overrides,
   };
 }

@@ -18,8 +18,10 @@ function pendingAction(): SlotOccupant {
     actionId: 'pending',
     deptId: 'admin_l1_0_dept_0',
     actionName: '待完成行动',
+    category: 'minor',
     startedAtDay: 0,
     durationDays: 3,
+    cooldownDays: 7,
   };
 }
 

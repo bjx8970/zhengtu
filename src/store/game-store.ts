@@ -26,6 +26,7 @@ import type {
   GameTime,
   SlotOccupant,
   CompletedActionNotification,
+  SlotTierKey,
 } from '../types/player';
 import type { TimeTrigger } from '../types/game';
 import {
@@ -168,7 +169,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
  * 新增系统时在此 union 中添加对应的 action type。
  */
 export type GameAction =
-  | { type: 'START_ACTION'; deptId: string; actionId: string }
+  | { type: 'START_ACTION'; deptId: string; actionId: string; tierKey: SlotTierKey }
   | { type: 'ADVANCE_TIME'; granularity: TimeGranularity; _rng?: () => number }
   | { type: 'CHOOSE_EVENT_OPTION'; eventId: string; optionIndex: number }
   | { type: 'PROCESS_DOCUMENT'; docId: string; action: FileAction }
@@ -252,6 +253,7 @@ function initializeDepartmentStates(draft: PlayerSave): void {
       monthlyConsumption: 0,
       cumulativeConsumption: 0,
       lastActionDay: 0,
+      actionCooldownUntilDays: {},
     };
   }
 }
@@ -393,12 +395,16 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       const actionConfig = deptConfig.actions.find((a) => a.id === action.actionId);
       if (!actionConfig) break;
 
-      const result = startAction(
-        actionConfig,
-        draft.slots,
-        draft.remainingBudget,
-        draft.totalDaysPlayed,
-      );
+      const deptState = draft.departmentStates[action.deptId];
+      const result = startAction({
+        action: actionConfig,
+        slotState: draft.slots,
+        remainingBudget: draft.remainingBudget,
+        currentDay: draft.totalDaysPlayed,
+        deptId: action.deptId,
+        tierKey: action.tierKey,
+        cooldownUntilDay: deptState?.actionCooldownUntilDays[action.actionId] ?? 0,
+      });
 
       if (!result.success) break;
 
@@ -406,8 +412,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
         actionId: actionConfig.id,
         deptId: action.deptId,
         actionName: actionConfig.name,
+        category: actionConfig.category,
         startedAtDay: draft.totalDaysPlayed,
         durationDays: actionConfig.durationDays,
+        cooldownDays: actionConfig.cooldownDays,
       };
 
       const tierKey = result.tierKey;
@@ -431,7 +439,6 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
         );
       }
 
-      const deptState = draft.departmentStates[action.deptId];
       if (deptState) {
         deptState.lastActionDay = draft.totalDaysPlayed;
       }
@@ -471,6 +478,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           const effects = resolveActionEffects(aCfg, action._rng);
           const deptState = draft.departmentStates[slotOccupant.deptId];
           if (deptState) {
+            if (slotOccupant.category !== 'routine') {
+              deptState.actionCooldownUntilDays[slotOccupant.actionId] =
+                slotOccupant.startedAtDay + slotOccupant.durationDays + slotOccupant.cooldownDays;
+            }
             for (const kpi of effects.kpiChanges) {
               const cur = deptState.kpiValues[kpi.indicatorId] ?? 0;
               if (kpi.operation === 'multiply') {
@@ -511,7 +522,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
                     : `${p.attr}${p.delta >= 0 ? '+' : ''}${p.delta}`,
               ),
             ],
-            completedAtDay: draft.totalDaysPlayed,
+            completedAtDay: slotOccupant.startedAtDay + slotOccupant.durationDays,
           });
         }
 

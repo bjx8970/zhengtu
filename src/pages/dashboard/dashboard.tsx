@@ -11,7 +11,7 @@
 
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
-import type { SlotOccupant } from '../../types/player';
+import type { SlotOccupant, SlotTierKey } from '../../types/player';
 import { formatDate } from '../../utils/format';
 import { calculateKPI } from '../../engine/governance/kpi';
 import { hasActiveActions } from '../../engine/core/action';
@@ -26,6 +26,25 @@ const TIER_COLOR: Record<string, string> = {
   secondary: '#6B8E6B',
   reserve: '#C44D4D',
 };
+
+const CATEGORY_LABEL: Record<string, string> = {
+  major: '重大',
+  minor: '次要',
+  routine: '日常',
+};
+
+const CATEGORY_COLOR: Record<string, string> = {
+  major: '#C44D4D',
+  minor: '#E6A817',
+  routine: '#6B8E6B',
+};
+
+/** 各级槽位按钮的显示顺序 */
+const TIER_BUTTONS: { key: SlotTierKey; label: string }[] = [
+  { key: 'primary', label: '主要' },
+  { key: 'secondary', label: '次要' },
+  { key: 'reserve', label: '加班' },
+];
 
 const GRANULARITIES: { key: TimeGranularity; label: string; days: number }[] = [
   { key: 'day', label: '推进1天', days: 1 },
@@ -123,8 +142,8 @@ export function Dashboard() {
 
   const hasPendingActions = createMemo(() => hasActiveActions(state.slots));
 
-  function startAction(deptId: string, actionId: string) {
-    dispatch({ type: 'START_ACTION', deptId, actionId });
+  function startAction(deptId: string, actionId: string, tierKey: SlotTierKey) {
+    dispatch({ type: 'START_ACTION', deptId, actionId, tierKey });
   }
 
   return (
@@ -239,7 +258,7 @@ export function Dashboard() {
                       'margin-left': '0.5rem',
                     }}
                   >
-                    ⚠️ 健康-5 消沉+3
+                    {`\u26A0\uFE0F 健康${getConfigLoader().getGameConfig().reservePenalty.health} 消沉+${getConfigLoader().getGameConfig().reservePenalty.demoralization}`}
                   </span>
                 )}
               </div>
@@ -352,85 +371,152 @@ export function Dashboard() {
             {(dept) => (
               <For each={dept().actions}>
                 {(action) => {
-                  const tiers = [state.slots.primary, state.slots.secondary, state.slots.reserve];
-                  const running = tiers.some((tier) =>
-                    tier.occupants.some((o: SlotOccupant | null) => o?.actionId === action.id),
+                  const categoryCfg = CATEGORY_LABEL[action.category] ?? action.category;
+                  const catColor = CATEGORY_COLOR[action.category] ?? colors.textSecondary;
+
+                  const deptState = state.departmentStates[dept().id];
+                  const cooldownUntil = deptState?.actionCooldownUntilDays[action.id] ?? 0;
+                  const onCooldown =
+                    action.category !== 'routine' && state.totalDaysPlayed < cooldownUntil;
+                  const cooldownRemain = onCooldown ? cooldownUntil - state.totalDaysPlayed : 0;
+
+                  const isRunningThisDept = (Object.keys(state.slots) as SlotTierKey[]).some((k) =>
+                    state.slots[k].occupants.some(
+                      (o: SlotOccupant | null) =>
+                        o?.actionId === action.id && o?.deptId === dept().id,
+                    ),
                   );
-                  const hasFreeSlot = tiers.some((tier) =>
-                    tier.occupants.some((o: SlotOccupant | null) => o === null),
-                  );
-                  const insufficientBudget = state.remainingBudget < action.budgetDelta;
-                  const canStart = !running && hasFreeSlot && !insufficientBudget;
 
                   return (
                     <div
                       style={{
                         ...darkCardStyle('0.5rem 0.8rem'),
                         'margin-bottom': '0.4rem',
-                        display: 'flex',
-                        'justify-content': 'space-between',
-                        'align-items': 'center',
                       }}
                     >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ 'font-size': '0.85rem', 'font-weight': 'bold' }}>
-                          {action.name}
-                          {action.minTier !== 'secondary' && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          'justify-content': 'space-between',
+                          'align-items': 'center',
+                        }}
+                      >
+                        <div style={{ flex: 1, 'min-width': 0 }}>
+                          <div style={{ 'font-size': '0.85rem', 'font-weight': 'bold' }}>
+                            {action.name}
                             <span
                               style={{
                                 'font-size': '0.65rem',
                                 'margin-left': '0.4rem',
                                 padding: '0.1rem 0.3rem',
                                 'border-radius': radius.sm,
-                                'background-color':
-                                  action.minTier === 'primary'
-                                    ? colors.primary + '44'
-                                    : colors.warning + '44',
-                                color:
-                                  action.minTier === 'primary' ? colors.primary : colors.warning,
+                                'background-color': catColor + '33',
+                                color: catColor,
                               }}
                             >
-                              {action.minTier === 'primary' ? '主要' : '加班'}
+                              {categoryCfg}
                             </span>
-                          )}
+                          </div>
+                          <div style={{ 'font-size': '0.7rem', color: colors.textMuted }}>
+                            {action.durationDays}天 · 预算{action.budgetDelta}万
+                            {action.cooldownDays > 0 && ` · 冷却${action.cooldownDays}天`}
+                            <Show when={action.effects.length > 0}>
+                              {' · '}
+                              {action.effects
+                                .map((e) => {
+                                  const label = e.target
+                                    .replace('dept.kpi.', '')
+                                    .replace('player.', '');
+                                  return `${label}${e.value >= 0 ? '+' : ''}${e.value}`;
+                                })
+                                .join(' ')}
+                            </Show>
+                          </div>
                         </div>
-                        <div style={{ 'font-size': '0.7rem', color: colors.textMuted }}>
-                          {action.durationDays}天 · 预算{action.budgetDelta}万
-                          <Show when={action.effects.length > 0}>
-                            {' · '}
-                            {action.effects
-                              .map((e) => {
-                                const label = e.target
-                                  .replace('dept.kpi.', '')
-                                  .replace('player.', '');
-                                return `${label}${e.value >= 0 ? '+' : ''}${e.value}`;
-                              })
-                              .join(' ')}
-                          </Show>
-                        </div>
+                        <Show when={isRunningThisDept}>
+                          <span
+                            style={{
+                              'font-size': '0.75rem',
+                              color: colors.primary,
+                              'margin-right': '0.5rem',
+                              'white-space': 'nowrap',
+                            }}
+                          >
+                            执行中
+                          </span>
+                        </Show>
                       </div>
-                      <button
-                        onClick={() => startAction(dept().id, action.id)}
-                        disabled={!canStart}
+
+                      {/* 冷却提示 */}
+                      <Show when={onCooldown}>
+                        <div
+                          style={{
+                            'font-size': '0.7rem',
+                            color: colors.warning,
+                            'margin-top': '0.3rem',
+                          }}
+                        >
+                          冷却还剩 {cooldownRemain} 天
+                        </div>
+                      </Show>
+
+                      {/* 槽位等级按钮 */}
+                      <div
                         style={{
-                          padding: '0.3rem 0.7rem',
-                          'font-size': '0.75rem',
-                          'background-color': canStart ? colors.primary : colors.border,
-                          color: canStart ? colors.primaryText : colors.textMuted,
-                          border: 'none',
-                          'border-radius': radius.sm,
-                          cursor: canStart ? 'pointer' : 'not-allowed',
-                          'white-space': 'nowrap',
+                          display: 'flex',
+                          gap: '0.3rem',
+                          'margin-top': '0.4rem',
+                          'flex-wrap': 'wrap',
                         }}
                       >
-                        {running
-                          ? '执行中'
-                          : insufficientBudget
-                            ? '预算不足'
-                            : !hasFreeSlot
-                              ? '无槽位'
-                              : `启动(${action.durationDays}天)`}
-                      </button>
+                        <For each={TIER_BUTTONS}>
+                          {(tb) => {
+                            const disallowedByCategory =
+                              action.category === 'major' && tb.key !== 'primary';
+                            if (disallowedByCategory) return null;
+
+                            const tierGroup = state.slots[tb.key];
+                            const hasFree = tierGroup.occupants.some(
+                              (o: SlotOccupant | null) => o === null,
+                            );
+                            const blockedByDuplicate =
+                              action.category !== 'routine' && isRunningThisDept;
+                            const insufficientBudget = state.remainingBudget < action.budgetDelta;
+                            const disabled =
+                              insufficientBudget || !hasFree || blockedByDuplicate || onCooldown;
+
+                            let tooltip = '';
+                            if (insufficientBudget) tooltip = '预算不足';
+                            else if (!hasFree) tooltip = '槽位已满';
+                            else if (blockedByDuplicate) tooltip = '执行中';
+                            else if (onCooldown) tooltip = `冷却${cooldownRemain}天`;
+
+                            return (
+                              <button
+                                onClick={() => startAction(dept().id, action.id, tb.key)}
+                                disabled={disabled}
+                                title={tooltip}
+                                style={{
+                                  padding: '0.25rem 0.5rem',
+                                  'font-size': '0.72rem',
+                                  'background-color': disabled
+                                    ? colors.border
+                                    : tb.key === 'reserve'
+                                      ? colors.danger
+                                      : colors.secondary,
+                                  color: disabled ? colors.textMuted : colors.white,
+                                  border: 'none',
+                                  'border-radius': radius.sm,
+                                  cursor: disabled ? 'not-allowed' : 'pointer',
+                                  'white-space': 'nowrap',
+                                }}
+                              >
+                                {tb.label}
+                              </button>
+                            );
+                          }}
+                        </For>
+                      </div>
                     </div>
                   );
                 }}

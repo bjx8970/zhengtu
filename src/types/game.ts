@@ -18,6 +18,8 @@ import type {
 } from './enums';
 import type { KPITier } from './enums';
 import type { SlotTierKey, SlotOccupant } from './player';
+import type { SlotState } from './player';
+import type { ActionTemplate } from './config';
 
 /** 时间推进后触发的周期事件 */
 export interface TimeTrigger {
@@ -47,9 +49,27 @@ export interface TimeAdvanceResult {
   triggers: TimeTrigger[];
 }
 
+/** 行动启动校验输入 */
+export interface StartActionInput {
+  action: ActionTemplate;
+  slotState: SlotState;
+  remainingBudget: number;
+  currentDay: number;
+  deptId: string;
+  tierKey: SlotTierKey;
+  /** 该部门中此行动当前的绝对冷却截止日，未设置时为 0 */
+  cooldownUntilDay: number;
+}
+
+/** 行动启动失败结果 */
+export interface StartActionFailure {
+  success: false;
+  error: string;
+}
+
 /** 行动启动结果（放入槽位时的校验结果） */
 export type StartActionResult =
-  { success: false; error: string } | { success: true; tierKey: SlotTierKey; slotIndex: number };
+  StartActionFailure | { success: true; tierKey: SlotTierKey; slotIndex: number };
 
 /** 槽位完成结果：已到期的行动记录 */
 export interface CompletedSlotAction {

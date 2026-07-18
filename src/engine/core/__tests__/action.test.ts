@@ -1,17 +1,32 @@
-import { describe, it, expect } from 'vitest';
-import { startAction, completeActions, hasActiveActions, resolveActionEffects } from '../action';
+import { describe, expect, it } from 'vitest';
+import { completeActions, hasActiveActions, resolveActionEffects, startAction } from '../action';
 import type { ActionTemplate } from '../../../types/config';
-import type { SlotState, SlotOccupant } from '../../../types/player';
+import type { SlotOccupant, SlotState } from '../../../types/player';
+import type { StartActionInput } from '../../../types/game';
 
 function makeAction(overrides?: Partial<ActionTemplate>): ActionTemplate {
   return {
     id: 'test_action',
     name: '测试行动',
     description: '用于测试',
+    category: 'minor',
     durationDays: 3,
-    minTier: 'primary',
+    cooldownDays: 5,
     budgetDelta: 10,
     effects: [{ target: 'dept.kpi.test_kpi', operation: 'add', value: 5 }],
+    ...overrides,
+  };
+}
+
+function occupant(overrides?: Partial<SlotOccupant>): SlotOccupant {
+  return {
+    actionId: 'other_action',
+    deptId: 'dept_a',
+    actionName: '行动',
+    category: 'minor',
+    startedAtDay: 0,
+    durationDays: 3,
+    cooldownDays: 5,
     ...overrides,
   };
 }
@@ -25,298 +40,179 @@ function makeSlotState(overrides?: Partial<SlotState>): SlotState {
   };
 }
 
-function occ(
-  actionId = 'a',
-  startedAtDay = 0,
-  durationDays = 3,
-  deptId = 'd',
-  actionName = 'A',
-): SlotOccupant {
-  return { actionId, deptId, actionName, startedAtDay, durationDays };
+function makeInput(overrides?: Partial<StartActionInput>): StartActionInput {
+  return {
+    action: makeAction(),
+    slotState: makeSlotState(),
+    remainingBudget: 1000,
+    currentDay: 10,
+    deptId: 'dept_a',
+    tierKey: 'primary',
+    cooldownUntilDay: 0,
+    ...overrides,
+  };
 }
 
-describe('hasActiveActions', () => {
-  it('所有槽位为空时返回 false', () => {
-    expect(hasActiveActions(makeSlotState())).toBe(false);
-  });
-
-  it('任一等级存在行动时返回 true', () => {
-    const state = makeSlotState({
-      reserve: { label: '备用', count: 1, occupants: [occ()] },
-    });
-    expect(hasActiveActions(state)).toBe(true);
-  });
-});
-
 describe('startAction', () => {
-  describe('slot allocation', () => {
-    it('分配到主要槽位', () => {
-      const result = startAction(makeAction(), makeSlotState(), 1000, 0);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.tierKey).toBe('primary');
-        expect(result.slotIndex).toBe(0);
-      }
+  it.each([
+    ['major', 'primary', true],
+    ['major', 'secondary', false],
+    ['major', 'reserve', false],
+    ['minor', 'primary', true],
+    ['minor', 'secondary', true],
+    ['minor', 'reserve', true],
+    ['routine', 'primary', true],
+    ['routine', 'secondary', true],
+    ['routine', 'reserve', true],
+  ] as const)('%s 使用 %s 槽位的结果为 %s', (category, tierKey, success) => {
+    const result = startAction(makeInput({ action: makeAction({ category }), tierKey }));
+    expect(result.success).toBe(success);
+  });
+
+  it('使用玩家指定等级的第一个空位，不自动改用其他等级', () => {
+    const slots = makeSlotState({
+      secondary: {
+        label: '次要',
+        count: 2,
+        occupants: [occupant({ actionId: 'occupied' }), null],
+      },
+    });
+    expect(startAction(makeInput({ slotState: slots, tierKey: 'secondary' }))).toEqual({
+      success: true,
+      tierKey: 'secondary',
+      slotIndex: 1,
     });
 
-    it('找到主要中第一个空位', () => {
-      const state = makeSlotState({
-        primary: { label: '主要', count: 3, occupants: [occ('a'), null, null] },
-      });
-      const result = startAction(makeAction(), state, 1000, 0);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.tierKey).toBe('primary');
-        expect(result.slotIndex).toBe(1);
-      }
-    });
-
-    it('主要满时分配到次要', () => {
-      const state = makeSlotState({
-        primary: { label: '主要', count: 3, occupants: [occ('a'), occ('b'), occ('c')] },
-      });
-      const result = startAction(makeAction({ minTier: 'secondary' }), state, 1000, 0);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.tierKey).toBe('secondary');
-      }
-    });
-
-    it('主要和次要满时分配到备用', () => {
-      const state = makeSlotState({
-        primary: { label: '主要', count: 3, occupants: [occ('a'), occ('b'), occ('c')] },
-        secondary: { label: '次要', count: 2, occupants: [occ('d'), occ('e')] },
-      });
-      const result = startAction(makeAction({ minTier: 'reserve' }), state, 1000, 0);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.tierKey).toBe('reserve');
-      }
-    });
-
-    it('所有槽位满时返回无空闲槽位', () => {
-      const state = makeSlotState({
-        primary: { label: '主要', count: 3, occupants: [occ('a'), occ('b'), occ('c')] },
-        secondary: { label: '次要', count: 2, occupants: [occ('d'), occ('e')] },
-        reserve: { label: '备用', count: 1, occupants: [occ('f')] },
-      });
-      const result = startAction(makeAction({ minTier: 'reserve' }), state, 1000, 0);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('无空闲槽位');
-      }
+    slots.secondary.occupants[1] = occupant({ actionId: 'occupied_2' });
+    expect(startAction(makeInput({ slotState: slots, tierKey: 'secondary' }))).toEqual({
+      success: false,
+      error: '所选槽位等级无空闲槽位',
     });
   });
 
-  describe('tier filtering', () => {
-    it('primary 行动只能放主要槽位', () => {
-      const state = makeSlotState({
-        primary: { label: '主要', count: 3, occupants: [occ('a'), occ('b'), occ('c')] },
-      });
-      const result = startAction(makeAction({ minTier: 'primary' }), state, 1000, 0);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('无空闲槽位');
-      }
+  it('routine 允许同部门同行动并行', () => {
+    const slots = makeSlotState({
+      primary: {
+        label: '主要',
+        count: 3,
+        occupants: [occupant({ actionId: 'test_action', category: 'routine' }), null, null],
+      },
     });
+    const result = startAction(
+      makeInput({ action: makeAction({ category: 'routine' }), slotState: slots }),
+    );
+    expect(result).toEqual({ success: true, tierKey: 'primary', slotIndex: 1 });
+  });
 
-    it('secondary 行动可放主要或次要', () => {
-      const state = makeSlotState();
-      const result = startAction(makeAction({ minTier: 'secondary' }), state, 1000, 0);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.tierKey).toBe('primary');
-      }
+  it('minor 拒绝同部门同行动重复，但允许不同部门的同 ID 行动', () => {
+    const slots = makeSlotState({
+      primary: {
+        label: '主要',
+        count: 3,
+        occupants: [occupant({ actionId: 'test_action', deptId: 'dept_a' }), null, null],
+      },
+    });
+    expect(startAction(makeInput({ slotState: slots }))).toEqual({
+      success: false,
+      error: '该部门的行动已在执行中',
+    });
+    expect(startAction(makeInput({ slotState: slots, deptId: 'dept_b' }))).toEqual({
+      success: true,
+      tierKey: 'primary',
+      slotIndex: 1,
     });
   });
 
-  describe('budget check', () => {
-    it('预算不足时拒绝', () => {
-      const result = startAction(makeAction({ budgetDelta: 100 }), makeSlotState(), 50, 0);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('预算不足');
-      }
-    });
+  it('major/minor 在截止日前拒绝，截止日当天允许，routine 忽略冷却', () => {
+    expect(startAction(makeInput({ currentDay: 9, cooldownUntilDay: 10 })).success).toBe(false);
+    expect(startAction(makeInput({ currentDay: 10, cooldownUntilDay: 10 })).success).toBe(true);
+    expect(
+      startAction(
+        makeInput({
+          action: makeAction({ category: 'routine' }),
+          currentDay: 1,
+          cooldownUntilDay: 100,
+        }),
+      ).success,
+    ).toBe(true);
+  });
 
-    it('预算刚好够时通过', () => {
-      const result = startAction(makeAction({ budgetDelta: 50 }), makeSlotState(), 50, 0);
-      expect(result.success).toBe(true);
+  it('预算不足时返回准确错误', () => {
+    expect(startAction(makeInput({ remainingBudget: 9 }))).toEqual({
+      success: false,
+      error: '预算不足',
     });
   });
 
-  describe('duplicate check', () => {
-    it('已在执行中的行动不能重复启动', () => {
-      const state = makeSlotState({
-        primary: {
-          label: '主要',
-          count: 3,
-          occupants: [occ('test_action', 0, 5, 'dept_a'), null, null],
-        },
-      });
-      const result = startAction(makeAction(), state, 1000, 0);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('已在执行中');
-      }
-    });
-
-    it('同一行动在不同部门先执行时不能重复启动', () => {
-      const state = makeSlotState({
-        primary: {
-          label: '主要',
-          count: 3,
-          occupants: [null, null, null],
-        },
-        secondary: {
-          label: '次要',
-          count: 2,
-          occupants: [occ('test_action', 0, 5, 'other_dept'), null],
-        },
-      });
-      const result = startAction(makeAction(), state, 1000, 0);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('已在执行中');
-      }
-    });
-
-    it('不同行动可以同时执行', () => {
-      const state = makeSlotState({
-        primary: { label: '主要', count: 3, occupants: [occ('other_action'), null, null] },
-      });
-      const result = startAction(makeAction(), state, 1000, 0);
-      expect(result.success).toBe(true);
-    });
+  it('不修改任何输入', () => {
+    const input = makeInput();
+    const before = structuredClone(input);
+    startAction(input);
+    expect(input).toEqual(before);
   });
 });
 
-describe('completeActions', () => {
-  it('返回已完成行动', () => {
-    const state = makeSlotState({
-      primary: { label: '主要', count: 3, occupants: [occ('a', 0, 5), null, null] },
+describe('action queue helpers', () => {
+  it('正确识别活动行动', () => {
+    expect(hasActiveActions(makeSlotState())).toBe(false);
+    expect(
+      hasActiveActions(
+        makeSlotState({
+          reserve: { label: '备用', count: 1, occupants: [occupant()] },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('仅返回达到名义完成日的行动及槽位位置', () => {
+    const slots = makeSlotState({
+      primary: {
+        label: '主要',
+        count: 3,
+        occupants: [occupant({ actionId: 'done', durationDays: 5 }), null, null],
+      },
+      secondary: {
+        label: '次要',
+        count: 2,
+        occupants: [occupant({ actionId: 'pending', durationDays: 6 }), null],
+      },
     });
-    const completed = completeActions(state, 5);
+    const completed = completeActions(slots, 5);
     expect(completed).toHaveLength(1);
-    expect(completed[0]!.occupant.actionId).toBe('a');
-    expect(completed[0]!.tierKey).toBe('primary');
-    expect(completed[0]!.slotIndex).toBe(0);
-  });
-
-  it('不返回未完成行动', () => {
-    const state = makeSlotState({
-      primary: { label: '主要', count: 3, occupants: [occ('a', 0, 5), null, null] },
-    });
-    const completed = completeActions(state, 4);
-    expect(completed).toHaveLength(0);
-  });
-
-  it('边界值：等于 durationDays 时完成', () => {
-    const state = makeSlotState({
-      primary: { label: '主要', count: 3, occupants: [occ('a', 0, 5), null, null] },
-    });
-    const completed = completeActions(state, 5);
-    expect(completed).toHaveLength(1);
-  });
-
-  it('返回多个 tier 中已完成行动', () => {
-    const state = makeSlotState({
-      primary: { label: '主要', count: 3, occupants: [occ('a', 0, 3), null, null] },
-      secondary: { label: '次要', count: 2, occupants: [occ('b', 0, 5), null] },
-    });
-    const completed = completeActions(state, 4);
-    expect(completed).toHaveLength(1);
-    expect(completed[0]!.occupant.actionId).toBe('a');
-  });
-
-  it('跳过空槽位', () => {
-    const state = makeSlotState();
-    const completed = completeActions(state, 100);
-    expect(completed).toHaveLength(0);
+    expect(completed[0]).toMatchObject({ tierKey: 'primary', slotIndex: 0 });
+    expect(completed[0]?.occupant.actionId).toBe('done');
   });
 });
 
 describe('resolveActionEffects', () => {
-  it('解析 KPI 效果', () => {
-    const action = makeAction({
-      effects: [{ target: 'dept.kpi.gdp', operation: 'add', value: 10 }],
+  it('解析 KPI、玩家及操作类型', () => {
+    const result = resolveActionEffects(
+      makeAction({
+        effects: [
+          { target: 'dept.kpi.gdp', operation: 'multiply', value: 1.5 },
+          { target: 'player.competence', operation: 'set', value: 80 },
+        ],
+      }),
+    );
+    expect(result.kpiChanges[0]).toEqual({
+      indicatorId: 'gdp',
+      operation: 'multiply',
+      delta: 1.5,
     });
-    const result = resolveActionEffects(action);
-    expect(result.kpiChanges).toHaveLength(1);
-    expect(result.kpiChanges[0]!.indicatorId).toBe('gdp');
-    expect(result.kpiChanges[0]!.operation).toBe('add');
-    expect(result.kpiChanges[0]!.delta).toBe(10);
-    expect(result.playerChanges).toHaveLength(0);
-  });
-
-  it('解析 Player 效果', () => {
-    const action = makeAction({
-      effects: [{ target: 'player.competence', operation: 'add', value: 5 }],
+    expect(result.playerChanges[0]).toEqual({
+      attr: 'competence',
+      operation: 'set',
+      delta: 80,
     });
-    const result = resolveActionEffects(action);
-    expect(result.playerChanges).toHaveLength(1);
-    expect(result.playerChanges[0]!.attr).toBe('competence');
-    expect(result.playerChanges[0]!.operation).toBe('add');
-    expect(result.playerChanges[0]!.delta).toBe(5);
-    expect(result.kpiChanges).toHaveLength(0);
   });
 
-  it('透传 multiply 操作', () => {
-    const action = makeAction({
-      effects: [{ target: 'dept.kpi.gdp', operation: 'multiply', value: 1.5 }],
-    });
-    const result = resolveActionEffects(action);
-    expect(result.kpiChanges[0]!.operation).toBe('multiply');
-    expect(result.kpiChanges[0]!.delta).toBe(1.5);
-  });
-
-  it('透传 set 操作', () => {
-    const action = makeAction({
-      effects: [{ target: 'player.competence', operation: 'set', value: 80 }],
-    });
-    const result = resolveActionEffects(action);
-    expect(result.playerChanges[0]!.operation).toBe('set');
-    expect(result.playerChanges[0]!.delta).toBe(80);
-  });
-
-  it('混合效果', () => {
-    const action = makeAction({
-      effects: [
-        { target: 'dept.kpi.gdp', operation: 'add', value: 10 },
-        { target: 'player.competence', operation: 'add', value: 5 },
-      ],
-    });
-    const result = resolveActionEffects(action);
-    expect(result.kpiChanges).toHaveLength(1);
-    expect(result.playerChanges).toHaveLength(1);
-  });
-
-  it('空效果列表', () => {
-    const action = makeAction({ effects: [] });
-    const result = resolveActionEffects(action);
-    expect(result.kpiChanges).toHaveLength(0);
-    expect(result.playerChanges).toHaveLength(0);
-  });
-
-  it('range 效果使用注入的 RNG 确定值', () => {
+  it('使用注入 RNG 解析闭区间范围', () => {
     const action = makeAction({
       effects: [
         { target: 'dept.kpi.gdp', operation: 'add', value: 0, range: { min: 10, max: 20 } },
       ],
     });
-    // 注入 RNG 返回 0（映射为 min=10）
-    const result = resolveActionEffects(action, () => 0);
-    expect(result.kpiChanges[0]!.delta).toBe(10);
-  });
-
-  it('range 效果使用注入的 RNG 确定值（上界）', () => {
-    const action = makeAction({
-      effects: [
-        { target: 'dept.kpi.gdp', operation: 'add', value: 0, range: { min: 10, max: 20 } },
-      ],
-    });
-    // 注入 RNG 返回 0.9999（映射为 max=20）
-    const result = resolveActionEffects(action, () => 0.9999);
-    expect(result.kpiChanges[0]!.delta).toBe(20);
+    expect(resolveActionEffects(action, () => 0).kpiChanges[0]?.delta).toBe(10);
+    expect(resolveActionEffects(action, () => 0.9999).kpiChanges[0]?.delta).toBe(20);
   });
 });
