@@ -6,15 +6,21 @@
  * Phase 3 待扩展为完整的派系博弈计算。
  */
 
+import type { FactionPenaltyConfig } from '../../types/config';
+
 /**
  * 从派系声望差异计算惩罚值。
  *
  * 规则：max 与 second 声望差值越大，派系对立越强，惩罚越高。
  *
  * @param factionReputation 各派系声望记录
- * @returns 惩罚分（0~15）
+ * @param cfg               派系惩罚配置常量（reputationDivisor / maxPenalty）
+ * @returns 惩罚分（0~maxPenalty）
  */
-export function calculateFactionPenalty(factionReputation: Record<string, number>): number {
+export function calculateFactionPenalty(
+  factionReputation: Record<string, number>,
+  cfg: FactionPenaltyConfig,
+): number {
   const reputations = Object.values(factionReputation).filter((v) => v > 0);
   if (reputations.length <= 1) return 0;
 
@@ -22,5 +28,5 @@ export function calculateFactionPenalty(factionReputation: Record<string, number
   const max = sorted[0] ?? 0;
   const second = sorted[1] ?? 0;
 
-  return Math.round(((max - second) / 100) * 15);
+  return Math.round(((max - second) / cfg.reputationDivisor) * cfg.maxPenalty);
 }

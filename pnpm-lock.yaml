@@ -8,12 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@preact/signals-core':
-        specifier: ^1.8.0
-        version: 1.14.4
-      '@solidjs/router':
-        specifier: ^0.15.0
-        version: 0.15.4(solid-js@1.9.14)
       '@supabase/supabase-js':
         specifier: ^2.49.0
         version: 2.110.5
@@ -30,12 +24,6 @@ importers:
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.1
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^8.0.0
-        version: 8.64.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5)(typescript@5.9.3))(eslint@9.39.5)(typescript@5.9.3)
-      '@typescript-eslint/parser':
-        specifier: ^8.0.0
-        version: 8.64.0(eslint@9.39.5)(typescript@5.9.3)
       '@vitest/coverage-v8':
         specifier: ^3.0.0
         version: 3.2.7(vitest@3.2.7)
@@ -605,9 +593,6 @@ packages:
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
-
-  '@preact/signals-core@1.14.4':
-    resolution: {integrity: sha512-HNB6HYeYKhQbJ1aKl+YRjrS4+QWHLKX6qKoUsfS/m0vqzsVaEBiZiaKbG/e+NKk2ch5ALQr/ihWaMHxiCuuWHA==}
 
   '@rollup/rollup-android-arm-eabi@4.62.2':
     resolution: {integrity: sha512-6o7ZLZK+BeenkZCFNDXqpbjw9bD6nuWonvS/lwQJp7NoVVxm6p3qE7qQ5jGuBjiFsgvqjD8mZAU5oWxTmbOeOg==}
@@ -2336,8 +2321,6 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
-  '@preact/signals-core@1.14.4': {}
-
   '@rollup/rollup-android-arm-eabi@4.62.2':
     optional: true
 
@@ -2416,6 +2399,7 @@ snapshots:
   '@solidjs/router@0.15.4(solid-js@1.9.14)':
     dependencies:
       solid-js: 1.9.14
+    optional: true
 
   '@solidjs/testing-library@0.8.10(@solidjs/router@0.15.4(solid-js@1.9.14))(solid-js@1.9.14)':
     dependencies:

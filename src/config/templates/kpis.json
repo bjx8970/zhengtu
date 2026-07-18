@@ -254,5 +254,101 @@
     "weight": 0.5,
     "unit": "分",
     "calcType": "ratio"
+  },
+  "investment_attraction": {
+    "id": "investment_attraction",
+    "name": "招商引资到位率",
+    "targetValue": 100,
+    "weight": 0.15,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "industrial_output": {
+    "id": "industrial_output",
+    "name": "规上工业产值增长",
+    "targetValue": 100,
+    "weight": 0.12,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "land_revenue": {
+    "id": "land_revenue",
+    "name": "土地出让收入",
+    "targetValue": 100,
+    "weight": 0.1,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "project_approval": {
+    "id": "project_approval",
+    "name": "重点项目开工率",
+    "targetValue": 90,
+    "weight": 0.15,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "business_env": {
+    "id": "business_env",
+    "name": "营商环境评分",
+    "targetValue": 85,
+    "weight": 0.12,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "poverty_alleviation": {
+    "id": "poverty_alleviation",
+    "name": "脱贫巩固率",
+    "targetValue": 95,
+    "weight": 0.1,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "urban_mgmt": {
+    "id": "urban_mgmt",
+    "name": "城市管理评分",
+    "targetValue": 80,
+    "weight": 0.08,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "infrastructure": {
+    "id": "infrastructure",
+    "name": "基建完成率",
+    "targetValue": 100,
+    "weight": 0.12,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "digital_gov": {
+    "id": "digital_gov",
+    "name": "数字政府建设率",
+    "targetValue": 80,
+    "weight": 0.08,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "healthcare_cov": {
+    "id": "healthcare_cov",
+    "name": "医疗覆盖率",
+    "targetValue": 90,
+    "weight": 0.08,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "enterprise_svc": {
+    "id": "enterprise_svc",
+    "name": "企业服务满意度",
+    "targetValue": 85,
+    "weight": 0.1,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "fiscal_balance": {
+    "id": "fiscal_balance",
+    "name": "财政收支平衡度",
+    "targetValue": 100,
+    "weight": 0.1,
+    "unit": "%",
+    "calcType": "ratio"
   }
 }

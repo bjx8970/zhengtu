@@ -42,18 +42,20 @@ function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
 }
 
 describe('calculateFactionPenalty', () => {
+  const fpCfg = cfg.promotion.factionPenalty;
+
   it('单派系有声望 → 0', () => {
-    expect(calculateFactionPenalty({ reform: 30, pragmatic: 0, conservative: 0 })).toBe(0);
+    expect(calculateFactionPenalty({ reform: 30, pragmatic: 0, conservative: 0 }, fpCfg)).toBe(0);
   });
 
   it('双派系差距大 → 高分惩罚', () => {
-    const result = calculateFactionPenalty({ reform: 80, pragmatic: 20, conservative: 0 });
+    const result = calculateFactionPenalty({ reform: 80, pragmatic: 20, conservative: 0 }, fpCfg);
     expect(result).toBeGreaterThan(0);
-    expect(result).toBeLessThanOrEqual(15);
+    expect(result).toBeLessThanOrEqual(fpCfg.maxPenalty);
   });
 
   it('三派系均衡 → 低惩罚', () => {
-    const result = calculateFactionPenalty({ reform: 30, pragmatic: 30, conservative: 30 });
+    const result = calculateFactionPenalty({ reform: 30, pragmatic: 30, conservative: 30 }, fpCfg);
     expect(result).toBe(0);
   });
 });

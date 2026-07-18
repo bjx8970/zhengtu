@@ -131,3 +131,26 @@ export enum InvestigationEvidence {
 
 /** 时间推进粒度：玩家可选择按天/按周/按月推进 */
 export type TimeGranularity = 'day' | 'week' | 'month';
+
+/** 项目里程碑阶段（行政线专属），内部使用英文标识 */
+export enum ProjectMilestone {
+  /** 项目刚开工 */
+  Groundbreaking = 'groundbreaking',
+  /** 项目主体建设中 */
+  MidConstruction = 'mid_construction',
+  /** 项目主体结构封顶 */
+  ToppedOff = 'topped_off',
+  /** 项目竣工交付 */
+  Completed = 'completed',
+  /** 项目因资金/政策等原因停工 */
+  Abandoned = 'abandoned',
+}
+
+/** 项目里程碑阶段的中文显示文本映射 */
+export const PROJECT_MILESTONE_LABELS: Record<ProjectMilestone, string> = {
+  [ProjectMilestone.Groundbreaking]: '开工',
+  [ProjectMilestone.MidConstruction]: '建设中',
+  [ProjectMilestone.ToppedOff]: '主体封顶',
+  [ProjectMilestone.Completed]: '竣工',
+  [ProjectMilestone.Abandoned]: '烂尾',
+};

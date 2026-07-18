@@ -140,12 +140,26 @@ export interface SlotConfig {
   month: number;
 }
 
+/** 派系惩罚配置常量 */
+export interface FactionPenaltyConfig {
+  /** 声望差值归一化除数（max - second 除以该值得到差异比例） */
+  reputationDivisor: number;
+  /** 惩罚值上限（惩罚范围 0~maxPenalty） */
+  maxPenalty: number;
+}
+
 /** 晋升引擎配置常量 */
 export interface PromotionConfig {
   democraticVote: {
     passThreshold: number;
     connectionsBonus: number;
     connectionsRiskProbability: number;
+    /** 考核得分的权重（各权重之和应为 1.0） */
+    scoreWeight: number;
+    /** 魅力的权重 */
+    charismaWeight: number;
+    /** 上司好感的权重 */
+    superiorFavorWeight: number;
   };
   orgInspection: {
     excellentThreshold: number;
@@ -153,15 +167,31 @@ export interface PromotionConfig {
     suspendedThreshold: number;
     influencePoliticalCost: number;
     influenceScoreBonus: number;
+    /** 政绩的权重 */
+    performanceWeight: number;
+    /** 能力的权重 */
+    competenceWeight: number;
+    /** 考核得分的权重 */
+    scoreWeight: number;
+    /** 廉洁的权重 */
+    integrityWeight: number;
   };
   jointReview: {
     disciplineCorruptionThreshold: number;
     otherDepartmentsPassRate: number;
+    /** 腐败风险归一化除数（将 0-100 的 corruptionRisk 映射为影响因子） */
+    complaintNormalizer: number;
   };
   committeeVote: {
     minSize: number;
     maxSize: number;
     sizePerLevelInterval: number;
+    /** 赞成率归一化除数（avgReputation + superiorFavor 各 0-100，除以此值归一化到 0-1） */
+    approvalDivisor: number;
+    /** 派系惩罚值归一化除数（除以该值转为对通过率的影响） */
+    factionPenaltyDivisor: number;
+    /** 常委会票决最低通过率保底值 */
+    minApprovalRate: number;
   };
   publicNotice: {
     complaintProbPerRisk: number;
@@ -169,12 +199,40 @@ export interface PromotionConfig {
   };
   probation: {
     passThreshold: number;
+    /** 试用期考核随机因素最大值（0~randomFactorMax 的均匀分布） */
+    randomFactorMax: number;
   };
   progression: {
     demoralizationOnFail: number;
     demoralizationOnRejected: number;
     politicalCapitalBonusOnSuccess: number;
   };
+  /** 派系惩罚参数 */
+  factionPenalty: FactionPenaltyConfig;
+}
+
+/** 行政线专属配置常量 */
+export interface AdminLineConfig {
+  /** 招商引资的标准收益率 */
+  investmentYieldRate: number;
+  /** 项目完��的基础推进率 */
+  projectCompletionBaseRate: number;
+  /** 土地出让收入的倍率系数 */
+  landRevenueMultiplier: number;
+  /** 产业园区的增长速率 */
+  parkGrowthRate: number;
+  /** 财政收支平衡的达标阈值 */
+  fiscalBalanceThreshold: number;
+  /** 项目审批充分完成的基准天数（审批超过此天数视为审批充分） */
+  projectApprovalBaselineDays: number;
+  /** 烂尾判定：资金到位率低于此值且进度不足一半视为资金链断裂 */
+  abandonedBudgetThreshold: number;
+  /** 烂尾判定：资金链断裂/政策搁置进度参考阈值 */
+  abandonedProgressThreshold: number;
+  /** 烂尾判定：政策搁置停滞超过此天数视为烂尾 */
+  abandonedStagnationDays: number;
+  /** 财政支出估算系数（支出 = 收入 × 此系数，略 >1 表示赤字倾向） */
+  expenditureEstimateRatio: number;
 }
 
 /** 全局游戏配置常量（从 constants.json 读取） */
@@ -221,6 +279,8 @@ export interface GameConfig {
   completionBarThresholds: { excellent: number; good: number };
   /** 晋升引擎阈值配置 */
   promotion: PromotionConfig;
+  /** 行政线专属配置 */
+  adminLine: AdminLineConfig;
 }
 
 /** 省份/地区配置（regions.json） */

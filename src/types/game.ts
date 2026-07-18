@@ -10,13 +10,16 @@
 import type {
   FileType,
   FileCategory,
+  FileAction,
   SentimentType,
+  TimeGranularity,
   OrgInspectResult,
   PromotionStage,
   Faction,
   InvestigationEvidence,
 } from './enums';
 import type { KPITier } from './enums';
+import type { PlayerSave } from './player';
 
 /** 时间推进后触发的周期事件 */
 export interface TimeTrigger {
@@ -260,3 +263,25 @@ export interface SuperiorAction {
   favorGain: number;
   description: string;
 }
+
+/**
+ * 全局可派发的动作类型。
+ *
+ * 新增系统时在此 union 中添加对应的 action type。
+ */
+export type GameAction =
+  | { type: 'EXECUTE_ACTION'; deptId: string; actionId: string }
+  | { type: 'ADVANCE_TIME'; granularity: TimeGranularity }
+  | { type: 'SET_GRANULARITY'; granularity: TimeGranularity }
+  | { type: 'CHOOSE_EVENT_OPTION'; eventId: string; optionIndex: number }
+  | { type: 'PROCESS_DOCUMENT'; docId: string; action: FileAction }
+  | { type: 'START_PROMOTION' }
+  | { type: 'RESET_PROMOTION' }
+  | {
+      type: 'PROMOTION_RESOLVE_STAGE';
+      choices?: { useConnections?: boolean; influenceInspectors?: boolean };
+      /** 仅测试用：注入随机数生成器 */
+      _rng?: () => number;
+    }
+  | { type: 'LOAD_SAVE'; save: PlayerSave }
+  | { type: 'NEW_GAME'; data: Record<string, unknown> };
