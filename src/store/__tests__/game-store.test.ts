@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createInitialState, createTestStore, dispatch } from '../game-store';
 // 模块级 dispatch（而非 createTestStore）在此文件中用于持久化测项，
-// 因为 createTestStore 的 dispatch 故意不触发 localStorage/Supabase 写入。
+// 因为 createTestStore 的 dispatch 故意不触发 localStorage 写入。
 import type { PlayerSave, SlotOccupant } from '../../types/player';
 import { CareerLine, PromotionStage } from '../../types/enums';
 
