@@ -14,6 +14,7 @@ import { useGameStore } from '../../store/game-store';
 import type { SlotOccupant } from '../../types/player';
 import { formatDate } from '../../utils/format';
 import { calculateKPI } from '../../engine/governance/kpi';
+import { hasActiveActions } from '../../engine/core/action';
 import { getConfigLoader } from '../../config/loader';
 import { PromotionStage, KPITier } from '../../types/enums';
 import type { TimeGranularity } from '../../types/enums';
@@ -110,6 +111,17 @@ export function Dashboard() {
       state.promotionStage === PromotionStage.DemocraticVote ||
       state.promotionStage === PromotionStage.OrgInspection,
   );
+
+  const hasNextLevel = createMemo(() => {
+    const line = getConfigLoader().getCareerLine(state.currentCareerLine);
+    return (
+      line?.levels.some(
+        (level) => level.level === state.currentLevel + 1 && level.positions.length > 0,
+      ) ?? false
+    );
+  });
+
+  const hasPendingActions = createMemo(() => hasActiveActions(state.slots));
 
   function startAction(deptId: string, actionId: string) {
     dispatch({ type: 'START_ACTION', deptId, actionId });
@@ -480,23 +492,36 @@ export function Dashboard() {
             </Show>
           </div>
 
-          <Show when={!isActivePromotion() && state.promotionStage !== PromotionStage.Completed}>
-            <button
-              onClick={() => dispatch({ type: 'START_PROMOTION' })}
-              disabled={state.frozenPeriods > 0}
-              style={{
-                padding: '0.5rem 1rem',
-                'font-size': '0.85rem',
-                'background-color': state.frozenPeriods > 0 ? colors.border : colors.primary,
-                color: state.frozenPeriods > 0 ? colors.textMuted : colors.primaryText,
-                border: 'none',
-                'border-radius': radius.sm,
-                cursor: state.frozenPeriods > 0 ? 'not-allowed' : 'pointer',
-                'margin-bottom': '0.5rem',
-              }}
+          <Show when={state.promotionStage === PromotionStage.Idle}>
+            <Show
+              when={hasNextLevel()}
+              fallback={<div style={{ color: colors.textMuted }}>已达当前版本最高等级</div>}
             >
-              启动晋升
-            </button>
+              <button
+                onClick={() => dispatch({ type: 'START_PROMOTION' })}
+                disabled={state.frozenPeriods > 0 || hasPendingActions()}
+                style={{
+                  padding: '0.5rem 1rem',
+                  'font-size': '0.85rem',
+                  'background-color':
+                    state.frozenPeriods > 0 || hasPendingActions() ? colors.border : colors.primary,
+                  color:
+                    state.frozenPeriods > 0 || hasPendingActions()
+                      ? colors.textMuted
+                      : colors.primaryText,
+                  border: 'none',
+                  'border-radius': radius.sm,
+                  cursor:
+                    state.frozenPeriods > 0 || hasPendingActions() ? 'not-allowed' : 'pointer',
+                  'margin-bottom': '0.5rem',
+                }}
+              >
+                启动晋升
+              </button>
+              <Show when={hasPendingActions()}>
+                <div style={{ color: colors.warning }}>请先完成当前行动，再启动晋升</div>
+              </Show>
+            </Show>
           </Show>
 
           <Show when={isActivePromotion()}>
@@ -563,6 +588,23 @@ export function Dashboard() {
 
           <Show when={state.promotionStage === PromotionStage.Completed}>
             <div style={{ color: colors.success, 'margin-bottom': '0.5rem' }}>晋升成功！</div>
+            <Show
+              when={hasNextLevel()}
+              fallback={
+                <>
+                  <div style={{ color: colors.textMuted, 'margin-bottom': '0.5rem' }}>
+                    已达当前版本最高等级
+                  </div>
+                  <button onClick={() => dispatch({ type: 'RESET_PROMOTION' })} style={btnStyle()}>
+                    继续任职
+                  </button>
+                </>
+              }
+            >
+              <button onClick={() => dispatch({ type: 'RESET_PROMOTION' })} style={btnStyle()}>
+                开始新任期
+              </button>
+            </Show>
           </Show>
 
           <Show when={state.promotionStage === PromotionStage.Failed}>

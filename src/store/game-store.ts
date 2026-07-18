@@ -28,7 +28,12 @@ import type {
   CompletedActionNotification,
 } from '../types/player';
 import type { TimeTrigger } from '../types/game';
-import { startAction, completeActions, resolveActionEffects } from '../engine/core/action';
+import {
+  startAction,
+  completeActions,
+  resolveActionEffects,
+  hasActiveActions,
+} from '../engine/core/action';
 import { advanceTime, getGranularityDays } from '../engine/core/time';
 import { monthlySettlement } from '../engine/governance/budget';
 import { calculateKPI } from '../engine/governance/kpi';
@@ -568,15 +573,22 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       break;
     }
     case 'RESET_PROMOTION': {
+      if (
+        draft.promotionStage !== PromotionStage.Completed &&
+        draft.promotionStage !== PromotionStage.Failed
+      ) {
+        break;
+      }
       draft.promotionStage = PromotionStage.Idle;
       draft.promotionState = null;
       break;
     }
     case 'START_PROMOTION': {
-      // 晋升进行中不能重新触发
-      if (!canAct(draft.promotionStage)) break;
+      if (draft.promotionStage !== PromotionStage.Idle) break;
       // 冻结期中不能晋升
       if (draft.frozenPeriods > 0) break;
+      // 旧岗位行动依赖当前部门配置，必须先完成后再进入晋升流程。
+      if (hasActiveActions(draft.slots)) break;
 
       const nextLevel = draft.currentLevel + 1;
       const lineCfg = getConfigLoader().getCareerLine(draft.currentCareerLine);
@@ -735,12 +747,29 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
         case PromotionStage.Probation: {
           const result = resolveProbation(ctxStore, cfgPromoStore, rng);
           if (result.passed) {
-            // 晋升成功：更新职位
-            const oldPos = getConfigLoader().getPosition(
+            if (ps.targetLevel !== draft.currentLevel + 1) {
+              draft.promotionStage = PromotionStage.Failed;
+              ps.currentStage = PromotionStage.Failed;
+              break;
+            }
+
+            const loader = getConfigLoader();
+            const oldPos = loader.getPosition(
               draft.currentCareerLine,
               draft.currentLevel,
               extractPositionIndex(draft.currentPositionId),
             );
+            const targetPos = loader.getPosition(
+              draft.currentCareerLine,
+              ps.targetLevel,
+              extractPositionIndex(ps.targetPositionId),
+            );
+            if (!targetPos || targetPos.id !== ps.targetPositionId) {
+              draft.promotionStage = PromotionStage.Failed;
+              ps.currentStage = PromotionStage.Failed;
+              break;
+            }
+
             const careerRecord: CareerRecord = {
               positionId: draft.currentPositionId,
               positionName: oldPos?.name ?? draft.currentPositionId,
@@ -748,13 +777,18 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
               careerLine: draft.currentCareerLine,
               startYear: draft.time.year - draft.yearsInCurrentPosition,
               endYear: draft.time.year,
-              assessmentResults: draft.annualAssessments.map((a) => a.tier),
+              assessmentResults: draft.annualAssessments.map((assessment) => ({
+                ...assessment,
+              })),
               archived: false,
             };
             draft.careerHistory.push(careerRecord);
             draft.currentPositionId = ps.targetPositionId;
             draft.currentLevel = ps.targetLevel;
             draft.yearsInCurrentPosition = 0;
+            draft.remainingBudget = targetPos.annualBudget;
+            draft.annualAssessments = [];
+            draft.comprehensiveScore = 0;
             draft.politicalCapital = clamp(
               draft.politicalCapital +
                 cfgPromoStore.promotion.progression.politicalCapitalBonusOnSuccess,
