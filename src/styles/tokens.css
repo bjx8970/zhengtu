@@ -215,7 +215,6 @@ a:focus-visible {
   font-weight: 700;
 }
 
-
 @media (max-width: 640px) {
   .app-container {
     padding: 0 12px 32px;

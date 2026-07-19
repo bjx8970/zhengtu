@@ -118,7 +118,7 @@ Tests use `createTestStore()` for isolation. Never import the module-level `disp
 
 ```typescript
 export enum Faction {
-  Reform = 'reform',        // key for JSON/DB
+  Reform = 'reform', // key for JSON/DB
   Pragmatic = 'pragmatic',
   Conservative = 'conservative',
 }

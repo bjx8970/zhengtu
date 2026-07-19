@@ -1,166 +1,392 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>人脉关系 - 征途工作台</title>
-  <style>
-    :root {
-      --bg-main: #eeece6; --bg-card: #fffdf8; --bg-soft: #f8f4ec; --bg-header: #172b45;
-      --text-primary: #202a35; --text-secondary: #657080; --text-muted: #8d939b;
-      --color-primary: #b3262d; --color-secondary: #284b70; --color-success: #4caf50;
-      --color-warning: #e6a817; --color-danger: #c44d4d; --color-gold: #b78324; --color-cyan: #3b7f8f;
-      --border-color: #d8d4cc; --border-light: #e8e4dc; --radius-md: 4px; --radius-lg: 8px;
-      --font-title: 'STKaiti', 'KaiTi', '楷体', serif;
-      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { height: 100%; font-family: var(--font-body); background: var(--bg-main); color: var(--text-primary); }
-    .page { max-width: 900px; margin: 0 auto; padding: 0 16px 40px; }
-    .page-header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: var(--bg-header); color: #fff; border-radius: 0 0 var(--radius-lg) var(--radius-lg); box-shadow: 0 4px 16px rgba(23,43,69,0.18); }
-    .back-btn { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.25); border-radius: 50%; background: transparent; color: #fff; font-size: 16px; cursor: pointer; }
-    .back-btn:hover { background: rgba(255,255,255,0.1); }
-    .page-header__title { font-size: 18px; font-weight: 700; font-family: var(--font-title); }
-    .page-header__desc { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
-    .section { margin-top: 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 18px 20px; }
-    .section__title { font-size: 16px; font-weight: 700; font-family: var(--font-title); margin-bottom: 4px; }
-    .section__desc { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>人脉关系 - 征途工作台</title>
+    <style>
+      :root {
+        --bg-main: #eeece6;
+        --bg-card: #fffdf8;
+        --bg-soft: #f8f4ec;
+        --bg-header: #172b45;
+        --text-primary: #202a35;
+        --text-secondary: #657080;
+        --text-muted: #8d939b;
+        --color-primary: #b3262d;
+        --color-secondary: #284b70;
+        --color-success: #4caf50;
+        --color-warning: #e6a817;
+        --color-danger: #c44d4d;
+        --color-gold: #b78324;
+        --color-cyan: #3b7f8f;
+        --border-color: #d8d4cc;
+        --border-light: #e8e4dc;
+        --radius-md: 4px;
+        --radius-lg: 8px;
+        --font-title: 'STKaiti', 'KaiTi', '楷体', serif;
+        --font-body:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+          'Microsoft YaHei', sans-serif;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        font-family: var(--font-body);
+        background: var(--bg-main);
+        color: var(--text-primary);
+      }
+      .page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 0 16px 40px;
+      }
+      .page-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 20px;
+        background: var(--bg-header);
+        color: #fff;
+        border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+        box-shadow: 0 4px 16px rgba(23, 43, 69, 0.18);
+      }
+      .back-btn {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 50%;
+        background: transparent;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .back-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .page-header__title {
+        font-size: 18px;
+        font-weight: 700;
+        font-family: var(--font-title);
+      }
+      .page-header__desc {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 2px;
+      }
+      .section {
+        margin-top: 16px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 18px 20px;
+      }
+      .section__title {
+        font-size: 16px;
+        font-weight: 700;
+        font-family: var(--font-title);
+        margin-bottom: 4px;
+      }
+      .section__desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 14px;
+      }
 
-    .relation-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-    .relation-tab { padding: 6px 14px; border: 1px solid var(--border-color); border-radius: 999px; font-size: 12px; font-weight: 700; background: #fff; cursor: pointer; transition: all 0.15s; }
-    .relation-tab--active { background: var(--color-secondary); border-color: var(--color-secondary); color: #fff; }
-    .relation-tab:hover:not(.relation-tab--active) { border-color: var(--color-secondary); }
+      .relation-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      .relation-tab {
+        padding: 6px 14px;
+        border: 1px solid var(--border-color);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        background: #fff;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .relation-tab--active {
+        background: var(--color-secondary);
+        border-color: var(--color-secondary);
+        color: #fff;
+      }
+      .relation-tab:hover:not(.relation-tab--active) {
+        border-color: var(--color-secondary);
+      }
 
-    .person-card { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; padding: 14px; border: 1px solid var(--border-light); border-radius: var(--radius-lg); background: #fff; margin-bottom: 10px; transition: all 0.15s; }
-    .person-card:hover { border-color: var(--color-secondary); box-shadow: 0 2px 8px rgba(40,75,112,0.06); }
-    .person-card__avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; font-size: 18px; font-weight: 900; font-family: var(--font-title); color: #fff; }
-    .person-card__name { font-size: 14px; font-weight: 700; }
-    .person-card__role { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-    .person-card__score { text-align: right; }
-    .person-card__score-num { font-size: 18px; font-weight: 900; }
-    .person-card__score-label { font-size: 11px; color: var(--text-muted); }
-    .person-card__bar { grid-column: 1 / -1; height: 5px; border-radius: 999px; background: #e7e1d6; overflow: hidden; }
-    .person-card__bar-fill { height: 100%; border-radius: inherit; }
+      .person-card {
+        display: grid;
+        grid-template-columns: 44px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 14px;
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-lg);
+        background: #fff;
+        margin-bottom: 10px;
+        transition: all 0.15s;
+      }
+      .person-card:hover {
+        border-color: var(--color-secondary);
+        box-shadow: 0 2px 8px rgba(40, 75, 112, 0.06);
+      }
+      .person-card__avatar {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        font-size: 18px;
+        font-weight: 900;
+        font-family: var(--font-title);
+        color: #fff;
+      }
+      .person-card__name {
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .person-card__role {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 3px;
+      }
+      .person-card__score {
+        text-align: right;
+      }
+      .person-card__score-num {
+        font-size: 18px;
+        font-weight: 900;
+      }
+      .person-card__score-label {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+      .person-card__bar {
+        grid-column: 1 / -1;
+        height: 5px;
+        border-radius: 999px;
+        background: #e7e1d6;
+        overflow: hidden;
+      }
+      .person-card__bar-fill {
+        height: 100%;
+        border-radius: inherit;
+      }
 
-    .faction-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-    @media (max-width: 600px) { .faction-grid { grid-template-columns: 1fr; } }
-    .faction-card { padding: 16px; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: #fff; text-align: center; }
-    .faction-card__name { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
-    .faction-card__num { font-size: 28px; font-weight: 900; font-family: var(--font-title); }
-    .faction-card__bar { height: 6px; border-radius: 999px; background: #e7e1d6; overflow: hidden; margin-top: 10px; }
-    .faction-card__bar-fill { height: 100%; border-radius: inherit; }
-    .faction-card__desc { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+      .faction-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+      @media (max-width: 600px) {
+        .faction-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .faction-card {
+        padding: 16px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        background: #fff;
+        text-align: center;
+      }
+      .faction-card__name {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .faction-card__num {
+        font-size: 28px;
+        font-weight: 900;
+        font-family: var(--font-title);
+      }
+      .faction-card__bar {
+        height: 6px;
+        border-radius: 999px;
+        background: #e7e1d6;
+        overflow: hidden;
+        margin-top: 10px;
+      }
+      .faction-card__bar-fill {
+        height: 100%;
+        border-radius: inherit;
+      }
+      .faction-card__desc {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 8px;
+      }
 
-    .tag { padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-    .planned-notice { padding: 14px; border: 1px dashed var(--border-color); border-radius: var(--radius-lg); text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 16px; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <header class="page-header">
-      <button class="back-btn" title="返回工作台">←</button>
-      <div>
-        <div class="page-header__title">人脉关系</div>
-        <div class="page-header__desc">维护六类关系网络，助力仕途发展</div>
-      </div>
-    </header>
-
-    <!-- 关系分类 -->
-    <section class="section">
-      <h2 class="section__title">关系网络</h2>
-      <p class="section__desc">点击分类查看对应人脉，关系值影响晋升投票与事件触发。</p>
-      <div class="relation-tabs">
-        <button class="relation-tab relation-tab--active">同事</button>
-        <button class="relation-tab">同学</button>
-        <button class="relation-tab">商界</button>
-        <button class="relation-tab">学界</button>
-        <button class="relation-tab">媒体</button>
-        <button class="relation-tab">中央</button>
-      </div>
-
-      <!-- 同事列表 -->
-      <div class="person-card">
-        <div class="person-card__avatar" style="background: var(--color-secondary);">王</div>
+      .tag {
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .planned-notice {
+        padding: 14px;
+        border: 1px dashed var(--border-color);
+        border-radius: var(--radius-lg);
+        text-align: center;
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-top: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="page-header">
+        <button class="back-btn" title="返回工作台">←</button>
         <div>
-          <div class="person-card__name">王志明</div>
-          <div class="person-card__role">市政府办公室副主任 · 直属上级</div>
+          <div class="page-header__title">人脉关系</div>
+          <div class="page-header__desc">维护六类关系网络，助力仕途发展</div>
         </div>
-        <div class="person-card__score">
-          <div class="person-card__score-num" style="color: var(--color-success);">72</div>
-          <div class="person-card__score-label">好感度</div>
-        </div>
-        <div class="person-card__bar"><div class="person-card__bar-fill" style="width: 72%; background: var(--color-success)"></div></div>
-      </div>
+      </header>
 
-      <div class="person-card">
-        <div class="person-card__avatar" style="background: var(--color-cyan);">张</div>
-        <div>
-          <div class="person-card__name">张丽华</div>
-          <div class="person-card__role">综合科科长 · 平级同事</div>
+      <!-- 关系分类 -->
+      <section class="section">
+        <h2 class="section__title">关系网络</h2>
+        <p class="section__desc">点击分类查看对应人脉，关系值影响晋升投票与事件触发。</p>
+        <div class="relation-tabs">
+          <button class="relation-tab relation-tab--active">同事</button>
+          <button class="relation-tab">同学</button>
+          <button class="relation-tab">商界</button>
+          <button class="relation-tab">学界</button>
+          <button class="relation-tab">媒体</button>
+          <button class="relation-tab">中央</button>
         </div>
-        <div class="person-card__score">
-          <div class="person-card__score-num" style="color: var(--color-secondary);">58</div>
-          <div class="person-card__score-label">好感度</div>
-        </div>
-        <div class="person-card__bar"><div class="person-card__bar-fill" style="width: 58%; background: var(--color-secondary)"></div></div>
-      </div>
 
-      <div class="person-card">
-        <div class="person-card__avatar" style="background: var(--color-gold);">刘</div>
-        <div>
-          <div class="person-card__name">刘国强</div>
-          <div class="person-card__role">经济发展办公室主任 · 平级同事</div>
+        <!-- 同事列表 -->
+        <div class="person-card">
+          <div class="person-card__avatar" style="background: var(--color-secondary)">王</div>
+          <div>
+            <div class="person-card__name">王志明</div>
+            <div class="person-card__role">市政府办公室副主任 · 直属上级</div>
+          </div>
+          <div class="person-card__score">
+            <div class="person-card__score-num" style="color: var(--color-success)">72</div>
+            <div class="person-card__score-label">好感度</div>
+          </div>
+          <div class="person-card__bar">
+            <div
+              class="person-card__bar-fill"
+              style="width: 72%; background: var(--color-success)"
+            ></div>
+          </div>
         </div>
-        <div class="person-card__score">
-          <div class="person-card__score-num" style="color: var(--color-warning);">45</div>
-          <div class="person-card__score-label">好感度</div>
-        </div>
-        <div class="person-card__bar"><div class="person-card__bar-fill" style="width: 45%; background: var(--color-warning)"></div></div>
-      </div>
 
-      <div class="person-card">
-        <div class="person-card__avatar" style="background: var(--color-primary);">陈</div>
-        <div>
-          <div class="person-card__name">陈建军</div>
-          <div class="person-card__role">市委组织部干部科科长 · 关键人脉</div>
+        <div class="person-card">
+          <div class="person-card__avatar" style="background: var(--color-cyan)">张</div>
+          <div>
+            <div class="person-card__name">张丽华</div>
+            <div class="person-card__role">综合科科长 · 平级同事</div>
+          </div>
+          <div class="person-card__score">
+            <div class="person-card__score-num" style="color: var(--color-secondary)">58</div>
+            <div class="person-card__score-label">好感度</div>
+          </div>
+          <div class="person-card__bar">
+            <div
+              class="person-card__bar-fill"
+              style="width: 58%; background: var(--color-secondary)"
+            ></div>
+          </div>
         </div>
-        <div class="person-card__score">
-          <div class="person-card__score-num" style="color: var(--color-danger);">32</div>
-          <div class="person-card__score-label">好感度</div>
-        </div>
-        <div class="person-card__bar"><div class="person-card__bar-fill" style="width: 32%; background: var(--color-danger)"></div></div>
-      </div>
-    </section>
 
-    <!-- 派系声望 -->
-    <section class="section">
-      <h2 class="section__title">派系声望</h2>
-      <p class="section__desc">当前归属：独立。派系声望影响晋升联审与票决阶段的投票倾向。</p>
-      <div class="faction-grid">
-        <div class="faction-card">
-          <div class="faction-card__name" style="color: var(--color-primary);">改革派</div>
-          <div class="faction-card__num" style="color: var(--color-primary);">15</div>
-          <div class="faction-card__bar"><div class="faction-card__bar-fill" style="width: 15%; background: var(--color-primary)"></div></div>
-          <div class="faction-card__desc">主张制度创新与开放</div>
+        <div class="person-card">
+          <div class="person-card__avatar" style="background: var(--color-gold)">刘</div>
+          <div>
+            <div class="person-card__name">刘国强</div>
+            <div class="person-card__role">经济发展办公室主任 · 平级同事</div>
+          </div>
+          <div class="person-card__score">
+            <div class="person-card__score-num" style="color: var(--color-warning)">45</div>
+            <div class="person-card__score-label">好感度</div>
+          </div>
+          <div class="person-card__bar">
+            <div
+              class="person-card__bar-fill"
+              style="width: 45%; background: var(--color-warning)"
+            ></div>
+          </div>
         </div>
-        <div class="faction-card">
-          <div class="faction-card__name" style="color: var(--color-secondary);">务实派</div>
-          <div class="faction-card__num" style="color: var(--color-secondary);">28</div>
-          <div class="faction-card__bar"><div class="faction-card__bar-fill" style="width: 28%; background: var(--color-secondary)"></div></div>
-          <div class="faction-card__desc">注重经济发展实绩</div>
-        </div>
-        <div class="faction-card">
-          <div class="faction-card__name" style="color: var(--color-gold);">保守派</div>
-          <div class="faction-card__num" style="color: var(--color-gold);">10</div>
-          <div class="faction-card__bar"><div class="faction-card__bar-fill" style="width: 10%; background: var(--color-gold)"></div></div>
-          <div class="faction-card__desc">强调稳定与纪律</div>
-        </div>
-      </div>
-    </section>
 
-    <div class="planned-notice">
-      关系互动（送礼、宴请、求助）功能将在后续版本开放
+        <div class="person-card">
+          <div class="person-card__avatar" style="background: var(--color-primary)">陈</div>
+          <div>
+            <div class="person-card__name">陈建军</div>
+            <div class="person-card__role">市委组织部干部科科长 · 关键人脉</div>
+          </div>
+          <div class="person-card__score">
+            <div class="person-card__score-num" style="color: var(--color-danger)">32</div>
+            <div class="person-card__score-label">好感度</div>
+          </div>
+          <div class="person-card__bar">
+            <div
+              class="person-card__bar-fill"
+              style="width: 32%; background: var(--color-danger)"
+            ></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 派系声望 -->
+      <section class="section">
+        <h2 class="section__title">派系声望</h2>
+        <p class="section__desc">当前归属：独立。派系声望影响晋升联审与票决阶段的投票倾向。</p>
+        <div class="faction-grid">
+          <div class="faction-card">
+            <div class="faction-card__name" style="color: var(--color-primary)">改革派</div>
+            <div class="faction-card__num" style="color: var(--color-primary)">15</div>
+            <div class="faction-card__bar">
+              <div
+                class="faction-card__bar-fill"
+                style="width: 15%; background: var(--color-primary)"
+              ></div>
+            </div>
+            <div class="faction-card__desc">主张制度创新与开放</div>
+          </div>
+          <div class="faction-card">
+            <div class="faction-card__name" style="color: var(--color-secondary)">务实派</div>
+            <div class="faction-card__num" style="color: var(--color-secondary)">28</div>
+            <div class="faction-card__bar">
+              <div
+                class="faction-card__bar-fill"
+                style="width: 28%; background: var(--color-secondary)"
+              ></div>
+            </div>
+            <div class="faction-card__desc">注重经济发展实绩</div>
+          </div>
+          <div class="faction-card">
+            <div class="faction-card__name" style="color: var(--color-gold)">保守派</div>
+            <div class="faction-card__num" style="color: var(--color-gold)">10</div>
+            <div class="faction-card__bar">
+              <div
+                class="faction-card__bar-fill"
+                style="width: 10%; background: var(--color-gold)"
+              ></div>
+            </div>
+            <div class="faction-card__desc">强调稳定与纪律</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="planned-notice">关系互动（送礼、宴请、求助）功能将在后续版本开放</div>
     </div>
-  </div>
-</body>
+  </body>
 </html>

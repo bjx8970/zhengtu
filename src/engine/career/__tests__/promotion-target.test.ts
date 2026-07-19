@@ -141,12 +141,7 @@ describe('validatePromotionTarget', () => {
   });
 
   it('已到达最高等级 → invalid', () => {
-    const result = validatePromotionTarget(
-      'any_pos',
-      3,
-      adminCfg,
-      makeCtx({ playerLevel: 3 }),
-    );
+    const result = validatePromotionTarget('any_pos', 3, adminCfg, makeCtx({ playerLevel: 3 }));
     expect(result.valid).toBe(false);
     expect(result.reason).toContain('最高等级');
   });

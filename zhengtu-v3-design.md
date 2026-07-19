@@ -6,16 +6,16 @@
 
 ### 1.1 规模估算
 
-| 维度 | 数量 | 说明 |
-|------|------|------|
-| 职业线 | 4 | 行政/党务/纪检/群团 |
-| 级别 | 11 | 科员→正部 |
-| 职位 | ~154 | 每级 3~4 个 |
-| 部门 | ~660 | 每职位 4~5 个 |
-| 行动 | ~2,000 | 每部门 2~4 个 |
-| KPI 指标 | ~660 | 每职位 4~5 项 |
-| 页面 | ~35 | 含子页面 |
-| 玩家属性 | 50+ | 含嵌套结构 |
+| 维度     | 数量   | 说明                |
+| -------- | ------ | ------------------- |
+| 职业线   | 4      | 行政/党务/纪检/群团 |
+| 级别     | 11     | 科员→正部           |
+| 职位     | ~154   | 每级 3~4 个         |
+| 部门     | ~660   | 每职位 4~5 个       |
+| 行动     | ~2,000 | 每部门 2~4 个       |
+| KPI 指标 | ~660   | 每职位 4~5 项       |
+| 页面     | ~35    | 含子页面            |
+| 玩家属性 | 50+    | 含嵌套结构          |
 
 ### 1.2 设计原则
 
@@ -31,13 +31,13 @@
 
 ### 2.1 候选方案对比
 
-| 方案 | 打包体积(估) | 开发效率 | 状态管理 | 生态 | 部署 |
-|------|-------------|---------|---------|------|------|
-| Vanilla HTML/JS | ~50KB | 低（手动 DOM） | 自建 pub/sub | 无 | 静态 |
-| **Preact + Signals** | **~15KB** | **高** | **Signals 响应式** | **React 兼容** | **静态** |
-| Svelte 5 | ~30KB | 高 | 内置 runes | 较小 | 静态 |
-| React 19 | ~45KB | 高 | useState/Reducer | 最大 | 静态 |
-| Vue 3 | ~35KB | 中高 | Composition API | 大 | 静态 |
+| 方案                 | 打包体积(估) | 开发效率       | 状态管理           | 生态           | 部署     |
+| -------------------- | ------------ | -------------- | ------------------ | -------------- | -------- |
+| Vanilla HTML/JS      | ~50KB        | 低（手动 DOM） | 自建 pub/sub       | 无             | 静态     |
+| **Preact + Signals** | **~15KB**    | **高**         | **Signals 响应式** | **React 兼容** | **静态** |
+| Svelte 5             | ~30KB        | 高             | 内置 runes         | 较小           | 静态     |
+| React 19             | ~45KB        | 高             | useState/Reducer   | 最大           | 静态     |
+| Vue 3                | ~35KB        | 中高           | Composition API    | 大             | 静态     |
 
 ### 2.2 推荐方案：Preact + Signals + esbuild
 
@@ -263,30 +263,30 @@ src/
 // types/enums.ts
 
 export enum CareerLine {
-  Administrative = 'admin',    // 行政线
-  Party = 'party',             // 党务线
-  Discipline = 'discipline',   // 纪检线
-  Mass = 'mass',               // 群团线
+  Administrative = 'admin', // 行政线
+  Party = 'party', // 党务线
+  Discipline = 'discipline', // 纪检线
+  Mass = 'mass', // 群团线
 }
 
 export enum LevelLabel {
-  L1  = '科员',
-  L2  = '副科',
-  L3  = '正科',
-  L4  = '副处',
-  L5  = '正处',
-  L6  = '正处上',
-  L7  = '副厅',
-  L8  = '正厅',
-  L9  = '正厅上',
+  L1 = '科员',
+  L2 = '副科',
+  L3 = '正科',
+  L4 = '副处',
+  L5 = '正处',
+  L6 = '正处上',
+  L7 = '副厅',
+  L8 = '正厅',
+  L9 = '正厅上',
   L10 = '副部',
   L11 = '正部',
 }
 
 export enum KPITier {
-  Excellent = '优秀',    // >= 90
-  Competent = '称职',    // >= 75
-  Basic = '基本称职',    // >= 60
+  Excellent = '优秀', // >= 90
+  Competent = '称职', // >= 75
+  Basic = '基本称职', // >= 60
   Incompetent = '不称职', // < 60
 }
 
@@ -345,18 +345,18 @@ export enum Faction {
 }
 
 export enum SecretaryLevel {
-  Junior = '初级',       // 0-99
-  Assistant = '助理',    // 100-299
-  Director = '主任',     // 300-599
-  Senior = '资深',       // 600-999
-  Chief = '首席',        // 1000+
+  Junior = '初级', // 0-99
+  Assistant = '助理', // 100-299
+  Director = '主任', // 300-599
+  Senior = '资深', // 600-999
+  Chief = '首席', // 1000+
 }
 
 export enum ReserveCadreTier {
   None = 0,
-  First = 1,    // 近期提拔
-  Second = 2,   // 中期储备
-  Third = 3,    // 长期储备
+  First = 1, // 近期提拔
+  Second = 2, // 中期储备
+  Third = 3, // 长期储备
 }
 
 export enum InvestigationEvidence {
@@ -379,10 +379,10 @@ import { CareerLine, FileType, FileCategory } from './enums';
 // ============ KPI 指标 ============
 
 export interface KPIIndicatorConfig {
-  id: string;                    // 如 'gdp_growth'
-  name: string;                  // 如 '城市GDP增长率'
-  targetValue: number;           // 目标值（百分比或绝对值）
-  weight: number;                // 权重（0~1，同职位下所有权重之和=1）
+  id: string; // 如 'gdp_growth'
+  name: string; // 如 '城市GDP增长率'
+  targetValue: number; // 目标值（百分比或绝对值）
+  weight: number; // 权重（0~1，同职位下所有权重之和=1）
   unit: '%' | '万元' | '分' | '次' | '个';
   calcType: 'ratio' | 'absolute' | 'inverse';
   // ratio: 完成率 = current / target
@@ -393,18 +393,18 @@ export interface KPIIndicatorConfig {
 // ============ 部门行动 ============
 
 export interface DeptActionConfig {
-  id: string;                    // 如 'approve_major_project'
-  name: string;                  // 如 '审批重大工程项目'
-  description: string;           // 效果描述
-  apCost: number;                // AP 消耗
-  cooldownDays: number;          // 冷却天数
-  budgetDelta: number;           // 额外资金消耗（万元）
-  effects: ActionEffect[];       // 对 KPI/属性的影响
-  unlockRank?: number;           // 解锁条件（可选）
+  id: string; // 如 'approve_major_project'
+  name: string; // 如 '审批重大工程项目'
+  description: string; // 效果描述
+  apCost: number; // AP 消耗
+  cooldownDays: number; // 冷却天数
+  budgetDelta: number; // 额外资金消耗（万元）
+  effects: ActionEffect[]; // 对 KPI/属性的影响
+  unlockRank?: number; // 解锁条件（可选）
 }
 
 export interface ActionEffect {
-  target: string;                // 目标标识：'dept.kpi.{kpiId}' 或 'player.{attr}'
+  target: string; // 目标标识：'dept.kpi.{kpiId}' 或 'player.{attr}'
   operation: 'add' | 'multiply' | 'set';
   value: number;
   // 支持范围值：{ min, max } 随机
@@ -414,25 +414,26 @@ export interface ActionEffect {
 // ============ 部门配置 ============
 
 export interface DepartmentConfig {
-  id: string;                    // 如 'admin_l3_0_dept_urban'
-  name: string;                  // 如 '城建部门'
+  id: string; // 如 'admin_l3_0_dept_urban'
+  name: string; // 如 '城建部门'
   consumptionCoefficient: number; // 资金消耗系数
-  baseConsumption: number;       // 基础月消耗（万元）
-  actions: DeptActionConfig[];   // 2~4 个专属行动
+  baseConsumption: number; // 基础月消耗（万元）
+  actions: DeptActionConfig[]; // 2~4 个专属行动
   kpiIndicators: KPIIndicatorConfig[]; // 部门级 KPI（1~3 项）
 }
 
 // ============ 职位配置 ============
 
 export interface PositionConfig {
-  id: string;                    // 如 'admin_l3_0' (行政线-级别3-职位0)
-  name: string;                  // 如 '镇长'
-  level: number;                 // 1~11
+  id: string; // 如 'admin_l3_0' (行政线-级别3-职位0)
+  name: string; // 如 '镇长'
+  level: number; // 1~11
   careerLine: CareerLine;
   departments: DepartmentConfig[]; // 4~5 个部门
   kpiIndicators: KPIIndicatorConfig[]; // 职位级 KPI（4~5 项）
-  annualBudget: number;          // 年度拨款（万元）
-  prerequisites?: {              // 任职前置条件（用于晋升选择）
+  annualBudget: number; // 年度拨款（万元）
+  prerequisites?: {
+    // 任职前置条件（用于晋升选择）
     minYearsInLevel?: number;
     requiresGrassroots?: boolean;
     requiresMultiRegion?: boolean;
@@ -442,18 +443,18 @@ export interface PositionConfig {
 // ============ 级别配置 ============
 
 export interface LevelConfig {
-  level: number;                 // 1~11
-  label: string;                 // '科员' / '副科' / ...
-  positions: PositionConfig[];   // 3~4 个职位
+  level: number; // 1~11
+  label: string; // '科员' / '副科' / ...
+  positions: PositionConfig[]; // 3~4 个职位
   promotionRequirements: PromotionRequirement; // 晋升到下一级的条件
 }
 
 export interface PromotionRequirement {
-  minYearsInService: number;     // 最低任职年限
-  minAssessmentPasses: number;   // 至少N次称职以上
+  minYearsInService: number; // 最低任职年限
+  minAssessmentPasses: number; // 至少N次称职以上
   politicalConditions: string[]; // 政治条件描述
-  specialConditions?: string[];  // 特殊条件（如基层主官经历）
-  canBreakRules?: boolean;       // 是否允许破格（副厅以上false）
+  specialConditions?: string[]; // 特殊条件（如基层主官经历）
+  canBreakRules?: boolean; // 是否允许破格（副厅以上false）
 }
 
 // ============ 职业线配置 ============
@@ -461,10 +462,10 @@ export interface PromotionRequirement {
 export interface CareerLineConfig {
   id: CareerLine;
   name: string;
-  color: string;                 // 主题色
+  color: string; // 主题色
   description: string;
-  levels: LevelConfig[];         // 11 个级别
-  privileges: string[];          // 路线特权说明
+  levels: LevelConfig[]; // 11 个级别
+  privileges: string[]; // 路线特权说明
 }
 ```
 
@@ -478,11 +479,11 @@ import { CareerLine, PromotionStage, ReserveCadreTier, Faction, SecretaryLevel }
 // ============ 部门运行时状态 ============
 
 export interface DepartmentState {
-  id: string;                    // 对应 DepartmentConfig.id
-  kpiValues: Record<string, number>;   // KPI id → 当前值
-  monthlyConsumption: number;    // 当月消耗
+  id: string; // 对应 DepartmentConfig.id
+  kpiValues: Record<string, number>; // KPI id → 当前值
+  monthlyConsumption: number; // 当月消耗
   cumulativeConsumption: number; // 累计消耗
-  activityLevel: number;         // 活跃度 0.5~2.0
+  activityLevel: number; // 活跃度 0.5~2.0
   actionCooldowns: Record<string, number>; // actionId → 冷却到期日（游戏内时间戳）
 }
 
@@ -503,27 +504,27 @@ export interface CareerRecord {
   level: number;
   careerLine: CareerLine;
   startYear: number;
-  endYear: number | null;        // null = 当前职位
-  assessmentResults: string[];   // 年度考核结果
-  archived: boolean;             // 跨线转职后封存
+  endYear: number | null; // null = 当前职位
+  assessmentResults: string[]; // 年度考核结果
+  archived: boolean; // 跨线转职后封存
 }
 
 // ============ 人脉关系 ============
 
 export interface RelationState {
-  classmates: Record<string, number>;   // NPC id → 关系值
+  classmates: Record<string, number>; // NPC id → 关系值
   colleagues: Record<string, number>;
   business: Record<string, number>;
   academic: Record<string, number>;
   media: Record<string, number>;
-  central: Record<string, number>;       // 中央/省级
+  central: Record<string, number>; // 中央/省级
 }
 
 // ============ 派系状态 ============
 
 export interface FactionState {
   alignment: Faction | 'independent';
-  reputation: Record<Faction, number>;  // 各派系声望
+  reputation: Record<Faction, number>; // 各派系声望
 }
 
 // ============ 接班人状态 ============
@@ -531,8 +532,8 @@ export interface FactionState {
 export interface SuccessorState {
   id: string | null;
   name: string;
-  investment: number;             // 关注值投入
-  readiness: number;             // 接位准备度
+  investment: number; // 关注值投入
+  readiness: number; // 接位准备度
 }
 
 // ============ 玩家存档 ============
@@ -544,7 +545,7 @@ export interface PlayerSave {
   characterName: string;
   gender: '男' | '女';
   birthPlace: string;
-  birthYear: number;             // 游戏内出生年
+  birthYear: number; // 游戏内出生年
   education: '高中' | '大专' | '本科' | '硕士' | '博士';
   motivation: '为民服务' | '个人抱负' | '家族期望';
   personality: '廉洁型' | '务实型' | '改革型' | '稳健型';
@@ -557,30 +558,30 @@ export interface PlayerSave {
   yearsInCurrentPosition: number;
 
   // ---- 资源 ----
-  ap: number;                    // 当前行动体力
-  maxAp: number;                 // AP 上限
-  politicalCapital: number;      // 政治资本
-  remainingBudget: number;       // 剩余预算（万元）
+  ap: number; // 当前行动体力
+  maxAp: number; // AP 上限
+  politicalCapital: number; // 政治资本
+  remainingBudget: number; // 剩余预算（万元）
 
   // ---- 考核 ----
-  comprehensiveScore: number;    // 综合考核得分
+  comprehensiveScore: number; // 综合考核得分
   annualAssessments: { year: number; score: number; tier: string }[];
 
   // ---- 核心属性 ----
-  integrity: number;             // 廉洁
-  stability: number;             // 稳定性
-  performance: number;           // 政绩
-  charisma: number;              // 魅力
-  competence: number;            // 能力
+  integrity: number; // 廉洁
+  stability: number; // 稳定性
+  performance: number; // 政绩
+  charisma: number; // 魅力
+  competence: number; // 能力
 
   // ---- 晋升 ----
   promotionStage: PromotionStage;
   promotionAttempts: number;
-  frozenPeriods: number;         // 晋升冻结届数
+  frozenPeriods: number; // 晋升冻结届数
 
   // ---- 转职 ----
-  transferCount: number;         // 剩余转职次数（初始5）
-  isLineLocked: boolean;         // 副厅级后锁定
+  transferCount: number; // 剩余转职次数（初始5）
+  isLineLocked: boolean; // 副厅级后锁定
 
   // ---- 部门状态 ----
   departmentStates: Record<string, DepartmentState>;
@@ -598,20 +599,20 @@ export interface PlayerSave {
   factions: FactionState;
 
   // ---- 上级关系 ----
-  superiorFavor: number;         // 直属上司好感值
+  superiorFavor: number; // 直属上司好感值
 
   // ---- 后备干部池 ----
   reserveTier: ReserveCadreTier;
-  demoralization: number;        // 消沉值
+  demoralization: number; // 消沉值
 
   // ---- 风险 ----
-  corruptionRisk: number;        // 贪腐风险值
+  corruptionRisk: number; // 贪腐风险值
   isUnderInvestigation: boolean;
 
   // ---- 游戏时间 ----
   gameYear: number;
-  gameMonth: number;             // 1~12
-  gameDay: number;               // 1~30
+  gameMonth: number; // 1~12
+  gameDay: number; // 1~30
 
   // ---- 高级系统 ----
   successor: SuccessorState | null;
@@ -641,7 +642,7 @@ export interface GameEvent {
   title: string;
   description: string;
   triggerCondition: EventCondition;
-  options: EventOption[];         // 3 个选项
+  options: EventOption[]; // 3 个选项
 }
 
 export interface EventCondition {
@@ -673,7 +674,7 @@ export interface PendingDocument {
     reject: { performance: number };
     shelve: Record<string, number>;
   };
-  abilityRequired?: number;      // 批准所需能力
+  abilityRequired?: number; // 批准所需能力
 }
 
 // ============ 舆情 ============
@@ -682,8 +683,8 @@ export interface Sentiment {
   id: string;
   type: SentimentType;
   description: string;
-  heatIndex: number;             // 热度 0~100
-  remainingDays: number;         // 剩余时效
+  heatIndex: number; // 热度 0~100
+  remainingDays: number; // 剩余时效
   resolved: boolean;
 }
 
@@ -881,11 +882,22 @@ const yearsUntilRetirement = computed(() => 65 - age.value);
 export function usePlayerStore() {
   return {
     // 读写
-    characterName, level, careerLine, positionId,
-    ap, maxAp, politicalCapital,
-    integrity, stability, performance, charisma, competence,
+    characterName,
+    level,
+    careerLine,
+    positionId,
+    ap,
+    maxAp,
+    politicalCapital,
+    integrity,
+    stability,
+    performance,
+    charisma,
+    competence,
     // 只读
-    canAct, age, yearsUntilRetirement,
+    canAct,
+    age,
+    yearsUntilRetirement,
   };
 }
 ```
@@ -906,8 +918,7 @@ function getDept(id: string) {
 
 // 预算汇总
 const totalMonthlyConsumption = computed(() =>
-  Object.values(departments.value)
-    .reduce((sum, d) => sum + d.monthlyConsumption, 0)
+  Object.values(departments.value).reduce((sum, d) => sum + d.monthlyConsumption, 0),
 );
 
 export function useDeptStore() {
@@ -1029,7 +1040,7 @@ interface TimeAdvanceResult {
   newYear: number;
   newMonth: number;
   newDay: number;
-  triggers: TimeTrigger[];       // 需要执行的周期事件
+  triggers: TimeTrigger[]; // 需要执行的周期事件
 }
 
 type TimeTrigger =
@@ -1100,7 +1111,7 @@ export interface KPIResult {
   name: string;
   currentValue: number;
   targetValue: number;
-  completionRate: number;        // 0~1.5（允许超额完成）
+  completionRate: number; // 0~1.5（允许超额完成）
   weight: number;
   weightedScore: number;
 }
@@ -1115,7 +1126,7 @@ export function calculateKPI(
   indicators: KPIIndicatorConfig[],
   deptStates: Record<string, DepartmentState>,
 ): AssessmentResult {
-  const results: KPIResult[] = indicators.map(ind => {
+  const results: KPIResult[] = indicators.map((ind) => {
     // 从部门状态中聚合当前值
     const currentValue = aggregateCurrentValue(ind.id, deptStates);
     let completionRate: number;
@@ -1248,17 +1259,44 @@ export function executeAction(
 ): ActionResult {
   // 1. 前置校验
   if (playerAp < actionConfig.apCost) {
-    return { success: false, error: '行动体力不足', apConsumed: 0, budgetDelta: 0, kpiChanges: [], playerChanges: [], newCooldown: { actionId: '', expiresAt: 0 }, daysAdvanced: 0 };
+    return {
+      success: false,
+      error: '行动体力不足',
+      apConsumed: 0,
+      budgetDelta: 0,
+      kpiChanges: [],
+      playerChanges: [],
+      newCooldown: { actionId: '', expiresAt: 0 },
+      daysAdvanced: 0,
+    };
   }
 
   const cooldownEnd = deptState.actionCooldowns[actionConfig.id] ?? 0;
   if (gameDay < cooldownEnd) {
     const remaining = cooldownEnd - gameDay;
-    return { success: false, error: `冷却中，剩余${remaining}天`, apConsumed: 0, budgetDelta: 0, kpiChanges: [], playerChanges: [], newCooldown: { actionId: '', expiresAt: 0 }, daysAdvanced: 0 };
+    return {
+      success: false,
+      error: `冷却中，剩余${remaining}天`,
+      apConsumed: 0,
+      budgetDelta: 0,
+      kpiChanges: [],
+      playerChanges: [],
+      newCooldown: { actionId: '', expiresAt: 0 },
+      daysAdvanced: 0,
+    };
   }
 
   if (remainingBudget < actionConfig.budgetDelta) {
-    return { success: false, error: '预算不足', apConsumed: 0, budgetDelta: 0, kpiChanges: [], playerChanges: [], newCooldown: { actionId: '', expiresAt: 0 }, daysAdvanced: 0 };
+    return {
+      success: false,
+      error: '预算不足',
+      apConsumed: 0,
+      budgetDelta: 0,
+      kpiChanges: [],
+      playerChanges: [],
+      newCooldown: { actionId: '', expiresAt: 0 },
+      daysAdvanced: 0,
+    };
   }
 
   // 2. 计算效果
@@ -1266,9 +1304,7 @@ export function executeAction(
   const playerChanges: { attr: string; delta: number }[] = [];
 
   for (const effect of actionConfig.effects) {
-    const value = effect.range
-      ? weightedRandom(effect.range.min, effect.range.max)
-      : effect.value;
+    const value = effect.range ? weightedRandom(effect.range.min, effect.range.max) : effect.value;
 
     if (effect.target.startsWith('dept.kpi.')) {
       const kpiId = effect.target.replace('dept.kpi.', '');
@@ -1339,9 +1375,7 @@ export function checkPrerequisites(
     missing.push(`任职年限不足（需${req.minYearsInService}年，当前${ctx.yearsInPosition}年）`);
   }
 
-  const passCount = ctx.assessmentHistory.filter(
-    a => a.tier !== KPITier.Incompetent
-  ).length;
+  const passCount = ctx.assessmentHistory.filter((a) => a.tier !== KPITier.Incompetent).length;
   if (passCount < req.minAssessmentPasses) {
     missing.push(`考核称职次数不足（需${req.minAssessmentPasses}次，当前${passCount}次）`);
   }
@@ -1400,8 +1434,8 @@ export function resolveOrgInspection(
   playerChoices: { influenceInspectors: boolean },
 ): { result: OrgInspectResult; detail: string } {
   // 考察得分 = 政绩 × 0.3 + 能力 × 0.3 + 考核历史 × 0.2 + 廉洁 × 0.2
-  let score = ctx.performance * 0.3 + ctx.competence * 0.3
-    + ctx.playerScore * 0.2 + ctx.integrity * 0.2;
+  let score =
+    ctx.performance * 0.3 + ctx.competence * 0.3 + ctx.playerScore * 0.2 + ctx.integrity * 0.2;
 
   if (playerChoices.influenceInspectors && ctx.politicalCapital >= 20) {
     score += 8;
@@ -1415,18 +1449,23 @@ export function resolveOrgInspection(
 
   return {
     result,
-    detail: `组织考察结论：${result}` + (
-      result === OrgInspectResult.Suspended ? '，本次提拔搁置' :
-      result === OrgInspectResult.Rejected ? '，晋升资格冻结两届' : ''
-    ),
+    detail:
+      `组织考察结论：${result}` +
+      (result === OrgInspectResult.Suspended
+        ? '，本次提拔搁置'
+        : result === OrgInspectResult.Rejected
+          ? '，晋升资格冻结两届'
+          : ''),
   };
 }
 
 // ===== 阶段 3：联审 =====
 
-export function resolveJointReview(
-  ctx: PromotionContext,
-): { passed: boolean; opinions: Record<string, boolean>; detail: string } {
+export function resolveJointReview(ctx: PromotionContext): {
+  passed: boolean;
+  opinions: Record<string, boolean>;
+  detail: string;
+} {
   const departments = ['纪委', '公安', '信访', '审计', '网信'];
   const opinions: Record<string, boolean> = {};
 
@@ -1436,30 +1475,33 @@ export function resolveJointReview(
       opinions[dept] = ctx.corruptionRisk < 50;
     } else if (dept === '信访') {
       // 信访：随机但受声望影响
-      opinions[dept] = Math.random() < (1 - ctx.corruptionRisk / 200);
+      opinions[dept] = Math.random() < 1 - ctx.corruptionRisk / 200;
     } else {
       // 其他部门：大概率通过
       opinions[dept] = Math.random() < 0.85;
     }
   }
 
-  const passed = Object.values(opinions).every(v => v);
-  const failedDepts = Object.entries(opinions).filter(([, v]) => !v).map(([k]) => k);
+  const passed = Object.values(opinions).every((v) => v);
+  const failedDepts = Object.entries(opinions)
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
 
   return {
     passed,
     opinions,
-    detail: passed
-      ? '多部门联审全部通过'
-      : `${failedDepts.join('、')}出具负面意见，提拔程序终止`,
+    detail: passed ? '多部门联审全部通过' : `${failedDepts.join('、')}出具负面意见，提拔程序终止`,
   };
 }
 
 // ===== 阶段 4：常委票决 =====
 
-export function resolveCommitteeVote(
-  ctx: PromotionContext,
-): { passed: boolean; forVotes: number; againstVotes: number; detail: string } {
+export function resolveCommitteeVote(ctx: PromotionContext): {
+  passed: boolean;
+  forVotes: number;
+  againstVotes: number;
+  detail: string;
+} {
   // 常委人数：奇数（7~13 人，按级别递增）
   const committeeSize = Math.min(7 + Math.floor(ctx.playerLevel / 3) * 2, 13);
 
@@ -1491,9 +1533,12 @@ export function resolveCommitteeVote(
 
 // ===== 阶段 5：公示 =====
 
-export function resolvePublicNotice(
-  ctx: PromotionContext,
-): { passed: boolean; hasComplaint: boolean; sentimentEscalated: boolean; detail: string } {
+export function resolvePublicNotice(ctx: PromotionContext): {
+  passed: boolean;
+  hasComplaint: boolean;
+  sentimentEscalated: boolean;
+  detail: string;
+} {
   // 实名举报概率 = corruptionRisk × 0.5%
   const complaintProb = ctx.corruptionRisk * 0.005;
   const hasComplaint = Math.random() < complaintProb;
@@ -1503,28 +1548,39 @@ export function resolvePublicNotice(
   const sentimentEscalated = Math.random() < sentimentProb;
 
   if (sentimentEscalated) {
-    return { passed: false, hasComplaint, sentimentEscalated, detail: '网络舆情大面积发酵，撤销拟任决定' };
+    return {
+      passed: false,
+      hasComplaint,
+      sentimentEscalated,
+      detail: '网络舆情大面积发酵，撤销拟任决定',
+    };
   }
   if (hasComplaint) {
-    return { passed: false, hasComplaint, sentimentEscalated, detail: '公示期间收到实名举报，暂停任命并重新核查' };
+    return {
+      passed: false,
+      hasComplaint,
+      sentimentEscalated,
+      detail: '公示期间收到实名举报，暂停任命并重新核查',
+    };
   }
-  return { passed: true, hasComplaint: false, sentimentEscalated: false, detail: '公示5个工作日无异议，进入正式任命' };
+  return {
+    passed: true,
+    hasComplaint: false,
+    sentimentEscalated: false,
+    detail: '公示5个工作日无异议，进入正式任命',
+  };
 }
 
 // ===== 阶段 6：任命 + 试用期 =====
 
-export function resolveProbation(
-  ctx: PromotionContext,
-): { passed: boolean; detail: string } {
+export function resolveProbation(ctx: PromotionContext): { passed: boolean; detail: string } {
   // 试用期考核 = 能力 × 0.5 + 综合得分 × 0.3 + 随机因素 × 0.2
   const score = ctx.competence * 0.5 + ctx.playerScore * 0.3 + Math.random() * 20;
   const passed = score >= 55;
 
   return {
     passed,
-    detail: passed
-      ? '一年试用期考核合格，正式定岗'
-      : '试用期考核不合格，降回原职级',
+    detail: passed ? '一年试用期考核合格，正式定岗' : '试用期考核不合格，降回原职级',
   };
 }
 ```
@@ -1539,7 +1595,7 @@ export function generateRandomEvents(
   careerLine: CareerLine,
   eventPool: GameEvent[],
 ): GameEvent[] {
-  return eventPool.filter(e => {
+  return eventPool.filter((e) => {
     const cond = e.triggerCondition;
     if (cond.minLevel && playerLevel < cond.minLevel) return false;
     if (cond.maxLevel && playerLevel > cond.maxLevel) return false;
@@ -1588,14 +1644,10 @@ const LEVEL_THRESHOLDS = [
   { level: SecretaryLevel.Chief, minExp: 1000 },
 ];
 
-export function addExperience(
-  current: SecretaryState,
-  amount: number,
-): SecretaryState {
+export function addExperience(current: SecretaryState, amount: number): SecretaryState {
   const newExp = current.experience + amount;
-  const newLevel = LEVEL_THRESHOLDS
-    .filter(t => newExp >= t.minExp)
-    .pop()?.level ?? SecretaryLevel.Junior;
+  const newLevel =
+    LEVEL_THRESHOLDS.filter((t) => newExp >= t.minExp).pop()?.level ?? SecretaryLevel.Junior;
 
   return { ...current, experience: newExp, level: newLevel };
 }
@@ -1615,9 +1667,13 @@ export function resolveDocumentAction(
 
     case FileAction.Revise:
       const halved = Object.fromEntries(
-        Object.entries(doc.effects.approve).map(([k, v]) => [k, Math.round(v / 2)])
+        Object.entries(doc.effects.approve).map(([k, v]) => [k, Math.round(v / 2)]),
       );
-      return { effects: { ...halved, integrity: 1 }, success: true, message: '文件已修改，效果减半，廉洁+1' };
+      return {
+        effects: { ...halved, integrity: 1 },
+        success: true,
+        message: '文件已修改，效果减半，廉洁+1',
+      };
 
     case FileAction.Reject:
       return { effects: doc.effects.reject, success: true, message: '文件已驳回' };
@@ -1633,7 +1689,11 @@ export function resolveSentimentAction(
   method: '删除' | '澄清' | '沉默' | '危机公关' | '公示宣传',
 ): { heatDelta: number; effects: Record<string, number>; message: string } {
   if (sentiment.type === SentimentType.Positive) {
-    return { heatDelta: -sentiment.heatIndex, effects: { performance: 5, superiorFavor: 3 }, message: '正面舆情公示宣传' };
+    return {
+      heatDelta: -sentiment.heatIndex,
+      effects: { performance: 5, superiorFavor: 3 },
+      message: '正面舆情公示宣传',
+    };
   }
 
   switch (method) {
@@ -1644,7 +1704,11 @@ export function resolveSentimentAction(
     case '沉默':
       return { heatDelta: +10, effects: {}, message: '保持沉默，热度上升' };
     case '危机公关':
-      return { heatDelta: -80, effects: { performance: -10 }, message: '危机公关，热度大幅降低，消耗政绩' };
+      return {
+        heatDelta: -80,
+        effects: { performance: -10 },
+        message: '危机公关，热度大幅降低，消耗政绩',
+      };
     default:
       return { heatDelta: 0, effects: {}, message: '' };
   }
@@ -1708,7 +1772,7 @@ export function canTransfer(
   if (transferCount <= 0) {
     return { allowed: false, reason: '转职次数已用完' };
   }
-  const node = TRANSFER_NODES.find(n => n.from === currentLevel && n.to === nextLevel);
+  const node = TRANSFER_NODES.find((n) => n.from === currentLevel && n.to === nextLevel);
   if (!node) {
     return { allowed: false, reason: `当前不在转职窗口期（${node?.label ?? ''}）` };
   }
@@ -1716,15 +1780,19 @@ export function canTransfer(
 }
 
 // 转职难度系数（影响审批通过率）
-export function transferDifficulty(
-  fromLine: CareerLine,
-  toLine: CareerLine,
-): number {
+export function transferDifficulty(fromLine: CareerLine, toLine: CareerLine): number {
   // 返回 0~1 的难度系数，1 = 最难
   if (fromLine === CareerLine.Discipline && toLine !== CareerLine.Discipline) return 0.8;
-  if (fromLine === CareerLine.Mass && (toLine === CareerLine.Administrative || toLine === CareerLine.Party)) return 0.6;
-  if ((fromLine === CareerLine.Administrative && toLine === CareerLine.Party) ||
-      (fromLine === CareerLine.Party && toLine === CareerLine.Administrative)) return 0.3;
+  if (
+    fromLine === CareerLine.Mass &&
+    (toLine === CareerLine.Administrative || toLine === CareerLine.Party)
+  )
+    return 0.6;
+  if (
+    (fromLine === CareerLine.Administrative && toLine === CareerLine.Party) ||
+    (fromLine === CareerLine.Party && toLine === CareerLine.Administrative)
+  )
+    return 0.3;
   return 0.4;
 }
 
@@ -1736,7 +1804,7 @@ export function resolveTransfer(
   superiorFavor: number,
 ): { approved: boolean; detail: string } {
   const difficulty = transferDifficulty(fromLine, toLine);
-  const approvalChance = (playerCompetence + superiorFavor) / 200 * (1 - difficulty);
+  const approvalChance = ((playerCompetence + superiorFavor) / 200) * (1 - difficulty);
   const approved = Math.random() < approvalChance;
 
   return {
@@ -1756,7 +1824,7 @@ export function resolveTransfer(
 import { InvestigationEvidence } from '../types/enums';
 
 interface InvestigationContext {
-  corruptionRisk: number;        // 0~100
+  corruptionRisk: number; // 0~100
   evidenceCollected: InvestigationEvidence[];
   playerIntegrity: number;
   playerPoliticalCapital: number;
@@ -1765,9 +1833,9 @@ interface InvestigationContext {
 }
 
 interface EvidenceStrength {
-  totalStrength: number;         // 0~100，证据总强度
+  totalStrength: number; // 0~100，证据总强度
   evidenceCount: number;
-  isOverwhelming: boolean;       // 总强度 >= 70
+  isOverwhelming: boolean; // 总强度 >= 70
 }
 
 // 证据强度计算
@@ -1786,7 +1854,7 @@ export function calculateEvidenceStrength(
 
   const totalStrength = Math.min(
     evidence.reduce((sum, e) => sum + weights[e], 0) * (corruptionRisk / 100),
-    100
+    100,
   );
 
   return {
@@ -1797,9 +1865,11 @@ export function calculateEvidenceStrength(
 }
 
 // 坦白认罪
-export function resolveConfession(
-  ctx: InvestigationContext,
-): { outcome: string; penalty: string; gameOver: boolean } {
+export function resolveConfession(ctx: InvestigationContext): {
+  outcome: string;
+  penalty: string;
+  gameOver: boolean;
+} {
   // 坦白从轻：降职但不 Game Over
   return {
     outcome: '坦白认罪，从轻处理',
@@ -1818,7 +1888,12 @@ export function resolveDenial(
   const success = Math.random() * 100 < successRate;
 
   if (success) {
-    return { outcome: '辩护成功，证据不足，解除审查', success: true, penalty: '无', gameOver: false };
+    return {
+      outcome: '辩护成功，证据不足，解除审查',
+      success: true,
+      penalty: '无',
+      gameOver: false,
+    };
   }
   return {
     outcome: '辩护失败，证据确凿',
@@ -1840,7 +1915,12 @@ export function resolveLawyer(
   const success = Math.random() * 100 < successRate;
 
   if (success) {
-    return { outcome: '律师辩护成功，案件撤销', success: true, penalty: '消耗政治资本30', gameOver: false };
+    return {
+      outcome: '律师辩护成功，案件撤销',
+      success: true,
+      penalty: '消耗政治资本30',
+      gameOver: false,
+    };
   }
   return {
     outcome: '律师辩护失败',
@@ -1851,9 +1931,10 @@ export function resolveLawyer(
 }
 
 // 触发双规检查（每次行动后调用）
-export function checkInvestigationTrigger(
-  corruptionRisk: number,
-): { triggered: boolean; probability: number } {
+export function checkInvestigationTrigger(corruptionRisk: number): {
+  triggered: boolean;
+  probability: number;
+} {
   // 贪腐风险越高，被审查概率越大
   // 风险 50 → 每行动 0.5% 概率触发；风险 100 → 每行动 5% 概率
   const probability = corruptionRisk * 0.0005;
@@ -1872,10 +1953,10 @@ interface CorruptionAction {
   name: string;
   description: string;
   apCost: number;
-  performanceGain: number;       // 政绩收益（短期）
-  capitalGain: number;           // 政治资本收益
-  riskIncrease: number;          // 巡视风险增加值
-  corruptionIncrease: number;    // 贪腐风险增加值
+  performanceGain: number; // 政绩收益（短期）
+  capitalGain: number; // 政治资本收益
+  riskIncrease: number; // 巡视风险增加值
+  corruptionIncrease: number; // 贪腐风险增加值
   minLevel: number;
 }
 
@@ -1963,9 +2044,9 @@ interface Proposal {
   title: string;
   description: string;
   politicalCapitalCost: number;
-  votesNeeded: number;           // 需要拉拢的代表票数
+  votesNeeded: number; // 需要拉拢的代表票数
   effects: Record<string, number>;
-  policyUnlocked: string;        // 通过后解锁的政策工具
+  policyUnlocked: string; // 通过后解锁的政策工具
 }
 
 export function canSubmitProposal(level: number, gameYear: number): boolean {
@@ -1984,21 +2065,24 @@ export function submitProposal(
   if (politicalCapital < proposal.politicalCapitalCost) {
     return { submitted: false, detail: '政治资本不足，无法提交议案' };
   }
-  return { submitted: true, detail: `议案「${proposal.title}」已提交，需拉拢${proposal.votesNeeded}票` };
+  return {
+    submitted: true,
+    detail: `议案「${proposal.title}」已提交，需拉拢${proposal.votesNeeded}票`,
+  };
 }
 
 export function gatherVotes(
   proposal: Proposal,
   playerCharisma: number,
   relations: RelationState,
-  apSpent: number,               // 花费的 AP（每次拉票消耗 AP）
+  apSpent: number, // 花费的 AP（每次拉票消耗 AP）
 ): {
   votesGathered: number;
   detail: string;
 } {
   // 拉票效率 = (魅力 + 人脉总和 / 10) × AP 投入 / 100
   const relationBonus = Object.values(relations.colleagues).reduce((a, b) => a + b, 0) / 10;
-  const efficiency = (playerCharisma + relationBonus) * apSpent / 100;
+  const efficiency = ((playerCharisma + relationBonus) * apSpent) / 100;
   const votesGathered = Math.round(efficiency);
 
   return {
@@ -2032,12 +2116,12 @@ export function resolveProposalVote(
 // engine/history-eval-engine.ts
 
 interface HistoricalEvaluation {
-  economyScore: number;          // 经济维度 0~100
-  livelihoodScore: number;       // 民生维度 0~100
-  integrityScore: number;        // 廉洁维度 0~100
-  reformScore: number;           // 改革维度 0~100
+  economyScore: number; // 经济维度 0~100
+  livelihoodScore: number; // 民生维度 0~100
+  integrityScore: number; // 廉洁维度 0~100
+  reformScore: number; // 改革维度 0~100
   totalScore: number;
-  designation: string;           // 历史定性
+  designation: string; // 历史定性
 }
 
 export function calculateHistoryEvaluation(
@@ -2049,10 +2133,7 @@ export function calculateHistoryEvaluation(
   const economyScore = clamp(playerStats.performance / 5, 0, 100);
 
   // 民生维度：基于考核历史中民生类 KPI 平均
-  const livelihoodScore = clamp(
-    careerHistory.length * 5 + playerStats.competence * 0.3,
-    0, 100
-  );
+  const livelihoodScore = clamp(careerHistory.length * 5 + playerStats.competence * 0.3, 0, 100);
 
   // 廉洁维度：直接取廉洁属性
   const integrityScore = playerStats.integrity;
@@ -2061,7 +2142,7 @@ export function calculateHistoryEvaluation(
   const reformScore = clamp(achievements.length * 8 + playerStats.competence * 0.2, 0, 100);
 
   const totalScore = Math.round(
-    economyScore * 0.3 + livelihoodScore * 0.25 + integrityScore * 0.25 + reformScore * 0.2
+    economyScore * 0.3 + livelihoodScore * 0.25 + integrityScore * 0.25 + reformScore * 0.2,
   );
 
   // 历史定性
@@ -2093,8 +2174,8 @@ export function evaluateForcedRetention(
 interface SuccessorCandidate {
   id: string;
   name: string;
-  competence: number;            // 能力值
-  loyalty: number;               // 忠诚度
+  competence: number; // 能力值
+  loyalty: number; // 忠诚度
 }
 
 export function selectSuccessor(
@@ -2115,11 +2196,11 @@ export function selectSuccessor(
 
 export function investInSuccessor(
   successor: SuccessorState,
-  investmentAmount: number,      // 关注值投入（消耗政治资本）
-  mentorCompetence: number,      // 导师（玩家）能力
+  investmentAmount: number, // 关注值投入（消耗政治资本）
+  mentorCompetence: number, // 导师（玩家）能力
 ): { updated: SuccessorState; detail: string } {
   // 准备度增长 = 投入 × 导师能力 / 100
-  const growth = investmentAmount * mentorCompetence / 100;
+  const growth = (investmentAmount * mentorCompetence) / 100;
   const updated = {
     ...successor,
     investment: successor.investment + investmentAmount,
@@ -2131,17 +2212,17 @@ export function investInSuccessor(
   };
 }
 
-export function judgeSuccession(
-  successor: SuccessorState,
-): { success: boolean; legacyBonus: number; detail: string } {
+export function judgeSuccession(successor: SuccessorState): {
+  success: boolean;
+  legacyBonus: number;
+  detail: string;
+} {
   const success = successor.readiness >= 70;
   const legacyBonus = success ? Math.round(successor.readiness * 0.5) : 0;
   return {
     success,
     legacyBonus,
-    detail: success
-      ? `接班人接位成功！政治遗产加成+${legacyBonus}`
-      : '接班人准备度不足，接位失败',
+    detail: success ? `接班人接位成功！政治遗产加成+${legacyBonus}` : '接班人准备度不足，接位失败',
   };
 }
 ```
@@ -2193,8 +2274,8 @@ interface Advisor {
   id: string;
   name: string;
   field: 'science' | 'economics' | 'law';
-  quality: number;               // 顾问质量 0~100
-  cost: number;                  // 招募消耗政治资本
+  quality: number; // 顾问质量 0~100
+  cost: number; // 招募消耗政治资本
 }
 
 export function recruitAdvisor(
@@ -2204,12 +2285,17 @@ export function recruitAdvisor(
   if (politicalCapital < advisor.cost) {
     return { recruited: false, detail: '政治资本不足，无法招募' };
   }
-  return { recruited: true, detail: `招募${advisor.field}顾问${advisor.name}，质量${advisor.quality}` };
+  return {
+    recruited: true,
+    detail: `招募${advisor.field}顾问${advisor.name}，质量${advisor.quality}`,
+  };
 }
 
-export function getAdvisorBonus(
-  advisors: { science: Advisor | null; economics: Advisor | null; law: Advisor | null },
-): { policyEndorsement: number; competenceBonus: number } {
+export function getAdvisorBonus(advisors: {
+  science: Advisor | null;
+  economics: Advisor | null;
+  law: Advisor | null;
+}): { policyEndorsement: number; competenceBonus: number } {
   let policyEndorsement = 0;
   let competenceBonus = 0;
 
@@ -2220,7 +2306,10 @@ export function getAdvisorBonus(
     }
   }
 
-  return { policyEndorsement: Math.round(policyEndorsement), competenceBonus: Math.round(competenceBonus) };
+  return {
+    policyEndorsement: Math.round(policyEndorsement),
+    competenceBonus: Math.round(competenceBonus),
+  };
 }
 ```
 
@@ -2232,20 +2321,20 @@ export function getAdvisorBonus(
 interface Mentee {
   id: string;
   name: string;
-  potential: number;             // 潜力值 0~100
-  progress: number;              // 培养进度 0~100
+  potential: number; // 潜力值 0~100
+  progress: number; // 培养进度 0~100
 }
 
 export function selectMentees(
   candidates: Mentee[],
-  maxCount: number,              // 每届最多3名
+  maxCount: number, // 每届最多3名
 ): { selected: Mentee[]; detail: string } {
   // 按潜力排序，选前 maxCount 名
   const sorted = [...candidates].sort((a, b) => b.potential - a.potential);
   const selected = sorted.slice(0, maxCount);
   return {
-    selected: selected.map(m => ({ ...m, progress: 0 })),
-    detail: `选拔${selected.length}名潜力股：${selected.map(m => m.name).join('、')}`,
+    selected: selected.map((m) => ({ ...m, progress: 0 })),
+    detail: `选拔${selected.length}名潜力股：${selected.map((m) => m.name).join('、')}`,
   };
 }
 
@@ -2254,7 +2343,7 @@ export function guideMentee(
   mentorCompetence: number,
   apSpent: number,
 ): { updated: Mentee; detail: string } {
-  const growth = apSpent * mentorCompetence / 100;
+  const growth = (apSpent * mentorCompetence) / 100;
   const updated = {
     ...mentee,
     progress: clamp(mentee.progress + growth, 0, 100),
@@ -2265,16 +2354,16 @@ export function guideMentee(
   };
 }
 
-export function evaluateMenteeOutcome(
-  mentee: Mentee,
-): { success: boolean; bonus: string; detail: string } {
+export function evaluateMenteeOutcome(mentee: Mentee): {
+  success: boolean;
+  bonus: string;
+  detail: string;
+} {
   const success = mentee.progress >= 80;
   return {
     success,
     bonus: success ? '长期政治资产+1' : '',
-    detail: success
-      ? `${mentee.name}培养成功，成为长期政治资产`
-      : `${mentee.name}培养未达标`,
+    detail: success ? `${mentee.name}培养成功，成为长期政治资产` : `${mentee.name}培养未达标`,
   };
 }
 ```
@@ -2289,7 +2378,7 @@ interface HistoricOpportunity {
   title: string;
   description: string;
   minLevel: number;
-  successThreshold: number;      // 成功所需综合得分
+  successThreshold: number; // 成功所需综合得分
   rewards: { achievement: string; historyRecord: string; bonusScore: number };
 }
 
@@ -2358,7 +2447,8 @@ export function resolveAmendment(
   }
 
   // 推动修宪：需要极高政治资本和派系支持
-  const totalSupport = politicalCapital + Object.values(factionReputation).reduce((a, b) => a + b, 0) / 3;
+  const totalSupport =
+    politicalCapital + Object.values(factionReputation).reduce((a, b) => a + b, 0) / 3;
   const success = totalSupport >= proposal.successThreshold && playerScore >= 80;
 
   if (success) {
@@ -2391,10 +2481,28 @@ interface SuperiorAction {
 
 export const SUPERIOR_ACTIONS: SuperiorAction[] = [
   { id: 'report_work', name: '汇报工作', apCost: 3, favorGain: 5, description: '定期汇报工作进展' },
-  { id: 'seek_guidance', name: '请示问题', apCost: 2, favorGain: 3, description: '向上级请教工作难题' },
+  {
+    id: 'seek_guidance',
+    name: '请示问题',
+    apCost: 2,
+    favorGain: 3,
+    description: '向上级请教工作难题',
+  },
   { id: 'holiday_greet', name: '节日问候', apCost: 1, favorGain: 2, description: '节日送上问候' },
-  { id: 'invite_dinner', name: '邀请用餐', apCost: 4, favorGain: 8, description: '邀请上司共进晚餐' },
-  { id: 'gift', name: '赠送礼物', apCost: 2, favorGain: 6, description: '赠送礼物（风险：廉洁-1）' },
+  {
+    id: 'invite_dinner',
+    name: '邀请用餐',
+    apCost: 4,
+    favorGain: 8,
+    description: '邀请上司共进晚餐',
+  },
+  {
+    id: 'gift',
+    name: '赠送礼物',
+    apCost: 2,
+    favorGain: 6,
+    description: '赠送礼物（风险：廉洁-1）',
+  },
 ];
 
 export function executeSuperiorAction(
@@ -2435,7 +2543,7 @@ interface PatrolTarget {
   id: string;
   name: string;
   position: string;
-  suspicionLevel: number;        // 嫌疑程度 0~100
+  suspicionLevel: number; // 嫌疑程度 0~100
 }
 
 interface PetitionCase {
@@ -2472,7 +2580,7 @@ export function resolvePatrol(
   effects: Record<string, number>;
 } {
   // 发现问题概率 = 嫌疑程度 × (能力/100)
-  const detectionRate = target.suspicionLevel * playerCompetence / 10000;
+  const detectionRate = (target.suspicionLevel * playerCompetence) / 10000;
   const foundIssues = Math.random() < detectionRate;
 
   if (foundIssues) {
@@ -2500,8 +2608,9 @@ export function resolvePetition(
   effects: Record<string, number>;
 } {
   // 化解率 = 能力 × AP投入 / (严重程度系数 × 100)
-  const severityMultiplier = petition.severity === 'high' ? 2 : petition.severity === 'medium' ? 1.5 : 1;
-  const resolveRate = playerCompetence * apSpent / (severityMultiplier * 100);
+  const severityMultiplier =
+    petition.severity === 'high' ? 2 : petition.severity === 'medium' ? 1.5 : 1;
+  const resolveRate = (playerCompetence * apSpent) / (severityMultiplier * 100);
   const resolved = Math.random() < resolveRate;
 
   return {
@@ -2509,9 +2618,7 @@ export function resolvePetition(
     detail: resolved
       ? `成功化解信访案件：${petition.description}`
       : `信访案件未能化解：${petition.description}`,
-    effects: resolved
-      ? { performance: 5, stability: 3 }
-      : { stability: -2 },
+    effects: resolved ? { performance: 5, stability: 3 } : { stability: -2 },
   };
 }
 ```
@@ -2525,7 +2632,7 @@ export function resolvePetition(
 interface HousingOption {
   id: string;
   name: string;
-  cost: number;                  // 购置成本（消耗政治资本）
+  cost: number; // 购置成本（消耗政治资本）
   effects: Record<string, number>;
 }
 
@@ -2542,7 +2649,7 @@ export function purchaseHousing(
 // ---- 子女培养 ----
 interface ChildEducation {
   id: string;
-  stage: string;                 // 幼儿/小学/中学/大学/研究生
+  stage: string; // 幼儿/小学/中学/大学/研究生
   action: string;
   apCost: number;
   effects: Record<string, number>;
@@ -2563,7 +2670,7 @@ interface StudyOption {
   id: string;
   name: string;
   apCost: number;
-  duration: number;              // 持续天数
+  duration: number; // 持续天数
   effects: Record<string, number>;
 }
 
@@ -2574,7 +2681,11 @@ export function study(
   if (playerAp < option.apCost) {
     return { success: false, effects: {}, detail: 'AP不足' };
   }
-  return { success: true, effects: option.effects, detail: `参加${option.name}，持续${option.duration}天` };
+  return {
+    success: true,
+    effects: option.effects,
+    detail: `参加${option.name}，持续${option.duration}天`,
+  };
 }
 
 // ---- 健康管理 ----
@@ -2582,7 +2693,7 @@ interface HealthAction {
   id: string;
   name: string;
   apCost: number;
-  maxApBonus: number;            // AP 上限加成
+  maxApBonus: number; // AP 上限加成
   effects: Record<string, number>;
 }
 
@@ -2641,24 +2752,60 @@ interface Achievement {
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_promotion', name: '初露锋芒', description: '完成首次晋升',
-    condition: (s) => s.careerHistory.length > 1 },
-  { id: 'grassroots_hero', name: '基层先锋', description: '在基层主官岗位任职满5年',
-    condition: (s) => s.careerHistory.filter(r => r.level <= 3 && r.endYear).length > 0 },
-  { id: 'clean_record', name: '清廉标兵', description: '廉洁值保持90以上超过10年',
-    condition: (s) => s.integrity >= 90 },
-  { id: 'economic_miracle', name: '经济奇迹', description: 'GDP增长率达到15%以上',
-    condition: (s) => s.performance >= 500 },
-  { id: 'faction_leader', name: '派系领袖', description: '任一派系声望达到80',
-    condition: (s) => Object.values(s.factions.reputation).some(v => v >= 80) },
-  { id: 'master_strategist', name: '运筹帷幄', description: '政治资本累积到200以上',
-    condition: (s) => s.politicalCapital >= 200 },
-  { id: 'line_switcher', name: '跨界精英', description: '完成至少2次跨线转职',
-    condition: (s) => s.transferCount <= 3 }, // 初始5，剩3说明用了2次
-  { id: 'minister', name: '省部级领导', description: '晋升至级别10以上',
-    condition: (s) => s.currentLevel >= 10 },
-  { id: 'historical_figure', name: '历史人物', description: '历史评价总分达到90以上',
-    condition: (s) => s.currentLevel >= 11 }, // 简化判断
+  {
+    id: 'first_promotion',
+    name: '初露锋芒',
+    description: '完成首次晋升',
+    condition: (s) => s.careerHistory.length > 1,
+  },
+  {
+    id: 'grassroots_hero',
+    name: '基层先锋',
+    description: '在基层主官岗位任职满5年',
+    condition: (s) => s.careerHistory.filter((r) => r.level <= 3 && r.endYear).length > 0,
+  },
+  {
+    id: 'clean_record',
+    name: '清廉标兵',
+    description: '廉洁值保持90以上超过10年',
+    condition: (s) => s.integrity >= 90,
+  },
+  {
+    id: 'economic_miracle',
+    name: '经济奇迹',
+    description: 'GDP增长率达到15%以上',
+    condition: (s) => s.performance >= 500,
+  },
+  {
+    id: 'faction_leader',
+    name: '派系领袖',
+    description: '任一派系声望达到80',
+    condition: (s) => Object.values(s.factions.reputation).some((v) => v >= 80),
+  },
+  {
+    id: 'master_strategist',
+    name: '运筹帷幄',
+    description: '政治资本累积到200以上',
+    condition: (s) => s.politicalCapital >= 200,
+  },
+  {
+    id: 'line_switcher',
+    name: '跨界精英',
+    description: '完成至少2次跨线转职',
+    condition: (s) => s.transferCount <= 3,
+  }, // 初始5，剩3说明用了2次
+  {
+    id: 'minister',
+    name: '省部级领导',
+    description: '晋升至级别10以上',
+    condition: (s) => s.currentLevel >= 10,
+  },
+  {
+    id: 'historical_figure',
+    name: '历史人物',
+    description: '历史评价总分达到90以上',
+    condition: (s) => s.currentLevel >= 11,
+  }, // 简化判断
 ];
 
 export function checkNewAchievements(
@@ -2666,12 +2813,9 @@ export function checkNewAchievements(
   currentAchievements: string[],
 ): { newAchievements: Achievement[]; updatedList: string[] } {
   const newAchievements = ACHIEVEMENTS.filter(
-    a => !currentAchievements.includes(a.id) && a.condition(save)
+    (a) => !currentAchievements.includes(a.id) && a.condition(save),
   );
-  const updatedList = [
-    ...currentAchievements,
-    ...newAchievements.map(a => a.id),
-  ];
+  const updatedList = [...currentAchievements, ...newAchievements.map((a) => a.id)];
   return { newAchievements, updatedList };
 }
 
@@ -2681,7 +2825,7 @@ export function generateCareerTimeline(
   currentLine: CareerLine,
 ): CareerRecord[] {
   // 仅展示当前线路履历（跨线转职后旧线路封存）
-  return history.filter(r => !r.archived || r.careerLine === currentLine);
+  return history.filter((r) => !r.archived || r.careerLine === currentLine);
 }
 ```
 
@@ -2693,24 +2837,59 @@ export function generateCareerTimeline(
 interface CalendarEvent {
   id: string;
   name: string;
-  month: number;                 // 1~12
-  day: number;                   // 1~30
+  month: number; // 1~12
+  day: number; // 1~30
   type: 'holiday' | 'political' | 'personal';
   effects: Record<string, number>;
   description: string;
 }
 
 export const ANNUAL_EVENTS: CalendarEvent[] = [
-  { id: 'spring_festival', name: '春节', month: 1, day: 1, type: 'holiday',
-    effects: { superiorFavor: 2, ap: 5 }, description: '春节期间走访慰问' },
-  { id: 'two_sessions', name: '两会', month: 3, day: 5, type: 'political',
-    effects: {}, description: '全国两会召开（议案系统触发）' },
-  { id: 'national_day', name: '国庆节', month: 10, day: 1, type: 'holiday',
-    effects: { stability: 2, ap: 3 }, description: '国庆庆祝活动' },
-  { id: 'party_congress', name: '党代会', month: 10, day: 15, type: 'political',
-    effects: {}, description: '党代会召开（每5年一次）' },
-  { id: 'year_end_review', name: '年终总结', month: 12, day: 25, type: 'political',
-    effects: { performance: 3 }, description: '年终工作总结' },
+  {
+    id: 'spring_festival',
+    name: '春节',
+    month: 1,
+    day: 1,
+    type: 'holiday',
+    effects: { superiorFavor: 2, ap: 5 },
+    description: '春节期间走访慰问',
+  },
+  {
+    id: 'two_sessions',
+    name: '两会',
+    month: 3,
+    day: 5,
+    type: 'political',
+    effects: {},
+    description: '全国两会召开（议案系统触发）',
+  },
+  {
+    id: 'national_day',
+    name: '国庆节',
+    month: 10,
+    day: 1,
+    type: 'holiday',
+    effects: { stability: 2, ap: 3 },
+    description: '国庆庆祝活动',
+  },
+  {
+    id: 'party_congress',
+    name: '党代会',
+    month: 10,
+    day: 15,
+    type: 'political',
+    effects: {},
+    description: '党代会召开（每5年一次）',
+  },
+  {
+    id: 'year_end_review',
+    name: '年终总结',
+    month: 12,
+    day: 25,
+    type: 'political',
+    effects: { performance: 3 },
+    description: '年终工作总结',
+  },
 ];
 
 export function getCalendarEvents(
@@ -2718,7 +2897,7 @@ export function getCalendarEvents(
   gameDay: number,
   gameYear: number,
 ): CalendarEvent[] {
-  return ANNUAL_EVENTS.filter(e => {
+  return ANNUAL_EVENTS.filter((e) => {
     // 党代会只在每5年的10月触发
     if (e.id === 'party_congress' && gameYear % 5 !== 0) return false;
     // 两会只在两会年触发
@@ -2746,8 +2925,8 @@ interface NPC {
   name: string;
   category: keyof RelationState;
   position: string;
-  influence: number;             // 影响力 0~100
-  relationship: number;          // 关系值 0~100
+  influence: number; // 影响力 0~100
+  relationship: number; // 关系值 0~100
 }
 
 export function buildRelationship(
@@ -2757,9 +2936,12 @@ export function buildRelationship(
   apCost: number,
 ): { gain: number; newRelationship: number; detail: string } {
   const baseGain: Record<string, number> = {
-    network: 3, favor: 5, gift: 8, dinner: 6,
+    network: 3,
+    favor: 5,
+    gift: 8,
+    dinner: 6,
   };
-  const gain = Math.round(baseGain[action] * playerCharisma / 100);
+  const gain = Math.round((baseGain[action] * playerCharisma) / 100);
   const newRelationship = clamp(npc.relationship + gain, 0, 100);
 
   return {
@@ -2778,7 +2960,10 @@ export function requestFavor(
   detail: string;
 } {
   const costByType: Record<string, number> = {
-    vote: 20, information: 10, endorsement: 30, funding: 25,
+    vote: 20,
+    information: 10,
+    endorsement: 30,
+    funding: 25,
   };
   const cost = costByType[favorType];
   const granted = npc.relationship >= cost;
@@ -2808,8 +2993,8 @@ export function requestFavor(
 interface Route {
   path: string;
   component: () => JSX.Element;
-  auth?: boolean;             // 需要登录
-  characterCreated?: boolean;  // 需要角色已创建
+  auth?: boolean; // 需要登录
+  characterCreated?: boolean; // 需要角色已创建
 }
 
 const routes: Route[] = [
@@ -2823,9 +3008,24 @@ const routes: Route[] = [
   // ---- 游戏主界面 ----
   { path: '/dashboard', component: Dashboard, auth: true, characterCreated: true },
   { path: '/career', component: CareerPath, auth: true, characterCreated: true },
-  { path: '/position/:line/:level/:posIndex', component: PositionHub, auth: true, characterCreated: true },
-  { path: '/position/:line/:level/:posIndex/dept/:deptIndex', component: PositionDept, auth: true, characterCreated: true },
-  { path: '/kpi/:line/:level/:posIndex', component: PositionKPI, auth: true, characterCreated: true },
+  {
+    path: '/position/:line/:level/:posIndex',
+    component: PositionHub,
+    auth: true,
+    characterCreated: true,
+  },
+  {
+    path: '/position/:line/:level/:posIndex/dept/:deptIndex',
+    component: PositionDept,
+    auth: true,
+    characterCreated: true,
+  },
+  {
+    path: '/kpi/:line/:level/:posIndex',
+    component: PositionKPI,
+    auth: true,
+    characterCreated: true,
+  },
 
   // ---- 晋升 ----
   { path: '/promotion', component: PromotionPage, auth: true, characterCreated: true },
@@ -2920,7 +3120,7 @@ export function PositionHub({ line, level, posIndex }: RouteParams) {
       {/* KPI 指标列表 */}
       <section>
         <h2>专属考核指标</h2>
-        {positionConfig.kpiIndicators.map(kpi => (
+        {positionConfig.kpiIndicators.map((kpi) => (
           <KPIRow key={kpi.id} config={kpi} currentValue={/* 从 store 读取 */} />
         ))}
       </section>
@@ -2940,10 +3140,7 @@ export function PositionHub({ line, level, posIndex }: RouteParams) {
 
       {/* 预算状态 */}
       <section>
-        <BudgetGauge
-          total={positionConfig.annualBudget}
-          remaining={player.remainingBudget.value}
-        />
+        <BudgetGauge total={positionConfig.annualBudget} remaining={player.remainingBudget.value} />
       </section>
     </div>
   );
@@ -2973,7 +3170,7 @@ export function PositionDept({ line, level, posIndex, deptIndex }: RouteParams) 
 
       {/* 行动列表 */}
       <section>
-        {deptConfig.actions.map(action => {
+        {deptConfig.actions.map((action) => {
           const cooldownEnd = deptState.value.actionCooldowns[action.id] ?? 0;
           const isCooling = player.gameDay.value < cooldownEnd;
           const canAfford = player.ap.value >= action.apCost;
@@ -2994,7 +3191,7 @@ export function PositionDept({ line, level, posIndex, deptIndex }: RouteParams) 
 
       {/* KPI 数值 */}
       <section>
-        {deptConfig.kpiIndicators.map(kpi => (
+        {deptConfig.kpiIndicators.map((kpi) => (
           <StatCard key={kpi.id} label={kpi.name} value={deptState.value.kpiValues[kpi.id]} />
         ))}
       </section>
@@ -3055,7 +3252,7 @@ export function SecretaryPage() {
   const { player } = useGameStore();
   const [activeTab, setActiveTab] = useState('manage');
 
-  const availableTabs = TABS.filter(t => player.level.value >= t.minRank);
+  const availableTabs = TABS.filter((t) => player.level.value >= t.minRank);
 
   return (
     <div class="secretary">
@@ -3155,14 +3352,40 @@ export const DEPT_TEMPLATES: Record<string, Partial<DepartmentConfig>> = {
     consumptionCoefficient: 1.5,
     baseConsumption: 100,
     actions: [
-      { id: 'approve_project', name: '审批工程项目', apCost: 5, cooldownDays: 3,
-        budgetDelta: 50, effects: [{ target: 'dept.kpi.project_completion', operation: 'add', value: 10 }] },
-      { id: 'urban_planning', name: '城市规划评审', apCost: 3, cooldownDays: 2,
-        budgetDelta: 20, effects: [{ target: 'dept.kpi.planning_score', operation: 'add', value: 5 }] },
+      {
+        id: 'approve_project',
+        name: '审批工程项目',
+        apCost: 5,
+        cooldownDays: 3,
+        budgetDelta: 50,
+        effects: [{ target: 'dept.kpi.project_completion', operation: 'add', value: 10 }],
+      },
+      {
+        id: 'urban_planning',
+        name: '城市规划评审',
+        apCost: 3,
+        cooldownDays: 2,
+        budgetDelta: 20,
+        effects: [{ target: 'dept.kpi.planning_score', operation: 'add', value: 5 }],
+      },
     ],
     kpiIndicators: [
-      { id: 'project_completion', name: '项目完成度', targetValue: 100, weight: 0.5, unit: '%', calcType: 'ratio' },
-      { id: 'planning_score', name: '规划评分', targetValue: 80, weight: 0.5, unit: '分', calcType: 'ratio' },
+      {
+        id: 'project_completion',
+        name: '项目完成度',
+        targetValue: 100,
+        weight: 0.5,
+        unit: '%',
+        calcType: 'ratio',
+      },
+      {
+        id: 'planning_score',
+        name: '规划评分',
+        targetValue: 80,
+        weight: 0.5,
+        unit: '分',
+        calcType: 'ratio',
+      },
     ],
   },
 
@@ -3171,14 +3394,40 @@ export const DEPT_TEMPLATES: Record<string, Partial<DepartmentConfig>> = {
     consumptionCoefficient: 0.8,
     baseConsumption: 60,
     actions: [
-      { id: 'budget_review', name: '预算审查', apCost: 3, cooldownDays: 2, budgetDelta: 10,
-        effects: [{ target: 'dept.kpi.fiscal_health', operation: 'add', value: 8 }] },
-      { id: 'tax_collection', name: '税收征管', apCost: 4, cooldownDays: 3, budgetDelta: 30,
-        effects: [{ target: 'dept.kpi.revenue_rate', operation: 'add', value: 6 }] },
+      {
+        id: 'budget_review',
+        name: '预算审查',
+        apCost: 3,
+        cooldownDays: 2,
+        budgetDelta: 10,
+        effects: [{ target: 'dept.kpi.fiscal_health', operation: 'add', value: 8 }],
+      },
+      {
+        id: 'tax_collection',
+        name: '税收征管',
+        apCost: 4,
+        cooldownDays: 3,
+        budgetDelta: 30,
+        effects: [{ target: 'dept.kpi.revenue_rate', operation: 'add', value: 6 }],
+      },
     ],
     kpiIndicators: [
-      { id: 'fiscal_health', name: '财政健康度', targetValue: 90, weight: 0.5, unit: '%', calcType: 'ratio' },
-      { id: 'revenue_rate', name: '税收完成率', targetValue: 100, weight: 0.5, unit: '%', calcType: 'ratio' },
+      {
+        id: 'fiscal_health',
+        name: '财政健康度',
+        targetValue: 90,
+        weight: 0.5,
+        unit: '%',
+        calcType: 'ratio',
+      },
+      {
+        id: 'revenue_rate',
+        name: '税收完成率',
+        targetValue: 100,
+        weight: 0.5,
+        unit: '%',
+        calcType: 'ratio',
+      },
     ],
   },
 
@@ -3188,17 +3437,94 @@ export const DEPT_TEMPLATES: Record<string, Partial<DepartmentConfig>> = {
 // ============ KPI 模板 ============
 
 export const KPI_TEMPLATES: Record<string, KPIIndicatorConfig> = {
-  gdp_growth:      { id: 'gdp_growth', name: 'GDP增长率', targetValue: 8, weight: 0.25, unit: '%', calcType: 'ratio' },
-  fiscal_revenue:  { id: 'fiscal_revenue', name: '财政收入完成率', targetValue: 100, weight: 0.2, unit: '%', calcType: 'ratio' },
-  livelihood:      { id: 'livelihood', name: '民生满意度', targetValue: 80, weight: 0.2, unit: '分', calcType: 'ratio' },
-  project_done:    { id: 'project_done', name: '重大项目完成度', targetValue: 100, weight: 0.15, unit: '%', calcType: 'ratio' },
-  safety:          { id: 'safety', name: '安全生产事故率', targetValue: 2, weight: 0.1, unit: '次', calcType: 'inverse' },
-  party_building:  { id: 'party_building', name: '党建工作评分', targetValue: 90, weight: 0.2, unit: '分', calcType: 'ratio' },
-  anti_corruption: { id: 'anti_corruption', name: '廉政建设评分', targetValue: 95, weight: 0.25, unit: '分', calcType: 'ratio' },
-  case_clearance:  { id: 'case_clearance', name: '案件结案率', targetValue: 90, weight: 0.3, unit: '%', calcType: 'ratio' },
-  petition_resolve:{ id: 'petition_resolve', name: '信访化解率', targetValue: 85, weight: 0.2, unit: '%', calcType: 'ratio' },
-  youth_employ:    { id: 'youth_employ', name: '青年就业率', targetValue: 90, weight: 0.25, unit: '%', calcType: 'ratio' },
-  women_rights:    { id: 'women_rights', name: '妇女权益保障评分', targetValue: 85, weight: 0.2, unit: '分', calcType: 'ratio' },
+  gdp_growth: {
+    id: 'gdp_growth',
+    name: 'GDP增长率',
+    targetValue: 8,
+    weight: 0.25,
+    unit: '%',
+    calcType: 'ratio',
+  },
+  fiscal_revenue: {
+    id: 'fiscal_revenue',
+    name: '财政收入完成率',
+    targetValue: 100,
+    weight: 0.2,
+    unit: '%',
+    calcType: 'ratio',
+  },
+  livelihood: {
+    id: 'livelihood',
+    name: '民生满意度',
+    targetValue: 80,
+    weight: 0.2,
+    unit: '分',
+    calcType: 'ratio',
+  },
+  project_done: {
+    id: 'project_done',
+    name: '重大项目完成度',
+    targetValue: 100,
+    weight: 0.15,
+    unit: '%',
+    calcType: 'ratio',
+  },
+  safety: {
+    id: 'safety',
+    name: '安全生产事故率',
+    targetValue: 2,
+    weight: 0.1,
+    unit: '次',
+    calcType: 'inverse',
+  },
+  party_building: {
+    id: 'party_building',
+    name: '党建工作评分',
+    targetValue: 90,
+    weight: 0.2,
+    unit: '分',
+    calcType: 'ratio',
+  },
+  anti_corruption: {
+    id: 'anti_corruption',
+    name: '廉政建设评分',
+    targetValue: 95,
+    weight: 0.25,
+    unit: '分',
+    calcType: 'ratio',
+  },
+  case_clearance: {
+    id: 'case_clearance',
+    name: '案件结案率',
+    targetValue: 90,
+    weight: 0.3,
+    unit: '%',
+    calcType: 'ratio',
+  },
+  petition_resolve: {
+    id: 'petition_resolve',
+    name: '信访化解率',
+    targetValue: 85,
+    weight: 0.2,
+    unit: '%',
+    calcType: 'ratio',
+  },
+  youth_employ: {
+    id: 'youth_employ',
+    name: '青年就业率',
+    targetValue: 90,
+    weight: 0.25,
+    unit: '%',
+    calcType: 'ratio',
+  },
+  women_rights: {
+    id: 'women_rights',
+    name: '妇女权益保障评分',
+    targetValue: 85,
+    weight: 0.2,
+    unit: '分',
+    calcType: 'ratio',
+  },
 };
 
 // ============ 职位工厂 ============
@@ -3208,8 +3534,8 @@ export function buildPosition(
   level: number,
   index: number,
   name: string,
-  deptTemplates: string[],    // 引用部门模板 key
-  kpiTemplateIds: string[],   // 引用 KPI 模板 key
+  deptTemplates: string[], // 引用部门模板 key
+  kpiTemplateIds: string[], // 引用 KPI 模板 key
   overrides: {
     annualBudget?: number;
     deptOverrides?: Record<string, Partial<DepartmentConfig>>;
@@ -3227,13 +3553,13 @@ export function buildPosition(
       ...deptOverride,
       id: `${id}_dept_${i}`,
       name: deptOverride?.name ?? tpl.name,
-      actions: tpl.actions.map(a => ({ ...a })),
-      kpiIndicators: tpl.kpiIndicators.map(k => ({ ...k })),
+      actions: tpl.actions.map((a) => ({ ...a })),
+      kpiIndicators: tpl.kpiIndicators.map((k) => ({ ...k })),
     } as DepartmentConfig;
   });
 
   // 构建 KPI（从模板 + 覆盖 + 权重重新归一化）
-  const kpiIndicators = kpiTemplateIds.map(kpiId => {
+  const kpiIndicators = kpiTemplateIds.map((kpiId) => {
     const tpl = KPI_TEMPLATES[kpiId];
     const kpiOverride = overrides.kpiOverrides?.[kpiId];
     return { ...tpl, ...kpiOverride };
@@ -3254,9 +3580,8 @@ function getDefaultBudget(level: number, line: CareerLine): number {
   // 基础拨款随级别递增
   const base = [0, 1000, 2000, 3000, 5000, 8000, 12000, 18000, 25000, 35000, 50000, 70000];
   // 党务/群团比行政低 20%，纪检持平
-  const multiplier = line === CareerLine.Administrative ? 1.0
-    : line === CareerLine.Discipline ? 1.0
-    : 0.8;
+  const multiplier =
+    line === CareerLine.Administrative ? 1.0 : line === CareerLine.Discipline ? 1.0 : 0.8;
   return base[level] * multiplier;
 }
 ```
@@ -3272,7 +3597,7 @@ import { buildPosition } from '../templates';
 const adminLine: CareerLineConfig = {
   id: CareerLine.Administrative,
   name: '行政线',
-  color: '#4A6FA5',  // 蓝灰
+  color: '#4A6FA5', // 蓝灰
   description: '以经济发展、民生服务和社会治理为核心的行政管理路线',
   privileges: ['经济管理权', '行政审批权', '财政支配权'],
 
@@ -3282,20 +3607,32 @@ const adminLine: CareerLineConfig = {
       level: 1,
       label: '科员',
       positions: [
-        buildPosition('admin', 1, 0, '乡镇科员',
+        buildPosition(
+          'admin',
+          1,
+          0,
+          '乡镇科员',
           ['general_office', 'civil_affairs', 'agriculture', 'public_safety'],
           ['office_efficiency', 'petition_resolve', 'agricultural_output', 'safety'],
-          { annualBudget: 800 }
+          { annualBudget: 800 },
         ),
-        buildPosition('admin', 1, 1, '社区工作员',
+        buildPosition(
+          'admin',
+          1,
+          1,
+          '社区工作员',
           ['community_service', 'civil_affairs', 'environment', 'cultural'],
           ['resident_satisfaction', 'petition_resolve', 'environment_score', 'cultural_activity'],
-          { annualBudget: 600 }
+          { annualBudget: 600 },
         ),
-        buildPosition('admin', 1, 2, '乡镇办事员',
+        buildPosition(
+          'admin',
+          1,
+          2,
+          '乡镇办事员',
           ['general_office', 'finance', 'agriculture', 'statistics'],
           ['office_efficiency', 'fiscal_revenue', 'agricultural_output', 'data_accuracy'],
-          { annualBudget: 700 }
+          { annualBudget: 700 },
         ),
       ],
       promotionRequirements: {
@@ -3310,20 +3647,37 @@ const adminLine: CareerLineConfig = {
       level: 2,
       label: '副科',
       positions: [
-        buildPosition('admin', 2, 0, '副镇长',
+        buildPosition(
+          'admin',
+          2,
+          0,
+          '副镇长',
           ['urban_dev', 'finance', 'public_safety', 'civil_affairs'],
           ['gdp_growth', 'fiscal_revenue', 'safety', 'livelihood'],
-          { annualBudget: 2000 }
+          { annualBudget: 2000 },
         ),
-        buildPosition('admin', 2, 1, '乡镇办公室主任',
+        buildPosition(
+          'admin',
+          2,
+          1,
+          '乡镇办公室主任',
           ['general_office', 'human_resources', 'propaganda_dept', 'logistics'],
           ['office_efficiency', 'staff_satisfaction', 'propaganda_score', 'cost_control'],
-          { annualBudget: 1500 }
+          { annualBudget: 1500 },
         ),
-        buildPosition('admin', 2, 2, '民政助理',
+        buildPosition(
+          'admin',
+          2,
+          2,
+          '民政助理',
           ['civil_affairs', 'social_security', 'disability_service', 'elderly_care'],
-          ['livelihood', 'social_security_coverage', 'disability_service_score', 'elderly_care_rate'],
-          { annualBudget: 1800 }
+          [
+            'livelihood',
+            'social_security_coverage',
+            'disability_service_score',
+            'elderly_care_rate',
+          ],
+          { annualBudget: 1800 },
         ),
       ],
       promotionRequirements: {
@@ -3338,25 +3692,41 @@ const adminLine: CareerLineConfig = {
       level: 3,
       label: '正科',
       positions: [
-        buildPosition('admin', 3, 0, '镇长',
+        buildPosition(
+          'admin',
+          3,
+          0,
+          '镇长',
           ['urban_dev', 'finance', 'public_safety', 'civil_affairs', 'agriculture'],
           ['gdp_growth', 'fiscal_revenue', 'livelihood', 'project_done', 'safety'],
-          { annualBudget: 5000 }
+          { annualBudget: 5000 },
         ),
-        buildPosition('admin', 3, 1, '乡镇党委委员',
+        buildPosition(
+          'admin',
+          3,
+          1,
+          '乡镇党委委员',
           ['party_org', 'propaganda_dept', 'human_resources', 'discipline_inspect'],
           ['party_building', 'propaganda_score', 'staff_satisfaction', 'anti_corruption'],
-          { annualBudget: 3500 }
+          { annualBudget: 3500 },
         ),
-        buildPosition('admin', 3, 2, '科室主任',
+        buildPosition(
+          'admin',
+          3,
+          2,
+          '科室主任',
           ['general_office', 'finance', 'human_resources', 'statistics'],
           ['office_efficiency', 'fiscal_revenue', 'staff_satisfaction', 'data_accuracy'],
-          { annualBudget: 3000 }
+          { annualBudget: 3000 },
         ),
-        buildPosition('admin', 3, 3, '副乡镇党委书记',
+        buildPosition(
+          'admin',
+          3,
+          3,
+          '副乡镇党委书记',
           ['party_org', 'general_office', 'public_safety', 'civil_affairs'],
           ['party_building', 'office_efficiency', 'safety', 'livelihood'],
-          { annualBudget: 4000 }
+          { annualBudget: 4000 },
         ),
       ],
       promotionRequirements: {
@@ -3407,11 +3777,16 @@ export function useConfigRepo() {
   function getPosition(line: CareerLine, level: number, index: number): PositionConfig | null {
     const config = careerLineCache[line];
     if (!config) return null;
-    const levelConfig = config.levels.find(l => l.level === level);
+    const levelConfig = config.levels.find((l) => l.level === level);
     return levelConfig?.positions[index] ?? null;
   }
 
-  function getDepartment(line: CareerLine, level: number, posIndex: number, deptIndex: number): DepartmentConfig | null {
+  function getDepartment(
+    line: CareerLine,
+    level: number,
+    posIndex: number,
+    deptIndex: number,
+  ): DepartmentConfig | null {
     const pos = getPosition(line, level, posIndex);
     return pos?.departments[deptIndex] ?? null;
   }
@@ -3422,16 +3797,16 @@ export function useConfigRepo() {
 
 ### 9.5 配置数据量估算
 
-| 数据类型 | 估算体积 | 加载策略 |
-|---------|---------|---------|
-| 模板文件 (templates.ts) | ~15KB | 首屏加载 |
-| 行政线配置 | ~40KB | 懒加载 |
-| 党务线配置 | ~40KB | 懒加载 |
-| 纪检线配置 | ~40KB | 懒加载 |
-| 群团线配置 | ~40KB | 懒加载 |
-| 随机事件库 | ~20KB | 懒加载 |
-| 常量定义 | ~5KB | 首屏加载 |
-| **总计** | **~200KB** | 首屏 ~20KB |
+| 数据类型                | 估算体积   | 加载策略   |
+| ----------------------- | ---------- | ---------- |
+| 模板文件 (templates.ts) | ~15KB      | 首屏加载   |
+| 行政线配置              | ~40KB      | 懒加载     |
+| 党务线配置              | ~40KB      | 懒加载     |
+| 纪检线配置              | ~40KB      | 懒加载     |
+| 群团线配置              | ~40KB      | 懒加载     |
+| 随机事件库              | ~20KB      | 懒加载     |
+| 常量定义                | ~5KB       | 首屏加载   |
+| **总计**                | **~200KB** | 首屏 ~20KB |
 
 ---
 
@@ -3642,12 +4017,14 @@ async function saveWithRollback(save: PlayerSave): Promise<boolean> {
 ## 12. 实施路线图
 
 ### Phase 0：基础设施搭建（2~3 sessions）
+
 - 项目初始化：Preact + esbuild + TypeScript + Tailwind
 - Hash router 实现
 - Supabase 连接 + Auth + 表创建
 - Signals store 骨架
 
 ### Phase 1：配置数据 + 核心页面（4~5 sessions）
+
 - 模板系统实现
 - 行政线级别 1~3 配置（验证模板可行性）
 - 建档系统（6步向导）
@@ -3655,22 +4032,26 @@ async function saveWithRollback(save: PlayerSave): Promise<boolean> {
 - 职业线入口 + PositionHub + PositionDept（数据驱动）
 
 ### Phase 2：游戏引擎（4~5 sessions）
+
 - 时间引擎 + 行动引擎
 - KPI 引擎 + 预算引擎
 - 月度结算 + 年度考核
 - AP 恢复 + 活跃度衰减
 
 ### Phase 3：晋升系统（3~4 sessions）
+
 - 六阶段状态机完整实现
 - 门槛校验 + 后备干部池
 - 跨线转职
 
 ### Phase 4：配置数据补全（3~4 sessions）
+
 - 行政线级别 4~11
 - 党务线、纪检线、群团线全部配置
 - 随机事件库
 
 ### Phase 5：子系统页面（5~7 sessions）
+
 - 秘书处（5 Tab）
 - 人脉关系 + 派系政治
 - 个人生活 + 上级关系
@@ -3679,6 +4060,7 @@ async function saveWithRollback(save: PlayerSave): Promise<boolean> {
 - 接班人 + 智库 + 导师 + 历史机遇 + 修宪
 
 ### Phase 6：收尾与打磨（2~3 sessions）
+
 - 游戏结局
 - 存档/读档/多槽位
 - 数值平衡调优
@@ -3691,14 +4073,14 @@ async function saveWithRollback(save: PlayerSave): Promise<boolean> {
 
 ## 附录 A：与 v2.x 的映射关系
 
-| v2.x 模块 | v3.0 对应 | 变化说明 |
-|-----------|----------|---------|
-| game.ts (PlayerSave 350+字段) | types/player.ts | 扁平字段重组为嵌套对象，总字段数减少至~50 |
-| gameApi.ts (6481行 120+导出) | engine/*.ts + store/*.ts | 按职责拆分为 9 个引擎模块 + 9 个 store |
-| gameConfig.ts (53导出) | config/templates.ts + config/career-lines/*.ts | 扩展为模板继承系统 |
-| GameContext.tsx (advanceTime 1100行) | engine/time-engine.ts | 提取为纯函数，与 React 解耦 |
-| home.tsx (3823行) | pages/dashboard/dashboard.tsx + 各子系统页面 | 按功能拆分为独立页面 |
-| secretary.tsx | pages/secretary/secretary.tsx | 重构为 5 Tab + 新增文件批示/舆情 |
+| v2.x 模块                            | v3.0 对应                                      | 变化说明                                  |
+| ------------------------------------ | ---------------------------------------------- | ----------------------------------------- |
+| game.ts (PlayerSave 350+字段)        | types/player.ts                                | 扁平字段重组为嵌套对象，总字段数减少至~50 |
+| gameApi.ts (6481行 120+导出)         | engine/_.ts + store/_.ts                       | 按职责拆分为 9 个引擎模块 + 9 个 store    |
+| gameConfig.ts (53导出)               | config/templates.ts + config/career-lines/*.ts | 扩展为模板继承系统                        |
+| GameContext.tsx (advanceTime 1100行) | engine/time-engine.ts                          | 提取为纯函数，与 React 解耦               |
+| home.tsx (3823行)                    | pages/dashboard/dashboard.tsx + 各子系统页面   | 按功能拆分为独立页面                      |
+| secretary.tsx                        | pages/secretary/secretary.tsx                  | 重构为 5 Tab + 新增文件批示/舆情          |
 
 ## 附录 B：Supabase 部署检查清单
 
@@ -3712,11 +4094,11 @@ async function saveWithRollback(save: PlayerSave): Promise<boolean> {
 
 ## 附录 C：性能预算
 
-| 指标 | 目标值 |
-|------|-------|
-| 首屏 JS 体积 | < 200KB gzipped |
-| 首屏加载时间 | < 2s (4G) |
-| 行动执行响应 | < 100ms |
-| 存档保存延迟 | < 500ms |
+| 指标           | 目标值           |
+| -------------- | ---------------- |
+| 首屏 JS 体积   | < 200KB gzipped  |
+| 首屏加载时间   | < 2s (4G)        |
+| 行动执行响应   | < 100ms          |
+| 存档保存延迟   | < 500ms          |
 | 配置数据懒加载 | < 300ms per line |
-| 内存占用 | < 50MB |
+| 内存占用       | < 50MB           |
