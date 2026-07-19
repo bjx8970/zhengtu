@@ -9,14 +9,9 @@
 import { For, Show } from 'solid-js';
 import { navigate } from '../router';
 import { colors } from '../utils/theme';
+import type { AlertItem } from '../types/ui';
 
-/** 单条提醒项 */
-export interface AlertItem {
-  id: string;
-  level: 'warning' | 'danger' | 'info';
-  message: string;
-  action?: { label: string; route: string };
-}
+export type { AlertItem };
 
 const LEVEL_STYLE: Record<AlertItem['level'], { border: string; bg: string; text: string }> = {
   warning: { border: colors.gold, bg: 'rgba(183,131,36,0.06)', text: '#5e4825' },

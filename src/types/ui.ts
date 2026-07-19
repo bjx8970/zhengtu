@@ -15,3 +15,11 @@ export interface FeatureEntry {
   readonly route?: string;
   readonly phase: string;
 }
+
+/** 单条提醒项（AlertBanner 组件使用） */
+export interface AlertItem {
+  id: string;
+  level: 'warning' | 'danger' | 'info';
+  message: string;
+  action?: { label: string; route: string };
+}

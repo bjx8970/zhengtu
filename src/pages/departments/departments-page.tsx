@@ -53,7 +53,10 @@ export function DepartmentsPage() {
 
       <Show
         when={selectedDept() === null}
-        fallback={<DeptDetailView dept={selectedDept()!} onBack={() => setSelectedDeptIdx(null)} />}
+        fallback={
+          // 安全：fallback 仅在 selectedDept() !== null 时渲染
+          <DeptDetailView dept={selectedDept()!} onBack={() => setSelectedDeptIdx(null)} />
+        }
       >
         {/* 部门列表视图 */}
         <div style={{ ...darkCardStyle('18px'), 'margin-bottom': '16px', 'margin-top': '16px' }}>
