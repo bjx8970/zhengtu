@@ -118,8 +118,8 @@ describe('ConfigLoader', () => {
         return counts;
       }, {});
 
-      expect(actions).toHaveLength(62);
-      expect(categoryCounts).toEqual({ minor: 22, routine: 12, major: 28 });
+      expect(actions).toHaveLength(74);
+      expect(categoryCounts).toEqual({ minor: 22, routine: 12, major: 40 });
       for (const action of actions) {
         expect(action.cooldownDays).toBe(
           action.category === 'major' ? 14 : action.category === 'minor' ? 7 : 0,

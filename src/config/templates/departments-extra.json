@@ -716,5 +716,191 @@
       }
     ],
     "kpiTemplateIds": ["regional_integration", "gdp_growth"]
+  },
+  "provincial_leadership": {
+    "name": "省政府办公厅",
+    "consumptionCoefficient": 1.8,
+    "baseConsumption": 350,
+    "actions": [
+      {
+        "id": "provincial_coordination",
+        "name": "全省工作协调",
+        "description": "协调省直各部门和各地市工作，推进重大决策落实",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 350,
+        "effects": [{ "target": "dept.kpi.provincial_gdp", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "policy_deployment",
+        "name": "政策部署推进",
+        "description": "部署和推进重大政策实施，确保政令畅通",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 250,
+        "effects": [
+          { "target": "dept.kpi.provincial_gdp", "operation": "add", "value": 10 },
+          { "target": "player.performance", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["provincial_gdp", "strategic_execution"]
+  },
+  "provincial_committee": {
+    "name": "省委办公厅",
+    "consumptionCoefficient": 1.9,
+    "baseConsumption": 400,
+    "actions": [
+      {
+        "id": "party_decision",
+        "name": "党委决策推进",
+        "description": "推进党委重大决策部署，加强党的领导",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 400,
+        "effects": [{ "target": "dept.kpi.political_ecology", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "cadre_management",
+        "name": "干部管理监督",
+        "description": "加强干部队伍建设，强化监督管理",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 300,
+        "effects": [
+          { "target": "dept.kpi.political_ecology", "operation": "add", "value": 10 },
+          { "target": "player.integrity", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["political_ecology", "party_building"]
+  },
+  "strategic_planning": {
+    "name": "战略规划委",
+    "consumptionCoefficient": 1.7,
+    "baseConsumption": 320,
+    "actions": [
+      {
+        "id": "five_year_plan",
+        "name": "五年规划编制",
+        "description": "编制和实施五年发展规划，明确战略方向",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 320,
+        "effects": [{ "target": "dept.kpi.reform_progress", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "reform_implementation",
+        "name": "改革任务推进",
+        "description": "推进重点领域改革任务落地见效",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 240,
+        "effects": [
+          { "target": "dept.kpi.reform_progress", "operation": "add", "value": 10 },
+          { "target": "player.competence", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["reform_progress", "governance_quality"]
+  },
+  "provincial_finance": {
+    "name": "省财政厅",
+    "consumptionCoefficient": 1.6,
+    "baseConsumption": 300,
+    "actions": [
+      {
+        "id": "budget_management",
+        "name": "预算统筹管理",
+        "description": "统筹全省财政预算，优化支出结构",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 300,
+        "effects": [{ "target": "dept.kpi.people_livelihood", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "fiscal_reform",
+        "name": "财税体制改革",
+        "description": "推进财税体制改革，提升财政效能",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 220,
+        "effects": [
+          { "target": "dept.kpi.people_livelihood", "operation": "add", "value": 10 },
+          { "target": "player.performance", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["people_livelihood", "fiscal_revenue"]
+  },
+  "provincial_org": {
+    "name": "省委组织部",
+    "consumptionCoefficient": 1.5,
+    "baseConsumption": 280,
+    "actions": [
+      {
+        "id": "cadre_selection",
+        "name": "干部选拔任用",
+        "description": "做好干部选拔任用工作，建设高素质队伍",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 280,
+        "effects": [{ "target": "dept.kpi.stability_index", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "talent_program",
+        "name": "人才强省战略",
+        "description": "实施人才强省战略，集聚优秀人才",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 200,
+        "effects": [
+          { "target": "dept.kpi.stability_index", "operation": "add", "value": 10 },
+          { "target": "player.charisma", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["stability_index", "staff_satisfaction"]
+  },
+  "provincial_discipline": {
+    "name": "省纪委",
+    "consumptionCoefficient": 1.4,
+    "baseConsumption": 260,
+    "actions": [
+      {
+        "id": "anti_corruption_campaign",
+        "name": "反腐败斗争",
+        "description": "深入推进反腐败斗争，保持高压态势",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 260,
+        "effects": [{ "target": "dept.kpi.political_ecology", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "supervision_inspection",
+        "name": "监督检查",
+        "description": "开展监督检查，确保权力规范运行",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 180,
+        "effects": [
+          { "target": "dept.kpi.political_ecology", "operation": "add", "value": 10 },
+          { "target": "player.integrity", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["political_ecology", "anti_corruption"]
   }
 }

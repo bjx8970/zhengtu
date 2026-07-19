@@ -350,5 +350,53 @@
     "weight": 0.2,
     "unit": "分",
     "calcType": "ratio"
+  },
+  "provincial_gdp": {
+    "id": "provincial_gdp",
+    "name": "全省GDP增长率",
+    "targetValue": 15,
+    "weight": 0.25,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "strategic_execution": {
+    "id": "strategic_execution",
+    "name": "战略执行力",
+    "targetValue": 90,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "political_ecology": {
+    "id": "political_ecology",
+    "name": "政治生态指数",
+    "targetValue": 85,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "people_livelihood": {
+    "id": "people_livelihood",
+    "name": "民生保障水平",
+    "targetValue": 90,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "reform_progress": {
+    "id": "reform_progress",
+    "name": "改革推进指数",
+    "targetValue": 80,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "stability_index": {
+    "id": "stability_index",
+    "name": "社会稳定指数",
+    "targetValue": 95,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
   }
 }

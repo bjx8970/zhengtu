@@ -493,6 +493,142 @@
         "politicalConditions": ["无党纪处分记录", "人事档案合规", "基层主官经历", "多岗位历练"],
         "specialConditions": ["grassroots", "multi_region"]
       }
+    },
+    {
+      "level": 8,
+      "label": "副省",
+      "positions": [
+        {
+          "id": "admin_l8_0",
+          "name": "副省长",
+          "departmentTemplateIds": [
+            "provincial_leadership",
+            "strategic_planning",
+            "provincial_finance",
+            "economic_development",
+            "social_governance"
+          ],
+          "kpiTemplateIds": [
+            "provincial_gdp",
+            "strategic_execution",
+            "people_livelihood",
+            "reform_progress",
+            "stability_index"
+          ],
+          "annualBudget": 400000
+        },
+        {
+          "id": "admin_l8_1",
+          "name": "省委常委",
+          "departmentTemplateIds": [
+            "provincial_committee",
+            "provincial_org",
+            "provincial_discipline",
+            "propaganda_dept",
+            "strategic_planning"
+          ],
+          "kpiTemplateIds": [
+            "political_ecology",
+            "party_building",
+            "anti_corruption",
+            "reform_progress",
+            "stability_index"
+          ],
+          "annualBudget": 350000
+        },
+        {
+          "id": "admin_l8_2",
+          "name": "省人大副主任",
+          "departmentTemplateIds": [
+            "provincial_leadership",
+            "provincial_finance",
+            "general_office",
+            "human_resources"
+          ],
+          "kpiTemplateIds": [
+            "governance_quality",
+            "people_livelihood",
+            "fiscal_health",
+            "staff_satisfaction"
+          ],
+          "annualBudget": 300000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 5,
+        "minAssessmentPasses": 5,
+        "politicalConditions": ["无党纪处分记录", "人事档案合规", "基层主官经历", "多岗位历练", "正厅级任职经历"],
+        "specialConditions": ["grassroots", "multi_region"]
+      }
+    },
+    {
+      "level": 9,
+      "label": "正省",
+      "positions": [
+        {
+          "id": "admin_l9_0",
+          "name": "省长",
+          "departmentTemplateIds": [
+            "provincial_leadership",
+            "strategic_planning",
+            "provincial_finance",
+            "economic_development",
+            "social_governance"
+          ],
+          "kpiTemplateIds": [
+            "provincial_gdp",
+            "strategic_execution",
+            "people_livelihood",
+            "reform_progress",
+            "stability_index"
+          ],
+          "annualBudget": 700000
+        },
+        {
+          "id": "admin_l9_1",
+          "name": "省委书记",
+          "departmentTemplateIds": [
+            "provincial_committee",
+            "provincial_org",
+            "provincial_discipline",
+            "propaganda_dept",
+            "strategic_planning"
+          ],
+          "kpiTemplateIds": [
+            "political_ecology",
+            "party_building",
+            "anti_corruption",
+            "reform_progress",
+            "stability_index"
+          ],
+          "annualBudget": 800000
+        },
+        {
+          "id": "admin_l9_2",
+          "name": "省政协主席",
+          "departmentTemplateIds": [
+            "provincial_leadership",
+            "provincial_finance",
+            "general_office",
+            "human_resources",
+            "regional_cooperation"
+          ],
+          "kpiTemplateIds": [
+            "governance_quality",
+            "people_livelihood",
+            "fiscal_health",
+            "staff_satisfaction",
+            "regional_integration"
+          ],
+          "annualBudget": 500000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 5,
+        "minAssessmentPasses": 5,
+        "politicalConditions": ["无党纪处分记录", "人事档案合规", "基层主官经历", "多岗位历练", "副省级任职经历"],
+        "specialConditions": ["grassroots", "multi_region"]
+      }
     }
   ]
 }

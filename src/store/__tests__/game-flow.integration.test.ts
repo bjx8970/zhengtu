@@ -256,12 +256,12 @@ describe('核心流程集成测试', () => {
     });
   });
 
-  describe('场景 3：L7 封顶', () => {
-    it('L7 状态下 START_PROMOTION 不改变任何状态', () => {
+  describe('场景 3：L9 封顶', () => {
+    it('L9 状态下 START_PROMOTION 不改变任何状态', () => {
       const store = createTestStore({
         currentCareerLine: CareerLine.Administrative,
-        currentLevel: 7,
-        currentPositionId: 'admin_l7_0',
+        currentLevel: 9,
+        currentPositionId: 'admin_l9_0',
         yearsInCurrentPosition: 5,
         annualAssessments: [
           { year: 2020, score: 90, tier: KPITier.Excellent },
@@ -276,7 +276,7 @@ describe('核心流程集成测试', () => {
       store.dispatch({ type: 'START_PROMOTION' });
       const after = store.getRawState();
 
-      // L7 没有 L8 配置，晋升应被静默拒绝
+      // L9 没有 L10 配置，晋升应被静默拒绝
       expect(after.promotionStage).toBe(PromotionStage.Idle);
       expect(after.promotionAttempts).toBe(before.promotionAttempts);
       expect(after.promotionState).toBeNull();
