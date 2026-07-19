@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>公文处理 - 征途工作台</title>
+  <style>
+    :root {
+      --bg-main: #eeece6; --bg-card: #fffdf8; --bg-soft: #f8f4ec; --bg-header: #172b45;
+      --text-primary: #202a35; --text-secondary: #657080; --text-muted: #8d939b;
+      --color-primary: #b3262d; --color-secondary: #284b70; --color-success: #4caf50;
+      --color-warning: #e6a817; --color-danger: #c44d4d; --color-gold: #b78324; --color-cyan: #3b7f8f;
+      --border-color: #d8d4cc; --border-light: #e8e4dc; --radius-md: 4px; --radius-lg: 8px;
+      --font-title: 'STKaiti', 'KaiTi', '楷体', serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; font-family: var(--font-body); background: var(--bg-main); color: var(--text-primary); }
+    .page { max-width: 900px; margin: 0 auto; padding: 0 16px 40px; }
+    .page-header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: var(--bg-header); color: #fff; border-radius: 0 0 var(--radius-lg) var(--radius-lg); box-shadow: 0 4px 16px rgba(23,43,69,0.18); }
+    .back-btn { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.25); border-radius: 50%; background: transparent; color: #fff; font-size: 16px; cursor: pointer; }
+    .back-btn:hover { background: rgba(255,255,255,0.1); }
+    .page-header__title { font-size: 18px; font-weight: 700; font-family: var(--font-title); }
+    .page-header__desc { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+    .section { margin-top: 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 18px 20px; }
+    .section__title { font-size: 16px; font-weight: 700; font-family: var(--font-title); margin-bottom: 4px; }
+    .section__desc { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+
+    .doc-card { border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: #fff; padding: 16px; margin-bottom: 12px; transition: all 0.15s; }
+    .doc-card:hover { border-color: var(--color-secondary); box-shadow: 0 2px 8px rgba(40,75,112,0.08); }
+    .doc-card__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .doc-card__title { font-size: 15px; font-weight: 700; }
+    .doc-card__type { padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .doc-card__summary { font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 12px; }
+    .doc-card__meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .tag { padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--bg-soft); color: var(--text-muted); }
+
+    .doc-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .doc-btn { padding: 8px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #fff; font-size: 12px; font-weight: 700; cursor: pointer; text-align: center; transition: all 0.15s; }
+    .doc-btn:hover { transform: translateY(-1px); }
+    .doc-btn--approve { border-color: var(--color-success); color: var(--color-success); }
+    .doc-btn--approve:hover { background: rgba(76,175,80,0.08); }
+    .doc-btn--revise { border-color: var(--color-secondary); color: var(--color-secondary); }
+    .doc-btn--revise:hover { background: rgba(40,75,112,0.08); }
+    .doc-btn--reject { border-color: var(--color-danger); color: var(--color-danger); }
+    .doc-btn--reject:hover { background: rgba(196,77,77,0.08); }
+    .doc-btn--shelve { border-color: var(--color-warning); color: var(--color-gold); }
+    .doc-btn--shelve:hover { background: rgba(230,168,23,0.08); }
+
+    .doc-effect { font-size: 11px; color: var(--text-muted); margin-top: 4px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="page-header">
+      <button class="back-btn" title="返回工作台">←</button>
+      <div>
+        <div class="page-header__title">公文处理</div>
+        <div class="page-header__desc">2 件待批 · 1 件已搁置</div>
+      </div>
+    </header>
+
+    <!-- 待批公文 -->
+    <section class="section">
+      <h2 class="section__title">待批公文</h2>
+      <p class="section__desc">批阅公文影响对应 KPI 维度，请谨慎选择操作。</p>
+
+      <div class="doc-card">
+        <div class="doc-card__header">
+          <div class="doc-card__title">关于申请拨付老旧小区改造专项资金的请示</div>
+          <span class="doc-card__type" style="background: rgba(59,127,143,0.1); color: var(--color-cyan);">请示</span>
+        </div>
+        <div class="doc-card__summary">
+          住建局申请拨付 320 万元用于城区 3 个老旧小区的外墙保温、管网更换和道路硬化工程，惠及居民 1200 户。
+        </div>
+        <div class="doc-card__meta">
+          <span class="tag">民生类</span>
+          <span class="tag">需能力值 ≥ 40</span>
+          <span class="tag">住建局</span>
+        </div>
+        <div class="doc-actions">
+          <div>
+            <button class="doc-btn doc-btn--approve">批准</button>
+            <div class="doc-effect">民生+5 预算-320</div>
+          </div>
+          <div>
+            <button class="doc-btn doc-btn--revise">修改</button>
+            <div class="doc-effect">民生+3 预算-200</div>
+          </div>
+          <div>
+            <button class="doc-btn doc-btn--reject">驳回</button>
+            <div class="doc-effect">民生-2 稳定+3</div>
+          </div>
+          <div>
+            <button class="doc-btn doc-btn--shelve">搁置</button>
+            <div class="doc-effect">无即时效果</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-card">
+        <div class="doc-card__header">
+          <div class="doc-card__title">关于开展营商环境专项整治行动的方案</div>
+          <span class="doc-card__type" style="background: rgba(40,75,112,0.1); color: var(--color-secondary);">方案</span>
+        </div>
+        <div class="doc-card__summary">
+          发改委提出为期 3 个月的营商环境专项整治，重点清理涉企违规收费、简化审批流程，预计投入行政资源 15 万元。
+        </div>
+        <div class="doc-card__meta">
+          <span class="tag">经济类</span>
+          <span class="tag">需能力值 ≥ 50</span>
+          <span class="tag">发改委</span>
+        </div>
+        <div class="doc-actions">
+          <div>
+            <button class="doc-btn doc-btn--approve">批准</button>
+            <div class="doc-effect">GDP+4 预算-15</div>
+          </div>
+          <div>
+            <button class="doc-btn doc-btn--revise">修改</button>
+            <div class="doc-effect">GDP+2 预算-8</div>
+          </div>
+          <div>
+            <button class="doc-btn doc-btn--reject">驳回</button>
+            <div class="doc-effect">GDP-1 稳定+2</div>
+          </div>
+          <div>
+            <button class="doc-btn doc-btn--shelve">搁置</button>
+            <div class="doc-effect">无即时效果</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 已处理 -->
+    <section class="section">
+      <h2 class="section__title">近期已处理</h2>
+      <p class="section__desc">最近批阅的公文记录。</p>
+      <div style="display: grid; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: #fff; font-size: 13px;">
+          <span>关于加强基层党组织建设的报告</span>
+          <span class="tag" style="background: rgba(76,175,80,0.1); color: var(--color-success);">已批准</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: #fff; font-size: 13px;">
+          <span>关于调整城区公交线路的建议</span>
+          <span class="tag" style="background: rgba(230,168,23,0.1); color: var(--color-gold);">已搁置</span>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

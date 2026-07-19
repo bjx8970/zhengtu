@@ -39,6 +39,7 @@
   --color-danger: #c44d4d;
   --color-gold: #b78324;
   --color-cyan: #3b7f8f;
+  --color-purple: #6b5b8a;
 
   /* 输入框 */
   --bg-input: #f8f7f5;
@@ -158,9 +159,9 @@ a:focus-visible {
 
 /* ── 响应式容器 ── */
 .app-container {
-  width: min(100%, 1180px);
+  width: min(100%, 900px);
   margin: 0 auto;
-  padding: 18px 18px 92px;
+  padding: 0 16px 40px;
   min-height: 100%;
 }
 
@@ -214,30 +215,10 @@ a:focus-visible {
   font-weight: 700;
 }
 
-/* ── 底部导航容器 ── */
-.tab-bar {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 20;
-  border-top: 1px solid var(--border-color);
-  background: rgba(255, 253, 248, 0.96);
-  box-shadow: 0 -12px 32px rgba(32, 42, 53, 0.12);
-  backdrop-filter: blur(10px);
-}
-.tab-inner {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  width: min(100%, 760px);
-  margin: 0 auto;
-  padding: 7px 10px 9px;
-  gap: 4px;
-}
 
 @media (max-width: 640px) {
   .app-container {
-    padding: 14px 12px 88px;
+    padding: 0 12px 32px;
   }
 }
 

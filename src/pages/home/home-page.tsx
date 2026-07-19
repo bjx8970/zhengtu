@@ -1,69 +1,101 @@
 /**
- * 主页（Home）
+ * 工作台主页
  *
- * 主页面只处理角色状态与时间推进：
- * - 角色名片（头像 + 信息 + 属性）
- * - 时间推进按钮
- * - 状态摘要（预算 / KPI / 槽位 / 健康）
- * - 子页面入口（部门 / 行动 / KPI / 晋升）
- * - 当前进行中的任务
- * - 月度提醒
+ * 单一工作台布局，自上而下包含：
+ * - 信息栏：人物名称、职务、就职位置、当前日期、设置按钮
+ * - 时间推进模块：推进1天/1周/1月
+ * - 日程规划模块：主要日程(3格)、次要日程(2格)、临时日程(1格)，进度条展示
+ * - 工作台卡片区：按功能分类的政务操作入口
  */
 
 import { createMemo, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { navigate } from '../../router';
 import { AppShell } from '../../components/app-shell';
-import { MetricsBar } from '../../components/metrics-bar';
 import { calculateKPI } from '../../engine/governance/kpi';
-import { hasActiveActions } from '../../engine/core/action';
 import { getConfigLoader } from '../../config/loader';
-import { formatNumber } from '../../utils/format';
+import { formatDate } from '../../utils/format';
 import { parsePositionIndex } from '../../utils/position';
 import type { SlotOccupant, SlotTierKey } from '../../types/player';
-import { colors, font, sealStyle, pillStyle, darkCardStyle } from '../../utils/theme';
+import { colors, font } from '../../utils/theme';
 
-const GRANULARITIES: { label: string; days: number; granularity: 'day' | 'week' | 'month' }[] = [
-  { label: '推进1天', days: 1, granularity: 'day' },
-  { label: '推进7天', days: 7, granularity: 'week' },
-  { label: '推进30天', days: 30, granularity: 'month' },
+/** 时间推进选项 */
+const GRANULARITIES: { label: string; desc: string; granularity: 'day' | 'week' | 'month' }[] = [
+  { label: '推进 1 天', desc: '适合等待短日程完成', granularity: 'day' },
+  { label: '推进 1 周', desc: '结算一周政务变化', granularity: 'week' },
+  { label: '推进 1 月', desc: '进入月度考核节奏', granularity: 'month' },
 ];
 
-const FEATURE_ENTRIES = [
+/** 日程分组配置 */
+const SCHEDULE_TIERS: { key: SlotTierKey; label: string; color: string }[] = [
+  { key: 'primary', label: '主要日程', color: colors.secondary },
+  { key: 'secondary', label: '次要日程', color: colors.success },
+  { key: 'reserve', label: '临时日程', color: colors.danger },
+];
+
+/** 工作台功能卡片 */
+const WORK_CARDS: {
+  icon: string;
+  label: string;
+  desc: string;
+  route: string;
+  color: string;
+}[] = [
   {
     icon: '政',
     label: '部门治理',
-    desc: '查看部门卡片、行动清单、冷却状态',
+    desc: '查看部门状态、安排行动、管理冷却',
     route: '/departments',
     color: colors.secondary,
   },
   {
-    icon: '\u25F7',
+    icon: '行',
     label: '行动排程',
-    desc: '管理主要、次要、备用槽位',
+    desc: '安排新行动到主要、次要、临时日程',
     route: '/actions',
     color: colors.success,
   },
   {
-    icon: '\u25CE',
+    icon: '考',
     label: 'KPI 考核',
-    desc: '查看指标构成、得分与改进建议',
+    desc: '查看指标完成度、得分与改进建议',
     route: '/assessment',
     color: colors.gold,
   },
   {
-    icon: '\u25B2',
+    icon: '晋',
     label: '晋升任命',
-    desc: '处理民主推荐、组织考察、票决',
+    desc: '民主推荐、组织考察、常委会票决',
     route: '/career',
     color: colors.cyan,
+  },
+  {
+    icon: '文',
+    label: '公文处理',
+    desc: '批阅请示、报告、方案与建议',
+    route: '/departments', // TODO: Phase 4 实现独立路由
+    color: colors.warning,
+  },
+  {
+    icon: '廉',
+    label: '廉政风险',
+    desc: '监控贪腐风险值、应对调查与举报',
+    route: '/departments', // TODO: Phase 4 实现独立路由
+    color: colors.primary,
+  },
+  {
+    icon: '交',
+    label: '人脉关系',
+    desc: '维护上级、同事、学界与媒体关系',
+    route: '/departments', // TODO: Phase 4 实现独立路由
+    color: colors.purple,
   },
 ];
 
 /**
- * 主页组件。
+ * 工作台主页组件。
  *
- * @returns 主页 JSX
+ * @returns 工作台 JSX
  */
 export function HomePage() {
   const { state, dispatch } = useGameStore();
@@ -76,6 +108,8 @@ export function HomePage() {
     return getConfigLoader().getPosition(state.currentCareerLine, state.currentLevel, idx);
   });
 
+  const dateStr = createMemo(() => formatDate(state.time.year, state.time.month, state.time.day));
+
   const kpiResult = createMemo(() => {
     const pos = positionConfig();
     if (!pos) return null;
@@ -86,144 +120,135 @@ export function HomePage() {
     );
   });
 
-  const kpiDisplay = createMemo(() => {
-    const r = kpiResult();
-    if (!r) return { value: 'N/A', pct: 0 };
-    return { value: formatNumber(r.totalScore, 1), pct: r.totalScore / 100 };
-  });
+  /** 按分组获取日程占用列表 */
+  function getTierOccupants(tierKey: SlotTierKey) {
+    const tier = state.slots[tierKey];
+    return tier.occupants;
+  }
 
-  const hasPending = createMemo(() => hasActiveActions(state.slots));
-
-  const slotOccupied = createMemo(() => {
-    let count = 0;
-    let total = 0;
-    for (const tier of Object.values(state.slots)) {
-      total += tier.count;
-      count += tier.occupants.filter((o: SlotOccupant | null) => o !== null).length;
-    }
-    return { count, total };
-  });
-
-  const budgetMax = createMemo(() => positionConfig()?.annualBudget ?? 100);
-
-  const pendingSlots = createMemo(() => {
-    const result: { occupant: SlotOccupant; tierKey: SlotTierKey; tierLabel: string }[] = [];
-    for (const [tierKey, tier] of Object.entries(state.slots) as [
-      SlotTierKey,
-      typeof state.slots.primary,
-    ][]) {
-      for (const o of tier.occupants) {
-        if (o !== null) result.push({ occupant: o, tierKey, tierLabel: tier.label });
-      }
-    }
-    return result;
-  });
+  /** 计算占用数/总数 */
+  function getTierCount(tierKey: SlotTierKey) {
+    const tier = state.slots[tierKey];
+    const occupied = tier.occupants.filter((o: SlotOccupant | null) => o !== null).length;
+    return { occupied, total: tier.count };
+  }
 
   return (
-    <AppShell activeTab={0}>
-      {/* 角色名片 */}
-      <article
+    <AppShell>
+      {/* ═══ 信息栏 ═══ */}
+      <header
         style={{
-          display: 'grid',
-          'grid-template-columns': 'minmax(0,1fr) 220px',
-          gap: '18px',
-          'min-height': '256px',
-          ...darkCardStyle('22px'),
-          'border-top': `4px solid ${colors.primary}`,
+          position: 'sticky',
+          top: 0,
+          'z-index': 10,
+          display: 'flex',
+          'align-items': 'center',
+          'justify-content': 'space-between',
+          padding: '14px 20px',
+          background: colors.bgHeader,
+          color: '#fff',
+          'border-radius': '0 0 8px 8px',
+          'box-shadow': '0 4px 16px rgba(23,43,69,0.18)',
         }}
       >
-        <div>
-          <div style={{ color: colors.textMuted, 'font-size': '13px' }}>当前角色</div>
-          <h2 style={{ 'font-family': font.title, 'font-size': '30px', 'margin-top': '3px' }}>
-            {state.characterName || '未创建角色'}
-          </h2>
+        <div style={{ display: 'flex', 'align-items': 'center', gap: '14px' }}>
           <div
             style={{
-              display: 'flex',
-              'flex-wrap': 'wrap',
-              gap: '8px',
-              'margin-top': '12px',
-              'margin-bottom': '18px',
+              display: 'grid',
+              'place-items': 'center',
+              width: '40px',
+              height: '40px',
+              'border-radius': '8px',
+              background: colors.primary,
+              'font-family': font.title,
+              'font-size': '22px',
+              'font-weight': 700,
+              color: '#fff',
             }}
           >
-            <Show when={positionConfig()}>
-              <span style={pillStyle('rgba(40,75,112,0.1)', colors.secondary)}>
-                {positionConfig()?.name}
-              </span>
-            </Show>
-            <span style={pillStyle('rgba(40,75,112,0.1)', colors.secondary)}>
-              行政线 L{state.currentLevel}
-            </span>
-            <span style={pillStyle('rgba(40,75,112,0.1)', colors.secondary)}>
-              任职第 {state.yearsInCurrentPosition} 年
-            </span>
+            {state.characterName ? state.characterName.charAt(0) : '?'}
           </div>
-          <p
-            style={{
-              'max-width': '560px',
-              color: colors.textMuted,
-              'font-size': '14px',
-              'line-height': '1.7',
-            }}
-          >
-            {kpiResult()?.tier ?? ''}考核，预算{state.remainingBudget >= 0 ? '充足' : '紧张'}。
-            {hasPending() ? '有行动进行中。' : '暂无进行中的行动。'}
-          </p>
+          <div>
+            <div
+              style={{
+                'font-size': '18px',
+                'font-weight': 700,
+                'font-family': font.title,
+              }}
+            >
+              {state.characterName || '未创建角色'}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                'margin-top': '3px',
+                'font-size': '12px',
+                color: 'rgba(255,255,255,0.72)',
+              }}
+            >
+              <Show when={positionConfig()}>
+                <span>{positionConfig()?.name}</span>
+                <span>·</span>
+              </Show>
+              <span>行政线 L{state.currentLevel}</span>
+            </div>
+          </div>
         </div>
-        <div
-          style={{
-            display: 'grid',
-            'align-content': 'space-between',
-            'min-height': '212px',
-            padding: '16px',
-            border: `1px solid ${colors.border}`,
-            'border-radius': '8px',
-            background: `linear-gradient(135deg, rgba(179,38,45,0.12), transparent 45%),
-                         linear-gradient(180deg, #fff, ${colors.bgSoft})`,
-          }}
-        >
-          <div style={sealStyle()}>{state.characterName ? state.characterName.charAt(0) : '?'}</div>
-          <dl
+        <div style={{ display: 'flex', 'align-items': 'center', gap: '16px' }}>
+          <div
+            style={{ 'text-align': 'right', 'font-size': '13px', color: 'rgba(255,255,255,0.85)' }}
+          >
+            {dateStr()}
+            <div
+              style={{ 'font-size': '11px', color: 'rgba(255,255,255,0.55)', 'margin-top': '2px' }}
+            >
+              任职第 {state.yearsInCurrentPosition} 年 · 累计 {state.totalDaysPlayed} 天
+            </div>
+          </div>
+          <button
+            title="设置"
             style={{
               display: 'grid',
-              'grid-template-columns': '1fr auto',
-              gap: '8px 12px',
-              margin: 0,
-              'font-size': '13px',
+              'place-items': 'center',
+              width: '34px',
+              height: '34px',
+              border: '1px solid rgba(255,255,255,0.25)',
+              'border-radius': '50%',
+              background: 'transparent',
+              color: 'rgba(255,255,255,0.8)',
+              'font-size': '16px',
+              cursor: 'pointer',
             }}
           >
-            <dt style={{ color: colors.textMuted }}>累计天数</dt>
-            <dd style={{ margin: 0, 'font-weight': 800 }}>{state.totalDaysPlayed} 天</dd>
-            <dt style={{ color: colors.textMuted }}>健康</dt>
-            <dd style={{ margin: 0, 'font-weight': 800 }}>{state.health}</dd>
-            <dt style={{ color: colors.textMuted }}>消沉</dt>
-            <dd style={{ margin: 0, 'font-weight': 800 }}>{state.demoralization}</dd>
-          </dl>
+            ⚙
+          </button>
         </div>
-      </article>
+      </header>
 
-      {/* 推进时间 */}
-      <article style={{ ...darkCardStyle('18px'), 'margin-top': '16px' }}>
-        <div style={{ 'margin-bottom': '14px' }}>
-          <h3 style={{ 'font-size': '18px', 'font-family': font.title }}>推进时间</h3>
-          <p style={{ 'margin-top': '4px', color: colors.textMuted, 'font-size': '13px' }}>
-            主页保留最高频操作，完成行动后再提示进入对应子页面查看详情。
-          </p>
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            'grid-template-columns': 'repeat(3, 1fr)',
-            gap: '10px',
-          }}
-        >
+      {/* ═══ 时间推进 ═══ */}
+      <section
+        style={{
+          'margin-top': '16px',
+          background: colors.bgCard,
+          border: `1px solid ${colors.border}`,
+          'border-radius': '8px',
+          padding: '18px 20px',
+        }}
+      >
+        <h2 style={{ 'font-size': '16px', 'font-weight': 700, 'font-family': font.title }}>
+          时间推进
+        </h2>
+        <p style={{ 'font-size': '12px', color: colors.textMuted, margin: '4px 0 14px' }}>
+          推进时间以结算进行中的日程，触发月度预算扣除与年度考核。
+        </p>
+        <div style={{ display: 'grid', 'grid-template-columns': 'repeat(3, 1fr)', gap: '10px' }}>
           <For each={GRANULARITIES}>
             {(g, i) => (
               <button
                 onClick={() => dispatch({ type: 'ADVANCE_TIME', granularity: g.granularity })}
                 style={{
-                  'min-height': '78px',
-                  padding: '12px',
+                  padding: '14px 12px',
                   border: i() === 2 ? 'none' : `1px solid ${colors.border}`,
                   'border-radius': '8px',
                   background: i() === 2 ? colors.primary : '#fff',
@@ -232,90 +257,180 @@ export function HomePage() {
                   'text-align': 'left',
                 }}
               >
-                <strong style={{ display: 'block' }}>{g.label}</strong>
+                <strong style={{ display: 'block', 'font-size': '14px' }}>{g.label}</strong>
                 <span
                   style={{
                     display: 'block',
-                    'margin-top': '6px',
-                    color: i() === 2 ? 'rgba(255,255,255,0.82)' : colors.textMuted,
-                    'font-size': '12px',
-                    'line-height': '1.45',
+                    'margin-top': '5px',
+                    'font-size': '11px',
+                    color: i() === 2 ? 'rgba(255,255,255,0.75)' : colors.textMuted,
+                    'line-height': '1.4',
                   }}
                 >
-                  {i() === 0
-                    ? '适合等待短行动完成'
-                    : i() === 1
-                      ? '结算一周政务变化'
-                      : '进入月度考核节奏'}
+                  {g.desc}
                 </span>
               </button>
             )}
           </For>
         </div>
-      </article>
+      </section>
 
-      {/* 状态摘要 */}
-      <article style={{ ...darkCardStyle('18px'), 'margin-top': '16px' }}>
-        <div style={{ 'margin-bottom': '14px' }}>
-          <h3 style={{ 'font-size': '18px', 'font-family': font.title }}>状态摘要</h3>
-          <p style={{ 'margin-top': '4px', color: colors.textMuted, 'font-size': '13px' }}>
-            详细分析下沉到 KPI、行动、部门等子页面。
-          </p>
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            'grid-template-columns': 'repeat(4, minmax(0, 1fr))',
-            gap: '12px',
+      {/* ═══ 日程规划 ═══ */}
+      <section
+        style={{
+          'margin-top': '16px',
+          background: colors.bgCard,
+          border: `1px solid ${colors.border}`,
+          'border-radius': '8px',
+          padding: '18px 20px',
+        }}
+      >
+        <h2 style={{ 'font-size': '16px', 'font-weight': 700, 'font-family': font.title }}>
+          日程规划
+        </h2>
+        <p style={{ 'font-size': '12px', color: colors.textMuted, margin: '4px 0 14px' }}>
+          管理当前正在执行的政务日程，日程完成后自动结算效果。
+        </p>
+
+        <For each={SCHEDULE_TIERS}>
+          {(tier) => {
+            const count = getTierCount(tier.key);
+            const occupants = getTierOccupants(tier.key);
+            return (
+              <div style={{ 'margin-bottom': '16px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    'align-items': 'center',
+                    gap: '8px',
+                    'margin-bottom': '10px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      'border-radius': '50%',
+                      background: tier.color,
+                    }}
+                  />
+                  <span style={{ 'font-size': '13px', 'font-weight': 700 }}>{tier.label}</span>
+                  <span style={{ 'font-size': '11px', color: colors.textMuted }}>
+                    {count.occupied}/{count.total}
+                  </span>
+                  <Show when={tier.key === 'reserve'}>
+                    <span
+                      style={{ 'font-size': '11px', color: colors.warning, 'margin-left': '4px' }}
+                    >
+                      ⚠ 使用将扣减健康、增加消沉
+                    </span>
+                  </Show>
+                </div>
+
+                <For each={occupants}>
+                  {(occupant: SlotOccupant | null) => {
+                    if (occupant) {
+                      const elapsed = state.totalDaysPlayed - occupant.startedAtDay;
+                      const total = occupant.durationDays;
+                      const pct = Math.min((elapsed / total) * 100, 100);
+                      const remain = Math.max(total - elapsed, 0);
+                      return (
+                        <div
+                          style={{
+                            display: 'grid',
+                            'grid-template-columns': '1fr auto',
+                            gap: '8px 12px',
+                            'align-items': 'center',
+                            padding: '10px 14px',
+                            border: `1px solid ${colors.borderLight}`,
+                            'border-radius': '4px',
+                            background: '#fff',
+                            'margin-bottom': '6px',
+                          }}
+                        >
+                          <div style={{ 'font-size': '13px', 'font-weight': 600 }}>
+                            {occupant.actionName}
+                          </div>
+                          <div
+                            style={{
+                              'font-size': '11px',
+                              color: colors.textMuted,
+                              'text-align': 'right',
+                            }}
+                          >
+                            剩余 {remain} 天
+                          </div>
+                          <div
+                            style={{
+                              'grid-column': '1 / -1',
+                              height: '6px',
+                              'border-radius': '999px',
+                              background: '#e7e1d6',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: '100%',
+                                'border-radius': 'inherit',
+                                width: `${pct}%`,
+                                background: tier.color,
+                                transition: 'width 0.3s',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div
+                        style={{
+                          padding: '10px 14px',
+                          border: `1px dashed ${colors.border}`,
+                          'border-radius': '4px',
+                          'text-align': 'center',
+                          'font-size': '12px',
+                          color: colors.textMuted,
+                          'margin-bottom': '6px',
+                        }}
+                      >
+                        （空闲）
+                      </div>
+                    );
+                  }}
+                </For>
+              </div>
+            );
           }}
-        >
-          <MetricsBar
-            label="剩余预算"
-            value={`${formatNumber(state.remainingBudget)}万`}
-            pct={budgetMax() > 0 ? state.remainingBudget / budgetMax() : 0}
-            barColor={colors.secondary}
-          />
-          <MetricsBar
-            label="KPI 总分"
-            value={kpiDisplay().value}
-            pct={kpiDisplay().pct}
-            barColor={colors.cyan}
-          />
-          <MetricsBar
-            label="健康状态"
-            value={`${state.health}`}
-            pct={state.health / 100}
-            barColor={colors.gold}
-          />
-          <MetricsBar
-            label="槽位占用"
-            value={`${slotOccupied().count}/${slotOccupied().total}`}
-            pct={slotOccupied().total > 0 ? slotOccupied().count / slotOccupied().total : 0}
-            barColor={colors.primary}
-          />
-        </div>
-      </article>
+        </For>
+      </section>
 
-      {/* 子页面入口 */}
-      <article style={{ ...darkCardStyle('18px'), 'margin-top': '16px' }}>
-        <div style={{ 'margin-bottom': '14px' }}>
-          <h3 style={{ 'font-size': '18px', 'font-family': font.title }}>子页面入口</h3>
-          <p style={{ 'margin-top': '4px', color: colors.textMuted, 'font-size': '13px' }}>
-            功能集中放到各自页面，主页只展示必要摘要。
-          </p>
-        </div>
-        <div style={{ display: 'grid', gap: '10px' }}>
-          <For each={FEATURE_ENTRIES}>
-            {(entry) => (
+      {/* ═══ 工作台 ═══ */}
+      <section
+        style={{
+          'margin-top': '16px',
+          background: colors.bgCard,
+          border: `1px solid ${colors.border}`,
+          'border-radius': '8px',
+          padding: '18px 20px',
+        }}
+      >
+        <h2 style={{ 'font-size': '16px', 'font-weight': 700, 'font-family': font.title }}>
+          工作台
+        </h2>
+        <p style={{ 'font-size': '12px', color: colors.textMuted, margin: '4px 0 14px' }}>
+          按功能分类的政务操作入口。
+        </p>
+        <div style={{ display: 'grid', 'grid-template-columns': 'repeat(2, 1fr)', gap: '12px' }}>
+          <For each={WORK_CARDS}>
+            {(card) => (
               <button
-                onClick={() => navigate(entry.route)}
+                onClick={() => navigate(card.route)}
                 style={{
-                  display: 'grid',
-                  'grid-template-columns': '38px minmax(0,1fr) auto',
+                  display: 'flex',
+                  'align-items': 'flex-start',
                   gap: '12px',
-                  'align-items': 'center',
-                  'min-height': '72px',
-                  padding: '12px',
+                  padding: '16px',
                   border: `1px solid ${colors.border}`,
                   'border-radius': '8px',
                   background: '#fff',
@@ -332,129 +447,53 @@ export function HomePage() {
                     height: '38px',
                     'border-radius': '8px',
                     color: '#fff',
-                    background: entry.color,
                     'font-weight': 900,
+                    'font-size': '16px',
+                    'flex-shrink': 0,
+                    background: card.color,
                   }}
                 >
-                  {entry.icon}
+                  {card.icon}
                 </div>
-                <div>
-                  <strong style={{ display: 'block', 'font-size': '13px' }}>{entry.label}</strong>
-                  <span
+                <div style={{ flex: 1, 'min-width': 0 }}>
+                  <div style={{ 'font-size': '14px', 'font-weight': 700 }}>{card.label}</div>
+                  <div
                     style={{
-                      display: 'block',
-                      'margin-top': '6px',
-                      color: colors.textMuted,
+                      'margin-top': '4px',
                       'font-size': '12px',
-                      'line-height': '1.45',
+                      color: colors.textMuted,
+                      'line-height': '1.5',
                     }}
                   >
-                    {entry.desc}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    border: `1px solid ${colors.border}`,
-                    'border-radius': '50%',
-                    color: colors.secondary,
-                    background: colors.bgSoft,
-                    display: 'grid',
-                    'place-items': 'center',
-                    'font-weight': 900,
-                  }}
-                >
-                  ›
+                    {card.desc}
+                  </div>
                 </div>
               </button>
             )}
           </For>
         </div>
-      </article>
+      </section>
 
-      {/* 当前进行中 */}
-      <article style={{ ...darkCardStyle('16px'), 'margin-top': '16px' }}>
-        <div style={{ 'margin-bottom': '14px' }}>
-          <h3 style={{ 'font-size': '18px', 'font-family': font.title }}>当前进行中</h3>
-          <p style={{ 'margin-top': '4px', color: colors.textMuted, 'font-size': '13px' }}>
-            仅展示摘要，点击后进入行动排程页。
-          </p>
-        </div>
-        <Show
-          when={pendingSlots().length > 0}
-          fallback={
-            <div style={{ padding: '12px 14px', color: colors.textMuted, 'font-size': '13px' }}>
-              暂无进行中的行动。
-            </div>
-          }
-        >
-          <For each={pendingSlots()}>
-            {(item) => {
-              const elapsed = state.totalDaysPlayed - item.occupant.startedAtDay;
-              const total = item.occupant.durationDays;
-              const pct = Math.min((elapsed / total) * 100, 100);
-              return (
-                <div
-                  style={{
-                    display: 'grid',
-                    'grid-template-columns': '68px minmax(0,1fr) 44px',
-                    gap: '10px',
-                    'align-items': 'center',
-                    padding: '12px 0',
-                    'border-top': `1px solid ${colors.border}`,
-                  }}
-                >
-                  <b style={{ color: colors.secondary, 'font-size': '13px' }}>
-                    {item.tierLabel}槽位
-                  </b>
-                  <div>
-                    <strong style={{ display: 'block', 'font-size': '13px' }}>
-                      {item.occupant.actionName}
-                    </strong>
-                    <span
-                      style={{
-                        display: 'block',
-                        'margin-top': '4px',
-                        color: colors.textMuted,
-                        'font-size': '12px',
-                      }}
-                    >
-                      剩余 {total - elapsed} 天
-                    </span>
-                  </div>
-                  <span
-                    style={{ 'font-size': '12px', color: colors.textMuted, 'text-align': 'right' }}
-                  >
-                    {pct.toFixed(0)}%
-                  </span>
-                </div>
-              );
-            }}
-          </For>
-        </Show>
-      </article>
-
-      {/* 月度提醒 */}
+      {/* ═══ KPI 提醒 ═══ */}
       <Show when={kpiResult()?.indicators.some((i) => i.completionRate < 0.5) ?? false}>
-        <article
+        <div
           style={{
             'margin-top': '16px',
-            padding: '12px 14px',
+            padding: '12px 16px',
             border: `1px solid ${colors.border}`,
-            'border-radius': '8px',
-            background: `rgba(183,131,36,0.1)`,
-            color: '#5e4825',
-            'font-size': '13px',
-            'line-height': '1.65',
             'border-left': `3px solid ${colors.gold}`,
+            'border-radius': '4px',
+            background: 'rgba(183,131,36,0.06)',
+            'font-size': '12px',
+            color: '#5e4825',
+            'line-height': '1.6',
           }}
         >
-          有 KPI 指标完成度低于 50%，进入「KPI 考核」页面查看详情并安排对应行动。
-        </article>
+          有 KPI 指标完成度低于 50%，建议进入「KPI 考核」查看详情并安排对应行动。
+        </div>
       </Show>
 
-      {/* 底部留白给 Tab 栏 */}
+      {/* 底部留白 */}
       <div style={{ height: '24px' }} />
     </AppShell>
   );

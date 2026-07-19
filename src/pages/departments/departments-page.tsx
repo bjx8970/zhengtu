@@ -9,6 +9,7 @@
 import { createMemo, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { AppShell } from '../../components/app-shell';
+import { PageHeader } from '../../components/page-header';
 import { getConfigLoader } from '../../config/loader';
 import { parsePositionIndex } from '../../utils/position';
 import { colors, font, meterContainer, darkCardStyle } from '../../utils/theme';
@@ -32,8 +33,9 @@ export function DepartmentsPage() {
   const allDepts = createMemo(() => positionConfig()?.departments ?? []);
 
   return (
-    <AppShell activeTab={1}>
-      <div style={{ ...darkCardStyle('18px'), 'margin-bottom': '16px' }}>
+    <AppShell>
+      <PageHeader title="部门治理" desc="查看部门状态、行动清单与冷却" />
+      <div style={{ ...darkCardStyle('18px'), 'margin-bottom': '16px', 'margin-top': '16px' }}>
         <h2 style={{ 'font-size': '25px', 'font-family': font.title }}>部门治理</h2>
         <p
           style={{

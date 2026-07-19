@@ -12,6 +12,7 @@
 import { createMemo, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { AppShell } from '../../components/app-shell';
+import { PageHeader } from '../../components/page-header';
 import { getConfigLoader } from '../../config/loader';
 import { parsePositionIndex } from '../../utils/position';
 import type { SlotTierKey, SlotOccupant } from '../../types/player';
@@ -54,7 +55,8 @@ export function ActionsPage() {
   );
 
   return (
-    <AppShell activeTab={2}>
+    <AppShell>
+      <PageHeader title="行动排程" desc="安排新行动到主要、次要、临时日程" />
       <div
         style={{
           display: 'grid',

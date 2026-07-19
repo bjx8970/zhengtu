@@ -38,6 +38,7 @@ export const colors = {
 
   gold: '#b78324',
   cyan: '#3b7f8f',
+  purple: '#6b5b8a',
 
   border: '#d8d4cc',
   borderLight: '#e8e4dc',
