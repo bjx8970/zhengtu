@@ -13,6 +13,11 @@ import { getConfigLoader } from '../../config/loader';
 import { parsePositionIndex } from '../../utils/position';
 import { colors, font, meterContainer, darkCardStyle } from '../../utils/theme';
 
+/**
+ * 部门治理页组件。
+ *
+ * @returns 部门页 JSX
+ */
 export function DepartmentsPage() {
   const { state } = useGameStore();
 

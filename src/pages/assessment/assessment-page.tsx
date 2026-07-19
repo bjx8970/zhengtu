@@ -38,6 +38,11 @@ function tierStyle(tier: KPITier) {
   }
 }
 
+/**
+ * KPI 考核页组件。
+ *
+ * @returns KPI 考核页 JSX
+ */
 export function AssessmentPage() {
   const { state } = useGameStore();
 
@@ -59,6 +64,11 @@ export function AssessmentPage() {
     );
   });
 
+  const kpiScoreDisplay = createMemo(() => {
+    const r = kpiResult();
+    if (!r) return { text: 'N/A', score: 0 };
+    return { text: formatNumber(r.totalScore, 1), score: r.totalScore };
+  });
   const posName = createMemo(() => positionConfig()?.name ?? '未分配职位');
   const hasBadIndicators = createMemo(
     () => kpiResult()?.indicators.some((i) => i.completionRate < 0.5) ?? false,
@@ -97,8 +107,7 @@ export function AssessmentPage() {
               <div>
                 <h3 style={{ 'font-size': '18px', 'font-family': font.title }}>指标得分</h3>
                 <p style={{ 'margin-top': '4px', color: colors.textMuted, 'font-size': '13px' }}>
-                  {posName()} · 当前总分{' '}
-                  {kpiResult() ? formatNumber(kpiResult()!.totalScore, 1) : 'N/A'}
+                  {posName()} · 当前总分 {kpiScoreDisplay().text}
                 </p>
               </div>
               <Show when={kpiResult()}>

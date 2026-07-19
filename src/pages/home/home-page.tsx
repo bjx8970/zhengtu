@@ -60,6 +60,11 @@ const FEATURE_ENTRIES = [
   },
 ];
 
+/**
+ * 主页组件。
+ *
+ * @returns 主页 JSX
+ */
 export function HomePage() {
   const { state, dispatch } = useGameStore();
 

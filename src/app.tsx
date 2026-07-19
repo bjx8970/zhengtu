@@ -30,6 +30,11 @@ const routes: Route[] = [
   { path: '/career', component: CareerPage },
 ];
 
+/**
+ * 应用根组件。
+ *
+ * @returns 应用根组件 JSX
+ */
 export function App(): JSX.Element {
   const { resolveRoute } = createRouter(routes);
 

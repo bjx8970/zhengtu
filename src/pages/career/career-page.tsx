@@ -43,6 +43,11 @@ const ACTIVE_STAGES: PromotionStage[] = [
   PromotionStage.Probation,
 ];
 
+/**
+ * 晋升任命页组件。
+ *
+ * @returns 晋升任命页 JSX
+ */
 export function CareerPage() {
   const { state, dispatch } = useGameStore();
 

@@ -23,6 +23,11 @@ const TIER_COLOR: Record<SlotTierKey, string> = {
   reserve: '#C44D4D',
 };
 
+/**
+ * 行动排程页组件。
+ *
+ * @returns 行动排程页 JSX
+ */
 export function ActionsPage() {
   const { state, dispatch } = useGameStore();
 
