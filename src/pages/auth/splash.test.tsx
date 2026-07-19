@@ -44,7 +44,7 @@ describe('SplashPage local archive entry', () => {
     expect(screen.getByText('2028年6月15日')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /继续游戏/ }));
 
-    expect(window.location.hash).toBe('#/dashboard');
+    expect(window.location.hash).toBe('#/main');
   });
 
   it('损坏存档按无存档处理', () => {

@@ -12,14 +12,22 @@
 import type { JSX } from 'solid-js';
 import { createRouter, type Route } from './router';
 import { SplashPage } from './pages/auth/splash';
-import { Dashboard } from './pages/dashboard/dashboard';
 import { CharacterCreation } from './pages/character/character-creation';
+import { HomePage } from './pages/home/home-page';
+import { DepartmentsPage } from './pages/departments/departments-page';
+import { ActionsPage } from './pages/actions/actions-page';
+import { AssessmentPage } from './pages/assessment/assessment-page';
+import { CareerPage } from './pages/career/career-page';
 
 /** 全局路由表 */
 const routes: Route[] = [
   { path: '/', component: SplashPage },
   { path: '/character', component: CharacterCreation },
-  { path: '/dashboard', component: Dashboard },
+  { path: '/main', component: HomePage },
+  { path: '/departments', component: DepartmentsPage },
+  { path: '/actions', component: ActionsPage },
+  { path: '/assessment', component: AssessmentPage },
+  { path: '/career', component: CareerPage },
 ];
 
 export function App(): JSX.Element {

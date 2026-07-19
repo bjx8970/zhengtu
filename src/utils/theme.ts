@@ -10,8 +10,10 @@
 
 export const colors = {
   bgMain: '#eeece6',
+  bgPaper: '#f1eee8',
   bgCard: '#fffdf8',
   bgCardLight: '#ffffff',
+  bgSoft: '#f8f4ec',
   bgHeader: '#172b45',
 
   textPrimary: '#202a35',
@@ -33,6 +35,9 @@ export const colors = {
   warning: '#e6a817',
   warningLight: 'rgba(230, 168, 23, 0.15)',
   danger: '#c44d4d',
+
+  gold: '#b78324',
+  cyan: '#3b7f8f',
 
   border: '#d8d4cc',
   borderLight: '#e8e4dc',
@@ -110,6 +115,77 @@ export function darkCardStyle(pad?: string) {
     padding: pad ?? space.md,
     border: `1px solid ${colors.border}`,
   };
+}
+
+/**
+ * Pill 标签样式（圆角药丸形状）。
+ *
+ * @param bgColor 背景色
+ * @param textColor 文字色
+ * @returns SolidJS style 对象
+ */
+export function pillStyle(bgColor: string, textColor: string) {
+  return {
+    display: 'inline-flex',
+    'align-items': 'center',
+    'min-height': '28px',
+    padding: '4px 9px',
+    'border-radius': '999px',
+    background: bgColor,
+    color: textColor,
+    'font-size': '12px',
+    'font-weight': 800,
+  } as const;
+}
+
+/**
+ * 带阴影的悬浮卡片样式。
+ *
+ * @param pad 可选内边距覆盖
+ * @returns SolidJS style 对象
+ */
+export function cardElevated(pad?: string) {
+  return {
+    background: colors.bgCard,
+    'border-radius': radius.lg,
+    padding: pad ?? space.md,
+    border: `1px solid ${colors.border}`,
+    'box-shadow': '0 16px 36px rgba(32, 42, 53, 0.1)',
+  } as const;
+}
+
+/**
+ * Meter 进度条容器样式。
+ *
+ * @returns SolidJS style 对象
+ */
+export function meterContainer() {
+  return {
+    height: '7px',
+    overflow: 'hidden' as const,
+    'border-radius': '999px',
+    background: '#e7e1d6',
+  } as const;
+}
+
+/**
+ * 品牌方块样式（红底楷体白字）。
+ *
+ * @returns SolidJS style 对象
+ */
+export function sealStyle() {
+  return {
+    display: 'grid',
+    'place-items': 'center',
+    width: '44px',
+    height: '44px',
+    'border-radius': '8px',
+    color: '#fff',
+    background: colors.primary,
+    'font-family': font.title,
+    'font-size': '25px',
+    'font-weight': 700,
+  } as const;
 }
 
 /** 属性名到中文显示名的映射 */

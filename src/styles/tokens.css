@@ -8,8 +8,10 @@
 :root {
   /* 背景 */
   --bg-main: #eeece6;
+  --bg-paper: #f1eee8;
   --bg-card: #fffdf8;
   --bg-card-light: #ffffff;
+  --bg-soft: #f8f4ec;
   --bg-header: #172b45;
 
   /* 文字 */
@@ -35,6 +37,8 @@
   --color-warning: #e6a817;
   --color-warning-light: rgba(230, 168, 23, 0.15);
   --color-danger: #c44d4d;
+  --color-gold: #b78324;
+  --color-cyan: #3b7f8f;
 
   /* 输入框 */
   --bg-input: #f8f7f5;
@@ -149,6 +153,91 @@ a:focus-visible {
     border-left: 0;
     border-right: 0;
     box-shadow: none;
+  }
+}
+
+/* ── 响应式容器 ── */
+.app-container {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+  padding: 18px 18px 92px;
+  min-height: 100%;
+}
+
+/* ── 卡片 ── */
+.card {
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 253, 248, 0.96);
+  box-shadow: 0 18px 50px rgba(30, 42, 55, 0.09);
+}
+
+/* ── 圆角药丸标签 ── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: var(--color-secondary);
+  background: rgba(40, 75, 112, 0.1);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ── 进度条 ── */
+.meter {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e7e1d6;
+}
+.meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-success);
+}
+
+/* ── 品牌方块 ── */
+.seal {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--color-primary);
+  font-family: var(--font-title);
+  font-size: 25px;
+  font-weight: 700;
+}
+
+/* ── 底部导航容器 ── */
+.tab-bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  border-top: 1px solid var(--border-color);
+  background: rgba(255, 253, 248, 0.96);
+  box-shadow: 0 -12px 32px rgba(32, 42, 53, 0.12);
+  backdrop-filter: blur(10px);
+}
+.tab-inner {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  width: min(100%, 760px);
+  margin: 0 auto;
+  padding: 7px 10px 9px;
+  gap: 4px;
+}
+
+@media (max-width: 640px) {
+  .app-container {
+    padding: 14px 12px 88px;
   }
 }
 
