@@ -25,7 +25,22 @@ jobs:
           model: opencode/big-pickle
           use_github_token: true
           prompt: |
-            请审查此 Pull Request，严格基于 Git Diff 中实际变更的文件进行检查。按以下优先级逐项审查，仅报告与变更相关的问题：
+            ## 项目上下文
+
+            政途人生（Zhengtu）v3.0 — 中文仕途模拟游戏。技术栈 SolidJS + TypeScript + Vite，
+            CSS 政务公文风格（藏蓝、暖灰、中国红配色），单一 store (createStore + dispatch)，
+            槽位行动系统（primary/secondary/reserve 三级），JSON 模板配置展开，
+            引擎层纯函数、UI 层 SolidJS 组件、类型定义集中在 src/types/。
+
+            规范文件: AGENTS.md，架构文档: ARCHITECTURE.md。
+            CI 已自动执行: format, lint, typecheck, test (coverage), validate:config, build。
+            已由 CI 覆盖的检查（console.log、any 类型、non-null assertion、JSON ID 引用完整性）
+            无需重复报告。
+
+            ---
+
+            请审查此 Pull Request，严格基于 Git Diff 中实际变更的文件进行检查。
+            按以下优先级逐项审查，仅报告与变更相关的问题：
 
             ## 0. 安全与敏感信息（最高优先级）
             - 是否硬编码密钥、Token、密码或内部 URL/IP？
@@ -33,51 +48,44 @@ jobs:
             - 是否存在敏感数据日志打印或前端暴露风险？
 
             ## 1. 引擎函数（src/engine/）
-            - 是否为纯函数？若引用全局 state/DOM，是否有合理理由（如初始化、副作用标记）？
-            - 返回值类型是否显式声明？（允许 void/undefined 省略）
+            - 引擎函数是否为纯函数（禁止引用 store、DOM、全局状态）？
             - 公开函数是否有 JSDoc（@param / @returns）？
             - 新增/修改的引擎函数是否在 __tests__/ 下有对应测试文件？
-            - 测试是否覆盖正常路径与关键边界条件？（注：仅需检查测试代码存在性与覆盖逻辑，无需执行）
+            - 测试是否覆盖正常路径与关键边界条件？（仅需检查测试存在性与覆盖逻辑，无需执行）
+            - 引擎文件是否超过 200 行？超过应建议拆分。
 
-            ## 1.5. 性能与资源管理
-            - 循环内是否有重复计算/对象创建？大数组操作是否使用高效算法？
-            - 事件监听器/定时器/订阅是否在组件卸载或作用域结束时正确清理？
-            - 是否存在潜在内存泄漏或阻塞主线程的操作？
-
-            ## 2. 类型、配置与向后兼容性
-            - 新增类型定义是否位于 src/types/ 目录？
-            - JSON 配置模板中引用的 ID 是否在代码中存在对应定义？
-            - 枚举内部 key 是否使用英文命名？
-            - 公开 API/导出函数签名是否发生变更？配置字段是否删除或重命名？若存在破坏性变更，是否在 PR 描述或注释中标注迁移方案？
+            ## 2. 性能与资源管理（仅在新增大段逻辑时关注，≤20 行变更可跳过）
+            - 大数组操作是否使用高效算法（避免 O(n²) 嵌套循环）？
+            - 事件监听器/定时器/订阅是否在 SolidJS onCleanup 或等效作用域结束处正确清理？
+            - 是否存在明显的内存泄漏或阻塞主线程的操作？
 
             ## 3. 状态管理
             - 状态变更是否统一通过 dispatch(action) 触发？禁止直接 mutation。
+            - 组件是否通过 useGameStore() 读取，而非直接引用 store 模块？
+            - 测试文件是否使用 createTestStore() 隔离，而非导入模块级 dispatch()？
 
-            ## 4. 代码质量与国际化
-            - 是否存在遗留的 console.log/debugger？
-            - non-null assertion (!) 是否有充分依据？是否可用可选链/默认值替代？
-            - any 类型使用是否必要？是否可替换为 unknown 或具体类型？
-            - UI 相关字符串是否提取至 i18n 资源文件？引擎层是否避免拼接用户可见文本？日期/数字格式化是否使用 locale-aware API？
+            ## 4. 类型、配置与向后兼容性
+            - 新增类型定义是否位于 src/types/ 目录？禁止在业务代码中散落 interface/type。
+            - 枚举内部 key 是否使用英文命名、value 为展示用的中文？
+            - 公开 API/导出函数签名是否发生变更？配置字段是否删除或重命名？
+              若存在破坏性变更，是否在 PR 描述或注释中标注迁移方案？
 
-            ## 5. 注释规范
-            - 新增文件是否包含文件头 JSDoc（描述用途、作者、日期）？
-            - 导出的函数/类/接口是否有完整 JSDoc？
+            ## 5. 代码规范（以下为 AGENTS.md 明确禁止）
+            - 是否存在注释掉的代码？（应删除，git 历史保留即可）
+            - 是否存在 catch-all 文件命名（utils.ts、helpers.ts、service.ts）？
+            - 代码或注释中是否使用了 emoji？
+            - 是否存在空 catch 块？如确实需要忽略，是否有注释说明原因？
+            - 是否存在 @ts-ignore / @ts-expect-error 而没有注释说明原因与移除条件？
+            - 文件名是否使用 kebab-case 命名？测试文件是否使用 .test.ts（非 .spec.ts）？
 
-            ## 6. 测试
-            - 新增引擎函数是否有配套测试（正常路径 + 边界）
-            - 测试文件是否使用 createTestStore() 隔离，而非导入模块级 dispatch()
-            - 覆盖率门槛：engine ≥90% lines、config ≥80%、store ≥70%
+            ## 6. 注释规范
+            - 新增 .ts/.tsx 文件是否包含文件头 JSDoc（描述模块职责）？
+            - 导出的函数是否有 JSDoc（@param / @returns）？
 
-            ## 7. 引擎文件长度
-            - src/engine/ 下单个文件是否超过 200 行，超过则建议拆分
-
-            ## 8. SolidJS 规范
-            - 列表渲染是否使用 <For each={list}> 而非 Array.map()
-            - 是否误用了 React hooks（useState、useEffect、useContext 等）
-            - 状态管理是否使用 createStore + produce，而非自建响应式
-
-            ## 9. Commit 信息
-            - 是否符合 Conventional Commits 格式（feat/fix/refactor/test/docs/chore + scope）
+            ## 7. SolidJS 规范
+            - 列表渲染是否使用 <For each={list}> 而非 Array.map()？
+            - 是否误用了 React hooks（useState、useEffect、useContext 等）？
+            - 状态管理是否使用 createStore + produce，而非自建响应式？
 
             ## 输出要求
             - 仅列出实际存在的问题，按严重等级标注：🔴 阻塞（必须修复）、🟡 建议（推荐优化）
@@ -85,3 +93,4 @@ jobs:
             - 若某项检查无问题，跳过该项，不输出 ✅
             - 若全部检查通过，仅回复：✅ 审查通过
             - 禁止输出审查过程、总结语或与问题无关的内容
+            - 禁止复述 CI 已覆盖的结果（format、lint、typecheck、test coverage、config validation）
