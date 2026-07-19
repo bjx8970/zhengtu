@@ -109,7 +109,11 @@ export interface EventCondition {
   /** 专属职位 ID 列表 */
   positionIds?: string[];
   /** 隐藏状态条件（后续扩展民众满意度等） */
-  hiddenStateConditions?: { key: string; operator: 'gt' | 'lt' | 'eq' | 'gte' | 'lte'; value: number }[];
+  hiddenStateConditions?: {
+    key: string;
+    operator: 'gt' | 'lt' | 'eq' | 'gte' | 'lte';
+    value: number;
+  }[];
 }
 
 /** 事件类型：通用 / 专属 */

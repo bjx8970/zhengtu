@@ -119,9 +119,7 @@ const EventSchema = z.object({
   /** 事件类型：通用 / 专属（P3 预留） */
   eventType: z.enum(['generic', 'exclusive']).optional(),
   /** 事件分类（P3 预留） */
-  eventCategory: z
-    .enum(['resident', 'political', 'economic', 'emergency', 'story'])
-    .optional(),
+  eventCategory: z.enum(['resident', 'political', 'economic', 'emergency', 'story']).optional(),
   triggerCondition: z.object({
     minLevel: z.number().optional(),
     maxLevel: z.number().optional(),
