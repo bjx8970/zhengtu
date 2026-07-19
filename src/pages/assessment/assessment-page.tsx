@@ -89,6 +89,7 @@ export function AssessmentPage() {
         }
       >
         <div
+          class="responsive-two-col"
           style={{
             display: 'grid',
             'grid-template-columns': 'minmax(0, 1fr) minmax(300px, 0.72fr)',

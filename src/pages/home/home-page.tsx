@@ -4,7 +4,7 @@
  * 单一工作台布局，自上而下包含：
  * - 信息栏：人物名称、职务、就职位置、当前日期、设置按钮
  * - 时间推进模块：推进1天/1周/1月
- * - 日程规划模块：主要日程(3格)、次要日程(2格)、临时日程(1格)，进度条展示
+ * - 日程规划模块：主要日程(3格)、次要日程(2格)、紧急日程(1格)，进度条展示
  * - 工作台卡片区：按功能分类的政务操作入口
  */
 
@@ -12,6 +12,7 @@ import { createMemo, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { navigate } from '../../router';
 import { AppShell } from '../../components/app-shell';
+import { AlertBanner, type AlertItem } from '../../components/alert-banner';
 import { calculateKPI } from '../../engine/governance/kpi';
 import { getConfigLoader } from '../../config/loader';
 import { formatDate } from '../../utils/format';
@@ -30,7 +31,7 @@ const GRANULARITIES: { label: string; desc: string; granularity: 'day' | 'week' 
 const SCHEDULE_TIERS: { key: SlotTierKey; label: string; color: string }[] = [
   { key: 'primary', label: '主要日程', color: colors.secondary },
   { key: 'secondary', label: '次要日程', color: colors.success },
-  { key: 'reserve', label: '临时日程', color: colors.danger },
+  { key: 'reserve', label: '紧急日程', color: colors.danger },
 ];
 
 /** 工作台功能卡片 */
@@ -44,16 +45,9 @@ const WORK_CARDS: {
   {
     icon: '政',
     label: '部门治理',
-    desc: '查看部门状态、安排行动、管理冷却',
+    desc: '查看部门、安排日程、管理冷却',
     route: '/departments',
     color: colors.secondary,
-  },
-  {
-    icon: '行',
-    label: '行动排程',
-    desc: '安排新行动到主要、次要、临时日程',
-    route: '/actions',
-    color: colors.success,
   },
   {
     icon: '考',
@@ -118,6 +112,20 @@ export function HomePage() {
       state.departmentStates,
       getConfigLoader().getGameConfig(),
     );
+  });
+
+  /** 通用提醒列表（后续扩展只需追加条件） */
+  const alerts = createMemo<AlertItem[]>(() => {
+    const items: AlertItem[] = [];
+    if (kpiResult()?.indicators.some((i) => i.completionRate < 0.5)) {
+      items.push({
+        id: 'kpi-low',
+        level: 'warning',
+        message: '有 KPI 指标完成度低于 50%，建议安排对应行动提升。',
+        action: { label: '查看考核', route: '/assessment' },
+      });
+    }
+    return items;
   });
 
   /** 按分组获取日程占用列表 */
@@ -225,6 +233,9 @@ export function HomePage() {
           </button>
         </div>
       </header>
+
+      {/* ═══ 信息提醒 ═══ */}
+      <AlertBanner alerts={alerts()} />
 
       {/* ═══ 时间推进 ═══ */}
       <section
@@ -473,25 +484,6 @@ export function HomePage() {
           </For>
         </div>
       </section>
-
-      {/* ═══ KPI 提醒 ═══ */}
-      <Show when={kpiResult()?.indicators.some((i) => i.completionRate < 0.5) ?? false}>
-        <div
-          style={{
-            'margin-top': '16px',
-            padding: '12px 16px',
-            border: `1px solid ${colors.border}`,
-            'border-left': `3px solid ${colors.gold}`,
-            'border-radius': '4px',
-            background: 'rgba(183,131,36,0.06)',
-            'font-size': '12px',
-            color: '#5e4825',
-            'line-height': '1.6',
-          }}
-        >
-          有 KPI 指标完成度低于 50%，建议进入「KPI 考核」查看详情并安排对应行动。
-        </div>
-      </Show>
 
       {/* 底部留白 */}
       <div style={{ height: '24px' }} />

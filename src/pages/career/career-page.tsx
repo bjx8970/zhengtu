@@ -120,6 +120,7 @@ export function CareerPage() {
     <AppShell>
       <PageHeader title="晋升任命" desc="民主推荐、组织考察、常委会票决" />
       <div
+        class="responsive-two-col"
         style={{
           display: 'grid',
           'grid-template-columns': 'minmax(0, 1fr) minmax(300px, 0.72fr)',
