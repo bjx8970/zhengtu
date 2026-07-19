@@ -357,6 +357,142 @@
         "politicalConditions": ["无党纪处分记录", "人事档案合规"],
         "specialConditions": ["grassroots", "multi_region"]
       }
+    },
+    {
+      "level": 6,
+      "label": "副厅",
+      "positions": [
+        {
+          "id": "admin_l6_0",
+          "name": "副市长",
+          "departmentTemplateIds": [
+            "municipal_coordination",
+            "economic_development",
+            "finance",
+            "urban_planning",
+            "social_governance"
+          ],
+          "kpiTemplateIds": [
+            "regional_gdp",
+            "economic_structure",
+            "fiscal_revenue",
+            "innovation_index",
+            "public_satisfaction"
+          ],
+          "annualBudget": 80000
+        },
+        {
+          "id": "admin_l6_1",
+          "name": "省厅副厅长",
+          "departmentTemplateIds": [
+            "provincial_department",
+            "human_resources",
+            "finance",
+            "discipline_inspect"
+          ],
+          "kpiTemplateIds": [
+            "governance_quality",
+            "staff_satisfaction",
+            "fiscal_health",
+            "anti_corruption"
+          ],
+          "annualBudget": 60000
+        },
+        {
+          "id": "admin_l6_2",
+          "name": "市委常委",
+          "departmentTemplateIds": [
+            "party_org",
+            "propaganda_dept",
+            "discipline_inspect",
+            "municipal_coordination",
+            "regional_cooperation"
+          ],
+          "kpiTemplateIds": [
+            "party_building",
+            "propaganda_score",
+            "anti_corruption",
+            "regional_gdp",
+            "regional_integration"
+          ],
+          "annualBudget": 70000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 5,
+        "minAssessmentPasses": 4,
+        "politicalConditions": ["无党纪处分记录", "人事档案合规", "基层主官经历"],
+        "specialConditions": ["grassroots", "multi_region"]
+      }
+    },
+    {
+      "level": 7,
+      "label": "正厅",
+      "positions": [
+        {
+          "id": "admin_l7_0",
+          "name": "市长",
+          "departmentTemplateIds": [
+            "municipal_coordination",
+            "economic_development",
+            "finance",
+            "urban_planning",
+            "social_governance"
+          ],
+          "kpiTemplateIds": [
+            "regional_gdp",
+            "economic_structure",
+            "fiscal_revenue",
+            "innovation_index",
+            "public_satisfaction"
+          ],
+          "annualBudget": 150000
+        },
+        {
+          "id": "admin_l7_1",
+          "name": "省厅厅长",
+          "departmentTemplateIds": [
+            "provincial_department",
+            "human_resources",
+            "finance",
+            "discipline_inspect",
+            "general_office"
+          ],
+          "kpiTemplateIds": [
+            "governance_quality",
+            "staff_satisfaction",
+            "fiscal_health",
+            "anti_corruption",
+            "office_efficiency"
+          ],
+          "annualBudget": 120000
+        },
+        {
+          "id": "admin_l7_2",
+          "name": "市委书记",
+          "departmentTemplateIds": [
+            "party_org",
+            "propaganda_dept",
+            "discipline_inspect",
+            "municipal_coordination",
+            "regional_cooperation"
+          ],
+          "kpiTemplateIds": [
+            "party_building",
+            "propaganda_score",
+            "anti_corruption",
+            "regional_gdp",
+            "regional_integration"
+          ],
+          "annualBudget": 180000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 5,
+        "minAssessmentPasses": 5,
+        "politicalConditions": ["无党纪处分记录", "人事档案合规", "基层主官经历", "多岗位历练"],
+        "specialConditions": ["grassroots", "multi_region"]
+      }
     }
   ]
 }

@@ -62,8 +62,8 @@ describe('getPromotionCandidates', () => {
   });
 
   it('最高等级无下一级 → 空数组', () => {
-    // 行政线现在最高到 L5，L5 无下一级
-    const candidates = getPromotionCandidates(CareerLine.Administrative, 5, adminCfg);
+    // 行政线现在最高到 L7，L7 无下一级
+    const candidates = getPromotionCandidates(CareerLine.Administrative, 7, adminCfg);
     expect(candidates).toHaveLength(0);
   });
 
@@ -141,7 +141,7 @@ describe('validatePromotionTarget', () => {
   });
 
   it('已到达最高等级 → invalid', () => {
-    const result = validatePromotionTarget('any_pos', 5, adminCfg, makeCtx({ playerLevel: 5 }));
+    const result = validatePromotionTarget('any_pos', 7, adminCfg, makeCtx({ playerLevel: 7 }));
     expect(result.valid).toBe(false);
     expect(result.reason).toContain('最高等级');
   });

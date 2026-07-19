@@ -530,5 +530,191 @@
       }
     ],
     "kpiTemplateIds": ["land_management", "fiscal_revenue"]
+  },
+  "municipal_coordination": {
+    "name": "市发改委",
+    "consumptionCoefficient": 1.2,
+    "baseConsumption": 150,
+    "actions": [
+      {
+        "id": "regional_planning",
+        "name": "区域规划编制",
+        "description": "编制区域经济发展规划，统筹重大项目布局",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 150,
+        "effects": [{ "target": "dept.kpi.regional_gdp", "operation": "add", "value": 12 }]
+      },
+      {
+        "id": "project_approval",
+        "name": "项目审批协调",
+        "description": "协调跨部门项目审批，推进重点项目落地",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 60,
+        "effects": [
+          { "target": "dept.kpi.regional_gdp", "operation": "add", "value": 6 },
+          { "target": "player.competence", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["regional_gdp", "project_completion"]
+  },
+  "provincial_department": {
+    "name": "省厅办公室",
+    "consumptionCoefficient": 1.3,
+    "baseConsumption": 180,
+    "actions": [
+      {
+        "id": "policy_research",
+        "name": "政策研究制定",
+        "description": "组织政策研究和制定，推动制度创新",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 180,
+        "effects": [{ "target": "dept.kpi.governance_quality", "operation": "add", "value": 12 }]
+      },
+      {
+        "id": "inter_dept_coordination",
+        "name": "跨部门协调",
+        "description": "协调省直各部门工作，形成工作合力",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 70,
+        "effects": [
+          { "target": "dept.kpi.governance_quality", "operation": "add", "value": 6 },
+          { "target": "player.charisma", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["governance_quality", "office_efficiency"]
+  },
+  "economic_development": {
+    "name": "经济发展局",
+    "consumptionCoefficient": 1.4,
+    "baseConsumption": 200,
+    "actions": [
+      {
+        "id": "industrial_upgrade",
+        "name": "产业升级推动",
+        "description": "推动产业结构优化升级，培育新兴产业",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 200,
+        "effects": [{ "target": "dept.kpi.economic_structure", "operation": "add", "value": 12 }]
+      },
+      {
+        "id": "investment_promotion",
+        "name": "招商引资",
+        "description": "组织重大招商活动，引进优质项目",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 150,
+        "effects": [
+          { "target": "dept.kpi.economic_structure", "operation": "add", "value": 8 },
+          { "target": "player.performance", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["economic_structure", "gdp_growth"]
+  },
+  "urban_planning": {
+    "name": "城市规划局",
+    "consumptionCoefficient": 1.2,
+    "baseConsumption": 160,
+    "actions": [
+      {
+        "id": "city_master_plan",
+        "name": "城市总体规划",
+        "description": "编制和实施城市总体规划，优化空间布局",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 160,
+        "effects": [{ "target": "dept.kpi.innovation_index", "operation": "add", "value": 12 }]
+      },
+      {
+        "id": "smart_city",
+        "name": "智慧城市建设",
+        "description": "推进智慧城市基础设施建设",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 120,
+        "effects": [
+          { "target": "dept.kpi.innovation_index", "operation": "add", "value": 8 },
+          { "target": "player.competence", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["innovation_index", "infrastructure"]
+  },
+  "social_governance": {
+    "name": "社会治理局",
+    "consumptionCoefficient": 1.1,
+    "baseConsumption": 140,
+    "actions": [
+      {
+        "id": "community_building",
+        "name": "社区治理创新",
+        "description": "推进社区治理体系和治理能力现代化",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 120,
+        "effects": [{ "target": "dept.kpi.public_satisfaction", "operation": "add", "value": 10 }]
+      },
+      {
+        "id": "conflict_resolution",
+        "name": "矛盾纠纷化解",
+        "description": "建立健全矛盾纠纷多元化解机制",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 50,
+        "effects": [
+          { "target": "dept.kpi.public_satisfaction", "operation": "add", "value": 5 },
+          { "target": "player.stability", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["public_satisfaction", "safety"]
+  },
+  "regional_cooperation": {
+    "name": "区域合作办",
+    "consumptionCoefficient": 1.0,
+    "baseConsumption": 130,
+    "actions": [
+      {
+        "id": "regional_integration",
+        "name": "区域一体化推进",
+        "description": "推动区域一体化发展，深化跨区域合作",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 140,
+        "effects": [{ "target": "dept.kpi.regional_integration", "operation": "add", "value": 12 }]
+      },
+      {
+        "id": "exchange_program",
+        "name": "交流合作项目",
+        "description": "组织跨区域交流合作项目",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 55,
+        "effects": [
+          { "target": "dept.kpi.regional_integration", "operation": "add", "value": 6 },
+          { "target": "player.charisma", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["regional_integration", "gdp_growth"]
   }
 }

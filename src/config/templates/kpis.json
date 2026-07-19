@@ -302,5 +302,53 @@
     "weight": 0.2,
     "unit": "%",
     "calcType": "ratio"
+  },
+  "regional_gdp": {
+    "id": "regional_gdp",
+    "name": "区域GDP增长率",
+    "targetValue": 12,
+    "weight": 0.25,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "innovation_index": {
+    "id": "innovation_index",
+    "name": "创新指数",
+    "targetValue": 80,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "public_satisfaction": {
+    "id": "public_satisfaction",
+    "name": "公众满意度",
+    "targetValue": 90,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "governance_quality": {
+    "id": "governance_quality",
+    "name": "治理质量指数",
+    "targetValue": 85,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "economic_structure": {
+    "id": "economic_structure",
+    "name": "经济结构优化度",
+    "targetValue": 75,
+    "weight": 0.2,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "regional_integration": {
+    "id": "regional_integration",
+    "name": "区域一体化指数",
+    "targetValue": 70,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
   }
 }
