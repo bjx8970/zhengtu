@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>征途工作台 - UI 原型</title>
+  <style>
+    :root {
+      --bg-main: #eeece6;
+      --bg-card: #fffdf8;
+      --bg-soft: #f8f4ec;
+      --bg-header: #172b45;
+      --text-primary: #202a35;
+      --text-secondary: #657080;
+      --text-muted: #8d939b;
+      --color-primary: #b3262d;
+      --color-primary-hover: #8f1f25;
+      --color-secondary: #284b70;
+      --color-success: #4caf50;
+      --color-warning: #e6a817;
+      --color-danger: #c44d4d;
+      --color-gold: #b78324;
+      --color-cyan: #3b7f8f;
+      --border-color: #d8d4cc;
+      --border-light: #e8e4dc;
+      --radius-sm: 2px;
+      --radius-md: 4px;
+      --radius-lg: 8px;
+      --radius-xl: 12px;
+      --font-title: 'STKaiti', 'KaiTi', '楷体', serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-body);
+      background: var(--bg-main);
+      color: var(--text-primary);
+      background-image:
+        linear-gradient(rgba(31,49,69,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(31,49,69,0.035) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    .workspace {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 16px 40px;
+      min-height: 100%;
+    }
+
+    /* ═══ 信息栏 ═══ */
+    .info-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: var(--bg-header);
+      color: #fff;
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+      box-shadow: 0 4px 16px rgba(23,43,69,0.18);
+    }
+
+    .info-bar__left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .info-bar__seal {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: var(--color-primary);
+      font-family: var(--font-title);
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .info-bar__name {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: var(--font-title);
+    }
+
+    .info-bar__meta {
+      display: flex;
+      gap: 12px;
+      margin-top: 3px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.72);
+    }
+
+    .info-bar__right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .info-bar__date {
+      text-align: right;
+      font-size: 13px;
+      color: rgba(255,255,255,0.85);
+    }
+
+    .info-bar__date small {
+      display: block;
+      font-size: 11px;
+      color: rgba(255,255,255,0.55);
+      margin-top: 2px;
+    }
+
+    .info-bar__settings {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 50%;
+      background: transparent;
+      color: rgba(255,255,255,0.8);
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .info-bar__settings:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    /* ═══ 通用模块卡片 ═══ */
+    .section {
+      margin-top: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+    }
+
+    .section__title {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--font-title);
+      margin-bottom: 4px;
+    }
+
+    .section__desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    /* ═══ 时间推进 ═══ */
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .time-btn {
+      padding: 14px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      background: #fff;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+
+    .time-btn:hover {
+      border-color: var(--color-secondary);
+      box-shadow: 0 2px 8px rgba(40,75,112,0.1);
+    }
+
+    .time-btn--primary {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #fff;
+    }
+
+    .time-btn--primary:hover {
+      background: var(--color-primary-hover);
+      border-color: var(--color-primary-hover);
+    }
+
+    .time-btn strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .time-btn span {
+      display: block;
+      margin-top: 5px;
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .time-btn--primary span {
+      color: rgba(255,255,255,0.75);
+    }
+
+    /* ═══ 日程规划 ═══ */
+    .schedule-group {
+      margin-bottom: 16px;
+    }
+
+    .schedule-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .schedule-group__header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .schedule-group__dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .schedule-group__label {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .schedule-group__count {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .schedule-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px 12px;
+      align-items: center;
+      padding: 10px 14px;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      background: #fff;
+      margin-bottom: 6px;
+    }
+
+    .schedule-item__name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .schedule-item__remain {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: right;
+    }
+
+    .schedule-item__bar {
+      grid-column: 1 / -1;
+      height: 6px;
+      border-radius: 999px;
+      background: #e7e1d6;
+      overflow: hidden;
+    }
+
+    .schedule-item__bar-fill {
+      height: 100%;
+      border-radius: inherit;
+      transition: width 0.3s;
+    }
+
+    .schedule-empty {
+      padding: 10px 14px;
+      border: 1px dashed var(--border-color);
+      border-radius: var(--radius-md);
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    /* ═══ 工作台卡片区 ═══ */
+    .work-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .work-grid { grid-template-columns: 1fr; }
+      .time-grid { grid-template-columns: 1fr; }
+    }
+
+    .work-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      background: #fff;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .work-card:hover {
+      border-color: var(--color-secondary);
+      box-shadow: 0 4px 12px rgba(40,75,112,0.08);
+      transform: translateY(-1px);
+    }
+
+    .work-card__icon {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      color: #fff;
+      font-weight: 900;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .work-card__body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .work-card__title {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .work-card__desc {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .work-card__badge {
+      display: inline-flex;
+      align-items: center;
+      margin-top: 8px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    /* ═══ 通知条 ═══ */
+    .notice {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border: 1px solid var(--border-color);
+      border-left: 3px solid var(--color-gold);
+      border-radius: var(--radius-md);
+      background: rgba(183,131,36,0.06);
+      font-size: 12px;
+      color: #5e4825;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="workspace">
+
+    <!-- ═══ 信息栏 ═══ -->
+    <header class="info-bar">
+      <div class="info-bar__left">
+        <div class="info-bar__seal">李</div>
+        <div>
+          <div class="info-bar__name">李建国</div>
+          <div class="info-bar__meta">
+            <span>综合科副科长</span>
+            <span>·</span>
+            <span>宁江市人民政府办公室</span>
+          </div>
+        </div>
+      </div>
+      <div class="info-bar__right">
+        <div class="info-bar__date">
+          2008年 3月 15日
+          <small>任职第 2 年 · 累计 430 天</small>
+        </div>
+        <button class="info-bar__settings" title="设置">⚙</button>
+      </div>
+    </header>
+
+    <!-- ═══ 时间推进 ═══ -->
+    <section class="section">
+      <h2 class="section__title">时间推进</h2>
+      <p class="section__desc">推进时间以结算进行中的日程，触发月度预算扣除与年度考核。</p>
+      <div class="time-grid">
+        <button class="time-btn">
+          <strong>推进 1 天</strong>
+          <span>适合等待短日程完成</span>
+        </button>
+        <button class="time-btn">
+          <strong>推进 1 周</strong>
+          <span>结算一周政务变化</span>
+        </button>
+        <button class="time-btn time-btn--primary">
+          <strong>推进 1 月</strong>
+          <span>进入月度考核节奏</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ═══ 日程规划 ═══ -->
+    <section class="section">
+      <h2 class="section__title">日程规划</h2>
+      <p class="section__desc">管理当前正在执行的政务日程，日程完成后自动结算效果。</p>
+
+      <!-- 主要日程 -->
+      <div class="schedule-group">
+        <div class="schedule-group__header">
+          <div class="schedule-group__dot" style="background: var(--color-secondary)"></div>
+          <span class="schedule-group__label">主要日程</span>
+          <span class="schedule-group__count">2/3</span>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-item__name">营商环境专项调研</div>
+          <div class="schedule-item__remain">剩余 3 天</div>
+          <div class="schedule-item__bar">
+            <div class="schedule-item__bar-fill" style="width: 70%; background: var(--color-secondary)"></div>
+          </div>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-item__name">年度安全生产检查</div>
+          <div class="schedule-item__remain">剩余 8 天</div>
+          <div class="schedule-item__bar">
+            <div class="schedule-item__bar-fill" style="width: 35%; background: var(--color-secondary)"></div>
+          </div>
+        </div>
+        <div class="schedule-empty">（空闲）</div>
+      </div>
+
+      <!-- 次要日程 -->
+      <div class="schedule-group">
+        <div class="schedule-group__header">
+          <div class="schedule-group__dot" style="background: var(--color-success)"></div>
+          <span class="schedule-group__label">次要日程</span>
+          <span class="schedule-group__count">1/2</span>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-item__name">基层党建述职评议</div>
+          <div class="schedule-item__remain">剩余 2 天</div>
+          <div class="schedule-item__bar">
+            <div class="schedule-item__bar-fill" style="width: 80%; background: var(--color-success)"></div>
+          </div>
+        </div>
+        <div class="schedule-empty">（空闲）</div>
+      </div>
+
+      <!-- 临时日程 -->
+      <div class="schedule-group">
+        <div class="schedule-group__header">
+          <div class="schedule-group__dot" style="background: var(--color-danger)"></div>
+          <span class="schedule-group__label">临时日程</span>
+          <span class="schedule-group__count">0/1</span>
+          <span style="font-size: 11px; color: var(--color-warning); margin-left: 4px;">⚠ 使用将扣减健康、增加消沉</span>
+        </div>
+        <div class="schedule-empty">（空闲）</div>
+      </div>
+    </section>
+
+    <!-- ═══ 工作台 ═══ -->
+    <section class="section">
+      <h2 class="section__title">工作台</h2>
+      <p class="section__desc">按功能分类的政务操作入口。</p>
+      <div class="work-grid">
+
+        <div class="work-card">
+          <div class="work-card__icon" style="background: var(--color-secondary)">政</div>
+          <div class="work-card__body">
+            <div class="work-card__title">部门治理</div>
+            <div class="work-card__desc">查看部门状态、安排行动、管理冷却</div>
+            <div class="work-card__badge" style="background: rgba(40,75,112,0.1); color: var(--color-secondary);">3 个部门</div>
+          </div>
+        </div>
+
+        <div class="work-card">
+          <div class="work-card__icon" style="background: var(--color-gold)">考</div>
+          <div class="work-card__body">
+            <div class="work-card__title">KPI 考核</div>
+            <div class="work-card__desc">查看指标完成度、得分与改进建议</div>
+            <div class="work-card__badge" style="background: rgba(183,131,36,0.1); color: var(--color-gold);">当前 72.5 分</div>
+          </div>
+        </div>
+
+        <div class="work-card">
+          <div class="work-card__icon" style="background: var(--color-cyan)">晋</div>
+          <div class="work-card__body">
+            <div class="work-card__title">晋升任命</div>
+            <div class="work-card__desc">民主推荐、组织考察、常委会票决</div>
+            <div class="work-card__badge" style="background: rgba(59,127,143,0.1); color: var(--color-cyan);">任职满 2 年可启动</div>
+          </div>
+        </div>
+
+        <div class="work-card">
+          <div class="work-card__icon" style="background: var(--color-success)">文</div>
+          <div class="work-card__body">
+            <div class="work-card__title">公文处理</div>
+            <div class="work-card__desc">批阅请示、报告、方案与建议</div>
+            <div class="work-card__badge" style="background: rgba(76,175,80,0.1); color: var(--color-success);">2 件待批</div>
+          </div>
+        </div>
+
+        <div class="work-card">
+          <div class="work-card__icon" style="background: var(--color-primary)">廉</div>
+          <div class="work-card__body">
+            <div class="work-card__title">廉政风险</div>
+            <div class="work-card__desc">监控贪腐风险值、应对调查与举报</div>
+            <div class="work-card__badge" style="background: rgba(179,38,45,0.1); color: var(--color-primary);">风险值 12</div>
+          </div>
+        </div>
+
+        <div class="work-card">
+          <div class="work-card__icon" style="background: #6b5b8a">交</div>
+          <div class="work-card__body">
+            <div class="work-card__title">人脉关系</div>
+            <div class="work-card__desc">维护上级、同事、学界与媒体关系</div>
+            <div class="work-card__badge" style="background: rgba(107,91,138,0.1); color: #6b5b8a;">规划中</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══ 提醒 ═══ -->
+    <div class="notice">
+      📋 有 KPI 指标完成度低于 50%，建议进入「KPI 考核」查看详情并安排对应行动。
+    </div>
+
+  </div>
+</body>
+</html>

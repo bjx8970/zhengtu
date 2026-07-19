@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 工作台主页
  *
  * 单一工作台布局，自上而下包含：
@@ -66,21 +66,21 @@ const WORK_CARDS: {
     icon: '文',
     label: '公文处理',
     desc: '批阅请示、报告、方案与建议',
-    route: '/departments',
+    route: '/departments', // TODO: Phase 4 实现独立路由
     color: colors.success,
   },
   {
     icon: '廉',
     label: '廉政风险',
     desc: '监控贪腐风险值、应对调查与举报',
-    route: '/departments',
+    route: '/departments', // TODO: Phase 4 实现独立路由
     color: colors.primary,
   },
   {
     icon: '交',
     label: '人脉关系',
     desc: '维护上级、同事、学界与媒体关系',
-    route: '/departments',
+    route: '/departments', // TODO: Phase 4 实现独立路由
     color: '#6b5b8a',
   },
 ];
