@@ -112,7 +112,11 @@ export function evaluateEventTrigger(event: GameEvent, ctx: EventContext): boole
   }
 
   // 专属职位
-  if (cond.positionIds && cond.positionIds.length > 0 && !cond.positionIds.includes(ctx.positionId)) {
+  if (
+    cond.positionIds &&
+    cond.positionIds.length > 0 &&
+    !cond.positionIds.includes(ctx.positionId)
+  ) {
     return false;
   }
 

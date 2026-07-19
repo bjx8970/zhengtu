@@ -16,9 +16,6 @@ import type { PlayerSave } from '../../types/player';
 const loader = getConfigLoader();
 const adminCfg = loader.getCareerLine(CareerLine.Administrative)!;
 
-/** 确定性 RNG：始终返回 0.3（有利于通过各阶段） */
-const goodRng = () => 0.3;
-
 /** 生成满足晋升条件的年度考核记录 */
 function makeAssessments(count: number): { year: number; score: number; tier: string }[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -66,7 +63,10 @@ describe('行政线 L1-L11 全链路回归测试', () => {
     expect(store.getRawState().currentPositionId).toBe('admin_l3_0');
 
     // 修改状态后再次往返
-    store.dispatch({ type: 'LOAD_SAVE', save: { ...store.getRawState(), yearsInCurrentPosition: 10 } });
+    store.dispatch({
+      type: 'LOAD_SAVE',
+      save: { ...store.getRawState(), yearsInCurrentPosition: 10 },
+    });
     const save2 = JSON.parse(JSON.stringify(store.getRawState())) as PlayerSave;
     store.dispatch({ type: 'LOAD_SAVE', save: save2 });
     expect(store.getRawState().yearsInCurrentPosition).toBe(10);
