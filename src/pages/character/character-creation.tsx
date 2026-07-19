@@ -43,7 +43,7 @@ export function CharacterCreation() {
   const { state, dispatch } = useGameStore();
 
   if (state.characterName) {
-    navigate('/dashboard');
+    navigate('/main');
     return null;
   }
 
@@ -103,7 +103,7 @@ export function CharacterCreation() {
         remainingBudget: startPos?.annualBudget ?? cfg.budgetByLevel[1] ?? 0,
       },
     });
-    navigate('/dashboard');
+    navigate('/main');
   }
 
   const canNext = createMemo(() => {

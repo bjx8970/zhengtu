@@ -1,0 +1,1067 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>征途 UI 静态方案预览</title>
+    <style>
+      :root {
+        --paper: #f1eee8;
+        --surface: #fffdf8;
+        --surface-soft: #f8f4ec;
+        --ink: #202a35;
+        --muted: #687382;
+        --line: #ddd6c9;
+        --red: #b3262d;
+        --red-dark: #8f1f25;
+        --blue: #284b70;
+        --green: #3f7d5a;
+        --gold: #b78324;
+        --cyan: #3b7f8f;
+        --shadow: 0 16px 36px rgba(32, 42, 53, 0.1);
+        --radius: 8px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei",
+          sans-serif;
+        background:
+          linear-gradient(rgba(32, 42, 53, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(32, 42, 53, 0.04) 1px, transparent 1px),
+          var(--paper);
+        background-size: 28px 28px;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .app-shell {
+        width: min(100%, 1180px);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: 18px 18px 92px;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      .brand {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .seal {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        color: #fff;
+        background: var(--red);
+        font-family: "STKaiti", "KaiTi", serif;
+        font-size: 25px;
+        font-weight: 700;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-family: "STKaiti", "KaiTi", serif;
+        font-size: 27px;
+        letter-spacing: 0;
+      }
+
+      .brand p,
+      .subtle {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .date-chip {
+        padding: 9px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--blue);
+        background: rgba(255, 253, 248, 0.88);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .home-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+        gap: 16px;
+      }
+
+      .card {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: rgba(255, 253, 248, 0.96);
+        box-shadow: var(--shadow);
+      }
+
+      .hero-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 220px;
+        gap: 18px;
+        min-height: 256px;
+        padding: 22px;
+        border-top: 4px solid var(--red);
+      }
+
+      .role-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0 18px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        color: var(--blue);
+        background: rgba(40, 75, 112, 0.1);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .hero-card h2 {
+        margin-top: 3px;
+        font-size: 30px;
+        letter-spacing: 0;
+      }
+
+      .summary {
+        max-width: 560px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .portrait {
+        display: grid;
+        align-content: space-between;
+        min-height: 212px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background:
+          linear-gradient(135deg, rgba(179, 38, 45, 0.12), transparent 45%),
+          linear-gradient(180deg, #fff, var(--surface-soft));
+      }
+
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 74px;
+        height: 74px;
+        border-radius: 50%;
+        color: #fff;
+        background: var(--blue);
+        font-family: "STKaiti", "KaiTi", serif;
+        font-size: 32px;
+        font-weight: 700;
+      }
+
+      .portrait dl {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px 12px;
+        margin: 0;
+        font-size: 13px;
+      }
+
+      .portrait dt {
+        color: var(--muted);
+      }
+
+      .portrait dd {
+        margin: 0;
+        font-weight: 800;
+      }
+
+      .advance-card {
+        padding: 18px;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+        margin-bottom: 14px;
+      }
+
+      .section-head h3 {
+        font-size: 18px;
+      }
+
+      .section-head p {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .advance-buttons {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      .advance {
+        min-height: 78px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .advance strong,
+      .feature strong,
+      .metric strong {
+        display: block;
+      }
+
+      .advance span,
+      .feature span,
+      .metric span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .advance.primary {
+        color: #fff;
+        border-color: var(--red);
+        background: var(--red);
+      }
+
+      .advance.primary span {
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .metric {
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .metric strong {
+        font-size: 22px;
+      }
+
+      .meter {
+        height: 7px;
+        margin-top: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #e7e1d6;
+      }
+
+      .meter i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--green);
+      }
+
+      .feature-card {
+        padding: 18px;
+      }
+
+      .feature-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .feature {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        min-height: 72px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .icon {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        color: #fff;
+        background: var(--blue);
+        font-weight: 900;
+      }
+
+      .feature:nth-child(2) .icon {
+        background: var(--green);
+      }
+
+      .feature:nth-child(3) .icon {
+        background: var(--gold);
+      }
+
+      .feature:nth-child(4) .icon {
+        background: var(--cyan);
+      }
+
+      .go {
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        color: var(--blue);
+        background: var(--surface-soft);
+        cursor: pointer;
+        font-weight: 900;
+      }
+
+      .side-stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .mini-card {
+        padding: 16px;
+      }
+
+      .notice {
+        padding: 12px 14px;
+        border-left: 3px solid var(--gold);
+        background: rgba(183, 131, 36, 0.1);
+        color: #5e4825;
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .task {
+        display: grid;
+        grid-template-columns: 68px minmax(0, 1fr) 44px;
+        gap: 10px;
+        align-items: center;
+        padding: 12px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .task:first-of-type {
+        border-top: 0;
+      }
+
+      .task b {
+        color: var(--blue);
+        font-size: 13px;
+      }
+
+      .task strong {
+        display: block;
+        font-size: 13px;
+      }
+
+      .task span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .view {
+        display: none;
+      }
+
+      .view.active {
+        display: block;
+      }
+
+      .page-title {
+        margin-bottom: 16px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: rgba(255, 253, 248, 0.92);
+        box-shadow: 0 10px 24px rgba(32, 42, 53, 0.07);
+      }
+
+      .page-title h2 {
+        font-size: 25px;
+        letter-spacing: 0;
+      }
+
+      .page-title p {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .sub-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .wide-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 0.72fr);
+        gap: 16px;
+      }
+
+      .list-card {
+        padding: 16px;
+      }
+
+      .dept-card,
+      .action-card,
+      .kpi-card,
+      .promotion-card {
+        min-height: 156px;
+        padding: 15px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #fff;
+      }
+
+      .dept-card h3,
+      .action-card h3,
+      .kpi-card h3,
+      .promotion-card h3 {
+        font-size: 16px;
+      }
+
+      .dept-card p,
+      .action-card p,
+      .kpi-card p,
+      .promotion-card p {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .card-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 12px;
+      }
+
+      .meta {
+        padding: 4px 7px;
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .lane {
+        display: grid;
+        gap: 11px;
+      }
+
+      .lane-row {
+        display: grid;
+        grid-template-columns: 84px minmax(0, 1fr) 72px;
+        gap: 12px;
+        align-items: center;
+        padding: 13px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #fff;
+      }
+
+      .lane-row b {
+        color: var(--blue);
+        font-size: 13px;
+      }
+
+      .lane-row strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .lane-row span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .score-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .score-row {
+        display: grid;
+        grid-template-columns: 112px minmax(0, 1fr) 44px;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .score-row b,
+      .score-row span {
+        font-size: 13px;
+      }
+
+      .progress-steps {
+        display: grid;
+        gap: 12px;
+      }
+
+      .progress-step {
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+      }
+
+      .step-badge {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        color: #fff;
+        background: var(--blue);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .progress-step.done .step-badge {
+        background: var(--green);
+      }
+
+      .progress-step.current .step-badge {
+        background: var(--red);
+      }
+
+      .bottom-tabs {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 20;
+        border-top: 1px solid var(--line);
+        background: rgba(255, 253, 248, 0.96);
+        box-shadow: 0 -12px 32px rgba(32, 42, 53, 0.12);
+        backdrop-filter: blur(10px);
+      }
+
+      .tab-inner {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        width: min(100%, 760px);
+        margin: 0 auto;
+        padding: 7px 10px 9px;
+      }
+
+      .tab {
+        display: grid;
+        place-items: center;
+        gap: 4px;
+        min-height: 56px;
+        border: 0;
+        border-radius: 8px;
+        color: var(--muted);
+        background: transparent;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .tab .tab-icon {
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .tab.active {
+        color: var(--red);
+        background: rgba(179, 38, 45, 0.09);
+      }
+
+      @media (max-width: 940px) {
+        .home-grid,
+        .hero-card,
+        .wide-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .metrics,
+        .sub-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 640px) {
+        .app-shell {
+          padding: 14px 12px 88px;
+        }
+
+        .topbar {
+          align-items: flex-start;
+        }
+
+        .date-chip {
+          white-space: nowrap;
+        }
+
+        h1 {
+          font-size: 24px;
+        }
+
+        .hero-card {
+          padding: 16px;
+        }
+
+        .hero-card h2 {
+          font-size: 25px;
+        }
+
+        .advance-buttons,
+        .metrics,
+        .sub-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .feature {
+          grid-template-columns: 36px minmax(0, 1fr) 32px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="seal">征</div>
+          <div>
+            <h1>征途</h1>
+            <p>主页面只处理角色状态与时间推进</p>
+          </div>
+        </div>
+        <div class="date-chip">2026 年 7 月 18 日</div>
+      </header>
+
+      <section class="view active" data-view="home">
+        <section class="home-grid">
+        <div>
+          <article class="card hero-card">
+            <div>
+              <p class="subtle">当前角色</p>
+              <h2>李明远</h2>
+              <div class="role-row">
+                <span class="pill">县政府办公室副主任</span>
+                <span class="pill">行政线 L3</span>
+                <span class="pill">务实派</span>
+                <span class="pill">任职第 2 年</span>
+              </div>
+              <p class="summary">
+                本月政务运行平稳，财政健康较好，城建项目进度偏慢。建议先推进城建与财政协同任务，
+                再进入“晋升”子页面处理组织考察。
+              </p>
+            </div>
+
+            <div class="portrait">
+              <div class="avatar">李</div>
+              <dl>
+                <dt>累计天数</dt>
+                <dd>642 天</dd>
+                <dt>当前年限</dt>
+                <dd>2 年 4 月</dd>
+                <dt>健康</dt>
+                <dd>86</dd>
+                <dt>消沉</dt>
+                <dd>12</dd>
+              </dl>
+            </div>
+          </article>
+
+          <article class="card advance-card" style="margin-top: 16px">
+            <div class="section-head">
+              <div>
+                <h3>推进时间</h3>
+                <p>主页保留最高频操作，完成行动后再提示进入对应子页面查看详情。</p>
+              </div>
+            </div>
+            <div class="advance-buttons">
+              <button class="advance">
+                <strong>推进 1 天</strong>
+                <span>适合等待短行动完成</span>
+              </button>
+              <button class="advance">
+                <strong>推进 7 天</strong>
+                <span>结算一周政务变化</span>
+              </button>
+              <button class="advance primary">
+                <strong>推进 30 天</strong>
+                <span>进入月度考核节奏</span>
+              </button>
+            </div>
+          </article>
+
+          <article class="card advance-card" style="margin-top: 16px">
+            <div class="section-head">
+              <div>
+                <h3>状态摘要</h3>
+                <p>详细分析下沉到 KPI、行动、部门等子页面。</p>
+              </div>
+            </div>
+            <div class="metrics">
+              <div class="metric">
+                <strong>420 万</strong>
+                <span>剩余预算</span>
+                <div class="meter"><i style="width: 72%"></i></div>
+              </div>
+              <div class="metric">
+                <strong>78.5</strong>
+                <span>KPI 总分</span>
+                <div class="meter"><i style="width: 79%; background: var(--cyan)"></i></div>
+              </div>
+              <div class="metric">
+                <strong>64%</strong>
+                <span>晋升概率</span>
+                <div class="meter"><i style="width: 64%; background: var(--gold)"></i></div>
+              </div>
+              <div class="metric">
+                <strong>2/6</strong>
+                <span>槽位占用</span>
+                <div class="meter"><i style="width: 34%; background: var(--blue)"></i></div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <aside class="side-stack">
+          <article class="card feature-card">
+            <div class="section-head">
+              <div>
+                <h3>子页面入口</h3>
+                <p>功能集中放到各自页面，主页只展示必要摘要。</p>
+              </div>
+            </div>
+            <div class="feature-list">
+              <div class="feature">
+                <div class="icon">政</div>
+                <div><strong>部门治理</strong><span>查看部门卡片、行动清单、冷却状态</span></div>
+                <button class="go" data-open="departments">›</button>
+              </div>
+              <div class="feature">
+                <div class="icon">排</div>
+                <div><strong>行动排程</strong><span>管理主要、次要、备用槽位</span></div>
+                <button class="go" data-open="actions">›</button>
+              </div>
+              <div class="feature">
+                <div class="icon">考</div>
+                <div><strong>KPI 考核</strong><span>查看指标构成、得分与改进建议</span></div>
+                <button class="go" data-open="kpi">›</button>
+              </div>
+              <div class="feature">
+                <div class="icon">升</div>
+                <div><strong>晋升任命</strong><span>处理民主推荐、组织考察、票决</span></div>
+                <button class="go" data-open="promotion">›</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="card mini-card">
+            <div class="section-head">
+              <div>
+                <h3>当前进行中</h3>
+                <p>仅展示摘要，点击后进入行动排程页。</p>
+              </div>
+            </div>
+            <div class="task">
+              <b>主要</b>
+              <div><strong>应急演练</strong><span>公安/安全部门 · 剩余 4 天</span></div>
+              <span>43%</span>
+            </div>
+            <div class="task">
+              <b>次要</b>
+              <div><strong>预算审查</strong><span>财政部门 · 剩余 1 天</span></div>
+              <span>72%</span>
+            </div>
+          </article>
+
+          <article class="card mini-card">
+            <div class="section-head">
+              <div>
+                <h3>月度提醒</h3>
+                <p>主页用提示指引，而不是展开复杂模块。</p>
+              </div>
+            </div>
+            <div class="notice">
+              城建项目完成度低于晋升建议线。进入“部门治理”页面安排城建行动后，再处理组织考察更稳。
+            </div>
+          </article>
+        </aside>
+      </section>
+      </section>
+
+      <section class="view" data-view="departments">
+        <div class="page-title">
+          <h2>部门治理</h2>
+          <p>部门页承载全部治理对象、部门状态和可执行行动，主页只保留风险摘要与入口。</p>
+        </div>
+        <div class="sub-grid">
+          <article class="dept-card">
+            <h3>财政部门</h3>
+            <p>预算执行平稳，收入率处于高位。适合安排日常征管行动积累稳定收益。</p>
+            <div class="meter"><i style="width: 86%"></i></div>
+            <div class="card-meta"><span class="meta">财政健康 88</span><span class="meta">收入率 82</span></div>
+          </article>
+          <article class="dept-card">
+            <h3>城建部门</h3>
+            <p>项目完成度偏低，是当前晋升路径的短板。优先处理规划评审或工程审批。</p>
+            <div class="meter"><i style="width: 54%; background: var(--gold)"></i></div>
+            <div class="card-meta"><span class="meta">项目 54</span><span class="meta">规划 61</span></div>
+          </article>
+          <article class="dept-card">
+            <h3>公安/安全部门</h3>
+            <p>稳定指标较好，可通过应急演练继续强化组织考察中的安全评价。</p>
+            <div class="meter"><i style="width: 76%; background: var(--cyan)"></i></div>
+            <div class="card-meta"><span class="meta">安全 76</span><span class="meta">满意度 70</span></div>
+          </article>
+          <article class="dept-card">
+            <h3>民政部门</h3>
+            <p>民生满意度中等，适合在月末考核前补一次基层调研。</p>
+            <div class="meter"><i style="width: 68%; background: var(--green)"></i></div>
+            <div class="card-meta"><span class="meta">民生 68</span><span class="meta">保障 73</span></div>
+          </article>
+          <article class="dept-card">
+            <h3>综合办公室</h3>
+            <p>办公效率稳定，日常会议与文件处理可以作为低成本补位行动。</p>
+            <div class="meter"><i style="width: 80%; background: var(--blue)"></i></div>
+            <div class="card-meta"><span class="meta">效率 80</span><span class="meta">协同 75</span></div>
+          </article>
+          <article class="dept-card">
+            <h3>农业农村部门</h3>
+            <p>农村产业指标尚可，预算压力低，可作为财政紧张时的稳妥选择。</p>
+            <div class="meter"><i style="width: 71%"></i></div>
+            <div class="card-meta"><span class="meta">产值 71</span><span class="meta">补贴 66</span></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" data-view="actions">
+        <div class="page-title">
+          <h2>行动排程</h2>
+          <p>行动页专门管理主要、次要、备用槽位，避免在主页展开所有任务细节。</p>
+        </div>
+        <div class="wide-grid">
+          <article class="card list-card">
+            <div class="section-head">
+              <div>
+                <h3>槽位状态</h3>
+                <p>以排程优先，展示任务占用、剩余时间与风险。</p>
+              </div>
+            </div>
+            <div class="lane">
+              <div class="lane-row">
+                <b>主要槽位</b>
+                <div><strong>应急演练</strong><span>公安/安全部门 · 剩余 4 天 · 冷却 14 天</span></div>
+                <span>43%</span>
+              </div>
+              <div class="lane-row">
+                <b>次要槽位</b>
+                <div><strong>预算审查</strong><span>财政部门 · 剩余 1 天 · 收益 +8 财政健康</span></div>
+                <span>72%</span>
+              </div>
+              <div class="lane-row">
+                <b>次要槽位</b>
+                <div><strong>空闲</strong><span>可安排城建规划评审，补齐项目短板</span></div>
+                <span>0%</span>
+              </div>
+              <div class="lane-row">
+                <b>备用槽位</b>
+                <div><strong>空闲</strong><span>加班会影响健康和消沉，建议谨慎使用</span></div>
+                <span>0%</span>
+              </div>
+            </div>
+          </article>
+          <article class="card list-card">
+            <div class="section-head">
+              <div>
+                <h3>推荐行动</h3>
+                <p>从部门页选择行动后进入这里排程。</p>
+              </div>
+            </div>
+            <div class="action-card">
+              <h3>城市规划评审</h3>
+              <p>次要行动 · 2 天 · 提升规划评分，适合当前空闲次要槽位。</p>
+              <div class="card-meta"><span class="meta">预算 -20 万</span><span class="meta">规划 +5</span></div>
+            </div>
+            <div class="action-card" style="margin-top: 12px">
+              <h3>税收征管</h3>
+              <p>日常行动 · 3 天 · 增加财政收入，适合作为并行稳定收益。</p>
+              <div class="card-meta"><span class="meta">预算 +30 万</span><span class="meta">收入 +6</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" data-view="kpi">
+        <div class="page-title">
+          <h2>KPI 考核</h2>
+          <p>KPI 页展示完整指标构成、分数来源和改进方向，主页只显示总分。</p>
+        </div>
+        <div class="wide-grid">
+          <article class="card list-card">
+            <div class="section-head">
+              <div>
+                <h3>指标得分</h3>
+                <p>当前总分 78.5，仍有明显的城建短板。</p>
+              </div>
+              <span class="pill">良好</span>
+            </div>
+            <div class="score-list">
+              <div class="score-row"><b>财政健康</b><div class="meter"><i style="width: 88%"></i></div><span>88</span></div>
+              <div class="score-row"><b>收入增长</b><div class="meter"><i style="width: 82%"></i></div><span>82</span></div>
+              <div class="score-row"><b>项目完成</b><div class="meter"><i style="width: 54%; background: var(--gold)"></i></div><span>54</span></div>
+              <div class="score-row"><b>安全稳定</b><div class="meter"><i style="width: 76%; background: var(--cyan)"></i></div><span>76</span></div>
+              <div class="score-row"><b>群众满意</b><div class="meter"><i style="width: 70%; background: var(--green)"></i></div><span>70</span></div>
+            </div>
+          </article>
+          <article class="card list-card">
+            <div class="section-head">
+              <div>
+                <h3>改进建议</h3>
+                <p>把建议留在 KPI 页，主页只给提醒。</p>
+              </div>
+            </div>
+            <div class="notice">优先安排城建部门的规划评审。若预算充足，再用财政部门的税收征管保持收入优势。</div>
+            <div class="kpi-card" style="margin-top: 12px">
+              <h3>晋升阈值</h3>
+              <p>建议总分达到 82 以上后，再推进组织考察阶段。</p>
+              <div class="card-meta"><span class="meta">当前 78.5</span><span class="meta">目标 82</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" data-view="promotion">
+        <div class="page-title">
+          <h2>晋升任命</h2>
+          <p>晋升页承载阶段流程、选择与风险，不再塞进主页折叠区域。</p>
+        </div>
+        <div class="wide-grid">
+          <article class="card list-card">
+            <div class="section-head">
+              <div>
+                <h3>流程阶段</h3>
+                <p>当前停留在组织考察，建议补齐治理成果材料。</p>
+              </div>
+              <span class="pill">64%</span>
+            </div>
+            <div class="progress-steps">
+              <div class="progress-step done">
+                <div class="step-badge">1</div>
+                <div><strong>民主推荐</strong><p>推荐票已通过，群众基础良好。</p></div>
+              </div>
+              <div class="progress-step current">
+                <div class="step-badge">2</div>
+                <div><strong>组织考察</strong><p>等待补充近半年治理成果材料，城建短板会影响评价。</p></div>
+              </div>
+              <div class="progress-step">
+                <div class="step-badge">3</div>
+                <div><strong>多部门联审</strong><p>受健康、稳定、财政与派系关系共同影响。</p></div>
+              </div>
+              <div class="progress-step">
+                <div class="step-badge">4</div>
+                <div><strong>常委会票决</strong><p>综合 KPI 与前序阶段结果进行最终判断。</p></div>
+              </div>
+            </div>
+          </article>
+          <article class="card list-card">
+            <div class="section-head">
+              <div>
+                <h3>风险画像</h3>
+                <p>把晋升决策拆成独立页面后，玩家能更清楚地准备材料。</p>
+              </div>
+            </div>
+            <div class="promotion-card">
+              <h3>优势</h3>
+              <p>财政健康、稳定治理和群众基础较好，有利于联审阶段。</p>
+              <div class="card-meta"><span class="meta">财政 +</span><span class="meta">稳定 +</span></div>
+            </div>
+            <div class="promotion-card" style="margin-top: 12px">
+              <h3>短板</h3>
+              <p>城建项目完成度不足，可能降低组织考察评价。</p>
+              <div class="card-meta"><span class="meta">城建 -</span><span class="meta">材料不足</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <nav class="bottom-tabs">
+      <div class="tab-inner">
+        <button class="tab active" data-tab="home"><span class="tab-icon">⌂</span><span>主页</span></button>
+        <button class="tab" data-tab="departments"><span class="tab-icon">▦</span><span>部门</span></button>
+        <button class="tab" data-tab="actions"><span class="tab-icon">◷</span><span>行动</span></button>
+        <button class="tab" data-tab="kpi"><span class="tab-icon">◎</span><span>KPI</span></button>
+        <button class="tab" data-tab="promotion"><span class="tab-icon">▲</span><span>晋升</span></button>
+      </div>
+    </nav>
+
+    <script>
+      const tabs = Array.from(document.querySelectorAll("[data-tab]"));
+      const views = Array.from(document.querySelectorAll("[data-view]"));
+      const openers = Array.from(document.querySelectorAll("[data-open]"));
+
+      function switchView(target) {
+        views.forEach((view) => {
+          view.classList.toggle("active", view.dataset.view === target);
+        });
+
+        tabs.forEach((tab) => {
+          tab.classList.toggle("active", tab.dataset.tab === target);
+        });
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => switchView(tab.dataset.tab));
+      });
+
+      openers.forEach((opener) => {
+        opener.addEventListener("click", () => switchView(opener.dataset.open));
+      });
+    </script>
+  </body>
+</html>

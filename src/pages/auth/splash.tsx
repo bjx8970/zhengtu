@@ -102,7 +102,7 @@ export function SplashPage() {
                   <div style={{ display: 'flex', gap: '0.65rem', 'margin-top': '0.8rem' }}>
                     <button
                       class="primary-action"
-                      onClick={() => navigate('/dashboard')}
+                      onClick={() => navigate('/main')}
                       style={{ padding: '0.8rem 1.5rem' }}
                     >
                       继续游戏 →

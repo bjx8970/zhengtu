@@ -15,7 +15,7 @@ const FEATURES: readonly FeatureEntry[] = [
     description: '安排部门行动并占用行动槽',
     icon: '政',
     status: 'available',
-    route: '/dashboard',
+    route: '/main',
     phase: '已接入',
   },
   {
@@ -24,7 +24,7 @@ const FEATURES: readonly FeatureEntry[] = [
     description: '查看 KPI 目标与完成情况',
     icon: '考',
     status: 'available',
-    route: '/dashboard',
+    route: '/main',
     phase: '已接入',
   },
   {
@@ -33,7 +33,7 @@ const FEATURES: readonly FeatureEntry[] = [
     description: '推进考察、联审与任命流程',
     icon: '升',
     status: 'available',
-    route: '/dashboard',
+    route: '/main',
     phase: '已接入',
   },
   {
