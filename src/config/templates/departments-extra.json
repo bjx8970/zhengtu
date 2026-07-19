@@ -344,5 +344,191 @@
       }
     ],
     "kpiTemplateIds": ["women_rights_score", "livelihood_score"]
+  },
+  "county_government": {
+    "name": "县政府办公室",
+    "consumptionCoefficient": 0.8,
+    "baseConsumption": 80,
+    "actions": [
+      {
+        "id": "county_coordination",
+        "name": "县域协调调度",
+        "description": "协调各部门工作，推进县域重点项目",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 30,
+        "effects": [{ "target": "dept.kpi.county_gdp", "operation": "add", "value": 6 }]
+      },
+      {
+        "id": "policy_implementation",
+        "name": "政策落地执行",
+        "description": "推动上级政策在县域落地实施",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 60,
+        "effects": [
+          { "target": "dept.kpi.county_gdp", "operation": "add", "value": 10 },
+          { "target": "player.performance", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["county_gdp", "office_efficiency"]
+  },
+  "district_administration": {
+    "name": "区行政服务中心",
+    "consumptionCoefficient": 0.7,
+    "baseConsumption": 70,
+    "actions": [
+      {
+        "id": "service_optimization",
+        "name": "服务流程优化",
+        "description": "优化行政审批流程，提升服务效率",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 25,
+        "effects": [{ "target": "dept.kpi.urbanization_rate", "operation": "add", "value": 5 }]
+      },
+      {
+        "id": "digital_government",
+        "name": "数字政府建设",
+        "description": "推进政务服务数字化转型",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 55,
+        "effects": [
+          { "target": "dept.kpi.urbanization_rate", "operation": "add", "value": 8 },
+          { "target": "player.competence", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["urbanization_rate", "resident_satisfaction"]
+  },
+  "education_bureau": {
+    "name": "教育局",
+    "consumptionCoefficient": 0.9,
+    "baseConsumption": 90,
+    "actions": [
+      {
+        "id": "school_construction",
+        "name": "学校建设改造",
+        "description": "推进学校基础设施建设和改造",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 80,
+        "effects": [{ "target": "dept.kpi.education_coverage", "operation": "add", "value": 10 }]
+      },
+      {
+        "id": "teacher_training",
+        "name": "教师培训",
+        "description": "组织教师专业能力提升培训",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 30,
+        "effects": [
+          { "target": "dept.kpi.education_coverage", "operation": "add", "value": 5 },
+          { "target": "player.charisma", "operation": "add", "value": 1 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["education_coverage", "livelihood_score"]
+  },
+  "health_bureau": {
+    "name": "卫生局",
+    "consumptionCoefficient": 0.9,
+    "baseConsumption": 85,
+    "actions": [
+      {
+        "id": "medical_facility",
+        "name": "医疗设施建设",
+        "description": "推进基层医疗设施建设和升级",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 75,
+        "effects": [{ "target": "dept.kpi.health_service", "operation": "add", "value": 10 }]
+      },
+      {
+        "id": "public_health",
+        "name": "公共卫生服务",
+        "description": "开展公共卫生服务和健康宣教",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 28,
+        "effects": [
+          { "target": "dept.kpi.health_service", "operation": "add", "value": 5 },
+          { "target": "player.stability", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["health_service", "livelihood_score"]
+  },
+  "transportation_bureau": {
+    "name": "交通局",
+    "consumptionCoefficient": 1.0,
+    "baseConsumption": 100,
+    "actions": [
+      {
+        "id": "road_construction",
+        "name": "道路建设维护",
+        "description": "推进辖区道路建设和维护",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 90,
+        "effects": [{ "target": "dept.kpi.infrastructure", "operation": "add", "value": 10 }]
+      },
+      {
+        "id": "traffic_management",
+        "name": "交通管理优化",
+        "description": "优化交通管理，提升通行效率",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 35,
+        "effects": [
+          { "target": "dept.kpi.infrastructure", "operation": "add", "value": 5 },
+          { "target": "player.stability", "operation": "add", "value": 1 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["infrastructure", "safety"]
+  },
+  "land_resources": {
+    "name": "国土资源局",
+    "consumptionCoefficient": 0.8,
+    "baseConsumption": 75,
+    "actions": [
+      {
+        "id": "land_planning",
+        "name": "土地规划管理",
+        "description": "编制和实施土地利用规划",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 50,
+        "effects": [{ "target": "dept.kpi.land_management", "operation": "add", "value": 8 }]
+      },
+      {
+        "id": "land_inspection",
+        "name": "土地执法监察",
+        "description": "开展土地执法监察，查处违法用地",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 25,
+        "effects": [
+          { "target": "dept.kpi.land_management", "operation": "add", "value": 5 },
+          { "target": "player.integrity", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["land_management", "fiscal_revenue"]
   }
 }

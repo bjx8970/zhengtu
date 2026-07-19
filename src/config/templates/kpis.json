@@ -254,5 +254,53 @@
     "weight": 0.5,
     "unit": "分",
     "calcType": "ratio"
+  },
+  "county_gdp": {
+    "id": "county_gdp",
+    "name": "县域GDP增长率",
+    "targetValue": 10,
+    "weight": 0.25,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "urbanization_rate": {
+    "id": "urbanization_rate",
+    "name": "城镇化率提升",
+    "targetValue": 60,
+    "weight": 0.2,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "education_coverage": {
+    "id": "education_coverage",
+    "name": "教育覆盖率",
+    "targetValue": 95,
+    "weight": 0.2,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "health_service": {
+    "id": "health_service",
+    "name": "医疗服务水平",
+    "targetValue": 85,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "infrastructure": {
+    "id": "infrastructure",
+    "name": "基础设施建设",
+    "targetValue": 100,
+    "weight": 0.25,
+    "unit": "%",
+    "calcType": "ratio"
+  },
+  "land_management": {
+    "id": "land_management",
+    "name": "土地管理合规率",
+    "targetValue": 95,
+    "weight": 0.2,
+    "unit": "%",
+    "calcType": "ratio"
   }
 }

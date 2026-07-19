@@ -185,6 +185,178 @@
         "politicalConditions": ["无党纪处分记录"],
         "specialConditions": ["grassroots"]
       }
+    },
+    {
+      "level": 4,
+      "label": "副处",
+      "positions": [
+        {
+          "id": "admin_l4_0",
+          "name": "副县长",
+          "departmentTemplateIds": [
+            "county_government",
+            "finance",
+            "civil_affairs",
+            "public_safety",
+            "agriculture"
+          ],
+          "kpiTemplateIds": [
+            "county_gdp",
+            "fiscal_revenue",
+            "livelihood_score",
+            "safety",
+            "agricultural_output"
+          ],
+          "annualBudget": 12000
+        },
+        {
+          "id": "admin_l4_1",
+          "name": "副区长",
+          "departmentTemplateIds": [
+            "district_administration",
+            "urban_dev",
+            "community_service",
+            "environment",
+            "cultural"
+          ],
+          "kpiTemplateIds": [
+            "urbanization_rate",
+            "gdp_growth",
+            "resident_satisfaction",
+            "environment_score",
+            "cultural_activity"
+          ],
+          "annualBudget": 10000
+        },
+        {
+          "id": "admin_l4_2",
+          "name": "市局副局长",
+          "departmentTemplateIds": [
+            "general_office",
+            "human_resources",
+            "statistics",
+            "discipline_inspect"
+          ],
+          "kpiTemplateIds": [
+            "office_efficiency",
+            "staff_satisfaction",
+            "data_accuracy",
+            "anti_corruption"
+          ],
+          "annualBudget": 8000
+        },
+        {
+          "id": "admin_l4_3",
+          "name": "县委常委",
+          "departmentTemplateIds": [
+            "party_org",
+            "propaganda_dept",
+            "discipline_inspect",
+            "human_resources"
+          ],
+          "kpiTemplateIds": [
+            "party_building",
+            "propaganda_score",
+            "anti_corruption",
+            "staff_satisfaction"
+          ],
+          "annualBudget": 9000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 4,
+        "minAssessmentPasses": 3,
+        "politicalConditions": ["无党纪处分记录", "人事档案合规"],
+        "specialConditions": ["grassroots"]
+      }
+    },
+    {
+      "level": 5,
+      "label": "正处",
+      "positions": [
+        {
+          "id": "admin_l5_0",
+          "name": "县长",
+          "departmentTemplateIds": [
+            "county_government",
+            "finance",
+            "urban_dev",
+            "civil_affairs",
+            "public_safety"
+          ],
+          "kpiTemplateIds": [
+            "county_gdp",
+            "fiscal_revenue",
+            "project_completion",
+            "livelihood_score",
+            "safety"
+          ],
+          "annualBudget": 25000
+        },
+        {
+          "id": "admin_l5_1",
+          "name": "区长",
+          "departmentTemplateIds": [
+            "district_administration",
+            "finance",
+            "urban_dev",
+            "education_bureau",
+            "health_bureau"
+          ],
+          "kpiTemplateIds": [
+            "urbanization_rate",
+            "fiscal_revenue",
+            "gdp_growth",
+            "education_coverage",
+            "health_service"
+          ],
+          "annualBudget": 22000
+        },
+        {
+          "id": "admin_l5_2",
+          "name": "市局局长",
+          "departmentTemplateIds": [
+            "general_office",
+            "human_resources",
+            "finance",
+            "statistics",
+            "discipline_inspect"
+          ],
+          "kpiTemplateIds": [
+            "office_efficiency",
+            "staff_satisfaction",
+            "fiscal_health",
+            "data_accuracy",
+            "anti_corruption"
+          ],
+          "annualBudget": 18000
+        },
+        {
+          "id": "admin_l5_3",
+          "name": "县委书记",
+          "departmentTemplateIds": [
+            "party_org",
+            "propaganda_dept",
+            "discipline_inspect",
+            "human_resources",
+            "general_office"
+          ],
+          "kpiTemplateIds": [
+            "party_building",
+            "propaganda_score",
+            "anti_corruption",
+            "staff_satisfaction",
+            "office_efficiency"
+          ],
+          "annualBudget": 20000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 4,
+        "minAssessmentPasses": 4,
+        "politicalConditions": ["无党纪处分记录", "人事档案合规"],
+        "specialConditions": ["grassroots", "multi_region"]
+      }
     }
   ]
 }
