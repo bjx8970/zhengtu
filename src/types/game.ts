@@ -15,6 +15,7 @@ import type {
   PromotionStage,
   Faction,
   InvestigationEvidence,
+  CareerLine,
 } from './enums';
 import type { KPITier } from './enums';
 import type { SlotTierKey, SlotOccupant, SlotState } from './player';
@@ -151,6 +152,16 @@ export interface EventResolveResult {
   effects: Record<string, number>;
   riskTriggered: boolean;
   detail: string;
+}
+
+/** 晋升目标候选职位 */
+export interface PromotionCandidate {
+  positionId: string;
+  positionName: string;
+  level: number;
+  careerLine: CareerLine;
+  /** 不可选原因（为空表示可选） */
+  blockedReason?: string;
 }
 
 /** 晋升流程的上下文数据（传入各阶段计算函数） */

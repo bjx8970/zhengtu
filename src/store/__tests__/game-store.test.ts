@@ -324,7 +324,7 @@ describe('dispatch - promotion lifecycle', () => {
     expect(store.getRawState().promotionState?.targetLevel).toBe(2);
   });
 
-  it('完成态重置后可启动下一等级晋升', () => {
+  it('完成态重置后可启动下一等级晋升（目标选择流程）', () => {
     const store = createTestStore({
       currentCareerLine: CareerLine.Administrative,
       currentLevel: 2,
@@ -343,10 +343,81 @@ describe('dispatch - promotion lifecycle', () => {
     store.dispatch({ type: 'RESET_PROMOTION' });
     store.dispatch({ type: 'START_PROMOTION' });
 
+    // START_PROMOTION 现在进入目标选择阶段
+    let state = store.getRawState();
+    expect(state.promotionStage).toBe(PromotionStage.TargetSelection);
+    expect(state.promotionState?.targetLevel).toBe(3);
+    expect(state.promotionState?.targetPositionId).toBe('');
+
+    // 选择目标职位后进入民主推荐
+    store.dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l3_0' });
+    state = store.getRawState();
+    expect(state.promotionStage).toBe(PromotionStage.DemocraticVote);
+    expect(state.promotionState?.targetPositionId).toBe('admin_l3_0');
+  });
+
+  it('目标选择阶段可选择任意合法候选职位', () => {
+    const store = createTestStore({
+      currentCareerLine: CareerLine.Administrative,
+      currentLevel: 2,
+      currentPositionId: 'admin_l2_0',
+      yearsInCurrentPosition: 3,
+      annualAssessments: passingAssessments,
+    });
+
+    store.dispatch({ type: 'START_PROMOTION' });
+    expect(store.getRawState().promotionStage).toBe(PromotionStage.TargetSelection);
+
+    // 选择第二个候选职位（非默认第一个）
+    store.dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l3_1' });
     const state = store.getRawState();
     expect(state.promotionStage).toBe(PromotionStage.DemocraticVote);
-    expect(state.promotionState?.targetLevel).toBe(3);
-    expect(state.promotionState?.targetPositionId).toBe('admin_l3_0');
+    expect(state.promotionState?.targetPositionId).toBe('admin_l3_1');
+  });
+
+  it('目标选择阶段选择非法职位 → 失败', () => {
+    const store = createTestStore({
+      currentCareerLine: CareerLine.Administrative,
+      currentLevel: 2,
+      currentPositionId: 'admin_l2_0',
+      yearsInCurrentPosition: 3,
+      annualAssessments: passingAssessments,
+    });
+
+    store.dispatch({ type: 'START_PROMOTION' });
+    store.dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'nonexistent_pos' });
+
+    const state = store.getRawState();
+    expect(state.promotionStage).toBe(PromotionStage.Failed);
+  });
+
+  it('目标选择阶段可以重置', () => {
+    const store = createTestStore({
+      currentCareerLine: CareerLine.Administrative,
+      currentLevel: 2,
+      currentPositionId: 'admin_l2_0',
+      yearsInCurrentPosition: 3,
+      annualAssessments: passingAssessments,
+    });
+
+    store.dispatch({ type: 'START_PROMOTION' });
+    expect(store.getRawState().promotionStage).toBe(PromotionStage.TargetSelection);
+
+    store.dispatch({ type: 'RESET_PROMOTION' });
+    expect(store.getRawState().promotionStage).toBe(PromotionStage.Idle);
+    expect(store.getRawState().promotionState).toBeNull();
+  });
+
+  it('非目标选择阶段不能执行 SELECT_PROMOTION_TARGET', () => {
+    const store = createTestStore({
+      currentCareerLine: CareerLine.Administrative,
+      currentLevel: 2,
+      currentPositionId: 'admin_l2_0',
+      promotionStage: PromotionStage.Idle,
+    });
+
+    store.dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l3_0' });
+    expect(store.getRawState().promotionStage).toBe(PromotionStage.Idle);
   });
 
   it('拒绝异常存档中的跨级晋升目标', () => {

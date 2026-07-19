@@ -23,6 +23,7 @@ import { colors, font, darkCardStyle } from '../../utils/theme';
 
 const STAGE_LABELS: Record<PromotionStage, string> = {
   [PromotionStage.Idle]: '待触发',
+  [PromotionStage.TargetSelection]: '选择目标职位',
   [PromotionStage.DemocraticVote]: '民主推荐',
   [PromotionStage.OrgInspection]: '组织考察',
   [PromotionStage.JointReview]: '多部门联审',

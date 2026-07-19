@@ -41,6 +41,8 @@ export enum KPITier {
 /** 晋升六阶段状态机状态 */
 export enum PromotionStage {
   Idle = 'idle',
+  /** 等待玩家选择目标职位 */
+  TargetSelection = 'target_selection',
   DemocraticVote = 'democratic_vote',
   OrgInspection = 'org_inspection',
   JointReview = 'joint_review',

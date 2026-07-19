@@ -42,11 +42,8 @@ import { annualAssessment as runAnnualAssessment } from '../engine/governance/as
 import { getConfigLoader } from '../config/loader';
 import { clamp, clampAttr } from '../utils/math';
 import { writeLocalSave } from '../services/save-repo';
-import {
-  checkPrerequisites,
-  resolveDemocraticVote,
-  resolveOrgInspection,
-} from '../engine/career/promotion';
+import { resolveDemocraticVote, resolveOrgInspection } from '../engine/career/promotion';
+import { validatePromotionTarget } from '../engine/career/promotion-target';
 import {
   resolveJointReview,
   resolveCommitteeVote,
@@ -174,6 +171,7 @@ export type GameAction =
   | { type: 'CHOOSE_EVENT_OPTION'; eventId: string; optionIndex: number }
   | { type: 'PROCESS_DOCUMENT'; docId: string; action: FileAction }
   | { type: 'START_PROMOTION' }
+  | { type: 'SELECT_PROMOTION_TARGET'; positionId: string }
   | { type: 'RESET_PROMOTION' }
   | {
       type: 'PROMOTION_RESOLVE_STAGE';
@@ -289,6 +287,23 @@ function migrateActionState(draft: PlayerSave): void {
       if (!('cooldownDays' in occupant) || occupant.cooldownDays === undefined) {
         occupant.cooldownDays = actionConfig?.cooldownDays ?? 0;
       }
+    }
+  }
+
+  // 兼容旧存档：若晋升流程进行中但缺少 targetPositionId，默认取目标等级第一个职位
+  if (
+    draft.promotionState &&
+    draft.promotionStage !== PromotionStage.Idle &&
+    draft.promotionStage !== PromotionStage.Completed &&
+    draft.promotionStage !== PromotionStage.Failed &&
+    (!draft.promotionState.targetPositionId || draft.promotionState.targetPositionId === '')
+  ) {
+    const lineCfgMigrate = getConfigLoader().getCareerLine(draft.currentCareerLine);
+    const targetLevelCfg = lineCfgMigrate?.levels.find(
+      (l) => l.level === draft.promotionState!.targetLevel,
+    );
+    if (targetLevelCfg && targetLevelCfg.positions.length > 0) {
+      draft.promotionState.targetPositionId = targetLevelCfg.positions[0]!.id;
     }
   }
 }
@@ -622,7 +637,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
     case 'RESET_PROMOTION': {
       if (
         draft.promotionStage !== PromotionStage.Completed &&
-        draft.promotionStage !== PromotionStage.Failed
+        draft.promotionStage !== PromotionStage.Failed &&
+        draft.promotionStage !== PromotionStage.TargetSelection
       ) {
         break;
       }
@@ -642,32 +658,47 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       if (!lineCfg) break;
       const nextLevelCfg = lineCfg.levels.find((l) => l.level === nextLevel);
       if (!nextLevelCfg || nextLevelCfg.positions.length === 0) break;
-      const targetPos = nextLevelCfg.positions[0];
-      if (!targetPos) break;
 
       draft.promotionAttempts += 1;
 
-      const ctx = buildPromotionContext(draft);
-      const prereq = checkPrerequisites(ctx, nextLevelCfg.promotionRequirements);
+      // 进入目标选择阶段，等待玩家选择目标职位
+      draft.promotionStage = PromotionStage.TargetSelection;
+      draft.promotionState = {
+        targetPositionId: '',
+        targetLevel: nextLevel,
+        currentStage: PromotionStage.TargetSelection,
+        stageResults: {},
+      };
+      break;
+    }
+    case 'SELECT_PROMOTION_TARGET': {
+      // 仅在目标选择阶段有效
+      if (draft.promotionStage !== PromotionStage.TargetSelection) break;
+      const psTarget = draft.promotionState;
+      if (!psTarget) break;
 
-      if (!prereq.eligible) {
+      const lineCfgTarget = getConfigLoader().getCareerLine(draft.currentCareerLine);
+      if (!lineCfgTarget) break;
+
+      const ctxTarget = buildPromotionContext(draft);
+      const validation = validatePromotionTarget(
+        action.positionId,
+        draft.currentLevel,
+        lineCfgTarget,
+        ctxTarget,
+      );
+
+      if (!validation.valid) {
         draft.promotionStage = PromotionStage.Failed;
-        draft.promotionState = {
-          targetPositionId: targetPos.id,
-          targetLevel: nextLevel,
-          currentStage: PromotionStage.Failed,
-          stageResults: {},
-        };
+        psTarget.currentStage = PromotionStage.Failed;
+        psTarget.targetPositionId = action.positionId;
         break;
       }
 
+      // 校验通过，设置目标并进入民主推荐阶段
+      psTarget.targetPositionId = action.positionId;
+      psTarget.currentStage = PromotionStage.DemocraticVote;
       draft.promotionStage = PromotionStage.DemocraticVote;
-      draft.promotionState = {
-        targetPositionId: targetPos.id,
-        targetLevel: nextLevel,
-        currentStage: PromotionStage.DemocraticVote,
-        stageResults: {},
-      };
       break;
     }
     case 'PROMOTION_RESOLVE_STAGE': {
