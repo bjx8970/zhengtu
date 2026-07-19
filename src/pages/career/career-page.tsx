@@ -14,6 +14,7 @@
 import { createMemo, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { AppShell } from '../../components/app-shell';
+import { PageHeader } from '../../components/page-header';
 import { getConfigLoader } from '../../config/loader';
 import { PromotionStage } from '../../types/enums';
 import { calculateKPI } from '../../engine/governance/kpi';
@@ -117,6 +118,7 @@ export function CareerPage() {
 
   return (
     <AppShell>
+      <PageHeader title="晋升任命" desc="民主推荐、组织考察、常委会票决" />
       <div
         style={{
           display: 'grid',

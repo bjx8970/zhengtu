@@ -10,6 +10,7 @@
 import { createMemo, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { AppShell } from '../../components/app-shell';
+import { PageHeader } from '../../components/page-header';
 import { calculateKPI } from '../../engine/governance/kpi';
 import { getConfigLoader } from '../../config/loader';
 import { parsePositionIndex } from '../../utils/position';
@@ -76,6 +77,7 @@ export function AssessmentPage() {
 
   return (
     <AppShell>
+      <PageHeader title="KPI 考核" desc="查看指标完成度、得分与改进建议" />
       <Show
         when={positionConfig()}
         fallback={

@@ -49,6 +49,13 @@ const WORK_CARDS: {
     color: colors.secondary,
   },
   {
+    icon: '行',
+    label: '行动排程',
+    desc: '安排新行动到主要、次要、临时日程',
+    route: '/actions',
+    color: colors.success,
+  },
+  {
     icon: '考',
     label: 'KPI 考核',
     desc: '查看指标完成度、得分与改进建议',
@@ -67,7 +74,7 @@ const WORK_CARDS: {
     label: '公文处理',
     desc: '批阅请示、报告、方案与建议',
     route: '/departments', // TODO: Phase 4 实现独立路由
-    color: colors.success,
+    color: colors.warning,
   },
   {
     icon: '廉',
@@ -81,7 +88,7 @@ const WORK_CARDS: {
     label: '人脉关系',
     desc: '维护上级、同事、学界与媒体关系',
     route: '/departments', // TODO: Phase 4 实现独立路由
-    color: '#6b5b8a',
+    color: colors.purple,
   },
 ];
 
