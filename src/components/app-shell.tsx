@@ -1,28 +1,25 @@
 /**
  * 应用外壳布局
  *
- * 提供 Tab 页面的标准三栏布局：
- * - 顶部：TopBar（品牌 + 日期）
- * - 中间：可滚动内容区
- * - 底部：BottomTabBar（固定 5-Tab 导航）
+ * 提供页面的标准布局容器：
+ * - 全屏弹性列布局
+ * - 可滚动内容区
  *
+ * 工作台设计下不再包含底部导航栏，各页面自行管理顶部信息栏。
  * 子页面渲染时用此组件包裹：
- *   <AppShell activeTab={0}><HomePageContent /></AppShell>
+ *   <AppShell><PageContent /></AppShell>
  */
 
 import type { JSX } from 'solid-js';
-import { TopBar } from './top-bar';
-import { BottomTabBar } from './bottom-tab-bar';
 import { colors } from '../utils/theme';
 
 /**
  * 应用外壳布局组件。
  *
- * @param props.activeTab 当前 Tab 索引
- * @param props.children  页面内容
+ * @param props.children 页面内容
  * @returns 完整页面布局
  */
-export function AppShell(props: { activeTab: number; children: JSX.Element }) {
+export function AppShell(props: { children: JSX.Element }) {
   return (
     <div
       style={{
@@ -33,7 +30,6 @@ export function AppShell(props: { activeTab: number; children: JSX.Element }) {
         color: colors.textPrimary,
       }}
     >
-      <TopBar />
       <main
         style={{
           flex: 1,
@@ -43,7 +39,6 @@ export function AppShell(props: { activeTab: number; children: JSX.Element }) {
       >
         <div class="app-container">{props.children}</div>
       </main>
-      <BottomTabBar activeTab={props.activeTab} />
     </div>
   );
 }

@@ -75,7 +75,7 @@ export function AssessmentPage() {
   );
 
   return (
-    <AppShell activeTab={3}>
+    <AppShell>
       <Show
         when={positionConfig()}
         fallback={

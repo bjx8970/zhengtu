@@ -54,7 +54,7 @@ export function ActionsPage() {
   );
 
   return (
-    <AppShell activeTab={2}>
+    <AppShell>
       <div
         style={{
           display: 'grid',

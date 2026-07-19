@@ -32,7 +32,7 @@ export function DepartmentsPage() {
   const allDepts = createMemo(() => positionConfig()?.departments ?? []);
 
   return (
-    <AppShell activeTab={1}>
+    <AppShell>
       <div style={{ ...darkCardStyle('18px'), 'margin-bottom': '16px' }}>
         <h2 style={{ 'font-size': '25px', 'font-family': font.title }}>部门治理</h2>
         <p

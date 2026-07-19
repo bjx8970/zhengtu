@@ -158,9 +158,9 @@ a:focus-visible {
 
 /* ── 响应式容器 ── */
 .app-container {
-  width: min(100%, 1180px);
+  width: min(100%, 900px);
   margin: 0 auto;
-  padding: 18px 18px 92px;
+  padding: 0 16px 40px;
   min-height: 100%;
 }
 
@@ -237,7 +237,7 @@ a:focus-visible {
 
 @media (max-width: 640px) {
   .app-container {
-    padding: 14px 12px 88px;
+    padding: 0 12px 32px;
   }
 }
 

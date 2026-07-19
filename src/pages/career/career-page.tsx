@@ -116,7 +116,7 @@ export function CareerPage() {
   );
 
   return (
-    <AppShell activeTab={4}>
+    <AppShell>
       <div
         style={{
           display: 'grid',
