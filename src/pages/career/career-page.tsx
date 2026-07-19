@@ -191,7 +191,13 @@ export function CareerPage() {
           {/* TargetSelection 状态：选择目标职位 */}
           <Show when={state.promotionStage === PromotionStage.TargetSelection}>
             <div style={{ padding: '1rem 0' }}>
-              <p style={{ 'text-align': 'center', 'margin-bottom': '1rem', color: colors.textSecondary }}>
+              <p
+                style={{
+                  'text-align': 'center',
+                  'margin-bottom': '1rem',
+                  color: colors.textSecondary,
+                }}
+              >
                 请选择晋升目标职位：
               </p>
               <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.6rem' }}>
