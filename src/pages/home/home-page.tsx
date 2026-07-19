@@ -20,7 +20,7 @@ import { hasActiveActions } from '../../engine/core/action';
 import { getConfigLoader } from '../../config/loader';
 import { formatNumber } from '../../utils/format';
 import { parsePositionIndex } from '../../utils/position';
-import type { SlotOccupant } from '../../types/player';
+import type { SlotOccupant, SlotTierKey } from '../../types/player';
 import { colors, font, sealStyle, pillStyle, darkCardStyle } from '../../utils/theme';
 
 const GRANULARITIES: { label: string; days: number; granularity: 'day' | 'week' | 'month' }[] = [
@@ -81,6 +81,12 @@ export function HomePage() {
     );
   });
 
+  const kpiDisplay = createMemo(() => {
+    const r = kpiResult();
+    if (!r) return { value: 'N/A', pct: 0 };
+    return { value: formatNumber(r.totalScore, 1), pct: r.totalScore / 100 };
+  });
+
   const hasPending = createMemo(() => hasActiveActions(state.slots));
 
   const slotOccupied = createMemo(() => {
@@ -96,10 +102,13 @@ export function HomePage() {
   const budgetMax = createMemo(() => positionConfig()?.annualBudget ?? 100);
 
   const pendingSlots = createMemo(() => {
-    const result: SlotOccupant[] = [];
-    for (const tier of Object.values(state.slots)) {
+    const result: { occupant: SlotOccupant; tierKey: SlotTierKey; tierLabel: string }[] = [];
+    for (const [tierKey, tier] of Object.entries(state.slots) as [
+      SlotTierKey,
+      typeof state.slots.primary,
+    ][]) {
       for (const o of tier.occupants) {
-        if (o !== null) result.push(o);
+        if (o !== null) result.push({ occupant: o, tierKey, tierLabel: tier.label });
       }
     }
     return result;
@@ -263,8 +272,8 @@ export function HomePage() {
           />
           <MetricsBar
             label="KPI 总分"
-            value={kpiResult() ? formatNumber(kpiResult()!.totalScore, 1) : 'N/A'}
-            pct={kpiResult() ? kpiResult()!.totalScore / 100 : 0}
+            value={kpiDisplay().value}
+            pct={kpiDisplay().pct}
             barColor={colors.cyan}
           />
           <MetricsBar
@@ -376,9 +385,9 @@ export function HomePage() {
           }
         >
           <For each={pendingSlots()}>
-            {(occupant) => {
-              const elapsed = state.totalDaysPlayed - occupant.startedAtDay;
-              const total = occupant.durationDays;
+            {(item) => {
+              const elapsed = state.totalDaysPlayed - item.occupant.startedAtDay;
+              const total = item.occupant.durationDays;
               const pct = Math.min((elapsed / total) * 100, 100);
               return (
                 <div
@@ -392,11 +401,11 @@ export function HomePage() {
                   }}
                 >
                   <b style={{ color: colors.secondary, 'font-size': '13px' }}>
-                    {occupant.actionName}
+                    {item.tierLabel}槽位
                   </b>
                   <div>
                     <strong style={{ display: 'block', 'font-size': '13px' }}>
-                      {occupant.actionName}
+                      {item.occupant.actionName}
                     </strong>
                     <span
                       style={{

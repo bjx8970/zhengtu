@@ -24,7 +24,15 @@ const TIER_COLOR: Record<SlotTierKey, string> = {
 };
 
 export function ActionsPage() {
-  const { state } = useGameStore();
+  const { state, dispatch } = useGameStore();
+
+  const TIER_PRIORITY: SlotTierKey[] = ['primary', 'secondary', 'reserve'];
+  function findEmptySlot(): SlotTierKey | null {
+    for (const key of TIER_PRIORITY) {
+      if (state.slots[key].occupants.some((o) => o === null)) return key;
+    }
+    return null;
+  }
 
   const positionConfig = createMemo(() => {
     const posId = state.currentPositionId;
@@ -194,6 +202,11 @@ export function ActionsPage() {
                     const onCooldown =
                       action.category !== 'routine' && state.totalDaysPlayed < cooldownUntil;
 
+                    const emptySlot = onCooldown ? null : findEmptySlot();
+                    const canStart =
+                      !onCooldown &&
+                      emptySlot !== null &&
+                      (action.category !== 'major' || emptySlot === 'primary');
                     return (
                       <div
                         style={{
@@ -272,6 +285,34 @@ export function ActionsPage() {
                             冷却中（{cooldownUntil - state.totalDaysPlayed}天）
                           </div>
                         </Show>
+                        <div style={{ 'margin-top': '12px' }}>
+                          <button
+                            onClick={() => {
+                              const tier = emptySlot;
+                              if (tier)
+                                dispatch({
+                                  type: 'START_ACTION',
+                                  deptId: dept.id,
+                                  actionId: action.id,
+                                  tierKey: tier,
+                                });
+                            }}
+                            disabled={!canStart}
+                            style={{
+                              width: '100%',
+                              padding: '7px',
+                              border: canStart ? 'none' : `1px solid ${colors.border}`,
+                              'border-radius': '6px',
+                              background: canStart ? colors.primary : colors.bgSoft,
+                              color: canStart ? '#fff' : colors.textMuted,
+                              cursor: canStart ? 'pointer' : 'not-allowed',
+                              'font-size': '13px',
+                              'font-weight': 700,
+                            }}
+                          >
+                            {onCooldown ? '冷却中' : emptySlot ? '开始执行' : '无空闲槽位'}
+                          </button>
+                        </div>
                       </div>
                     );
                   }}

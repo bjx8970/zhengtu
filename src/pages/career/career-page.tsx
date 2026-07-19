@@ -16,6 +16,8 @@ import { useGameStore } from '../../store/game-store';
 import { AppShell } from '../../components/app-shell';
 import { getConfigLoader } from '../../config/loader';
 import { PromotionStage } from '../../types/enums';
+import { calculateKPI } from '../../engine/governance/kpi';
+import { parsePositionIndex } from '../../utils/position';
 import { colors, font, darkCardStyle } from '../../utils/theme';
 
 const STAGE_LABELS: Record<PromotionStage, string> = {
@@ -63,6 +65,43 @@ export function CareerPage() {
   const stageIndex = createMemo(() => {
     if (!isActive()) return -1;
     return ACTIVE_STAGES.indexOf(state.promotionStage);
+  });
+
+  const riskProfile = createMemo(() => {
+    const posId = state.currentPositionId;
+    if (!posId) return { strengths: [], weaknesses: [] };
+    const idx = parsePositionIndex(posId);
+    if (idx === null) return { strengths: [], weaknesses: [] };
+    const position = getConfigLoader().getPosition(
+      state.currentCareerLine,
+      state.currentLevel,
+      idx,
+    );
+    if (!position) return { strengths: [], weaknesses: [] };
+    const kpi = calculateKPI(
+      position.kpiIndicators,
+      state.departmentStates,
+      getConfigLoader().getGameConfig(),
+    );
+    if (!kpi) return { strengths: [], weaknesses: [] };
+
+    const sorted = [...kpi.indicators].sort((a, b) => a.completionRate - b.completionRate);
+    return {
+      strengths: sorted
+        .slice(-3)
+        .filter((i) => i.completionRate > 0.6)
+        .map((i) => ({
+          label: i.name,
+          pct: i.completionRate,
+        })),
+      weaknesses: sorted
+        .slice(0, 3)
+        .filter((i) => i.completionRate < 0.8)
+        .map((i) => ({
+          label: i.name,
+          pct: i.completionRate,
+        })),
+    };
   });
 
   const hasChoices = createMemo(
@@ -409,37 +448,40 @@ export function CareerPage() {
                 'margin-top': '8px',
                 color: colors.textMuted,
                 'font-size': '13px',
-                  'line-height': '1.6',
+                'line-height': '1.6',
               }}
             >
-              财政健康、稳定治理和群众基础较好，有利于联审阶段。
+              以下 KPI 完成度较高，有利于考核与联审阶段。
             </p>
-            <div style={{ display: 'flex', 'flex-wrap': 'wrap', gap: '7px', 'margin-top': '12px' }}>
-              <span
-                style={{
-                  padding: '4px 7px',
-                  'border-radius': '999px',
-                  background: colors.successLight,
-                  color: colors.success,
-                  'font-size': '12px',
-                  'font-weight': 800,
-                }}
+            <Show
+              when={riskProfile().strengths.length > 0}
+              fallback={
+                <p style={{ 'margin-top': '8px', color: colors.textMuted, 'font-size': '13px' }}>
+                  暂无突出优势指标。
+                </p>
+              }
+            >
+              <div
+                style={{ display: 'flex', 'flex-wrap': 'wrap', gap: '7px', 'margin-top': '12px' }}
               >
-                财政 +
-              </span>
-              <span
-                style={{
-                  padding: '4px 7px',
-                  'border-radius': '999px',
-                  background: colors.successLight,
-                  color: colors.success,
-                  'font-size': '12px',
-                  'font-weight': 800,
-                }}
-              >
-                稳定 +
-              </span>
-            </div>
+                <For each={riskProfile().strengths}>
+                  {(s) => (
+                    <span
+                      style={{
+                        padding: '4px 7px',
+                        'border-radius': '999px',
+                        background: colors.successLight,
+                        color: colors.success,
+                        'font-size': '12px',
+                        'font-weight': 800,
+                      }}
+                    >
+                      {s.label} +{(s.pct * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </For>
+              </div>
+            </Show>
           </div>
 
           <div
@@ -457,37 +499,40 @@ export function CareerPage() {
                 'margin-top': '8px',
                 color: colors.textMuted,
                 'font-size': '13px',
-                  'line-height': '1.6',
+                'line-height': '1.6',
               }}
             >
-              城建项目完成度不足，可能降低组织考察评价。
+              以下 KPI 完成度不足，建议优先安排对应行动。
             </p>
-            <div style={{ display: 'flex', 'flex-wrap': 'wrap', gap: '7px', 'margin-top': '12px' }}>
-              <span
-                style={{
-                  padding: '4px 7px',
-                  'border-radius': '999px',
-                  background: colors.warningLight,
-                  color: colors.warning,
-                  'font-size': '12px',
-                  'font-weight': 800,
-                }}
+            <Show
+              when={riskProfile().weaknesses.length > 0}
+              fallback={
+                <p style={{ 'margin-top': '8px', color: colors.textMuted, 'font-size': '13px' }}>
+                  暂无显著短板。
+                </p>
+              }
+            >
+              <div
+                style={{ display: 'flex', 'flex-wrap': 'wrap', gap: '7px', 'margin-top': '12px' }}
               >
-                城建 -
-              </span>
-              <span
-                style={{
-                  padding: '4px 7px',
-                  'border-radius': '999px',
-                  background: colors.warningLight,
-                  color: colors.warning,
-                  'font-size': '12px',
-                  'font-weight': 800,
-                }}
-              >
-                材料不足
-              </span>
-            </div>
+                <For each={riskProfile().weaknesses}>
+                  {(w) => (
+                    <span
+                      style={{
+                        padding: '4px 7px',
+                        'border-radius': '999px',
+                        background: colors.warningLight,
+                        color: colors.warning,
+                        'font-size': '12px',
+                        'font-weight': 800,
+                      }}
+                    >
+                      {w.label} {(w.pct * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </For>
+              </div>
+            </Show>
           </div>
         </article>
       </div>
