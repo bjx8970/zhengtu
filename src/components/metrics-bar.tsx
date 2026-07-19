@@ -5,20 +5,7 @@
  */
 
 import { colors, meterContainer } from '../utils/theme';
-
-/**
- * 计量条组件属性。
- */
-export interface MetricsBarProps {
-  /** 显示标签 */
-  label: string;
-  /** 显示数值 */
-  value: string;
-  /** 完成率（0~1） */
-  pct: number;
-  /** 进度条颜色，默认品牌绿 */
-  barColor?: string;
-}
+import type { MetricsBarProps } from '../types/ui';
 
 /**
  * 渲染单个状态摘要计量条。

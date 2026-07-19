@@ -31,13 +31,12 @@ const TIER_COLOR: Record<SlotTierKey, string> = {
 export function ActionsPage() {
   const { state, dispatch } = useGameStore();
 
-  const TIER_PRIORITY: SlotTierKey[] = ['primary', 'secondary', 'reserve'];
-  function findEmptySlot(): SlotTierKey | null {
-    for (const key of TIER_PRIORITY) {
+  const findEmptySlot = createMemo(() => {
+    for (const key of ['primary', 'secondary', 'reserve'] as SlotTierKey[]) {
       if (state.slots[key].occupants.some((o) => o === null)) return key;
     }
     return null;
-  }
+  });
 
   const positionConfig = createMemo(() => {
     const posId = state.currentPositionId;
