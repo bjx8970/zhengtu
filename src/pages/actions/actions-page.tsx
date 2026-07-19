@@ -16,6 +16,7 @@ import { getConfigLoader } from '../../config/loader';
 import { parsePositionIndex } from '../../utils/position';
 import type { SlotTierKey, SlotOccupant } from '../../types/player';
 import { colors, font, darkCardStyle } from '../../utils/theme';
+import { formatEffectLabel } from '../../utils/effect-labels';
 
 const TIER_COLOR: Record<SlotTierKey, string> = {
   primary: '#4A6FA5',
@@ -272,8 +273,7 @@ export function ActionsPage() {
                                   'font-weight': 800,
                                 }}
                               >
-                                {eff.target.replace('dept.kpi.', '').replace('player.', '')}
-                                {eff.value >= 0 ? `+${eff.value}` : eff.value}
+                                {formatEffectLabel(eff)}
                               </span>
                             )}
                           </For>

@@ -113,7 +113,8 @@ export function DepartmentsPage() {
                             'font-weight': 800,
                           }}
                         >
-                          {String(kpiId).replace('dept.kpi.', '').slice(0, 4)} {String(value)}
+                          {dept.kpiIndicators.find((k) => k.id === kpiId)?.name ?? kpiId}{' '}
+                          {String(value)}
                         </span>
                       )}
                     </For>

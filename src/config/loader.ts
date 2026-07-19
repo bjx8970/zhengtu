@@ -122,6 +122,11 @@ class ConfigLoader {
     return this.events[id] ?? null;
   }
 
+  /** 按 ID 查询 KPI 模板 */
+  getKpiTemplate(id: string): KPITemplate | null {
+    return this.kpiTemplates[id] ?? null;
+  }
+
   /** 获取全部省份/地区数据 */
   getRegions(): RegionConfig {
     return this.regionConfig;
