@@ -398,5 +398,53 @@
     "weight": 0.2,
     "unit": "分",
     "calcType": "ratio"
+  },
+  "national_governance": {
+    "id": "national_governance",
+    "name": "国家治理指数",
+    "targetValue": 95,
+    "weight": 0.25,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "political_unity": {
+    "id": "political_unity",
+    "name": "政治统一指数",
+    "targetValue": 95,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "reform_depth": {
+    "id": "reform_depth",
+    "name": "改革深度指数",
+    "targetValue": 90,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "fiscal_sustainability": {
+    "id": "fiscal_sustainability",
+    "name": "财政可持续性",
+    "targetValue": 90,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "cadre_quality": {
+    "id": "cadre_quality",
+    "name": "干部队伍质量",
+    "targetValue": 95,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
+  },
+  "integrity_index": {
+    "id": "integrity_index",
+    "name": "廉政指数",
+    "targetValue": 95,
+    "weight": 0.2,
+    "unit": "分",
+    "calcType": "ratio"
   }
 }

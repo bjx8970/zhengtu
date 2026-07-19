@@ -641,6 +641,156 @@
         ],
         "specialConditions": ["grassroots", "multi_region"]
       }
+    },
+    {
+      "level": 10,
+      "label": "副部",
+      "positions": [
+        {
+          "id": "admin_l10_0",
+          "name": "国家部委副部长",
+          "departmentTemplateIds": [
+            "central_coordination",
+            "national_reform",
+            "national_finance",
+            "central_org",
+            "central_discipline"
+          ],
+          "kpiTemplateIds": [
+            "national_governance",
+            "reform_depth",
+            "fiscal_sustainability",
+            "cadre_quality",
+            "integrity_index"
+          ],
+          "annualBudget": 1200000
+        },
+        {
+          "id": "admin_l10_1",
+          "name": "省委常委兼副省长",
+          "departmentTemplateIds": [
+            "provincial_committee",
+            "provincial_leadership",
+            "strategic_planning",
+            "provincial_finance",
+            "provincial_org"
+          ],
+          "kpiTemplateIds": [
+            "political_ecology",
+            "provincial_gdp",
+            "strategic_execution",
+            "people_livelihood",
+            "stability_index"
+          ],
+          "annualBudget": 1000000
+        },
+        {
+          "id": "admin_l10_2",
+          "name": "中央委员",
+          "departmentTemplateIds": [
+            "central_committee",
+            "central_org",
+            "central_discipline",
+            "central_coordination",
+            "national_reform"
+          ],
+          "kpiTemplateIds": [
+            "political_unity",
+            "party_building",
+            "anti_corruption",
+            "national_governance",
+            "reform_depth"
+          ],
+          "annualBudget": 1500000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 5,
+        "minAssessmentPasses": 5,
+        "politicalConditions": [
+          "无党纪处分记录",
+          "人事档案合规",
+          "基层主官经历",
+          "多岗位历练",
+          "正省级任职经历"
+        ],
+        "specialConditions": ["grassroots", "multi_region"]
+      }
+    },
+    {
+      "level": 11,
+      "label": "正部",
+      "positions": [
+        {
+          "id": "admin_l11_0",
+          "name": "国家部委部长",
+          "departmentTemplateIds": [
+            "central_coordination",
+            "national_reform",
+            "national_finance",
+            "central_org",
+            "central_discipline"
+          ],
+          "kpiTemplateIds": [
+            "national_governance",
+            "reform_depth",
+            "fiscal_sustainability",
+            "cadre_quality",
+            "integrity_index"
+          ],
+          "annualBudget": 2000000
+        },
+        {
+          "id": "admin_l11_1",
+          "name": "省委书记兼省长",
+          "departmentTemplateIds": [
+            "provincial_committee",
+            "provincial_leadership",
+            "strategic_planning",
+            "provincial_finance",
+            "provincial_org"
+          ],
+          "kpiTemplateIds": [
+            "political_ecology",
+            "provincial_gdp",
+            "strategic_execution",
+            "people_livelihood",
+            "stability_index"
+          ],
+          "annualBudget": 1800000
+        },
+        {
+          "id": "admin_l11_2",
+          "name": "中央政治局委员",
+          "departmentTemplateIds": [
+            "central_committee",
+            "central_org",
+            "central_discipline",
+            "central_coordination",
+            "national_reform"
+          ],
+          "kpiTemplateIds": [
+            "political_unity",
+            "party_building",
+            "anti_corruption",
+            "national_governance",
+            "reform_depth"
+          ],
+          "annualBudget": 2500000
+        }
+      ],
+      "promotionRequirements": {
+        "minYearsInService": 5,
+        "minAssessmentPasses": 5,
+        "politicalConditions": [
+          "无党纪处分记录",
+          "人事档案合规",
+          "基层主官经历",
+          "多岗位历练",
+          "副部级任职经历"
+        ],
+        "specialConditions": ["grassroots", "multi_region"]
+      }
     }
   ]
 }

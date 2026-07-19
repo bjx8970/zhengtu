@@ -155,6 +155,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     totalActions: 0,
     totalDaysPlayed: 0,
     lastCompletedActions: [],
+    endgameReached: false,
     updatedAt: Date.now(),
     ...overrides,
   };
@@ -648,6 +649,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
     }
     case 'START_PROMOTION': {
       if (draft.promotionStage !== PromotionStage.Idle) break;
+      // 终局状态下不能晋升
+      if (draft.endgameReached) break;
       // 冻结期中不能晋升
       if (draft.frozenPeriods > 0) break;
       // 旧岗位行动依赖当前部门配置，必须先完成后再进入晋升流程。
@@ -876,6 +879,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             initializeDepartmentStates(draft);
             draft.promotionStage = PromotionStage.Completed;
             ps.currentStage = PromotionStage.Completed;
+            // L11 达成后设置终局状态
+            if (ps.targetLevel >= 11) {
+              draft.endgameReached = true;
+            }
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;

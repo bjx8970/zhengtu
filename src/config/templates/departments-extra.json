@@ -902,5 +902,191 @@
       }
     ],
     "kpiTemplateIds": ["political_ecology", "anti_corruption"]
+  },
+  "central_coordination": {
+    "name": "中央协调办",
+    "consumptionCoefficient": 2.5,
+    "baseConsumption": 600,
+    "actions": [
+      {
+        "id": "national_strategy",
+        "name": "国家战略推进",
+        "description": "推进国家重大战略实施，统筹全国资源",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 600,
+        "effects": [{ "target": "dept.kpi.national_governance", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "inter_provincial_coordination",
+        "name": "跨省协调",
+        "description": "协调跨省重大项目和区域合作",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 450,
+        "effects": [
+          { "target": "dept.kpi.national_governance", "operation": "add", "value": 12 },
+          { "target": "player.performance", "operation": "add", "value": 5 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["national_governance", "strategic_execution"]
+  },
+  "central_committee": {
+    "name": "中央办公厅",
+    "consumptionCoefficient": 2.8,
+    "baseConsumption": 700,
+    "actions": [
+      {
+        "id": "central_decision",
+        "name": "中央决策推进",
+        "description": "推进中央重大决策部署，确保政令统一",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 700,
+        "effects": [{ "target": "dept.kpi.political_unity", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "cadre_supervision",
+        "name": "高级干部监督",
+        "description": "加强高级干部监督管理，严明政治纪律",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 500,
+        "effects": [
+          { "target": "dept.kpi.political_unity", "operation": "add", "value": 12 },
+          { "target": "player.integrity", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["political_unity", "party_building"]
+  },
+  "national_reform": {
+    "name": "国家改革委",
+    "consumptionCoefficient": 2.3,
+    "baseConsumption": 550,
+    "actions": [
+      {
+        "id": "deep_reform",
+        "name": "深化改革推进",
+        "description": "推进全面深化改革，突破体制机制障碍",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 550,
+        "effects": [{ "target": "dept.kpi.reform_depth", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "institution_innovation",
+        "name": "制度创新",
+        "description": "推动制度创新，完善治理体系",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 400,
+        "effects": [
+          { "target": "dept.kpi.reform_depth", "operation": "add", "value": 12 },
+          { "target": "player.competence", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["reform_depth", "governance_quality"]
+  },
+  "national_finance": {
+    "name": "国家财政部",
+    "consumptionCoefficient": 2.2,
+    "baseConsumption": 520,
+    "actions": [
+      {
+        "id": "national_budget",
+        "name": "国家预算管理",
+        "description": "统筹国家财政预算，优化资源配置",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 520,
+        "effects": [{ "target": "dept.kpi.fiscal_sustainability", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "tax_reform",
+        "name": "税收制度改革",
+        "description": "推进税收制度改革，完善分配机制",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 380,
+        "effects": [
+          { "target": "dept.kpi.fiscal_sustainability", "operation": "add", "value": 12 },
+          { "target": "player.performance", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["fiscal_sustainability", "fiscal_revenue"]
+  },
+  "central_org": {
+    "name": "中央组织部",
+    "consumptionCoefficient": 2.0,
+    "baseConsumption": 480,
+    "actions": [
+      {
+        "id": "senior_cadre_management",
+        "name": "高级干部管理",
+        "description": "做好高级干部选拔任用和监督管理",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 480,
+        "effects": [{ "target": "dept.kpi.cadre_quality", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "talent_strategy",
+        "name": "人才强国战略",
+        "description": "实施人才强国战略，建设人才高地",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 350,
+        "effects": [
+          { "target": "dept.kpi.cadre_quality", "operation": "add", "value": 12 },
+          { "target": "player.charisma", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["cadre_quality", "staff_satisfaction"]
+  },
+  "central_discipline": {
+    "name": "中央纪委",
+    "consumptionCoefficient": 1.9,
+    "baseConsumption": 450,
+    "actions": [
+      {
+        "id": "national_anti_corruption",
+        "name": "全国反腐败斗争",
+        "description": "深入推进全国反腐败斗争，保持高压态势",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 450,
+        "effects": [{ "target": "dept.kpi.integrity_index", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "discipline_inspection",
+        "name": "纪律审查",
+        "description": "开展纪律审查，严肃查处违纪违法行为",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 320,
+        "effects": [
+          { "target": "dept.kpi.integrity_index", "operation": "add", "value": 12 },
+          { "target": "player.integrity", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["integrity_index", "anti_corruption"]
   }
 }

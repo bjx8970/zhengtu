@@ -265,6 +265,10 @@ export interface PlayerSave {
   /** 最近完成的行动通知列表（最多保留 5 条） */
   lastCompletedActions: CompletedActionNotification[];
 
+  // ===== 终局状态 =====
+  /** 终局状态（L11 达成后激活） */
+  endgameReached: boolean;
+
   // ===== 元数据 =====
   /** Unix 时间戳，用于本地/远程存档仲裁 */
   updatedAt: number;
