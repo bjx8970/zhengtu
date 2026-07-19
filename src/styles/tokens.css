@@ -222,6 +222,16 @@ a:focus-visible {
   }
 }
 
+/* ── 响应式布局工具类 ── */
+@media (max-width: 768px) {
+  .responsive-two-col {
+    grid-template-columns: 1fr !important;
+  }
+  .responsive-dept-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* 加载画面 */
 .loading-screen {
   display: flex;
