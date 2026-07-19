@@ -29,3 +29,12 @@ export interface MetricsBarProps {
   /** 进度条颜色，默认品牌绿 */
   barColor?: string;
 }
+
+/**
+ * 底部 Tab 导航项定义。
+ */
+export interface TabDef {
+  label: string;
+  icon: string;
+  route: string;
+}

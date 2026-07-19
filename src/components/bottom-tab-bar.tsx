@@ -8,12 +8,7 @@
 import { For } from 'solid-js';
 import { navigate } from '../router';
 import { colors } from '../utils/theme';
-
-interface TabDef {
-  label: string;
-  icon: string;
-  route: string;
-}
+import type { TabDef } from '../types/ui';
 
 const TABS: TabDef[] = [
   { label: '主页', icon: '\u2302', route: '/main' },
