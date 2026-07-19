@@ -16,13 +16,13 @@ import { checkPrerequisites } from './promotion';
 /**
  * 获取当前玩家可晋升的候选职位列表。
  *
- * 返回相邻下一级的所有职位，并标注不可选原因。
+ * 返回相邻下一级的所有职位。
  * 若无下一级别配置，返回空数组。
  *
  * @param line 当前职业线
  * @param currentLevel 当前等级
  * @param lineCfg 职业线完整配置
- * @returns 候选职位列表（含 blockedReason 标注）
+ * @returns 候选职位列表
  */
 export function getPromotionCandidates(
   line: CareerLine,
