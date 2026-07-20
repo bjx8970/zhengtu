@@ -54,32 +54,189 @@ const SlotTierGroupSchema = z.object({
   occupants: z.array(z.nullable(SlotOccupantSchema)),
 });
 
-/** GameTime 的 Zod schema */
+/** GameTime 的 Zod schema（含范围校验） */
 const GameTimeSchema = z.object({
-  year: z.number(),
-  month: z.number(),
-  day: z.number(),
+  year: z.number().int().min(1),
+  month: z.number().int().min(1).max(12),
+  day: z.number().int().min(1).max(30),
   granularity: z.enum(['day', 'week', 'month']),
 });
 
-/** PlayerSave 的最小必要字段验证 schema */
-const PlayerSaveSchema = z
-  .object({
-    saveId: z.string(),
-    userId: z.string(),
-    characterName: z.string(),
-    currentPositionId: z.string(),
-    currentLevel: z.number(),
-    currentCareerLine: z.string(),
-    slots: z.object({
-      primary: SlotTierGroupSchema,
-      secondary: SlotTierGroupSchema,
-      reserve: SlotTierGroupSchema,
+/** 合法职业线枚举 */
+const VALID_CAREER_LINES = ['admin', 'party', 'discipline', 'mass'];
+
+/** 合法晋升阶段枚举 */
+const VALID_PROMOTION_STAGES = [
+  'idle',
+  'target_selection',
+  'democratic_vote',
+  'org_inspection',
+  'joint_review',
+  'committee_vote',
+  'public_notice',
+  'appointment',
+  'probation',
+  'completed',
+  'failed',
+];
+
+/** DepartmentState 的 Zod schema */
+const DepartmentStateSchema = z.object({
+  id: z.string(),
+  kpiValues: z.record(z.number()),
+  monthlyConsumption: z.number(),
+  cumulativeConsumption: z.number(),
+  lastActionDay: z.number(),
+  actionCooldownUntilDays: z.record(z.number()),
+});
+
+/** PlayerSave 完整验证 schema */
+const PlayerSaveSchema = z.object({
+  // 基础信息
+  saveId: z.string(),
+  userId: z.string(),
+  characterName: z.string(),
+  gender: z.enum(['男', '女']),
+  birthPlace: z.object({ province: z.string(), city: z.string() }),
+  birthYear: z.number().int(),
+  gaokaoScore: z.number(),
+  gaokaoTier: z.string(),
+  university: z.string(),
+  universityTier: z.string(),
+  familyBackground: z.enum(['peasant', 'worker', 'merchant', 'cadre', 'academic']),
+  promotionPath: z.enum(['xuandiao', 'gongwuyuan', 'junzhuan', 'guoqi']),
+  isPreparatory: z.boolean(),
+  // 当前职位
+  currentPositionId: z.string(),
+  currentLevel: z.number().int().min(1).max(11),
+  currentCareerLine: z.string().refine((v) => VALID_CAREER_LINES.includes(v)),
+  yearsInCurrentPosition: z.number().min(0),
+  // 资源
+  slots: z.object({
+    primary: SlotTierGroupSchema,
+    secondary: SlotTierGroupSchema,
+    reserve: SlotTierGroupSchema,
+  }),
+  vigor: z.number(),
+  politicalCapital: z.number(),
+  remainingBudget: z.number(),
+  // 考核
+  comprehensiveScore: z.number(),
+  annualAssessments: z.array(
+    z.object({
+      year: z.number(),
+      score: z.number(),
+      tier: z.string(),
+      dimensions: z
+        .object({
+          virtue: z.number(),
+          capacity: z.number(),
+          diligenceScore: z.number(),
+          achievement: z.number(),
+          honesty: z.number(),
+        })
+        .optional(),
     }),
-    time: GameTimeSchema,
-    // 其余字段使用 passthrough 允许扩展
-  })
-  .passthrough();
+  ),
+  // 核心属性
+  integrity: z.number(),
+  stability: z.number(),
+  performance: z.number(),
+  charisma: z.number(),
+  competence: z.number(),
+  network: z.number(),
+  diligence: z.number(),
+  // 晋升
+  promotionStage: z.string().refine((v) => VALID_PROMOTION_STAGES.includes(v)),
+  promotionAttempts: z.number().min(0),
+  frozenPeriods: z.number().min(0),
+  promotionState: z.nullable(
+    z.object({
+      targetPositionId: z.string(),
+      targetLevel: z.number(),
+      currentStage: z.string(),
+      stageResults: z.record(z.unknown()),
+      flaggedForRisk: z.boolean().optional(),
+    }),
+  ),
+  // 转职
+  transferCount: z.number(),
+  isLineLocked: z.boolean(),
+  // 部门状态
+  departmentStates: z.record(DepartmentStateSchema),
+  // 职业履历
+  careerHistory: z.array(
+    z.object({
+      positionId: z.string(),
+      positionName: z.string(),
+      level: z.number(),
+      careerLine: z.string(),
+      startYear: z.number(),
+      endYear: z.nullable(z.number()),
+      assessmentResults: z.array(z.unknown()),
+      archived: z.boolean(),
+    }),
+  ),
+  // 秘书
+  secretary: z.nullable(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      experience: z.number(),
+      level: z.string(),
+    }),
+  ),
+  // 人脉与理念
+  relations: z.object({
+    classmates: z.record(z.number()),
+    colleagues: z.record(z.number()),
+    business: z.record(z.number()),
+    academic: z.record(z.number()),
+    media: z.record(z.number()),
+    central: z.record(z.number()),
+  }),
+  philosophy: z.object({
+    scores: z.record(z.number()),
+  }),
+  reserveTier: z.number(),
+  ambition: z.number(),
+  // 风险
+  corruptionRisk: z.number(),
+  isUnderInvestigation: z.boolean(),
+  // 时间
+  time: GameTimeSchema,
+  // 高级系统
+  successor: z.nullable(
+    z.object({
+      id: z.nullable(z.string()),
+      name: z.string(),
+      investment: z.number(),
+      readiness: z.number(),
+    }),
+  ),
+  thinkTank: z.object({
+    science: z.nullable(z.string()),
+    economics: z.nullable(z.string()),
+    law: z.nullable(z.string()),
+  }),
+  mentees: z.array(z.object({ id: z.string(), progress: z.number() })),
+  // 统计
+  achievements: z.array(z.string()),
+  totalActions: z.number().min(0),
+  totalDaysPlayed: z.number().min(0),
+  lastCompletedActions: z.array(
+    z.object({
+      actionName: z.string(),
+      deptName: z.string(),
+      effects: z.array(z.string()),
+      completedAtDay: z.number(),
+    }),
+  ),
+  // 终局
+  endgameReached: z.boolean(),
+  // 元数据
+  updatedAt: z.number(),
+});
 
 /** SaveEnvelope 的 Zod schema */
 const SaveEnvelopeSchema = z.object({

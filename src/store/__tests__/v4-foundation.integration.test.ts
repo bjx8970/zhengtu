@@ -385,4 +385,157 @@ describe('v4 基础工程集成测试', () => {
       }
     });
   });
+
+  describe('审查补强测试', () => {
+    it('年末考核有/无行动对照：行动影响当年分数', () => {
+      const deptId = 'admin_l3_0_dept_0';
+      const baseOverrides = {
+        currentPositionId: 'admin_l3_0',
+        currentLevel: 3,
+        currentCareerLine: CareerLine.Administrative,
+        remainingBudget: 10000,
+        totalDaysPlayed: 0,
+        time: { year: 2024, month: 1, day: 1, granularity: 'day' as const },
+        departmentStates: {
+          [deptId]: {
+            id: deptId,
+            kpiValues: {},
+            monthlyConsumption: 0,
+            cumulativeConsumption: 0,
+            lastActionDay: 0,
+            actionCooldownUntilDays: {},
+          },
+        },
+      };
+
+      // 无行动对照组
+      const noActionStore = createTestStore({ ...baseOverrides });
+      for (let i = 0; i < 12; i++) {
+        noActionStore.dispatch({ type: 'ADVANCE_TIME', granularity: 'month', _rng: () => 0.5 });
+      }
+      const noActionScore = noActionStore.getRawState().comprehensiveScore;
+
+      // 有行动组：年初启动一个行动，年末前完成
+      const withActionStore = createTestStore({
+        ...baseOverrides,
+        slots: makeSlotsWithActions([
+          { actionId: 'approve_project', deptId, startedAtDay: 0, durationDays: 3 },
+        ]),
+      });
+      for (let i = 0; i < 12; i++) {
+        withActionStore.dispatch({ type: 'ADVANCE_TIME', granularity: 'month', _rng: () => 0.5 });
+      }
+      const withActionScore = withActionStore.getRawState().comprehensiveScore;
+
+      // 有行动的考核分数应高于无行动
+      expect(withActionScore).toBeGreaterThan(noActionScore);
+    });
+
+    it('两个不同倍率行动并发：分别按各自倍率结算', () => {
+      const deptId = 'admin_l3_0_dept_0';
+      const store = createTestStore({
+        currentPositionId: 'admin_l3_0',
+        currentLevel: 3,
+        currentCareerLine: CareerLine.Administrative,
+        remainingBudget: 10000,
+        totalDaysPlayed: 0,
+        time: { year: 2024, month: 1, day: 1, granularity: 'day' },
+        departmentStates: {
+          [deptId]: {
+            id: deptId,
+            kpiValues: {},
+            monthlyConsumption: 0,
+            cumulativeConsumption: 0,
+            lastActionDay: 0,
+            actionCooldownUntilDays: {},
+          },
+        },
+        // A: 3天完成，倍率 0.5；B: 10天完成，倍率 1.0
+        slots: makeSlotsWithActions([
+          {
+            actionId: 'approve_project',
+            deptId,
+            startedAtDay: 0,
+            durationDays: 3,
+            runtimeSnapshot: {
+              effectivenessMultiplier: 0.5,
+              styleConflictTriggered: false,
+              styleAlignment: 'innovation',
+            },
+          },
+          {
+            actionId: 'urban_planning',
+            deptId,
+            startedAtDay: 0,
+            durationDays: 10,
+            runtimeSnapshot: {
+              effectivenessMultiplier: 1.0,
+              styleConflictTriggered: false,
+              styleAlignment: 'pragmatic',
+            },
+          },
+        ]),
+      });
+
+      // 第一次推进 5 天：只完成 A
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day', _rng: () => 0.5 });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day', _rng: () => 0.5 });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day', _rng: () => 0.5 });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day', _rng: () => 0.5 });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day', _rng: () => 0.5 });
+
+      let state = store.getRawState();
+      // A 已完成，B 仍在槽位
+      expect(state.slots.primary.occupants[0]).toBeNull();
+      expect(state.slots.primary.occupants[1]).not.toBeNull();
+      // B 的快照仍保留
+      expect(state.slots.primary.occupants[1]?.runtimeSnapshot?.effectivenessMultiplier).toBe(1.0);
+
+      // 第二次推进 5 天：完成 B
+      for (let i = 0; i < 5; i++) {
+        store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day', _rng: () => 0.5 });
+      }
+
+      state = store.getRawState();
+      // 两个都完成
+      expect(state.slots.primary.occupants[0]).toBeNull();
+      expect(state.slots.primary.occupants[1]).toBeNull();
+      // 两条完成通知
+      expect(state.lastCompletedActions.length).toBe(2);
+    });
+
+    it('拒绝未来 schemaVersion 存档', () => {
+      const futureSave = {
+        schemaVersion: 99,
+        contentVersion: '99.0.0',
+        revision: 1,
+        savedAt: Date.now(),
+        state: createInitialState(),
+      };
+
+      const result = migrateSave(JSON.stringify(futureSave));
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain('高于当前支持');
+        expect(result.backup).not.toBeNull();
+      }
+    });
+
+    it('当前版本 Envelope 损坏时拒绝加载并备份', () => {
+      const corruptedEnvelope = {
+        schemaVersion: 1,
+        contentVersion: '4.0.0-alpha',
+        revision: 1,
+        savedAt: Date.now(),
+        state: { invalid: 'data' }, // 损坏的 state
+      };
+
+      const result = migrateSave(JSON.stringify(corruptedEnvelope));
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain('验证失败');
+        expect(result.backup).not.toBeNull();
+      }
+    });
+  });
 });
