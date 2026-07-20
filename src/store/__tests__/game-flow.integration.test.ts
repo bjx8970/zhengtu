@@ -384,9 +384,9 @@ describe('核心流程集成测试', () => {
     }
 
     it('民主推荐失败（低属性） → 怀抱下降 + Failed', () => {
-      // baseScore = playerScore*0.4 + charisma*0.3 + network*0.3
-      // 要让 baseScore < 60：comprehensiveScore=30, charisma=30, network=30
-      // → 12 + 9 + 9 = 30 < 60 → 失败
+      // baseScore = playerScore*0.5 + charisma*0.5
+      // 要让 baseScore < 60：comprehensiveScore=30, charisma=30
+      // → 15 + 15 = 30 < 60 → 失败
       const store = makeStoreAtStage(PromotionStage.DemocraticVote, {
         comprehensiveScore: 30,
         charisma: 30,
@@ -441,8 +441,8 @@ describe('核心流程集成测试', () => {
     });
 
     it('常委会票决失败 → 怀抱下降 + Failed', () => {
-      // finalRate = max((avgReputation + network)/200 - factionPenalty, 0.1)
-      // factionReputation 全 0 → avgReputation=0, finalRate=max(0+60/200, 0.1)=0.3
+      // finalRate = max(avgStyleScore/100 - imbalancePenalty, 0.1)
+      // styleScores 全 60 → avgStyleScore=60, finalRate=max(60/100-0, 0.1)=0.6
       // rng=0.95 > 0.3 → 所有票反对 → 失败
       const store = makeStoreAtStage(PromotionStage.CommitteeVote, {
         network: 10, // 降低 finalRate 到 0.05 → max(0.05, 0.1) = 0.1

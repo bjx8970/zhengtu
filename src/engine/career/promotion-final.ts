@@ -65,7 +65,7 @@ export function resolveJointReview(
  * 阶段4 — 常委会票决。
  *
  * 常委人数 = min(7 + floor(level/interval) * sizePerLevel, maxSize)
- * 赞成率 = (平均派系声望 + 上司好感) / 200 - 派系惩罚
+ * 赞成率 = 平均风格评分 / 100 - 风格失衡修正
  * 每张票独立模拟，赞成过半即通过。
  *
  * @param ctx 晋升上下文

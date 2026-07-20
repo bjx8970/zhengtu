@@ -383,7 +383,7 @@ function buildPromotionContext(draft: PlayerSave): PromotionContext {
       draft.currentLevel <= 2 || draft.careerHistory.some((r) => r.level <= 2),
     hasMultiRegionExperience: draft.careerHistory.filter((r) => r.archived).length >= 2,
     charisma: draft.charisma,
-    superiorFavor: 0, // Phase A: superioFavor 已删除，暂用 0，Phase B/C 重写
+    superiorFavor: 0, // Phase A: superiorFavor 已删除，暂用 0，Phase B/C 重写
     performance: draft.performance,
     competence: draft.competence,
     integrity: draft.integrity,
