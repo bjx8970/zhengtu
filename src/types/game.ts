@@ -97,8 +97,6 @@ export interface EventCondition {
   minLevel?: number;
   maxLevel?: number;
   careerLines?: string[];
-  minScore?: number;
-  requiredFlag?: string;
   // P3 新增预留字段
   /** 地区限定 */
   regions?: string[];
