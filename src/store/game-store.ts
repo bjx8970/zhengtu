@@ -52,6 +52,7 @@ import {
 } from '../engine/career/promotion-final';
 import type { PromotionContext } from '../types/game';
 import type { CareerRecord } from '../types/player';
+import type { GameConfig } from '../types/config';
 
 export type GameState = PlayerSave;
 
@@ -724,12 +725,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnFail,
-              0,
-              100,
-            );
+            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnFail, cfgPromoStore);
           }
           break;
         }
@@ -746,12 +742,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
             draft.frozenPeriods = clamp(draft.frozenPeriods + 2, 0, cfgPromoStore.maxFrozenPeriods);
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnRejected,
-              0,
-              100,
-            );
+            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnRejected, cfgPromoStore);
           } else {
             // Suspended — 本次搁置
             draft.promotionStage = PromotionStage.Failed;
@@ -773,12 +764,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnFail,
-              0,
-              100,
-            );
+            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnFail, cfgPromoStore);
           }
           break;
         }
@@ -792,12 +778,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnFail,
-              0,
-              100,
-            );
+            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnFail, cfgPromoStore);
           }
           break;
         }
@@ -811,12 +792,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnFail,
-              0,
-              100,
-            );
+            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnFail, cfgPromoStore);
           }
           break;
         }
@@ -886,12 +862,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnFail,
-              0,
-              100,
-            );
+            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnFail, cfgPromoStore);
           }
           break;
         }
@@ -939,4 +910,9 @@ export function createTestStore(initialOverrides?: Partial<PlayerSave>) {
  */
 export function useGameStore() {
   return { state, dispatch, getState, getRawState };
+}
+
+// 用于 clamp 计算模式的辅助函数
+function applyDemoralization(draft: PlayerSave, delta: number, cfg: GameConfig): void {
+  draft.demoralization = clamp((draft.demoralization ?? 0) + delta, 0, 100);
 }
