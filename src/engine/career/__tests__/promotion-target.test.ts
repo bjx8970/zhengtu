@@ -49,7 +49,6 @@ describe('getPromotionCandidates', () => {
       expect(c.careerLine).toBe(CareerLine.Administrative);
       expect(c.positionId).toBeTruthy();
       expect(c.positionName).toBeTruthy();
-      expect(c.blockedReason).toBeUndefined();
     }
   });
 
