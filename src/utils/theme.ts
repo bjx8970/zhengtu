@@ -200,6 +200,7 @@ export const ATTR_LABELS: Record<string, string> = {
   network: '人脉',
   diligence: '勤勉',
   ambition: '怀抱',
+  performance: '绩效',
   innovation: '开拓创新',
   pragmatic: '实干务实',
   principled: '稳健守正',
