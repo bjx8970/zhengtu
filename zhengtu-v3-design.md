@@ -1774,7 +1774,7 @@ export function canTransfer(
   }
   const node = TRANSFER_NODES.find((n) => n.from === currentLevel && n.to === nextLevel);
   if (!node) {
-    return { allowed: false, reason: `当前不在转职窗口期（${node?.label ?? ''}）` };
+    return { allowed: false, reason: '当前不在转职窗口期' };
   }
   return { allowed: true };
 }
