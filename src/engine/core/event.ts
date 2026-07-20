@@ -69,8 +69,6 @@ function evaluateHiddenStateConditions(
  * 校验规则：
  * - 等级范围（minLevel/maxLevel）
  * - 职业线限制（careerLines）
- * - 最低分数要求（minScore）
- * - 必需标记（requiredFlag）
  * - 地区限定（regions）
  * - 时间窗口（timeWindow）
  * - 前置事件链（prerequisiteEvents）

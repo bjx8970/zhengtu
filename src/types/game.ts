@@ -97,8 +97,6 @@ export interface EventCondition {
   minLevel?: number;
   maxLevel?: number;
   careerLines?: string[];
-  minScore?: number;
-  requiredFlag?: string;
   // P3 新增预留字段
   /** 地区限定 */
   regions?: string[];
@@ -185,8 +183,6 @@ export interface PromotionCandidate {
   positionName: string;
   level: number;
   careerLine: CareerLine;
-  /** 不可选原因（为空表示可选）// TODO: 后续 PR 实现填充逻辑 */
-  blockedReason?: string;
 }
 
 /** 晋升流程的上下文数据（传入各阶段计算函数） */
