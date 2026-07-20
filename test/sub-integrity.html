@@ -1,136 +1,334 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>廉政风险 - 征途工作台</title>
-  <style>
-    :root {
-      --bg-main: #eeece6; --bg-card: #fffdf8; --bg-soft: #f8f4ec; --bg-header: #172b45;
-      --text-primary: #202a35; --text-secondary: #657080; --text-muted: #8d939b;
-      --color-primary: #b3262d; --color-secondary: #284b70; --color-success: #4caf50;
-      --color-warning: #e6a817; --color-danger: #c44d4d; --color-gold: #b78324; --color-cyan: #3b7f8f;
-      --border-color: #d8d4cc; --border-light: #e8e4dc; --radius-md: 4px; --radius-lg: 8px;
-      --font-title: 'STKaiti', 'KaiTi', '楷体', serif;
-      --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { height: 100%; font-family: var(--font-body); background: var(--bg-main); color: var(--text-primary); }
-    .page { max-width: 900px; margin: 0 auto; padding: 0 16px 40px; }
-    .page-header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: var(--bg-header); color: #fff; border-radius: 0 0 var(--radius-lg) var(--radius-lg); box-shadow: 0 4px 16px rgba(23,43,69,0.18); }
-    .back-btn { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.25); border-radius: 50%; background: transparent; color: #fff; font-size: 16px; cursor: pointer; }
-    .back-btn:hover { background: rgba(255,255,255,0.1); }
-    .page-header__title { font-size: 18px; font-weight: 700; font-family: var(--font-title); }
-    .page-header__desc { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
-    .section { margin-top: 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 18px 20px; }
-    .section__title { font-size: 16px; font-weight: 700; font-family: var(--font-title); margin-bottom: 4px; }
-    .section__desc { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>廉政风险 - 征途工作台</title>
+    <style>
+      :root {
+        --bg-main: #eeece6;
+        --bg-card: #fffdf8;
+        --bg-soft: #f8f4ec;
+        --bg-header: #172b45;
+        --text-primary: #202a35;
+        --text-secondary: #657080;
+        --text-muted: #8d939b;
+        --color-primary: #b3262d;
+        --color-secondary: #284b70;
+        --color-success: #4caf50;
+        --color-warning: #e6a817;
+        --color-danger: #c44d4d;
+        --color-gold: #b78324;
+        --color-cyan: #3b7f8f;
+        --border-color: #d8d4cc;
+        --border-light: #e8e4dc;
+        --radius-md: 4px;
+        --radius-lg: 8px;
+        --font-title: 'STKaiti', 'KaiTi', '楷体', serif;
+        --font-body:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+          'Microsoft YaHei', sans-serif;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        font-family: var(--font-body);
+        background: var(--bg-main);
+        color: var(--text-primary);
+      }
+      .page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 0 16px 40px;
+      }
+      .page-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 20px;
+        background: var(--bg-header);
+        color: #fff;
+        border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+        box-shadow: 0 4px 16px rgba(23, 43, 69, 0.18);
+      }
+      .back-btn {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 50%;
+        background: transparent;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .back-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .page-header__title {
+        font-size: 18px;
+        font-weight: 700;
+        font-family: var(--font-title);
+      }
+      .page-header__desc {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 2px;
+      }
+      .section {
+        margin-top: 16px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 18px 20px;
+      }
+      .section__title {
+        font-size: 16px;
+        font-weight: 700;
+        font-family: var(--font-title);
+        margin-bottom: 4px;
+      }
+      .section__desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 14px;
+      }
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 640px) {
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+      }
 
-    .gauge { display: flex; align-items: center; gap: 20px; padding: 20px; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: #fff; margin-bottom: 16px; }
-    .gauge__num { font-size: 48px; font-weight: 900; font-family: var(--font-title); }
-    .gauge__label { font-size: 13px; color: var(--text-muted); }
-    .gauge__bar { flex: 1; height: 10px; border-radius: 999px; background: #e7e1d6; overflow: hidden; }
-    .gauge__bar-fill { height: 100%; border-radius: inherit; transition: width 0.3s; }
-    .gauge__status { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+      .gauge {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 20px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        background: #fff;
+        margin-bottom: 16px;
+      }
+      .gauge__num {
+        font-size: 48px;
+        font-weight: 900;
+        font-family: var(--font-title);
+      }
+      .gauge__label {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+      .gauge__bar {
+        flex: 1;
+        height: 10px;
+        border-radius: 999px;
+        background: #e7e1d6;
+        overflow: hidden;
+      }
+      .gauge__bar-fill {
+        height: 100%;
+        border-radius: inherit;
+        transition: width 0.3s;
+      }
+      .gauge__status {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+      }
 
-    .risk-factor { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-light); font-size: 13px; }
-    .risk-factor:last-child { border-bottom: none; }
-    .risk-factor__bar { width: 80px; height: 6px; border-radius: 999px; background: #e7e1d6; overflow: hidden; }
-    .risk-factor__bar-fill { height: 100%; border-radius: inherit; }
+      .risk-factor {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-light);
+        font-size: 13px;
+      }
+      .risk-factor:last-child {
+        border-bottom: none;
+      }
+      .risk-factor__bar {
+        width: 80px;
+        height: 6px;
+        border-radius: 999px;
+        background: #e7e1d6;
+        overflow: hidden;
+      }
+      .risk-factor__bar-fill {
+        height: 100%;
+        border-radius: inherit;
+      }
 
-    .event-card { padding: 14px; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: #fff; margin-bottom: 10px; }
-    .event-card__title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
-    .event-card__text { font-size: 12px; color: var(--text-secondary); line-height: 1.7; }
-    .event-card__time { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+      .event-card {
+        padding: 14px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        background: #fff;
+        margin-bottom: 10px;
+      }
+      .event-card__title {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+      .event-card__text {
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+      .event-card__time {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 8px;
+      }
 
-    .advice-box { padding: 14px; border-left: 3px solid var(--color-success); background: rgba(76,175,80,0.06); border-radius: var(--radius-md); font-size: 13px; color: #2d5a2f; line-height: 1.7; }
-    .tag { padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <header class="page-header">
-      <button class="back-btn" title="返回工作台">←</button>
-      <div>
-        <div class="page-header__title">廉政风险</div>
-        <div class="page-header__desc">监控贪腐风险值，防范双规调查</div>
-      </div>
-    </header>
-
-    <!-- 风险仪表盘 -->
-    <section class="section">
-      <h2 class="section__title">风险仪表盘</h2>
-      <p class="section__desc">风险值达到 70 以上将触发纪检关注，90 以上可能被双规。</p>
-      <div class="gauge">
+      .advice-box {
+        padding: 14px;
+        border-left: 3px solid var(--color-success);
+        background: rgba(76, 175, 80, 0.06);
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        color: #2d5a2f;
+        line-height: 1.7;
+      }
+      .tag {
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="page-header">
+        <button class="back-btn" title="返回工作台">←</button>
         <div>
-          <div class="gauge__num" style="color: var(--color-success);">12</div>
-          <div class="gauge__label">当前风险值</div>
+          <div class="page-header__title">廉政风险</div>
+          <div class="page-header__desc">监控贪腐风险值，防范双规调查</div>
         </div>
-        <div class="gauge__bar">
-          <div class="gauge__bar-fill" style="width: 12%; background: var(--color-success);"></div>
-        </div>
-        <span class="gauge__status" style="background: rgba(76,175,80,0.1); color: var(--color-success);">安全</span>
-      </div>
-      <div style="display: flex; gap: 16px; font-size: 12px; color: var(--text-muted);">
-        <span>警戒线：70</span>
-        <span>危险线：90</span>
-        <span>廉洁值：68/100</span>
-      </div>
-    </section>
+      </header>
 
-    <div class="two-col">
-      <!-- 风险因素 -->
-      <section class="section" style="margin-top: 0;">
-        <h2 class="section__title">风险因素分析</h2>
-        <p class="section__desc">各维度对风险值的贡献。</p>
-        <div class="risk-factor">
-          <span>预算使用合规</span>
-          <div class="risk-factor__bar"><div class="risk-factor__bar-fill" style="width: 15%; background: var(--color-success)"></div></div>
-          <span style="color: var(--color-success)">低</span>
+      <!-- 风险仪表盘 -->
+      <section class="section">
+        <h2 class="section__title">风险仪表盘</h2>
+        <p class="section__desc">风险值达到 70 以上将触发纪检关注，90 以上可能被双规。</p>
+        <div class="gauge">
+          <div>
+            <div class="gauge__num" style="color: var(--color-success)">12</div>
+            <div class="gauge__label">当前风险值</div>
+          </div>
+          <div class="gauge__bar">
+            <div class="gauge__bar-fill" style="width: 12%; background: var(--color-success)"></div>
+          </div>
+          <span
+            class="gauge__status"
+            style="background: rgba(76, 175, 80, 0.1); color: var(--color-success)"
+            >安全</span
+          >
         </div>
-        <div class="risk-factor">
-          <span>人事任命公正</span>
-          <div class="risk-factor__bar"><div class="risk-factor__bar-fill" style="width: 8%; background: var(--color-success)"></div></div>
-          <span style="color: var(--color-success)">低</span>
-        </div>
-        <div class="risk-factor">
-          <span>政商关系边界</span>
-          <div class="risk-factor__bar"><div class="risk-factor__bar-fill" style="width: 20%; background: var(--color-warning)"></div></div>
-          <span style="color: var(--color-warning)">注意</span>
-        </div>
-        <div class="risk-factor">
-          <span>个人财产申报</span>
-          <div class="risk-factor__bar"><div class="risk-factor__bar-fill" style="width: 5%; background: var(--color-success)"></div></div>
-          <span style="color: var(--color-success)">低</span>
-        </div>
-        <div class="risk-factor">
-          <span>亲属经商情况</span>
-          <div class="risk-factor__bar"><div class="risk-factor__bar-fill" style="width: 10%; background: var(--color-success)"></div></div>
-          <span style="color: var(--color-success)">低</span>
+        <div style="display: flex; gap: 16px; font-size: 12px; color: var(--text-muted)">
+          <span>警戒线：70</span>
+          <span>危险线：90</span>
+          <span>廉洁值：68/100</span>
         </div>
       </section>
 
-      <!-- 廉政事件 -->
-      <section class="section" style="margin-top: 0;">
-        <h2 class="section__title">廉政动态</h2>
-        <p class="section__desc">近期与廉政相关的事件记录。</p>
-        <div class="event-card">
-          <div class="event-card__title">年度廉政教育学习</div>
-          <div class="event-card__text">参加全市干部廉政警示教育大会，观看警示教育片。廉洁值 +2。</div>
-          <div class="event-card__time">2008年2月20日</div>
-        </div>
-        <div class="event-card">
-          <div class="event-card__title">企业宴请婉拒</div>
-          <div class="event-card__text">婉拒某房地产企业老板的私人宴请邀请，维护了政商关系边界。</div>
-          <div class="event-card__time">2008年1月15日</div>
-        </div>
-        <div class="advice-box" style="margin-top: 12px;">
-          当前风险处于安全区间。建议定期参加廉政教育、保持财产申报透明，避免在晋升关键期出现风险波动。
-        </div>
-      </section>
+      <div class="two-col">
+        <!-- 风险因素 -->
+        <section class="section" style="margin-top: 0">
+          <h2 class="section__title">风险因素分析</h2>
+          <p class="section__desc">各维度对风险值的贡献。</p>
+          <div class="risk-factor">
+            <span>预算使用合规</span>
+            <div class="risk-factor__bar">
+              <div
+                class="risk-factor__bar-fill"
+                style="width: 15%; background: var(--color-success)"
+              ></div>
+            </div>
+            <span style="color: var(--color-success)">低</span>
+          </div>
+          <div class="risk-factor">
+            <span>人事任命公正</span>
+            <div class="risk-factor__bar">
+              <div
+                class="risk-factor__bar-fill"
+                style="width: 8%; background: var(--color-success)"
+              ></div>
+            </div>
+            <span style="color: var(--color-success)">低</span>
+          </div>
+          <div class="risk-factor">
+            <span>政商关系边界</span>
+            <div class="risk-factor__bar">
+              <div
+                class="risk-factor__bar-fill"
+                style="width: 20%; background: var(--color-warning)"
+              ></div>
+            </div>
+            <span style="color: var(--color-warning)">注意</span>
+          </div>
+          <div class="risk-factor">
+            <span>个人财产申报</span>
+            <div class="risk-factor__bar">
+              <div
+                class="risk-factor__bar-fill"
+                style="width: 5%; background: var(--color-success)"
+              ></div>
+            </div>
+            <span style="color: var(--color-success)">低</span>
+          </div>
+          <div class="risk-factor">
+            <span>亲属经商情况</span>
+            <div class="risk-factor__bar">
+              <div
+                class="risk-factor__bar-fill"
+                style="width: 10%; background: var(--color-success)"
+              ></div>
+            </div>
+            <span style="color: var(--color-success)">低</span>
+          </div>
+        </section>
+
+        <!-- 廉政事件 -->
+        <section class="section" style="margin-top: 0">
+          <h2 class="section__title">廉政动态</h2>
+          <p class="section__desc">近期与廉政相关的事件记录。</p>
+          <div class="event-card">
+            <div class="event-card__title">年度廉政教育学习</div>
+            <div class="event-card__text">
+              参加全市干部廉政警示教育大会，观看警示教育片。廉洁值 +2。
+            </div>
+            <div class="event-card__time">2008年2月20日</div>
+          </div>
+          <div class="event-card">
+            <div class="event-card__title">企业宴请婉拒</div>
+            <div class="event-card__text">
+              婉拒某房地产企业老板的私人宴请邀请，维护了政商关系边界。
+            </div>
+            <div class="event-card__time">2008年1月15日</div>
+          </div>
+          <div class="advice-box" style="margin-top: 12px">
+            当前风险处于安全区间。建议定期参加廉政教育、保持财产申报透明，避免在晋升关键期出现风险波动。
+          </div>
+        </section>
+      </div>
     </div>
-  </div>
-</body>
+  </body>
 </html>

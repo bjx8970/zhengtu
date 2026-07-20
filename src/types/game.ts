@@ -15,6 +15,7 @@ import type {
   PromotionStage,
   Faction,
   InvestigationEvidence,
+  CareerLine,
 } from './enums';
 import type { KPITier } from './enums';
 import type { SlotTierKey, SlotOccupant, SlotState } from './player';
@@ -96,9 +97,28 @@ export interface EventCondition {
   minLevel?: number;
   maxLevel?: number;
   careerLines?: string[];
-  minScore?: number;
-  requiredFlag?: string;
+  // P3 新增预留字段
+  /** 地区限定 */
+  regions?: string[];
+  /** 时间窗口（月份范围） */
+  timeWindow?: { startMonth: number; endMonth: number };
+  /** 前置事件链（已完成事件 ID） */
+  prerequisiteEvents?: string[];
+  /** 专属职位 ID 列表 */
+  positionIds?: string[];
+  /** 隐藏状态条件（后续扩展民众满意度等） */
+  hiddenStateConditions?: {
+    key: string;
+    operator: 'gt' | 'lt' | 'eq' | 'gte' | 'lte';
+    value: number;
+  }[];
 }
+
+/** 事件类型：通用 / 专属 */
+export type EventType = 'generic' | 'exclusive';
+
+/** 事件分类 */
+export type EventCategory = 'resident' | 'political' | 'economic' | 'emergency' | 'story';
 
 /** 随机事件的可选应对选项 */
 export interface EventOption {
@@ -113,6 +133,10 @@ export interface GameEvent {
   id: string;
   title: string;
   description: string;
+  /** 事件类型：通用 / 专属（P3 预留） */
+  eventType?: EventType;
+  /** 事件分类（P3 预留） */
+  eventCategory?: EventCategory;
   triggerCondition: EventCondition;
   options: EventOption[];
 }
@@ -151,6 +175,14 @@ export interface EventResolveResult {
   effects: Record<string, number>;
   riskTriggered: boolean;
   detail: string;
+}
+
+/** 晋升目标候选职位 */
+export interface PromotionCandidate {
+  positionId: string;
+  positionName: string;
+  level: number;
+  careerLine: CareerLine;
 }
 
 /** 晋升流程的上下文数据（传入各阶段计算函数） */

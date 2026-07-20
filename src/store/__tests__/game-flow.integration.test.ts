@@ -138,10 +138,15 @@ describe('核心流程集成测试', () => {
     it('完整晋升流程：L1 → L2', () => {
       const store = createTestStore(makePromotionReadyState());
 
-      // 启动晋升
+      // 启动晋升 → 进入目标选择阶段
       store.dispatch({ type: 'START_PROMOTION' });
-      expect(store.getRawState().promotionStage).toBe(PromotionStage.DemocraticVote);
+      expect(store.getRawState().promotionStage).toBe(PromotionStage.TargetSelection);
       expect(store.getRawState().promotionState?.targetLevel).toBe(2);
+      expect(store.getRawState().promotionState?.targetPositionId).toBe('');
+
+      // 选择目标职位
+      store.dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l2_0' });
+      expect(store.getRawState().promotionStage).toBe(PromotionStage.DemocraticVote);
       expect(store.getRawState().promotionState?.targetPositionId).toBe('admin_l2_0');
 
       // 阶段 1: 民主推荐
@@ -251,12 +256,12 @@ describe('核心流程集成测试', () => {
     });
   });
 
-  describe('场景 3：L3 封顶', () => {
-    it('L3 状态下 START_PROMOTION 不改变任何状态', () => {
+  describe('场景 3：L11 封顶', () => {
+    it('L11 状态下 START_PROMOTION 不改变任何状态', () => {
       const store = createTestStore({
         currentCareerLine: CareerLine.Administrative,
-        currentLevel: 3,
-        currentPositionId: 'admin_l3_0',
+        currentLevel: 11,
+        currentPositionId: 'admin_l11_0',
         yearsInCurrentPosition: 5,
         annualAssessments: [
           { year: 2020, score: 90, tier: KPITier.Excellent },
@@ -265,13 +270,14 @@ describe('核心流程集成测试', () => {
         ],
         frozenPeriods: 0,
         comprehensiveScore: 90,
+        endgameReached: true,
       });
 
       const before = store.getRawState();
       store.dispatch({ type: 'START_PROMOTION' });
       const after = store.getRawState();
 
-      // L3 没有 L4 配置，晋升应被静默拒绝
+      // L11 是最高等级且终局状态，晋升应被静默拒绝
       expect(after.promotionStage).toBe(PromotionStage.Idle);
       expect(after.promotionAttempts).toBe(before.promotionAttempts);
       expect(after.promotionState).toBeNull();
@@ -323,6 +329,10 @@ describe('核心流程集成测试', () => {
       );
 
       store.dispatch({ type: 'START_PROMOTION' });
+      expect(store.getRawState().promotionStage).toBe(PromotionStage.TargetSelection);
+
+      // 选择目标后进入民主推荐
+      store.dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l2_0' });
       expect(store.getRawState().promotionStage).toBe(PromotionStage.DemocraticVote);
     });
   });
@@ -540,6 +550,7 @@ describe('核心流程集成测试', () => {
     it('晋升中拒绝行动和时间推进', () => {
       const store = createTestStore(makePromotionReadyState());
       store.dispatch({ type: 'START_PROMOTION' });
+      store.dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l2_0' });
       expect(store.getRawState().promotionStage).toBe(PromotionStage.DemocraticVote);
 
       const actionsBefore = store.getRawState().totalActions;

@@ -15,17 +15,17 @@ export enum CareerLine {
   Mass = 'mass',
 }
 
-/** 11 级职务级别标签 */
+/** 11 级职务级别标签（按现实公务员级别体系） */
 export enum LevelLabel {
   L1 = '科员',
   L2 = '副科',
   L3 = '正科',
   L4 = '副处',
   L5 = '正处',
-  L6 = '正处上',
-  L7 = '副厅',
-  L8 = '正厅',
-  L9 = '正厅上',
+  L6 = '副厅',
+  L7 = '正厅',
+  L8 = '副省',
+  L9 = '正省',
   L10 = '副部',
   L11 = '正部',
 }
@@ -41,6 +41,8 @@ export enum KPITier {
 /** 晋升六阶段状态机状态 */
 export enum PromotionStage {
   Idle = 'idle',
+  /** 等待玩家选择目标职位 */
+  TargetSelection = 'target_selection',
   DemocraticVote = 'democratic_vote',
   OrgInspection = 'org_inspection',
   JointReview = 'joint_review',

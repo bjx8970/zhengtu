@@ -6,8 +6,10 @@
  *
  * 校验范围：
  * - 部门/KPI/事件模板格式
- * - 职业线职位定义格式
+ * - 职业线职位定义格式（全部 4 条线）
  * - 模板引用 ID 是否存在（departments ↔ career-lines）
+ * - 职位 ID / 行动 ID 全局唯一性
+ * - 预算单调性与晋升门槛合理性
  * - constants.json 全局配置项格式
  */
 import { z } from 'zod';
@@ -16,11 +18,22 @@ import deptExtra from '../src/config/templates/departments-extra.json' with { ty
 import kpis from '../src/config/templates/kpis.json' with { type: 'json' };
 import events from '../src/config/templates/events.json' with { type: 'json' };
 import admin from '../src/config/career-lines/administrative.json' with { type: 'json' };
+import party from '../src/config/career-lines/party.json' with { type: 'json' };
+import discipline from '../src/config/career-lines/discipline.json' with { type: 'json' };
+import mass from '../src/config/career-lines/mass.json' with { type: 'json' };
 import regionData from '../src/config/templates/regions.json' with { type: 'json' };
 import universityData from '../src/config/templates/universities.json' with { type: 'json' };
 import backgroundData from '../src/config/templates/backgrounds.json' with { type: 'json' };
 
 const departments = { ...deptCore, ...deptExtra };
+
+/** 所有职业线配置 */
+const ALL_CAREER_LINES: { id: string; name: string; data: typeof admin }[] = [
+  { id: 'admin', name: '行政线', data: admin },
+  { id: 'party', name: '党务线', data: party },
+  { id: 'discipline', name: '纪检线', data: discipline },
+  { id: 'mass', name: '群团线', data: mass },
+];
 
 const EffectSchema = z.object({
   target: z.string().min(1),
@@ -103,12 +116,37 @@ const EventSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
   description: z.string(),
+  /** 事件类型：通用 / 专属（P3 预留） */
+  eventType: z.enum(['generic', 'exclusive']).optional(),
+  /** 事件分类（P3 预留） */
+  eventCategory: z.enum(['resident', 'political', 'economic', 'emergency', 'story']).optional(),
   triggerCondition: z.object({
     minLevel: z.number().optional(),
     maxLevel: z.number().optional(),
     careerLines: z.array(z.string()).optional(),
     minScore: z.number().optional(),
     requiredFlag: z.string().optional(),
+    // P3 新增预留字段
+    /** 地区限定 */
+    regions: z.array(z.string()).optional(),
+    /** 时间窗口（月份范围） */
+    timeWindow: z
+      .object({ startMonth: z.number().min(1).max(12), endMonth: z.number().min(1).max(12) })
+      .optional(),
+    /** 前置事件链（已完成事件 ID） */
+    prerequisiteEvents: z.array(z.string()).optional(),
+    /** 专属职位 ID 列表 */
+    positionIds: z.array(z.string()).optional(),
+    /** 隐藏状态条件（后续扩展民众满意度等） */
+    hiddenStateConditions: z
+      .array(
+        z.object({
+          key: z.string().min(1),
+          operator: z.enum(['gt', 'lt', 'eq', 'gte', 'lte']),
+          value: z.number(),
+        }),
+      )
+      .optional(),
   }),
   options: z.array(EventOptionSchema).length(3),
 });
@@ -164,16 +202,19 @@ validateRecord('部门模板', DepartmentTemplateSchema, departments);
 validateRecord('KPI 模板', KPISchema, kpis);
 validateRecord('事件模板', EventSchema, events);
 
-for (const level of admin.levels) {
-  const levelResult = LevelSchema.safeParse(level);
-  if (!levelResult.success) {
-    console.error(`❌ 行政线 L${level.level}:`);
-    for (const issue of levelResult.error.issues) {
-      console.error(`   [${issue.path.join('.')}] ${issue.message}`);
+// 全部职业线格式校验
+for (const line of ALL_CAREER_LINES) {
+  for (const level of line.data.levels) {
+    const levelResult = LevelSchema.safeParse(level);
+    if (!levelResult.success) {
+      console.error(`❌ ${line.name} L${level.level}:`);
+      for (const issue of levelResult.error.issues) {
+        console.error(`   [${issue.path.join('.')}] ${issue.message}`);
+      }
+      errors++;
+    } else {
+      console.log(`   ✅ ${line.name} ${level.label} (${level.positions.length} 个职位)`);
     }
-    errors++;
-  } else {
-    console.log(`   ✅ 行政线 ${level.label} (${level.positions.length} 个职位)`);
   }
 }
 
@@ -197,26 +238,90 @@ for (const [deptId, department] of Object.entries(departments)) {
   }
 }
 
-for (const level of admin.levels) {
-  for (const pos of level.positions) {
-    for (const deptId of pos.departmentTemplateIds) {
-      if (!allDeptIds.has(deptId)) {
-        console.error(`❌ ${pos.name}: 引用不存在的部门模板 "${deptId}"`);
+// 职位 ID 全局唯一性检查（跨职业线）
+const positionOwners = new Map<string, string>();
+for (const line of ALL_CAREER_LINES) {
+  for (const level of line.data.levels) {
+    for (const pos of level.positions) {
+      const existingLine = positionOwners.get(pos.id);
+      if (existingLine) {
+        console.error(`❌ 职位 ID "${pos.id}" 在 ${existingLine} 和 ${line.name} 中重复`);
         errors++;
+      } else {
+        positionOwners.set(pos.id, line.name);
       }
     }
-    for (const kpiId of pos.kpiTemplateIds) {
-      if (!allKpiIds.has(kpiId)) {
-        console.error(`❌ ${pos.name}: 引用不存在的KPI模板 "${kpiId}"`);
-        errors++;
-      }
-    }
-    const deptWeightChecked =
-      pos.departmentTemplateIds.length >= 3 && pos.departmentTemplateIds.length <= 5;
-    if (!deptWeightChecked) {
-      console.error(`❌ ${pos.name}: 部门数量 ${pos.departmentTemplateIds.length} 不在 3~5 范围内`);
+  }
+}
+
+// 全部职业线引用完整性 + 预算单调性 + 晋升门槛合理性
+for (const line of ALL_CAREER_LINES) {
+  let prevLevelBudget = 0;
+  for (const level of line.data.levels) {
+    // 晋升门槛合理性检查
+    const req = level.promotionRequirements;
+    if (req.minYearsInService < 1 || req.minYearsInService > 8) {
+      console.error(
+        `❌ ${line.name} L${level.level}: minYearsInService=${req.minYearsInService} 不在 1~8 范围内`,
+      );
       errors++;
     }
+    if (req.minAssessmentPasses < 1 || req.minAssessmentPasses > 5) {
+      console.error(
+        `❌ ${line.name} L${level.level}: minAssessmentPasses=${req.minAssessmentPasses} 不在 1~5 范围内`,
+      );
+      errors++;
+    }
+
+    // 预算单调性检查（相邻等级预算应递增）
+    const avgBudget =
+      level.positions.reduce((sum, p) => sum + p.annualBudget, 0) / level.positions.length;
+    if (prevLevelBudget > 0 && avgBudget < prevLevelBudget) {
+      console.error(
+        `⚠️ ${line.name} L${level.level}: 平均预算 ${Math.round(avgBudget)} 低于上一级 ${Math.round(prevLevelBudget)}`,
+      );
+      // 警告不计入错误，仅提示
+    }
+    prevLevelBudget = avgBudget;
+
+    for (const pos of level.positions) {
+      for (const deptId of pos.departmentTemplateIds) {
+        if (!allDeptIds.has(deptId)) {
+          console.error(`❌ ${pos.name}: 引用不存在的部门模板 "${deptId}"`);
+          errors++;
+        }
+      }
+      for (const kpiId of pos.kpiTemplateIds) {
+        if (!allKpiIds.has(kpiId)) {
+          console.error(`❌ ${pos.name}: 引用不存在的KPI模板 "${kpiId}"`);
+          errors++;
+        }
+      }
+      const deptWeightChecked =
+        pos.departmentTemplateIds.length >= 3 && pos.departmentTemplateIds.length <= 5;
+      if (!deptWeightChecked) {
+        console.error(
+          `❌ ${pos.name}: 部门数量 ${pos.departmentTemplateIds.length} 不在 3~5 范围内`,
+        );
+        errors++;
+      }
+    }
+  }
+}
+
+// 逐级摘要输出
+console.log('\n--- 逐级配置摘要 ---\n');
+for (const line of ALL_CAREER_LINES) {
+  console.log(`   ${line.name}:`);
+  for (const level of line.data.levels) {
+    const budgets = level.positions.map((p) => p.annualBudget);
+    const minBudget = Math.min(...budgets);
+    const maxBudget = Math.max(...budgets);
+    const deptCount = level.positions.reduce((sum, p) => sum + p.departmentTemplateIds.length, 0);
+    const kpiCount = level.positions.reduce((sum, p) => sum + p.kpiTemplateIds.length, 0);
+    console.log(
+      `     L${level.level} ${level.label}: ${level.positions.length} 职位 | 预算 ${minBudget}~${maxBudget} | 部门引用 ${deptCount} | KPI 引用 ${kpiCount}`,
+    );
   }
 }
 

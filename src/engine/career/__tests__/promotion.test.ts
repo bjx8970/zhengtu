@@ -311,7 +311,7 @@ describe('store integration', () => {
     expect(getRawState().promotionStage).toBe('idle');
   });
 
-  it('START_PROMOTION 满足条件 → 进入民主推荐', () => {
+  it('START_PROMOTION 满足条件 → 进入目标选择 → 选择后进入民主推荐', () => {
     const { dispatch, getRawState } = createTestStore({
       currentLevel: 2,
       currentPositionId: 'admin_l2_0',
@@ -328,25 +328,37 @@ describe('store integration', () => {
       politicalCapital: 30,
     });
     dispatch({ type: 'START_PROMOTION' });
-    const state = getRawState();
-    expect(state.promotionStage).toBe('democratic_vote');
+    let state = getRawState();
+    expect(state.promotionStage).toBe('target_selection');
     expect(state.promotionState).not.toBeNull();
     expect(state.promotionState!.targetLevel).toBe(3);
+    expect(state.promotionState!.currentStage).toBe('target_selection');
+
+    // 选择目标职位后进入民主推荐
+    dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l3_0' });
+    state = getRawState();
+    expect(state.promotionStage).toBe('democratic_vote');
+    expect(state.promotionState!.targetPositionId).toBe('admin_l3_0');
     expect(state.promotionState!.currentStage).toBe('democratic_vote');
   });
 
-  it('START_PROMOTION 年限不足 → failed', () => {
+  it('SELECT_PROMOTION_TARGET 年限不足 → failed', () => {
     const { dispatch, getRawState } = createTestStore({
       currentLevel: 2,
+      currentPositionId: 'admin_l2_0',
       yearsInCurrentPosition: 1,
       annualAssessments: [],
       frozenPeriods: 0,
     });
     dispatch({ type: 'START_PROMOTION' });
+    expect(getRawState().promotionStage).toBe('target_selection');
+
+    // 选择目标时校验前置条件失败
+    dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l3_0' });
     expect(getRawState().promotionStage).toBe('failed');
   });
 
-  it('完整流程：idle → democratic_vote → 成功 → completed', () => {
+  it('完整流程：idle → target_selection → democratic_vote → 成功 → completed', () => {
     const { dispatch, getRawState } = createTestStore({
       currentLevel: 2,
       currentPositionId: 'admin_l2_0',
@@ -368,8 +380,12 @@ describe('store integration', () => {
     });
     // Deterministic "good luck" RNG
     const goodRng = () => 0.3;
-    // 启动
+    // 启动 → 目标选择
     dispatch({ type: 'START_PROMOTION' });
+    expect(getRawState().promotionStage).toBe('target_selection');
+
+    // 选择目标职位
+    dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l3_0' });
     expect(getRawState().promotionStage).toBe('democratic_vote');
 
     // 阶段1
@@ -419,6 +435,7 @@ describe('store integration', () => {
       frozenPeriods: 0,
     });
     dispatch({ type: 'START_PROMOTION' });
+    dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l3_0' });
     const yearBefore = getRawState().time.year;
     dispatch({ type: 'ADVANCE_TIME', granularity: 'month' });
     expect(getRawState().time.year).toBe(yearBefore);
@@ -436,6 +453,7 @@ describe('store integration', () => {
       frozenPeriods: 0,
     });
     dispatch({ type: 'START_PROMOTION' });
+    dispatch({ type: 'SELECT_PROMOTION_TARGET', positionId: 'admin_l3_0' });
     const actionsBefore = getRawState().totalActions;
     dispatch({ type: 'START_ACTION', deptId: 'dummy', actionId: 'dummy', tierKey: 'primary' });
     expect(getRawState().totalActions).toBe(actionsBefore);

@@ -18,12 +18,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.{ts,tsx}'],
-      exclude: [
-        'src/main.tsx',
-        'src/test/**',
-        'src/**/*.d.ts',
-        'src/**/*.{test,spec}.{ts,tsx}',
-      ],
+      exclude: ['src/main.tsx', 'src/test/**', 'src/**/*.d.ts', 'src/**/*.{test,spec}.{ts,tsx}'],
       thresholds: {
         'src/engine/**/*.ts': { lines: 90, statements: 85, branches: 75 },
         'src/config/*.ts': { lines: 80, statements: 75 },

@@ -18,11 +18,13 @@ import { PageHeader } from '../../components/page-header';
 import { getConfigLoader } from '../../config/loader';
 import { PromotionStage } from '../../types/enums';
 import { calculateKPI } from '../../engine/governance/kpi';
+import { getPromotionCandidates } from '../../engine/career/promotion-target';
 import { parsePositionIndex } from '../../utils/position';
 import { colors, font, darkCardStyle } from '../../utils/theme';
 
 const STAGE_LABELS: Record<PromotionStage, string> = {
   [PromotionStage.Idle]: '待触发',
+  [PromotionStage.TargetSelection]: '选择目标职位',
   [PromotionStage.DemocraticVote]: '民主推荐',
   [PromotionStage.OrgInspection]: '组织考察',
   [PromotionStage.JointReview]: '多部门联审',
@@ -65,7 +67,8 @@ export function CareerPage() {
     () =>
       state.promotionStage !== PromotionStage.Idle &&
       state.promotionStage !== PromotionStage.Completed &&
-      state.promotionStage !== PromotionStage.Failed,
+      state.promotionStage !== PromotionStage.Failed &&
+      state.promotionStage !== PromotionStage.TargetSelection,
   );
 
   const stageIndex = createMemo(() => {
@@ -115,6 +118,13 @@ export function CareerPage() {
       state.promotionStage === PromotionStage.DemocraticVote ||
       state.promotionStage === PromotionStage.OrgInspection,
   );
+
+  /** 缓存晋升候选职位列表，避免每次渲染重建 */
+  const promotionCandidates = createMemo(() => {
+    const lineCfg = getConfigLoader().getCareerLine(state.currentCareerLine);
+    if (!lineCfg) return [];
+    return getPromotionCandidates(state.currentCareerLine, state.currentLevel, lineCfg);
+  });
 
   return (
     <AppShell>
@@ -183,6 +193,67 @@ export function CareerPage() {
                   启动晋升流程
                 </button>
               </Show>
+            </div>
+          </Show>
+
+          {/* TargetSelection 状态：选择目标职位 */}
+          <Show when={state.promotionStage === PromotionStage.TargetSelection}>
+            <div style={{ padding: '1rem 0' }}>
+              <p
+                style={{
+                  'text-align': 'center',
+                  'margin-bottom': '1rem',
+                  color: colors.textSecondary,
+                }}
+              >
+                请选择晋升目标职位：
+              </p>
+              <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.6rem' }}>
+                <For each={promotionCandidates()}>
+                  {(candidate) => (
+                    <button
+                      onClick={() =>
+                        dispatch({
+                          type: 'SELECT_PROMOTION_TARGET',
+                          positionId: candidate.positionId,
+                        })
+                      }
+                      style={{
+                        padding: '0.8rem 1rem',
+                        'background-color': colors.bgCard,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        'border-radius': '8px',
+                        cursor: 'pointer',
+                        'text-align': 'left',
+                        transition: 'border-color 0.2s',
+                      }}
+                    >
+                      <div style={{ 'font-weight': 'bold', 'margin-bottom': '0.2rem' }}>
+                        {candidate.positionName}
+                      </div>
+                      <div style={{ 'font-size': '0.8rem', color: colors.textMuted }}>
+                        L{candidate.level} · {candidate.positionId}
+                      </div>
+                    </button>
+                  )}
+                </For>
+              </div>
+              <button
+                onClick={() => dispatch({ type: 'RESET_PROMOTION' })}
+                style={{
+                  width: '100%',
+                  'margin-top': '1rem',
+                  padding: '0.6rem',
+                  'background-color': 'transparent',
+                  color: colors.textMuted,
+                  border: `1px solid ${colors.border}`,
+                  'border-radius': '8px',
+                  cursor: 'pointer',
+                }}
+              >
+                取消晋升
+              </button>
             </div>
           </Show>
 

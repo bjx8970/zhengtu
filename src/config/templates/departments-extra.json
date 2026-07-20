@@ -344,5 +344,749 @@
       }
     ],
     "kpiTemplateIds": ["women_rights_score", "livelihood_score"]
+  },
+  "county_government": {
+    "name": "县政府办公室",
+    "consumptionCoefficient": 0.8,
+    "baseConsumption": 80,
+    "actions": [
+      {
+        "id": "county_coordination",
+        "name": "县域协调调度",
+        "description": "协调各部门工作，推进县域重点项目",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 30,
+        "effects": [{ "target": "dept.kpi.county_gdp", "operation": "add", "value": 6 }]
+      },
+      {
+        "id": "policy_implementation",
+        "name": "政策落地执行",
+        "description": "推动上级政策在县域落地实施",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 60,
+        "effects": [
+          { "target": "dept.kpi.county_gdp", "operation": "add", "value": 10 },
+          { "target": "player.performance", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["county_gdp", "office_efficiency"]
+  },
+  "district_administration": {
+    "name": "区行政服务中心",
+    "consumptionCoefficient": 0.7,
+    "baseConsumption": 70,
+    "actions": [
+      {
+        "id": "service_optimization",
+        "name": "服务流程优化",
+        "description": "优化行政审批流程，提升服务效率",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 25,
+        "effects": [{ "target": "dept.kpi.urbanization_rate", "operation": "add", "value": 5 }]
+      },
+      {
+        "id": "digital_government",
+        "name": "数字政府建设",
+        "description": "推进政务服务数字化转型",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 55,
+        "effects": [
+          { "target": "dept.kpi.urbanization_rate", "operation": "add", "value": 8 },
+          { "target": "player.competence", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["urbanization_rate", "resident_satisfaction"]
+  },
+  "education_bureau": {
+    "name": "教育局",
+    "consumptionCoefficient": 0.9,
+    "baseConsumption": 90,
+    "actions": [
+      {
+        "id": "school_construction",
+        "name": "学校建设改造",
+        "description": "推进学校基础设施建设和改造",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 80,
+        "effects": [{ "target": "dept.kpi.education_coverage", "operation": "add", "value": 10 }]
+      },
+      {
+        "id": "teacher_training",
+        "name": "教师培训",
+        "description": "组织教师专业能力提升培训",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 30,
+        "effects": [
+          { "target": "dept.kpi.education_coverage", "operation": "add", "value": 5 },
+          { "target": "player.charisma", "operation": "add", "value": 1 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["education_coverage", "livelihood_score"]
+  },
+  "health_bureau": {
+    "name": "卫生局",
+    "consumptionCoefficient": 0.9,
+    "baseConsumption": 85,
+    "actions": [
+      {
+        "id": "medical_facility",
+        "name": "医疗设施建设",
+        "description": "推进基层医疗设施建设和升级",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 75,
+        "effects": [{ "target": "dept.kpi.health_service", "operation": "add", "value": 10 }]
+      },
+      {
+        "id": "public_health",
+        "name": "公共卫生服务",
+        "description": "开展公共卫生服务和健康宣教",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 28,
+        "effects": [
+          { "target": "dept.kpi.health_service", "operation": "add", "value": 5 },
+          { "target": "player.stability", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["health_service", "livelihood_score"]
+  },
+  "transportation_bureau": {
+    "name": "交通局",
+    "consumptionCoefficient": 1.0,
+    "baseConsumption": 100,
+    "actions": [
+      {
+        "id": "road_construction",
+        "name": "道路建设维护",
+        "description": "推进辖区道路建设和维护",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 90,
+        "effects": [{ "target": "dept.kpi.infrastructure", "operation": "add", "value": 10 }]
+      },
+      {
+        "id": "traffic_management",
+        "name": "交通管理优化",
+        "description": "优化交通管理，提升通行效率",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 35,
+        "effects": [
+          { "target": "dept.kpi.infrastructure", "operation": "add", "value": 5 },
+          { "target": "player.stability", "operation": "add", "value": 1 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["infrastructure", "safety"]
+  },
+  "land_resources": {
+    "name": "国土资源局",
+    "consumptionCoefficient": 0.8,
+    "baseConsumption": 75,
+    "actions": [
+      {
+        "id": "land_planning",
+        "name": "土地规划管理",
+        "description": "编制和实施土地利用规划",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 50,
+        "effects": [{ "target": "dept.kpi.land_management", "operation": "add", "value": 8 }]
+      },
+      {
+        "id": "land_inspection",
+        "name": "土地执法监察",
+        "description": "开展土地执法监察，查处违法用地",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 25,
+        "effects": [
+          { "target": "dept.kpi.land_management", "operation": "add", "value": 5 },
+          { "target": "player.integrity", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["land_management", "fiscal_revenue"]
+  },
+  "municipal_coordination": {
+    "name": "市发改委",
+    "consumptionCoefficient": 1.2,
+    "baseConsumption": 150,
+    "actions": [
+      {
+        "id": "regional_planning",
+        "name": "区域规划编制",
+        "description": "编制区域经济发展规划，统筹重大项目布局",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 150,
+        "effects": [{ "target": "dept.kpi.regional_gdp", "operation": "add", "value": 12 }]
+      },
+      {
+        "id": "project_approval",
+        "name": "项目审批协调",
+        "description": "协调跨部门项目审批，推进重点项目落地",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 60,
+        "effects": [
+          { "target": "dept.kpi.regional_gdp", "operation": "add", "value": 6 },
+          { "target": "player.competence", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["regional_gdp", "project_completion"]
+  },
+  "provincial_department": {
+    "name": "省厅办公室",
+    "consumptionCoefficient": 1.3,
+    "baseConsumption": 180,
+    "actions": [
+      {
+        "id": "policy_research",
+        "name": "政策研究制定",
+        "description": "组织政策研究和制定，推动制度创新",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 180,
+        "effects": [{ "target": "dept.kpi.governance_quality", "operation": "add", "value": 12 }]
+      },
+      {
+        "id": "inter_dept_coordination",
+        "name": "跨部门协调",
+        "description": "协调省直各部门工作，形成工作合力",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 70,
+        "effects": [
+          { "target": "dept.kpi.governance_quality", "operation": "add", "value": 6 },
+          { "target": "player.charisma", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["governance_quality", "office_efficiency"]
+  },
+  "economic_development": {
+    "name": "经济发展局",
+    "consumptionCoefficient": 1.4,
+    "baseConsumption": 200,
+    "actions": [
+      {
+        "id": "industrial_upgrade",
+        "name": "产业升级推动",
+        "description": "推动产业结构优化升级，培育新兴产业",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 200,
+        "effects": [{ "target": "dept.kpi.economic_structure", "operation": "add", "value": 12 }]
+      },
+      {
+        "id": "investment_promotion",
+        "name": "招商引资",
+        "description": "组织重大招商活动，引进优质项目",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 150,
+        "effects": [
+          { "target": "dept.kpi.economic_structure", "operation": "add", "value": 8 },
+          { "target": "player.performance", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["economic_structure", "gdp_growth"]
+  },
+  "urban_planning": {
+    "name": "城市规划局",
+    "consumptionCoefficient": 1.2,
+    "baseConsumption": 160,
+    "actions": [
+      {
+        "id": "city_master_plan",
+        "name": "城市总体规划",
+        "description": "编制和实施城市总体规划，优化空间布局",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 160,
+        "effects": [{ "target": "dept.kpi.innovation_index", "operation": "add", "value": 12 }]
+      },
+      {
+        "id": "smart_city",
+        "name": "智慧城市建设",
+        "description": "推进智慧城市基础设施建设",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 120,
+        "effects": [
+          { "target": "dept.kpi.innovation_index", "operation": "add", "value": 8 },
+          { "target": "player.competence", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["innovation_index", "infrastructure"]
+  },
+  "social_governance": {
+    "name": "社会治理局",
+    "consumptionCoefficient": 1.1,
+    "baseConsumption": 140,
+    "actions": [
+      {
+        "id": "community_building",
+        "name": "社区治理创新",
+        "description": "推进社区治理体系和治理能力现代化",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 120,
+        "effects": [{ "target": "dept.kpi.public_satisfaction", "operation": "add", "value": 10 }]
+      },
+      {
+        "id": "conflict_resolution",
+        "name": "矛盾纠纷化解",
+        "description": "建立健全矛盾纠纷多元化解机制",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 50,
+        "effects": [
+          { "target": "dept.kpi.public_satisfaction", "operation": "add", "value": 5 },
+          { "target": "player.stability", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["public_satisfaction", "safety"]
+  },
+  "regional_cooperation": {
+    "name": "区域合作办",
+    "consumptionCoefficient": 1.0,
+    "baseConsumption": 130,
+    "actions": [
+      {
+        "id": "regional_integration",
+        "name": "区域一体化推进",
+        "description": "推动区域一体化发展，深化跨区域合作",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 140,
+        "effects": [{ "target": "dept.kpi.regional_integration", "operation": "add", "value": 12 }]
+      },
+      {
+        "id": "exchange_program",
+        "name": "交流合作项目",
+        "description": "组织跨区域交流合作项目",
+        "durationDays": 3,
+        "category": "minor",
+        "cooldownDays": 7,
+        "budgetDelta": 55,
+        "effects": [
+          { "target": "dept.kpi.regional_integration", "operation": "add", "value": 6 },
+          { "target": "player.charisma", "operation": "add", "value": 2 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["regional_integration", "gdp_growth"]
+  },
+  "provincial_leadership": {
+    "name": "省政府办公厅",
+    "consumptionCoefficient": 1.8,
+    "baseConsumption": 350,
+    "actions": [
+      {
+        "id": "provincial_coordination",
+        "name": "全省工作协调",
+        "description": "协调省直各部门和各地市工作，推进重大决策落实",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 350,
+        "effects": [{ "target": "dept.kpi.provincial_gdp", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "policy_deployment",
+        "name": "政策部署推进",
+        "description": "部署和推进重大政策实施，确保政令畅通",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 250,
+        "effects": [
+          { "target": "dept.kpi.provincial_gdp", "operation": "add", "value": 10 },
+          { "target": "player.performance", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["provincial_gdp", "strategic_execution"]
+  },
+  "provincial_committee": {
+    "name": "省委办公厅",
+    "consumptionCoefficient": 1.9,
+    "baseConsumption": 400,
+    "actions": [
+      {
+        "id": "party_decision",
+        "name": "党委决策推进",
+        "description": "推进党委重大决策部署，加强党的领导",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 400,
+        "effects": [{ "target": "dept.kpi.political_ecology", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "cadre_management",
+        "name": "干部管理监督",
+        "description": "加强干部队伍建设，强化监督管理",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 300,
+        "effects": [
+          { "target": "dept.kpi.political_ecology", "operation": "add", "value": 10 },
+          { "target": "player.integrity", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["political_ecology", "party_building"]
+  },
+  "strategic_planning": {
+    "name": "战略规划委",
+    "consumptionCoefficient": 1.7,
+    "baseConsumption": 320,
+    "actions": [
+      {
+        "id": "five_year_plan",
+        "name": "五年规划编制",
+        "description": "编制和实施五年发展规划，明确战略方向",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 320,
+        "effects": [{ "target": "dept.kpi.reform_progress", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "reform_implementation",
+        "name": "改革任务推进",
+        "description": "推进重点领域改革任务落地见效",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 240,
+        "effects": [
+          { "target": "dept.kpi.reform_progress", "operation": "add", "value": 10 },
+          { "target": "player.competence", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["reform_progress", "governance_quality"]
+  },
+  "provincial_finance": {
+    "name": "省财政厅",
+    "consumptionCoefficient": 1.6,
+    "baseConsumption": 300,
+    "actions": [
+      {
+        "id": "budget_management",
+        "name": "预算统筹管理",
+        "description": "统筹全省财政预算，优化支出结构",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 300,
+        "effects": [{ "target": "dept.kpi.people_livelihood", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "fiscal_reform",
+        "name": "财税体制改革",
+        "description": "推进财税体制改革，提升财政效能",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 220,
+        "effects": [
+          { "target": "dept.kpi.people_livelihood", "operation": "add", "value": 10 },
+          { "target": "player.performance", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["people_livelihood", "fiscal_revenue"]
+  },
+  "provincial_org": {
+    "name": "省委组织部",
+    "consumptionCoefficient": 1.5,
+    "baseConsumption": 280,
+    "actions": [
+      {
+        "id": "cadre_selection",
+        "name": "干部选拔任用",
+        "description": "做好干部选拔任用工作，建设高素质队伍",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 280,
+        "effects": [{ "target": "dept.kpi.stability_index", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "talent_program",
+        "name": "人才强省战略",
+        "description": "实施人才强省战略，集聚优秀人才",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 200,
+        "effects": [
+          { "target": "dept.kpi.stability_index", "operation": "add", "value": 10 },
+          { "target": "player.charisma", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["stability_index", "staff_satisfaction"]
+  },
+  "provincial_discipline": {
+    "name": "省纪委",
+    "consumptionCoefficient": 1.4,
+    "baseConsumption": 260,
+    "actions": [
+      {
+        "id": "anti_corruption_campaign",
+        "name": "反腐败斗争",
+        "description": "深入推进反腐败斗争，保持高压态势",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 260,
+        "effects": [{ "target": "dept.kpi.political_ecology", "operation": "add", "value": 15 }]
+      },
+      {
+        "id": "supervision_inspection",
+        "name": "监督检查",
+        "description": "开展监督检查，确保权力规范运行",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 180,
+        "effects": [
+          { "target": "dept.kpi.political_ecology", "operation": "add", "value": 10 },
+          { "target": "player.integrity", "operation": "add", "value": 3 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["political_ecology", "anti_corruption"]
+  },
+  "central_coordination": {
+    "name": "中央协调办",
+    "consumptionCoefficient": 2.5,
+    "baseConsumption": 600,
+    "actions": [
+      {
+        "id": "national_strategy",
+        "name": "国家战略推进",
+        "description": "推进国家重大战略实施，统筹全国资源",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 600,
+        "effects": [{ "target": "dept.kpi.national_governance", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "inter_provincial_coordination",
+        "name": "跨省协调",
+        "description": "协调跨省重大项目和区域合作",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 450,
+        "effects": [
+          { "target": "dept.kpi.national_governance", "operation": "add", "value": 12 },
+          { "target": "player.performance", "operation": "add", "value": 5 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["national_governance", "strategic_execution"]
+  },
+  "central_committee": {
+    "name": "中央办公厅",
+    "consumptionCoefficient": 2.8,
+    "baseConsumption": 700,
+    "actions": [
+      {
+        "id": "central_decision",
+        "name": "中央决策推进",
+        "description": "推进中央重大决策部署，确保政令统一",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 700,
+        "effects": [{ "target": "dept.kpi.political_unity", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "cadre_supervision",
+        "name": "高级干部监督",
+        "description": "加强高级干部监督管理，严明政治纪律",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 500,
+        "effects": [
+          { "target": "dept.kpi.political_unity", "operation": "add", "value": 12 },
+          { "target": "player.integrity", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["political_unity", "party_building"]
+  },
+  "national_reform": {
+    "name": "国家改革委",
+    "consumptionCoefficient": 2.3,
+    "baseConsumption": 550,
+    "actions": [
+      {
+        "id": "deep_reform",
+        "name": "深化改革推进",
+        "description": "推进全面深化改革，突破体制机制障碍",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 550,
+        "effects": [{ "target": "dept.kpi.reform_depth", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "institution_innovation",
+        "name": "制度创新",
+        "description": "推动制度创新，完善治理体系",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 400,
+        "effects": [
+          { "target": "dept.kpi.reform_depth", "operation": "add", "value": 12 },
+          { "target": "player.competence", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["reform_depth", "governance_quality"]
+  },
+  "national_finance": {
+    "name": "国家财政部",
+    "consumptionCoefficient": 2.2,
+    "baseConsumption": 520,
+    "actions": [
+      {
+        "id": "national_budget",
+        "name": "国家预算管理",
+        "description": "统筹国家财政预算，优化资源配置",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 520,
+        "effects": [{ "target": "dept.kpi.fiscal_sustainability", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "tax_reform",
+        "name": "税收制度改革",
+        "description": "推进税收制度改革，完善分配机制",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 380,
+        "effects": [
+          { "target": "dept.kpi.fiscal_sustainability", "operation": "add", "value": 12 },
+          { "target": "player.performance", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["fiscal_sustainability", "fiscal_revenue"]
+  },
+  "central_org": {
+    "name": "中央组织部",
+    "consumptionCoefficient": 2.0,
+    "baseConsumption": 480,
+    "actions": [
+      {
+        "id": "senior_cadre_management",
+        "name": "高级干部管理",
+        "description": "做好高级干部选拔任用和监督管理",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 480,
+        "effects": [{ "target": "dept.kpi.cadre_quality", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "talent_strategy",
+        "name": "人才强国战略",
+        "description": "实施人才强国战略，建设人才高地",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 350,
+        "effects": [
+          { "target": "dept.kpi.cadre_quality", "operation": "add", "value": 12 },
+          { "target": "player.charisma", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["cadre_quality", "staff_satisfaction"]
+  },
+  "central_discipline": {
+    "name": "中央纪委",
+    "consumptionCoefficient": 1.9,
+    "baseConsumption": 450,
+    "actions": [
+      {
+        "id": "national_anti_corruption",
+        "name": "全国反腐败斗争",
+        "description": "深入推进全国反腐败斗争，保持高压态势",
+        "durationDays": 7,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 450,
+        "effects": [{ "target": "dept.kpi.integrity_index", "operation": "add", "value": 18 }]
+      },
+      {
+        "id": "discipline_inspection",
+        "name": "纪律审查",
+        "description": "开展纪律审查，严肃查处违纪违法行为",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 320,
+        "effects": [
+          { "target": "dept.kpi.integrity_index", "operation": "add", "value": 12 },
+          { "target": "player.integrity", "operation": "add", "value": 4 }
+        ]
+      }
+    ],
+    "kpiTemplateIds": ["integrity_index", "anti_corruption"]
   }
 }
