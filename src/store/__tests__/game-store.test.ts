@@ -4,7 +4,6 @@ import { createInitialState, createTestStore, dispatch } from '../game-store';
 // 因为 createTestStore 的 dispatch 故意不触发 localStorage 写入。
 import type { PlayerSave, SlotOccupant } from '../../types/player';
 import { CareerLine, PromotionStage } from '../../types/enums';
-import { migrateSave } from '../migrations';
 
 function occ(
   actionId: string,
@@ -191,40 +190,18 @@ describe('dispatch - ADVANCE_TIME (integration)', () => {
     });
   }
 
-  describe('旧存档迁移', () => {
-    it('迁移管道补齐行动分类、冷却天数和部门冷却表', () => {
+  describe('旧存档不兼容', () => {
+    it('裸旧版存档通过 LOAD_SAVE 加载时保持原样（不迁移）', () => {
       const legacySave = structuredClone(mkStore().getRawState());
       const occupant = occ(actionId, deptId, '审批项目', 0, 3);
-      const legacyOccupant = occupant as unknown as Record<string, unknown>;
-      delete legacyOccupant['category'];
-      delete legacyOccupant['cooldownDays'];
       legacySave.slots.primary.occupants[0] = occupant;
 
-      const legacyDepartment = legacySave.departmentStates[deptId] as unknown as Record<
-        string,
-        unknown
-      >;
-      delete legacyDepartment['actionCooldownUntilDays'];
-
-      // 通过迁移管道处理
-      const result = migrateSave(JSON.stringify(legacySave));
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-
-      // 迁移后加载到 store
+      // LOAD_SAVE 直接赋值，不做迁移
       const store = createTestStore();
-      store.dispatch({ type: 'LOAD_SAVE', save: result.state });
+      store.dispatch({ type: 'LOAD_SAVE', save: legacySave });
 
-      const migrated = store.getRawState();
-      // 迁移管道补齐 category 为 'routine'（无法访问配置时的默认值）
-      expect(migrated.slots.primary.occupants[0]?.category).toBeDefined();
-      expect(migrated.slots.primary.occupants[0]?.cooldownDays).toBeDefined();
-      expect(migrated.departmentStates[deptId]?.actionCooldownUntilDays).toEqual({});
-
-      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'week' });
-      // 迁移默认 category='routine'，routine 行动不写冷却
-      // 验证行动正常完成（槽位清空）
-      expect(store.getRawState().slots.primary.occupants[0]).toBeNull();
+      const loaded = store.getRawState();
+      expect(loaded.slots.primary.occupants[0]?.actionId).toBe(actionId);
     });
   });
 

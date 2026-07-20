@@ -12,52 +12,33 @@
 import type { PlayerSave } from '../types/player';
 import type { SaveEnvelope } from '../types/save';
 import { getSupabase } from './supabase';
-import {
-  migrateSave,
-  wrapSaveEnvelope,
-  validatePlayerSave,
-  extractPlayerSave,
-} from '../store/migrations';
+import { decodeCurrentSave, wrapSaveEnvelope } from '../store/migrations';
 
 const TABLE_NAME = 'game_saves';
 const SLOT_NAME = 'main';
 const LOCAL_KEY = 'zhengtu_autosave';
 
-/** 迁移失败备份的 key 前缀 */
-const MIGRATION_FAILED_KEY = 'zhengtu_migration_failed';
-
 /**
  * 从 localStorage 读取本地存档。
  *
- * v4 变更：通过迁移管道处理旧版本存档。
- * 迁移失败时保存错误信息到 localStorage 并返回 null。
+ * 使用严格解码器，只接受当前版本的完整 SaveEnvelope。
+ * 不兼容存档会被备份并返回 null。
  *
- * @returns PlayerSave 或 null（无存档/迁移失败）
+ * @returns PlayerSave 或 null（无存档/不兼容/损坏）
  */
 export function readLocalSave(): PlayerSave | null {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return null;
 
-    // 尝试通过迁移管道处理
-    const result = migrateSave(raw);
+    const result = decodeCurrentSave(raw);
 
-    if (result.success) {
+    if (result.success && result.state) {
       return result.state;
     }
 
-    // 迁移失败：记录错误，保留备份
-    console.error('存档迁移失败:', result.error);
-    if (result.backup) {
-      localStorage.setItem(
-        MIGRATION_FAILED_KEY,
-        JSON.stringify({
-          error: result.error,
-          backupKey: result.backup,
-          timestamp: Date.now(),
-        }),
-      );
-    }
+    // 不兼容或损坏：记录错误
+    console.error('存档加载失败:', result.error, result.detail);
     return null;
   } catch (err) {
     console.error('读取存档失败:', err);
@@ -93,17 +74,6 @@ export function writeLocalSave(save: PlayerSave): void {
   }
 }
 
-/**
- * 校验 JSON 解析结果是否为合法的 PlayerSave 对象。
- *
- * @param data 待校验数据
- * @returns 是否为合法 PlayerSave
- */
-function isValidPlayerSave(data: unknown): data is PlayerSave {
-  const result = validatePlayerSave(data);
-  return result.valid;
-}
-
 /** 从 Supabase 读取远程存档 */
 export async function fetchRemoteSave(userId: string): Promise<PlayerSave | null> {
   const supabase = getSupabase();
@@ -120,10 +90,10 @@ export async function fetchRemoteSave(userId: string): Promise<PlayerSave | null
 
   if (error || !data) return null;
 
-  // 尝试从 SaveEnvelope 或裸 PlayerSave 中提取
-  const extracted = extractPlayerSave(data.save_data);
-  if (extracted && isValidPlayerSave(extracted)) {
-    return extracted;
+  // 使用相同的严格解码器
+  const result = decodeCurrentSave(JSON.stringify(data.save_data));
+  if (result.success && result.state) {
+    return result.state;
   }
 
   return null;
@@ -181,30 +151,4 @@ export function selectNewer(a: PlayerSave | null, b: PlayerSave | null): PlayerS
   if (!a) return b;
   if (!b) return a;
   return (a.updatedAt ?? 0) > (b.updatedAt ?? 0) ? a : b;
-}
-
-/**
- * 获取上次迁移失败的信息。
- *
- * @returns 迁移失败信息或 null
- */
-export function getMigrationFailureInfo(): {
-  error: string;
-  backupKey: string;
-  timestamp: number;
-} | null {
-  try {
-    const raw = localStorage.getItem(MIGRATION_FAILED_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * 清除迁移失败记录。
- */
-export function clearMigrationFailureInfo(): void {
-  localStorage.removeItem(MIGRATION_FAILED_KEY);
 }

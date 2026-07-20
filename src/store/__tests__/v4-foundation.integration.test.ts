@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { createTestStore, createInitialState } from '../game-store';
 import { CareerLine } from '../../types/enums';
 import type { PlayerSave, SlotOccupant } from '../../types/player';
-import { migrateSave } from '../migrations';
+import { decodeCurrentSave, wrapSaveEnvelope } from '../migrations';
 
 /** 创建带有指定行动的槽位状态 */
 function makeSlotsWithActions(actions: Partial<SlotOccupant>[]): PlayerSave['slots'] {
@@ -333,56 +333,30 @@ describe('v4 基础工程集成测试', () => {
     });
   });
 
-  describe('存档迁移兼容性', () => {
-    it('迁移管道清除旧存档的临时字段', () => {
-      const legacySave = createInitialState({
-        currentPositionId: 'admin_l3_0',
-        currentLevel: 3,
-        currentCareerLine: CareerLine.Administrative,
-      }) as unknown as Record<string, unknown>;
-
-      // 模拟旧存档的临时字段
-      legacySave._pendingDeviationMultiplier = 0.8;
-      legacySave.pendingStyleConflict = true;
-
-      // 通过迁移管道处理
-      const result = migrateSave(JSON.stringify(legacySave));
-      expect(result.success).toBe(true);
-      if (result.success) {
-        const state = result.state as unknown as Record<string, unknown>;
-        expect(state._pendingDeviationMultiplier).toBeUndefined();
-        expect(state.pendingStyleConflict).toBeUndefined();
-      }
-    });
-
-    it('迁移管道为槽位行动补充 runtimeSnapshot', () => {
+  describe('存档解码兼容性', () => {
+    it('裸旧版 PlayerSave 被拒绝为不兼容', () => {
       const legacySave = createInitialState({
         currentPositionId: 'admin_l3_0',
         currentLevel: 3,
         currentCareerLine: CareerLine.Administrative,
       });
 
-      // 模拟旧存档中没有 runtimeSnapshot 的行动
-      legacySave.slots.primary.occupants[0] = {
-        actionId: 'test',
-        deptId: 'admin_l3_0_dept_0',
-        actionName: '测试行动',
-        category: 'minor',
-        startedAtDay: 0,
-        durationDays: 3,
-        cooldownDays: 7,
-      };
+      const result = decodeCurrentSave(JSON.stringify(legacySave));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('legacy_save_unsupported');
+    });
 
-      // 通过迁移管道处理
-      const result = migrateSave(JSON.stringify(legacySave));
+    it('当前版本 Envelope 可以正常加载', () => {
+      const state = createInitialState({
+        currentPositionId: 'admin_l3_0',
+        currentLevel: 3,
+        currentCareerLine: CareerLine.Administrative,
+      });
+      const envelope = wrapSaveEnvelope(state);
+
+      const result = decodeCurrentSave(JSON.stringify(envelope));
       expect(result.success).toBe(true);
-      if (result.success) {
-        const occupant = result.state.slots.primary.occupants[0];
-        expect(occupant?.runtimeSnapshot).toEqual({
-          effectivenessMultiplier: 1,
-          styleConflictTriggered: false,
-        });
-      }
+      expect(result.state?.currentPositionId).toBe('admin_l3_0');
     });
   });
 
@@ -513,12 +487,10 @@ describe('v4 基础工程集成测试', () => {
         state: createInitialState(),
       };
 
-      const result = migrateSave(JSON.stringify(futureSave));
+      const result = decodeCurrentSave(JSON.stringify(futureSave));
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('高于当前支持');
-        expect(result.backup).not.toBeNull();
-      }
+      expect(result.error).toBe('future_version');
+      expect(result.backupKey).toBeDefined();
     });
 
     it('当前版本 Envelope 损坏时拒绝加载并备份', () => {
@@ -527,15 +499,13 @@ describe('v4 基础工程集成测试', () => {
         contentVersion: '4.0.0-alpha',
         revision: 1,
         savedAt: Date.now(),
-        state: { invalid: 'data' }, // 损坏的 state
+        state: { invalid: 'data' },
       };
 
-      const result = migrateSave(JSON.stringify(corruptedEnvelope));
+      const result = decodeCurrentSave(JSON.stringify(corruptedEnvelope));
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toContain('验证失败');
-        expect(result.backup).not.toBeNull();
-      }
+      expect(result.error).toBe('invalid_envelope');
+      expect(result.backupKey).toBeDefined();
     });
   });
 });

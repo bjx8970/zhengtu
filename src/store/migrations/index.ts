@@ -1,31 +1,23 @@
 /**
- * 存档迁移管道
+ * 存档严格解码器
  *
- * 提供版本化存档的安全迁移能力：
- * - 检测存档版本
- * - 按版本链逐步迁移
- * - 迁移失败时保留原始数据备份
- * - 提供 Zod schema 验证
+ * 本版本明确不兼容旧存档，不提供任何旧存档自动迁移。
+ * 只接受当前版本的完整 SaveEnvelope，拒绝所有其他格式。
+ *
+ * 严格流程：
+ * 读取原始数据 → 必须是完整 SaveEnvelope → schemaVersion 必须等于 CURRENT
+ * → 完整验证 Envelope 和 PlayerSave → 成功加载
+ *
+ * 拒绝：裸旧版 PlayerSave、低版本、未来版本、缺失元数据、结构验证失败。
  */
 
 import { z } from 'zod';
 import type { PlayerSave } from '../../types/player';
-import type { SaveEnvelope, MigrationStep, MigrationResult } from '../../types/save';
+import type { SaveEnvelope, SaveDecodeResult } from '../../types/save';
 import { CURRENT_SCHEMA_VERSION, CURRENT_CONTENT_VERSION } from '../../types/save';
-import { migrateV0ToV1 } from './versions/v0-to-v1';
-
-/** 所有已注册的迁移步骤（按 fromVersion 排序） */
-const MIGRATIONS: MigrationStep[] = [
-  {
-    fromVersion: 0,
-    toVersion: 1,
-    description: 'v3 原型存档 → v4 版本化存档：删除临时字段，补充 runtimeSnapshot',
-    migrate: migrateV0ToV1,
-  },
-];
 
 /** 存档备份的 localStorage key 前缀 */
-const BACKUP_KEY_PREFIX = 'zhengtu_backup_v';
+const BACKUP_KEY_PREFIX = 'zhengtu_incompatible_backup_';
 
 // ===== Zod Schema 验证 =====
 
@@ -92,7 +84,6 @@ const DepartmentStateSchema = z.object({
 
 /** PlayerSave 完整验证 schema */
 const PlayerSaveSchema = z.object({
-  // 基础信息
   saveId: z.string(),
   userId: z.string(),
   characterName: z.string(),
@@ -106,12 +97,10 @@ const PlayerSaveSchema = z.object({
   familyBackground: z.enum(['peasant', 'worker', 'merchant', 'cadre', 'academic']),
   promotionPath: z.enum(['xuandiao', 'gongwuyuan', 'junzhuan', 'guoqi']),
   isPreparatory: z.boolean(),
-  // 当前职位
   currentPositionId: z.string(),
   currentLevel: z.number().int().min(1).max(11),
   currentCareerLine: z.string().refine((v) => VALID_CAREER_LINES.includes(v)),
   yearsInCurrentPosition: z.number().min(0),
-  // 资源
   slots: z.object({
     primary: SlotTierGroupSchema,
     secondary: SlotTierGroupSchema,
@@ -120,7 +109,6 @@ const PlayerSaveSchema = z.object({
   vigor: z.number(),
   politicalCapital: z.number(),
   remainingBudget: z.number(),
-  // 考核
   comprehensiveScore: z.number(),
   annualAssessments: z.array(
     z.object({
@@ -138,7 +126,6 @@ const PlayerSaveSchema = z.object({
         .optional(),
     }),
   ),
-  // 核心属性
   integrity: z.number(),
   stability: z.number(),
   performance: z.number(),
@@ -146,7 +133,6 @@ const PlayerSaveSchema = z.object({
   competence: z.number(),
   network: z.number(),
   diligence: z.number(),
-  // 晋升
   promotionStage: z.string().refine((v) => VALID_PROMOTION_STAGES.includes(v)),
   promotionAttempts: z.number().min(0),
   frozenPeriods: z.number().min(0),
@@ -159,12 +145,9 @@ const PlayerSaveSchema = z.object({
       flaggedForRisk: z.boolean().optional(),
     }),
   ),
-  // 转职
   transferCount: z.number(),
   isLineLocked: z.boolean(),
-  // 部门状态
   departmentStates: z.record(DepartmentStateSchema),
-  // 职业履历
   careerHistory: z.array(
     z.object({
       positionId: z.string(),
@@ -177,7 +160,6 @@ const PlayerSaveSchema = z.object({
       archived: z.boolean(),
     }),
   ),
-  // 秘书
   secretary: z.nullable(
     z.object({
       id: z.string(),
@@ -186,7 +168,6 @@ const PlayerSaveSchema = z.object({
       level: z.string(),
     }),
   ),
-  // 人脉与理念
   relations: z.object({
     classmates: z.record(z.number()),
     colleagues: z.record(z.number()),
@@ -195,17 +176,12 @@ const PlayerSaveSchema = z.object({
     media: z.record(z.number()),
     central: z.record(z.number()),
   }),
-  philosophy: z.object({
-    scores: z.record(z.number()),
-  }),
+  philosophy: z.object({ scores: z.record(z.number()) }),
   reserveTier: z.number(),
   ambition: z.number(),
-  // 风险
   corruptionRisk: z.number(),
   isUnderInvestigation: z.boolean(),
-  // 时间
   time: GameTimeSchema,
-  // 高级系统
   successor: z.nullable(
     z.object({
       id: z.nullable(z.string()),
@@ -220,7 +196,6 @@ const PlayerSaveSchema = z.object({
     law: z.nullable(z.string()),
   }),
   mentees: z.array(z.object({ id: z.string(), progress: z.number() })),
-  // 统计
   achievements: z.array(z.string()),
   totalActions: z.number().min(0),
   totalDaysPlayed: z.number().min(0),
@@ -232,201 +207,119 @@ const PlayerSaveSchema = z.object({
       completedAtDay: z.number(),
     }),
   ),
-  // 终局
   endgameReached: z.boolean(),
-  // 元数据
   updatedAt: z.number(),
 });
 
 /** SaveEnvelope 的 Zod schema */
 const SaveEnvelopeSchema = z.object({
-  schemaVersion: z.number(),
+  schemaVersion: z.number().int().min(0),
   contentVersion: z.string(),
-  revision: z.number(),
+  revision: z.number().int().min(0),
   savedAt: z.number(),
   state: PlayerSaveSchema,
 });
 
-/**
- * 检测原始数据的存档版本。
- *
- * @param data 反序列化后的存档数据
- * @returns 版本号（0 表示无版本号的旧存档，-1 表示无法识别）
- */
-export function detectSchemaVersion(data: unknown): number {
-  if (!data || typeof data !== 'object') return -1;
-  const obj = data as Record<string, unknown>;
-
-  // 有 SaveEnvelope 结构
-  if (typeof obj.schemaVersion === 'number') {
-    // 必须是非负有限整数
-    if (!Number.isFinite(obj.schemaVersion) || obj.schemaVersion < 0) return -1;
-    return obj.schemaVersion;
-  }
-
-  // 无版本号但有 PlayerSave 基本结构 → v0 旧存档
-  if (
-    typeof obj.currentPositionId === 'string' &&
-    typeof obj.currentLevel === 'number' &&
-    typeof obj.characterName === 'string'
-  ) {
-    return 0;
-  }
-
-  return -1; // 无法识别
-}
+// ===== 公开 API =====
 
 /**
- * 验证 PlayerSave 数据是否符合当前 schema。
- *
- * @param data 待验证数据
- * @returns 验证结果
- */
-export function validatePlayerSave(data: unknown): { valid: boolean; error?: string } {
-  const result = PlayerSaveSchema.safeParse(data);
-  if (result.success) {
-    return { valid: true };
-  }
-  return { valid: false, error: result.error.message };
-}
-
-/**
- * 验证 SaveEnvelope 数据。
- *
- * @param data 待验证数据
- * @returns 验证结果
- */
-export function validateSaveEnvelope(data: unknown): { valid: boolean; error?: string } {
-  const result = SaveEnvelopeSchema.safeParse(data);
-  if (result.success) {
-    return { valid: true };
-  }
-  return { valid: false, error: result.error.message };
-}
-
-/**
- * 创建存档备份到 localStorage。
+ * 创建不兼容存档的只读备份。
  *
  * @param rawData 原始存档 JSON 字符串
- * @param version 存档版本号
+ * @returns 备份 key（空字符串表示备份失败）
  */
-export function createBackup(rawData: string, version: number): string {
-  const backupKey = `${BACKUP_KEY_PREFIX}${version}_${Date.now()}`;
+export function createIncompatibleBackup(rawData: string): string {
+  const backupKey = `${BACKUP_KEY_PREFIX}${Date.now()}`;
   try {
     localStorage.setItem(backupKey, rawData);
     return backupKey;
   } catch {
-    // localStorage 不可用时返回空字符串
     return '';
   }
 }
 
 /**
- * 执行存档迁移。
+ * 严格解码已解析的存档数据。
  *
- * 迁移流程：
- * 1. 检测源版本
- * 2. 创建备份
- * 3. 逐步执行迁移链
- * 4. 验证最终结果
- * 5. 返回迁移结果或错误
+ * 只接受当前版本的完整 SaveEnvelope，拒绝所有其他格式。
+ *
+ * @param data 已解析的存档数据
+ * @returns 解码结果
+ */
+export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
+  if (!data || typeof data !== 'object') {
+    return { success: false, error: 'invalid_envelope', detail: '数据不是有效对象' };
+  }
+
+  const obj = data as Record<string, unknown>;
+
+  // 检测裸旧版 PlayerSave（无 schemaVersion 但有 currentPositionId）
+  if (typeof obj.schemaVersion !== 'number' && typeof obj.currentPositionId === 'string') {
+    return {
+      success: false,
+      error: 'legacy_save_unsupported',
+      detail: '本次大型版本不兼容旧存档，需要重新开始',
+    };
+  }
+
+  // 必须有 schemaVersion
+  if (typeof obj.schemaVersion !== 'number') {
+    return { success: false, error: 'invalid_envelope', detail: '缺失 schemaVersion' };
+  }
+
+  // 拒绝未来版本
+  if (obj.schemaVersion > CURRENT_SCHEMA_VERSION) {
+    return {
+      success: false,
+      error: 'future_version',
+      detail: `存档版本 v${obj.schemaVersion} 高于当前支持的 v${CURRENT_SCHEMA_VERSION}，请更新客户端`,
+    };
+  }
+
+  // 拒绝低版本（不兼容旧存档）
+  if (obj.schemaVersion < CURRENT_SCHEMA_VERSION) {
+    return {
+      success: false,
+      error: 'legacy_save_unsupported',
+      detail: `存档版本 v${obj.schemaVersion} 低于当前版本 v${CURRENT_SCHEMA_VERSION}，本次大型版本不兼容旧存档`,
+    };
+  }
+
+  // 验证完整 Envelope 结构
+  const envelopeResult = SaveEnvelopeSchema.safeParse(data);
+  if (!envelopeResult.success) {
+    return {
+      success: false,
+      error: 'invalid_envelope',
+      detail: `存档结构验证失败: ${envelopeResult.error.message}`,
+    };
+  }
+
+  return { success: true, state: envelopeResult.data.state as PlayerSave };
+}
+
+/**
+ * 严格解码原始 JSON 字符串存档。
  *
  * @param rawData 原始存档 JSON 字符串
- * @returns 迁移结果
+ * @returns 解码结果
  */
-export function migrateSave(rawData: string): MigrationResult {
+export function decodeCurrentSave(rawData: string): SaveDecodeResult {
   let data: unknown;
   try {
     data = JSON.parse(rawData);
   } catch {
-    // JSON 解析失败也创建备份
-    const backupKey = createBackup(rawData, -1);
-    return { success: false, error: '存档 JSON 解析失败', backup: backupKey || null };
+    return { success: false, error: 'invalid_json', detail: '存档 JSON 解析失败' };
   }
 
-  const sourceVersion = detectSchemaVersion(data);
-  if (sourceVersion === -1) {
-    const backupKey = createBackup(rawData, -1);
-    return { success: false, error: '无法识别的存档格式', backup: backupKey || null };
+  const result = decodeCurrentSaveData(data);
+
+  // 不兼容或损坏的存档创建只读备份
+  if (!result.success && rawData.length > 0) {
+    result.backupKey = createIncompatibleBackup(rawData) || undefined;
   }
 
-  // 拒绝未来版本存档：旧客户端不能加载新版本存档
-  if (sourceVersion > CURRENT_SCHEMA_VERSION) {
-    const backupKey = createBackup(rawData, sourceVersion);
-    return {
-      success: false,
-      error: `存档版本 v${sourceVersion} 高于当前支持的 v${CURRENT_SCHEMA_VERSION}，请更新客户端`,
-      backup: backupKey || null,
-    };
-  }
-
-  // 已经是最新版本
-  if (sourceVersion === CURRENT_SCHEMA_VERSION) {
-    const obj = data as Record<string, unknown>;
-    const state = (obj.state ?? obj) as unknown as PlayerSave;
-    const validation = validatePlayerSave(state);
-    if (!validation.valid) {
-      const backupKey = createBackup(rawData, sourceVersion);
-      return {
-        success: false,
-        error: `存档验证失败: ${validation.error}`,
-        backup: backupKey || null,
-      };
-    }
-    return { success: true, state, migratedFrom: sourceVersion };
-  }
-
-  // 创建备份
-  const backupKey = createBackup(rawData, sourceVersion);
-
-  // 提取初始状态
-  let currentState: Record<string, unknown>;
-  const obj = data as Record<string, unknown>;
-  if (obj.state && typeof obj.state === 'object') {
-    currentState = obj.state as Record<string, unknown>;
-  } else {
-    currentState = obj;
-  }
-
-  // 逐步迁移
-  let currentVersion = sourceVersion;
-  while (currentVersion < CURRENT_SCHEMA_VERSION) {
-    const migration = MIGRATIONS.find((m) => m.fromVersion === currentVersion);
-    if (!migration) {
-      return {
-        success: false,
-        error: `缺少从 v${currentVersion} 到 v${currentVersion + 1} 的迁移路径`,
-        backup: backupKey || null,
-      };
-    }
-
-    try {
-      currentState = migration.migrate(currentState);
-      currentVersion = migration.toVersion;
-    } catch (err) {
-      return {
-        success: false,
-        error: `迁移 v${migration.fromVersion} → v${migration.toVersion} 失败: ${err}`,
-        backup: backupKey || null,
-      };
-    }
-  }
-
-  // 验证最终结果
-  const validation = validatePlayerSave(currentState);
-  if (!validation.valid) {
-    return {
-      success: false,
-      error: `迁移后验证失败: ${validation.error}`,
-      backup: backupKey || null,
-    };
-  }
-
-  return {
-    success: true,
-    state: currentState as unknown as PlayerSave,
-    migratedFrom: sourceVersion,
-  };
+  return result;
 }
 
 /**
@@ -447,24 +340,15 @@ export function wrapSaveEnvelope(state: PlayerSave, existingRevision = 0): SaveE
 }
 
 /**
- * 从 SaveEnvelope 或裸 PlayerSave 中提取游戏状态。
+ * 验证 PlayerSave 数据是否符合当前 schema。
  *
- * @param data 存档数据
- * @returns PlayerSave 或 null
+ * @param data 待验证数据
+ * @returns 验证结果
  */
-export function extractPlayerSave(data: unknown): PlayerSave | null {
-  if (!data || typeof data !== 'object') return null;
-  const obj = data as Record<string, unknown>;
-
-  // SaveEnvelope 格式
-  if (obj.state && typeof obj.state === 'object') {
-    return obj.state as PlayerSave;
+export function validatePlayerSave(data: unknown): { valid: boolean; error?: string } {
+  const result = PlayerSaveSchema.safeParse(data);
+  if (result.success) {
+    return { valid: true };
   }
-
-  // 裸 PlayerSave 格式
-  if (typeof obj.currentPositionId === 'string') {
-    return obj as unknown as PlayerSave;
-  }
-
-  return null;
+  return { valid: false, error: result.error.message };
 }
