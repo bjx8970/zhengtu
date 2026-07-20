@@ -44,9 +44,7 @@ import { scoreToKPITier } from '../engine/governance/kpi';
 import { getConfigLoader } from '../config/loader';
 import { normalizeAllSpectrums } from '../engine/career/spectrum-constraint';
 import { calculateDeviationPenalty } from '../engine/career/deviation-penalty';
-import { deriveStyleDeltas, collectAllStyleIds } from '../engine/career/style-derivation';
 import { decayStyleScores } from '../engine/career/style-decay';
-import type { AnnualActionRecord } from '../engine/career/style-derivation';
 import { clamp, clampAttr } from '../utils/math';
 import { writeLocalSave } from '../services/save-repo';
 import { resolveDemocraticVote, resolveOrgInspection } from '../engine/career/promotion';
@@ -492,34 +490,6 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
           dimensions,
         });
         draft.yearsInCurrentPosition += 1;
-
-        // Phase C: 年度风格派生
-        const styleCfgA = getConfigLoader().getLeadershipStyleConfig();
-        if (position) {
-          const completedActionsForDerivation = completeActions(draft.slots, draft.totalDaysPlayed);
-          const annualActions: AnnualActionRecord[] = [];
-          for (const c of completedActionsForDerivation) {
-            const deptCfg = position.departments.find((d) => d.id === c.occupant.deptId);
-            const actCfg = deptCfg?.actions.find((a) => a.id === c.occupant.actionId);
-            if (actCfg) {
-              annualActions.push({
-                actionName: actCfg.name,
-                styleAlignment: actCfg.styleAlignment,
-              });
-            }
-          }
-
-          const allIds = collectAllStyleIds(styleCfgA);
-          const deltas = deriveStyleDeltas(annualActions, allIds);
-          for (const [styleId, delta] of Object.entries(deltas)) {
-            if (delta !== 0) applyStyleDelta(draft, styleId, delta);
-          }
-        }
-        break;
-      }
-      case 'style_conflict': {
-        draft.vigor = clampAttr('vigor', (draft.vigor ?? 100) - 5, cfg.attributeBounds);
-        draft.ambition = clampAttr('ambition', (draft.ambition ?? 100) - 5, cfg.attributeBounds);
         break;
       }
       default:
@@ -586,9 +556,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           getConfigLoader().getLeadershipStyleConfig().styleSpectrums,
           getConfigLoader().getLeadershipStyleConfig().deviationPenalty,
         );
+        draft._pendingDeviationMultiplier = devResult.effectivenessMultiplier;
         // 标记冲突状态供 ADVANCE_TIME 处理
         if (devResult.styleConflictTriggered) {
-          (draft as unknown as Record<string, unknown>).pendingStyleConflict = true;
+          draft.pendingStyleConflict = true;
         }
       }
 
@@ -648,6 +619,9 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       const completed = completeActions(draft.slots, draft.totalDaysPlayed);
       const notifications: CompletedActionNotification[] = [];
 
+      const devMult = draft._pendingDeviationMultiplier ?? 1;
+      delete draft._pendingDeviationMultiplier;
+
       for (const c of completed) {
         const slotOccupant = c.occupant;
         const deptCfg = currentPosition?.departments.find((d) => d.id === slotOccupant.deptId);
@@ -669,13 +643,13 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
               } else if (kpi.operation === 'set') {
                 deptState.kpiValues[kpi.indicatorId] = kpi.delta;
               } else {
-                deptState.kpiValues[kpi.indicatorId] = cur + kpi.delta;
+                deptState.kpiValues[kpi.indicatorId] = cur + kpi.delta * devMult;
               }
             }
           }
           for (const change of effects.playerChanges) {
             if (change.operation === 'add') {
-              applyPlayerAttr(draft, change.attr, change.delta, cfgAdv.attributeBounds);
+              applyPlayerAttr(draft, change.attr, change.delta * devMult, cfgAdv.attributeBounds);
             } else if (change.operation === 'multiply' || change.operation === 'set') {
               const cur = getPlayerAttr(draft, change.attr);
               const newVal = change.operation === 'multiply' ? cur * change.delta : change.delta;
@@ -691,8 +665,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           }
 
           // Phase C: 处理风格冲突
-          if ((draft as unknown as Record<string, unknown>).pendingStyleConflict) {
-            delete (draft as unknown as Record<string, unknown>).pendingStyleConflict;
+          if (draft.pendingStyleConflict) {
+            delete draft.pendingStyleConflict;
             draft.vigor = clampAttr('vigor', (draft.vigor ?? 100) - 5, cfgAdv.attributeBounds);
             draft.ambition = clampAttr(
               'ambition',
@@ -855,13 +829,20 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       if (!ps) break;
 
       const cfgPromoStore = getConfigLoader().getGameConfig();
+      const styleSpectrums = getConfigLoader().getLeadershipStyleConfig().styleSpectrums;
       const ctxStore = buildPromotionContext(draft);
       const choices = action.choices ?? {};
       const rng = action._rng ?? Math.random;
 
       switch (ps.currentStage) {
         case PromotionStage.DemocraticVote: {
-          const result = resolveDemocraticVote(ctxStore, choices, cfgPromoStore, rng);
+          const result = resolveDemocraticVote(
+            ctxStore,
+            choices,
+            cfgPromoStore,
+            rng,
+            styleSpectrums,
+          );
           ps.stageResults.democraticVotes = result.votes;
           if (result.flaggedForRisk) ps.flaggedForRisk = true;
           if (result.passed) {
@@ -926,7 +907,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           break;
         }
         case PromotionStage.CommitteeVote: {
-          const result = resolveCommitteeVote(ctxStore, cfgPromoStore, rng);
+          const result = resolveCommitteeVote(ctxStore, cfgPromoStore, rng, styleSpectrums);
           ps.stageResults.committeeForVotes = result.forVotes;
           ps.stageResults.committeeAgainstVotes = result.againstVotes;
           if (result.passed) {

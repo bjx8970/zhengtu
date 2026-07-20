@@ -14,6 +14,7 @@ import { createTestStore } from '../../../store/game-store';
 import { KPITier } from '../../../types/enums';
 
 const cfg = getConfigLoader().getGameConfig();
+const styleSpectrums = getConfigLoader().getLeadershipStyleConfig().styleSpectrums;
 
 function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
   return {
@@ -44,27 +45,38 @@ function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
 describe('calculateStyleFuzzinessPenalty', () => {
   it('清晰风格 → 无惩罚', () => {
     // innovation-principled 差值 30 > fuzzyThreshold 10 → 非模糊
-    expect(calculateStyleFuzzinessPenalty({ innovation: 30, pragmatic: 0, principled: 0 })).toBe(0);
+    expect(
+      calculateStyleFuzzinessPenalty(
+        { innovation: 30, pragmatic: 0, principled: 0 },
+        styleSpectrums,
+      ),
+    ).toBe(0);
   });
 
   it('风格模糊 → 触发惩罚因子', () => {
     // innovation-principled 差值 5 ≤ fuzzyThreshold 10 → 模糊
-    const result = calculateStyleFuzzinessPenalty({
-      innovation: 50,
-      pragmatic: 20,
-      principled: 55,
-    });
+    const result = calculateStyleFuzzinessPenalty(
+      {
+        innovation: 50,
+        pragmatic: 20,
+        principled: 55,
+      },
+      styleSpectrums,
+    );
     expect(result).toBeGreaterThan(0);
     expect(result).toBeLessThanOrEqual(1);
   });
 
   it('另一清晰组合 → 无惩罚', () => {
     // innovation-principled 差值 60 > fuzzyThreshold 10 → 非模糊
-    const result = calculateStyleFuzzinessPenalty({
-      innovation: 80,
-      pragmatic: 20,
-      principled: 20,
-    });
+    const result = calculateStyleFuzzinessPenalty(
+      {
+        innovation: 80,
+        pragmatic: 20,
+        principled: 20,
+      },
+      styleSpectrums,
+    );
     expect(result).toBe(0);
   });
 });

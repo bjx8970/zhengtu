@@ -279,6 +279,12 @@ export interface PlayerSave {
   /** 终局状态（L11 达成后激活） */
   endgameReached: boolean;
 
+  /** Phase C: 待处理的风格冲突标记（START_ACTION 设置，ADVANCE_TIME 消费后清除） */
+  pendingStyleConflict?: boolean;
+
+  /** Phase C: START_ACTION 阶段的偏离乘数，ADVANCE_TIME 中应用并清除 */
+  _pendingDeviationMultiplier?: number;
+
   // ===== 元数据 =====
   /** Unix 时间戳，用于本地/远程存档仲裁 */
   updatedAt: number;

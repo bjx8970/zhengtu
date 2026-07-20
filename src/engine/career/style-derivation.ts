@@ -8,11 +8,7 @@
  * 所有函数为纯函数，不依赖任何外部状态。
  */
 
-/** 单个行动的年度记录（供风格派生使用） */
-export interface AnnualActionRecord {
-  actionName: string;
-  styleAlignment?: string;
-}
+import type { AnnualActionRecord } from '../../types/game';
 
 /**
  * 根据全年行动记录计算风格评分年度增量。

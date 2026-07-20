@@ -12,7 +12,7 @@
  */
 
 import type { PromotionContext } from '../../types/game';
-import type { GameConfig } from '../../types/config';
+import type { GameConfig, StyleSpectrumConfig } from '../../types/config';
 import { calculateStyleFuzzinessPenalty } from './philosophy-imbalance';
 
 /**
@@ -68,15 +68,17 @@ export function resolveJointReview(
  * 赞成率 = 平均风格评分 / 100 - 风格失衡修正
  * 每张票独立模拟，赞成过半即通过。
  *
- * @param ctx 晋升上下文
- * @param cfg 晋升配置常量
- * @param rng 随机数生成器（默认 Math.random）
+ * @param ctx       晋升上下文
+ * @param cfg       晋升配置常量
+ * @param rng       随机数生成器（默认 Math.random）
+ * @param spectrums 风格光谱配置列表
  * @returns 是否通过 + 赞成/反对票数 + 详情
  */
 export function resolveCommitteeVote(
   ctx: PromotionContext,
   cfg: GameConfig,
   rng: () => number = Math.random,
+  spectrums: StyleSpectrumConfig[] = [],
 ): {
   passed: boolean;
   forVotes: number;
@@ -96,7 +98,7 @@ export function resolveCommitteeVote(
 
   const approvalRate = avgStyleScore / 100;
 
-  const fuzziness = calculateStyleFuzzinessPenalty(ctx.styleScores);
+  const fuzziness = calculateStyleFuzzinessPenalty(ctx.styleScores, spectrums);
   const finalRate = Math.max(approvalRate - fuzziness, 0.1);
 
   let forVotes = 0;
