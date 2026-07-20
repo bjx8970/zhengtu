@@ -3,7 +3,10 @@
  *
  * 单一工作台布局，自上而下包含：
  * - 信息栏：人物名称、职务、就职位置、当前日期、设置按钮
+ * - 信息提醒：KPI 低完成度等自动提醒横幅
  * - 时间推进模块：推进1天/1周/1月
+ * - 玩家属性面板：九大基础属性（值+进度条）和资源指标
+ * - 从政理念面板：三种风格评分卡片
  * - 日程规划模块：主要日程(3格)、次要日程(2格)、紧急日程(1格)，进度条展示
  * - 工作台卡片区：按功能分类的政务操作入口
  */
@@ -19,6 +22,8 @@ import { formatDate } from '../../utils/format';
 import { parsePositionIndex } from '../../utils/position';
 import type { SlotOccupant, SlotTierKey } from '../../types/player';
 import { colors, font } from '../../utils/theme';
+import { PlayerAttributesPanel } from '../../components/player-attributes-panel';
+import { PhilosophyPanel } from '../../components/philosophy-panel';
 
 /** 时间推进选项 */
 const GRANULARITIES: { label: string; desc: string; granularity: 'day' | 'week' | 'month' }[] = [
@@ -285,6 +290,9 @@ export function HomePage() {
           </For>
         </div>
       </section>
+
+      <PlayerAttributesPanel />
+      <PhilosophyPanel />
 
       {/* ═══ 日程规划 ═══ */}
       <section
