@@ -13,7 +13,6 @@ import type {
   SentimentType,
   OrgInspectResult,
   PromotionStage,
-  LeadershipStyle,
   InvestigationEvidence,
   CareerLine,
 } from './enums';
@@ -29,7 +28,8 @@ export interface TimeTrigger {
     | 'congress_cycle' // 两会/党代会
     | 'retirement_check' // 退休检测
     | 'random_event' // 随机事件
-    | 'sentiment_generate'; // 舆情生成（rank4+）
+    | 'sentiment_generate' // 舆情生成（rank4+）
+    | 'style_conflict'; // Phase C: 风格冲突事件
   count?: number;
   year?: number;
   eventId?: string;
@@ -192,7 +192,7 @@ export interface PromotionContext {
   yearsInPosition: number;
   politicalCapital: number;
   corruptionRisk: number;
-  styleScores: Record<LeadershipStyle, number>;
+  styleScores: Record<string, number>;
   relations: { colleagues: Record<string, number> };
   assessmentHistory: { score: number; tier: string }[];
   hasDisciplinaryRecord: boolean;
@@ -280,7 +280,7 @@ export interface InvestigationContext {
   evidenceCollected: InvestigationEvidence[];
   playerIntegrity: number;
   playerPoliticalCapital: number;
-  styleScores: Record<LeadershipStyle, number>;
+  styleScores: Record<string, number>;
   hasLawyer: boolean;
 }
 

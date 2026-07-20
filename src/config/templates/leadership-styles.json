@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "styleSpectrums": [
+    {
+      "id": "innovation_vs_principled",
+      "name": "创新—守正光谱",
+      "description": "创新与守正在此消彼长的政治光谱上互相制约",
+      "members": ["innovation", "principled"],
+      "sumCap": 100,
+      "fuzzyThreshold": 10,
+      "fuzzyPenalty": -0.15,
+      "extremeThreshold": 80,
+      "extremeHighThreshold": 95,
+      "extremeActions": {
+        "innovation": [
+          {
+            "id": "extreme_pilot_reform",
+            "name": "试点激进改革",
+            "description": "在未获上级明确支持下强行推进改革试点",
+            "styleAlignment": "innovation",
+            "requiredScore": 80,
+            "durationDays": 14,
+            "category": "major",
+            "cooldownDays": 14,
+            "budgetDelta": 500,
+            "effects": [
+              {
+                "target": "dept.kpi.economy",
+                "operation": "add",
+                "value": 15,
+                "range": { "min": 10, "max": 20 }
+              },
+              { "target": "player.corruptionRisk", "operation": "add", "value": 10 }
+            ],
+            "riskDescription": "可能触发上级督查",
+            "isExtreme": true
+          }
+        ],
+        "principled": [
+          {
+            "id": "extreme_rectification",
+            "name": "整风肃纪运动",
+            "description": "在辖区内发起大规模纪律整肃",
+            "styleAlignment": "principled",
+            "requiredScore": 80,
+            "durationDays": 14,
+            "category": "major",
+            "cooldownDays": 14,
+            "budgetDelta": 300,
+            "effects": [
+              { "target": "dept.kpi.party_building", "operation": "add", "value": 15 },
+              { "target": "player.stability", "operation": "add", "value": -10 }
+            ],
+            "riskDescription": "可能引发基层反弹",
+            "isExtreme": true
+          }
+        ]
+      },
+      "extremeEvents": {
+        "innovation": [],
+        "principled": []
+      }
+    }
+  ],
+  "independentStyles": [
+    {
+      "id": "pragmatic",
+      "name": "实干务实",
+      "description": "独立维度，不受光谱约束",
+      "max": 100,
+      "defaultDecayRate": 0.99,
+      "extremeActions": {}
+    }
+  ],
+  "deviationPenalty": {
+    "effectivenessMultiplier": 0.7,
+    "minStyleDiffForOpposition": 40,
+    "styleConflictThreshold": 80
+  },
+  "styleDecayFactor": 0.99,
+  "defaultStyleDecayRate": 0.99
+}

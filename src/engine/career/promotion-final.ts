@@ -13,7 +13,7 @@
 
 import type { PromotionContext } from '../../types/game';
 import type { GameConfig } from '../../types/config';
-import { calculateImbalancePenalty } from './philosophy-imbalance';
+import { calculateStyleFuzzinessPenalty } from './philosophy-imbalance';
 
 /**
  * 阶段3 — 多部门联审。
@@ -96,8 +96,8 @@ export function resolveCommitteeVote(
 
   const approvalRate = avgStyleScore / 100;
 
-  const stylePenalty = calculateImbalancePenalty(ctx.styleScores) / 100;
-  const finalRate = Math.max(approvalRate - stylePenalty, 0.1);
+  const fuzziness = calculateStyleFuzzinessPenalty(ctx.styleScores);
+  const finalRate = Math.max(approvalRate - fuzziness, 0.1);
 
   let forVotes = 0;
   for (let i = 0; i < committeeSize; i++) {

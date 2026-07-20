@@ -15,7 +15,6 @@ import type {
   PromotionStage,
   OrgInspectResult,
   ReserveCadreTier,
-  LeadershipStyle,
   SecretaryLevel,
   TimeGranularity,
 } from './enums';
@@ -113,7 +112,7 @@ export interface RelationState {
 /** 从政理念风格评分 */
 export interface LeadershipStyleState {
   /** 各风格评分值（0~100），非互斥非归属，仅反映数值倾向 */
-  scores: { [K in LeadershipStyle]: number };
+  scores: Record<string, number>;
 }
 
 /** 接班人培养状态 */

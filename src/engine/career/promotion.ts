@@ -13,7 +13,7 @@
 import type { PromotionContext } from '../../types/game';
 import type { PromotionRequirement, GameConfig } from '../../types/config';
 import { OrgInspectResult } from '../../types/enums';
-import { calculateImbalancePenalty } from './philosophy-imbalance';
+import { calculateStyleFuzzinessPenalty } from './philosophy-imbalance';
 
 /**
  * 晋升门槛校验。
@@ -87,8 +87,8 @@ export function resolveDemocraticVote(
     }
   }
 
-  const stylePenalty = calculateImbalancePenalty(ctx.styleScores);
-  baseScore -= stylePenalty;
+  const fuzzinessFactor = calculateStyleFuzzinessPenalty(ctx.styleScores);
+  baseScore -= baseScore * fuzzinessFactor;
 
   const passed = baseScore >= promo.passThreshold;
 
