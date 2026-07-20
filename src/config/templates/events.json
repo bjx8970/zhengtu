@@ -26,7 +26,7 @@
         "description": "立即向上级报告请求支援，等待上级派员指挥。",
         "effects": [
           { "target": "player.performance", "value": 2 },
-          { "target": "player.superiorFavor", "value": -3 }
+          { "target": "player.network", "value": -3 }
         ]
       }
     ]
@@ -52,7 +52,7 @@
         "effects": [
           { "target": "player.integrity", "value": -3 },
           { "target": "player.corruptionRisk", "value": 5 },
-          { "target": "player.superiorFavor", "value": 2 }
+          { "target": "player.network", "value": 2 }
         ]
       },
       {

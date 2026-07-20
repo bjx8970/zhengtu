@@ -13,7 +13,7 @@
 import type { PromotionContext } from '../../types/game';
 import type { PromotionRequirement, GameConfig } from '../../types/config';
 import { OrgInspectResult } from '../../types/enums';
-import { calculateFactionPenalty } from './faction-penalty';
+import { calculateImbalancePenalty } from './philosophy-imbalance';
 
 /**
  * 晋升门槛校验。
@@ -55,7 +55,7 @@ export function checkPrerequisites(
 /**
  * 阶段1 — 民主推荐。
  *
- * 得票 = 考核得分×0.4 + 魅力×0.3 + 上司好感×0.3
+ * 得票 = 考核得分×0.5 + 魅力×0.5
  * 玩家可动用人脉拉票 (+10 分，30% 概率留负面记录)。
  *
  * @param ctx     晋升上下文
@@ -76,7 +76,7 @@ export function resolveDemocraticVote(
   flaggedForRisk?: boolean;
 } {
   const promo = cfg.promotion.democraticVote;
-  let baseScore = ctx.playerScore * 0.4 + ctx.charisma * 0.3 + ctx.superiorFavor * 0.3;
+  let baseScore = ctx.playerScore * 0.5 + ctx.charisma * 0.5;
 
   let flaggedForRisk = false;
 
@@ -87,8 +87,8 @@ export function resolveDemocraticVote(
     }
   }
 
-  const factionPenalty = calculateFactionPenalty(ctx.factionReputation);
-  baseScore -= factionPenalty;
+  const stylePenalty = calculateImbalancePenalty(ctx.styleScores);
+  baseScore -= stylePenalty;
 
   const passed = baseScore >= promo.passThreshold;
 

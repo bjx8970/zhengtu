@@ -6,7 +6,7 @@ import {
   resolvePublicNotice,
   resolveProbation,
 } from '../promotion-final';
-import { calculateFactionPenalty } from '../faction-penalty';
+import { calculateImbalancePenalty } from '../philosophy-imbalance';
 import { getConfigLoader } from '../../../config/loader';
 import { OrgInspectResult } from '../../../types/enums';
 import type { PromotionContext } from '../../../types/game';
@@ -22,7 +22,7 @@ function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
     yearsInPosition: 4,
     politicalCapital: 30,
     corruptionRisk: 10,
-    factionReputation: { reform: 20, pragmatic: 30, conservative: 15 },
+    styleScores: { innovation: 20, pragmatic: 30, principled: 15 },
     relations: { colleagues: {} },
     assessmentHistory: [
       { score: 85, tier: '称职' },
@@ -33,7 +33,7 @@ function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
     hasGrassrootsExperience: true,
     hasMultiRegionExperience: false,
     charisma: 60,
-    superiorFavor: 40,
+    superiorFavor: 0,
     performance: 70,
     competence: 65,
     integrity: 55,
@@ -41,19 +41,19 @@ function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
   };
 }
 
-describe('calculateFactionPenalty', () => {
+describe('calculateImbalancePenalty', () => {
   it('单派系有声望 → 0', () => {
-    expect(calculateFactionPenalty({ reform: 30, pragmatic: 0, conservative: 0 })).toBe(0);
+    expect(calculateImbalancePenalty({ innovation: 30, pragmatic: 0, principled: 0 })).toBe(0);
   });
 
   it('双派系差距大 → 高分惩罚', () => {
-    const result = calculateFactionPenalty({ reform: 80, pragmatic: 20, conservative: 0 });
+    const result = calculateImbalancePenalty({ innovation: 80, pragmatic: 20, principled: 0 });
     expect(result).toBeGreaterThan(0);
     expect(result).toBeLessThanOrEqual(15);
   });
 
   it('三派系均衡 → 低惩罚', () => {
-    const result = calculateFactionPenalty({ reform: 30, pragmatic: 30, conservative: 30 });
+    const result = calculateImbalancePenalty({ innovation: 30, pragmatic: 30, principled: 30 });
     expect(result).toBe(0);
   });
 });
@@ -134,7 +134,7 @@ describe('resolveDemocraticVote', () => {
       playerScore: 55,
       charisma: 55,
       superiorFavor: 55,
-      factionReputation: { reform: 0, pragmatic: 0, conservative: 0 },
+      styleScores: { innovation: 0, pragmatic: 0, principled: 0 },
     });
     const result = resolveDemocraticVote(ctx, { useConnections: true }, cfg);
     expect(result.passed).toBe(true);
@@ -151,7 +151,7 @@ describe('resolveDemocraticVote', () => {
       playerScore: 60,
       charisma: 60,
       superiorFavor: 60,
-      factionReputation: { reform: 0, pragmatic: 0, conservative: 0 },
+      styleScores: { innovation: 0, pragmatic: 0, principled: 0 },
     });
     const result = resolveDemocraticVote(ctx, {}, cfg);
     expect(result.passed).toBe(true);
@@ -230,7 +230,7 @@ describe('resolveCommitteeVote', () => {
   it('高声望 + 高好感 → 通过', () => {
     const ctx = makeCtx({
       superiorFavor: 80,
-      factionReputation: { reform: 70, pragmatic: 60, conservative: 50 },
+      styleScores: { innovation: 70, pragmatic: 60, principled: 50 },
     });
     const result = resolveCommitteeVote(ctx, cfg, () => 0.4);
     expect(result.passed).toBe(true);
@@ -239,7 +239,7 @@ describe('resolveCommitteeVote', () => {
   it('低声望 + 差运气 → 不通过', () => {
     const ctx = makeCtx({
       superiorFavor: 10,
-      factionReputation: { reform: 5, pragmatic: 5, conservative: 5 },
+      styleScores: { innovation: 5, pragmatic: 5, principled: 5 },
     });
     const result = resolveCommitteeVote(ctx, cfg, () => 0.5);
     expect(result.passed).toBe(false);
@@ -322,7 +322,7 @@ describe('store integration', () => {
         { year: 2026, score: 90, tier: KPITier.Excellent },
       ],
       frozenPeriods: 0,
-      superiorFavor: 50,
+      network: 50,
       charisma: 50,
       comprehensiveScore: 80,
       politicalCapital: 30,
@@ -372,11 +372,18 @@ describe('store integration', () => {
       comprehensiveScore: 95,
       charisma: 80,
       competence: 80,
-      integrity: 80,
-      performance: 80,
-      superiorFavor: 80,
+      network: 80,
       corruptionRisk: 0,
       politicalCapital: 50,
+      performance: 80,
+      integrity: 80,
+      philosophy: {
+        scores: {
+          innovation: 70,
+          pragmatic: 70,
+          principled: 70,
+        },
+      },
     });
     // Deterministic "good luck" RNG
     const goodRng = () => 0.3;

@@ -43,12 +43,12 @@ describe('formatEffectLabel', () => {
   describe('player.xxx 前缀', () => {
     it('已知属性 → 中文名 + 数值', () => {
       const eff = makeEffect({ target: 'player.competence', value: 1 });
-      expect(formatEffectLabel(eff)).toBe('能力+1');
+      expect(formatEffectLabel(eff)).toBe('才干+1');
     });
 
     it('已知属性，负值', () => {
       const eff = makeEffect({ target: 'player.stability', value: -2 });
-      expect(formatEffectLabel(eff)).toBe('稳定-2');
+      expect(formatEffectLabel(eff)).toBe('定力-2');
     });
 
     it('未知属性 → 回退到 raw attrKey', () => {
