@@ -244,7 +244,6 @@ export interface AssessmentResult {
   totalScore: number;
   tier: KPITier;
   indicators: KPIResult[];
-  dimensions?: FiveDimensionScore;
 }
 
 /** 游戏内日历事件 */
