@@ -230,11 +230,21 @@ export interface KPIResult {
   weightedScore: number;
 }
 
+/** 德能勤绩廉五维分项得分 */
+export interface FiveDimensionScore {
+  virtue: number;
+  capacity: number;
+  diligenceScore: number;
+  achievement: number;
+  honesty: number;
+}
+
 /** 年度考核结果 */
 export interface AssessmentResult {
   totalScore: number;
   tier: KPITier;
   indicators: KPIResult[];
+  dimensions?: FiveDimensionScore;
 }
 
 /** 游戏内日历事件 */

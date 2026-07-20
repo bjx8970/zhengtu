@@ -373,6 +373,19 @@ const ConstantsSchema = z.object({
   initialAttributes: z.record(z.number()),
   kpiTierColors: z.record(z.string()),
   completionBarThresholds: z.object({ excellent: z.number(), good: z.number() }),
+  fiveDimMapping: z.object({
+    virtue: z.record(z.number().min(0).max(1)),
+    capacity: z.record(z.number().min(0).max(1)),
+    diligenceScore: z.record(z.number().min(0).max(1)),
+    honesty: z.record(z.number().min(0).max(1)),
+  }),
+  comprehensiveScoreWeights: z.object({
+    virtue: z.number().min(0).max(1),
+    capacity: z.number().min(0).max(1),
+    diligenceScore: z.number().min(0).max(1),
+    achievement: z.number().min(0).max(1),
+    honesty: z.number().min(0).max(1),
+  }),
   promotion: z.object({
     democraticVote: z.object({
       passThreshold: z.number(),

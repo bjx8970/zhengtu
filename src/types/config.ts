@@ -227,6 +227,21 @@ export interface GameConfig {
   kpiTierColors: Record<string, string>;
   /** 进度条颜色阈值 */
   completionBarThresholds: { excellent: number; good: number };
+  /** 五维映射权重配置：玩家属性 → 五维分项得分的加权系数 */
+  fiveDimMapping: {
+    virtue: Record<string, number>;
+    capacity: Record<string, number>;
+    diligenceScore: Record<string, number>;
+    honesty: Record<string, number>;
+  };
+  /** 五维到综合分的权重 */
+  comprehensiveScoreWeights: {
+    virtue: number;
+    capacity: number;
+    diligenceScore: number;
+    achievement: number;
+    honesty: number;
+  };
   /** 晋升引擎阈值配置 */
   promotion: PromotionConfig;
 }

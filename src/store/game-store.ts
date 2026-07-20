@@ -39,6 +39,8 @@ import { advanceTime, getGranularityDays } from '../engine/core/time';
 import { monthlySettlement } from '../engine/governance/budget';
 import { calculateKPI } from '../engine/governance/kpi';
 import { annualAssessment as runAnnualAssessment } from '../engine/governance/assessment';
+import { computeFiveDimensions, computeComprehensiveScore } from '../engine/governance/dimensions';
+import { scoreToKPITier } from '../engine/governance/kpi';
 import { getConfigLoader } from '../config/loader';
 import { clamp, clampAttr } from '../utils/math';
 import { writeLocalSave } from '../services/save-repo';
@@ -430,10 +432,30 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
       }
       case 'annual_assessment': {
         if (!position) break;
-        // KPI 考核
+        // Phase B: KPI 计算 → 五维分项 → 综合评分 → 等次
         const kpiResult = calculateKPI(position.kpiIndicators, draft.departmentStates, cfg);
-        // 年度评价
-        const assessment = runAnnualAssessment(kpiResult, draft.yearsInCurrentPosition, cfg);
+        const dimensions = computeFiveDimensions(
+          {
+            integrity: draft.integrity,
+            stability: draft.stability,
+            ambition: draft.ambition,
+            competence: draft.competence,
+            charisma: draft.charisma,
+            network: draft.network,
+            diligence: draft.diligence,
+            vigor: draft.vigor,
+          },
+          kpiResult.totalScore,
+          cfg,
+        );
+        const comprehensiveScore = computeComprehensiveScore(dimensions, cfg);
+        const tier = scoreToKPITier(comprehensiveScore, cfg.kpiTierThresholds);
+        const assessment = runAnnualAssessment(
+          comprehensiveScore,
+          tier,
+          draft.yearsInCurrentPosition,
+          cfg,
+        );
         draft.comprehensiveScore = assessment.score;
         // 冻结期每年递减 1，再累加不称职处罚
         if (draft.frozenPeriods > 0) draft.frozenPeriods -= 1;
@@ -443,6 +465,7 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
           year: trigger.year ?? draft.time.year,
           score: assessment.score,
           tier: assessment.tier,
+          dimensions,
         });
         draft.yearsInCurrentPosition += 1;
         break;
