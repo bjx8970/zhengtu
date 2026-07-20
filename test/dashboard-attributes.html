@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>仪表盘属性面板 - UI 原型</title>
+    <style>
+      :root {
+        --bg-main: #eeece6;
+        --bg-card: #fffdf8;
+        --bg-header: #172b45;
+        --text-primary: #202a35;
+        --text-secondary: #657080;
+        --text-muted: #8d939b;
+        --color-primary: #b3262d;
+        --color-secondary: #284b70;
+        --color-success: #4caf50;
+        --color-warning: #e6a817;
+        --color-danger: #c44d4d;
+        --border-color: #d8d4cc;
+        --radius-md: 4px;
+        --radius-lg: 8px;
+        --font-title: 'STKaiti', 'KaiTi', '楷体', serif;
+        --font-body:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+          sans-serif;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: var(--font-body);
+        background: var(--bg-main);
+        color: var(--text-primary);
+        padding: 20px;
+      }
+      .workspace {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      /* ═══ 属性仪表盘 ═══ */
+      .attr-dashboard {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 18px 20px;
+        margin-top: 16px;
+      }
+      .attr-dashboard__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .attr-dashboard__title {
+        font-size: 16px;
+        font-weight: 700;
+        font-family: var(--font-title);
+      }
+      .attr-dashboard__subtitle {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .attr-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .attr-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: var(--radius-md);
+        background: #f9f7f2;
+        border: 1px solid #ece8de;
+      }
+      .attr-item__icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+        font-family: var(--font-title);
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+        flex-shrink: 0;
+      }
+      .attr-item__info {
+        flex: 1;
+        min-width: 0;
+      }
+      .attr-item__label {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 3px;
+      }
+      .attr-item__bar-wrap {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .attr-item__bar-bg {
+        flex: 1;
+        height: 6px;
+        border-radius: 3px;
+        background: #e8e4dc;
+        overflow: hidden;
+      }
+      .attr-item__bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
+      .attr-item__value {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+        min-width: 28px;
+        text-align: right;
+      }
+
+      /* ═══ 资源栏 ═══ */
+      .resource-bar {
+        display: flex;
+        gap: 12px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border-color);
+      }
+      .resource-item {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: var(--radius-md);
+        background: #f9f7f2;
+      }
+      .resource-item__label {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .resource-item__value {
+        font-size: 16px;
+        font-weight: 700;
+        font-family: var(--font-title);
+      }
+
+      /* ═══ 从政理念 ═══ */
+      .philosophy-section {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 18px 20px;
+        margin-top: 16px;
+      }
+      .philosophy-layout {
+        display: grid;
+        grid-template-columns: 1fr 200px;
+        gap: 16px;
+        margin-top: 12px;
+      }
+      /* ── 光谱 ── */
+      .spectrum-bar {
+        background: #f9f7f2;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 14px 16px;
+      }
+      .spectrum-bar__header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .spectrum-bar__track {
+        position: relative;
+        height: 28px;
+        border-radius: 14px;
+        background: linear-gradient(to right, #3b7f8f, #c44d4d, #284b70);
+        overflow: hidden;
+      }
+      .spectrum-bar__fill-left {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.15);
+        border-right: 2px solid #fff;
+      }
+      .spectrum-bar__fill-right {
+        position: absolute;
+        right: 0;
+        top: 0;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.15);
+        border-left: 2px solid #fff;
+      }
+      .spectrum-bar__labels {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 11px;
+      }
+      .spectrum-bar__labels span:first-child {
+        color: #3b7f8f;
+      }
+      .spectrum-bar__labels span:nth-child(2) {
+        color: var(--text-muted);
+      }
+      .spectrum-bar__labels span:last-child {
+        color: #284b70;
+      }
+      /* ── 务实卡片 ── */
+      .indie-card {
+        text-align: center;
+        padding: 14px 8px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .indie-card__name {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+      }
+      .indie-card__score {
+        font-size: 22px;
+        font-weight: 700;
+        font-family: var(--font-title);
+      }
+      .indie-card__label {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="workspace">
+      <!-- 属性仪表盘 -->
+      <section class="attr-dashboard">
+        <div class="attr-dashboard__header">
+          <div>
+            <div class="attr-dashboard__title">个人属性</div>
+            <div class="attr-dashboard__subtitle">属性影响行动成效、考核评价与晋升表决</div>
+          </div>
+          <div class="attr-dashboard__subtitle">政治资本 120 · 预算余量 3,500 万</div>
+        </div>
+
+        <div class="attr-grid" id="attrGrid"></div>
+
+        <div class="resource-bar">
+          <div class="resource-item">
+            <span class="resource-item__label">政治资本</span>
+            <span class="resource-item__value" style="color: var(--color-warning)">120</span>
+            <span style="font-size: 11px; color: var(--text-muted)">/500</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-item__label">剩余预算</span>
+            <span class="resource-item__value" style="color: var(--color-secondary)">3,500</span>
+            <span style="font-size: 11px; color: var(--text-muted)">万</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-item__label">冻结周期</span>
+            <span class="resource-item__value" style="color: var(--color-danger)">0</span>
+            <span style="font-size: 11px; color: var(--text-muted)">届</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 从政理念 -->
+      <section class="philosophy-section">
+        <h2 style="font-size: 16px; font-weight: 700; font-family: var(--font-title)">从政理念</h2>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px">
+          创新与守正互为光谱（合计 ≤ 100），实干务实为独立维度
+        </p>
+        <div class="philosophy-layout" id="philosophyLayout"></div>
+      </section>
+    </div>
+
+    <script>
+      // ── 模拟数据 ──
+      const attrs = [
+        { key: 'vigor', label: '体魄', value: 100, color: '#4caf50' },
+        { key: 'integrity', label: '品性', value: 50, color: '#284b70' },
+        { key: 'stability', label: '定力', value: 50, color: '#284b70' },
+        { key: 'competence', label: '才干', value: 50, color: '#3b7f8f' },
+        { key: 'charisma', label: '魅力', value: 50, color: '#b78324' },
+        { key: 'network', label: '人脉', value: 10, color: '#b78324' },
+        { key: 'diligence', label: '勤勉', value: 50, color: '#3b7f8f' },
+        { key: 'ambition', label: '怀抱', value: 100, color: '#b3262d' },
+        { key: 'performance', label: '政绩', value: 0, color: '#7b68ee', max: 9999 },
+      ];
+
+      // ── 渲染属性 ──
+      const attrGrid = document.getElementById('attrGrid');
+      attrs.forEach((a) => {
+        const max = a.max || 100;
+        const pct = Math.min((a.value / max) * 100, 100);
+        const barColor = pct >= 80 ? '#4caf50' : pct >= 40 ? '#3b7f8f' : '#c44d4d';
+        const item = document.createElement('div');
+        item.className = 'attr-item';
+        item.innerHTML = `
+          <div class="attr-item__icon" style="background:${a.color}">${a.label.charAt(0)}</div>
+          <div class="attr-item__info">
+            <div class="attr-item__label">${a.label}</div>
+            <div class="attr-item__bar-wrap">
+              <div class="attr-item__bar-bg">
+                <div class="attr-item__bar-fill" style="width:${pct}%;background:${barColor}"></div>
+              </div>
+              <div class="attr-item__value">${a.value}</div>
+            </div>
+          </div>
+        `;
+        attrGrid.appendChild(item);
+      });
+
+      const philosophy = {
+        innovation: 35,
+        pragmatic: 50,
+        principled: 55 /* sum 35+55 = 90 ≤ 100 ✓ */,
+      };
+
+      // ── 渲染从政理念 ──
+      const philosophyLayout = document.getElementById('philosophyLayout');
+
+      // 光谱：创新 vs 守正
+      const spectrum = document.createElement('div');
+      spectrum.className = 'spectrum-bar';
+
+      const innoPct = philosophy.innovation;
+      const prinPct = philosophy.principled;
+      const gapPct = 100 - innoPct - prinPct;
+
+      spectrum.innerHTML = `
+        <div class="spectrum-bar__header">
+          <span>开拓创新 ${innoPct}</span>
+          <span style="font-size:11px;color:${gapPct <= 10 ? 'var(--color-danger)' : 'var(--text-muted)'}">
+            ${gapPct <= 10 ? '⚠ 风格模糊' : '风格清晰'}
+          </span>
+          <span>稳健守正 ${prinPct}</span>
+        </div>
+        <div class="spectrum-bar__track">
+          <div class="spectrum-bar__fill-left" style="width:${innoPct}%"></div>
+          <div class="spectrum-bar__fill-right" style="width:${prinPct}%"></div>
+        </div>
+        <div class="spectrum-bar__labels">
+          <span>开拓创新</span>
+          <span>平衡</span>
+          <span>稳健守正</span>
+        </div>
+      `;
+      philosophyLayout.appendChild(spectrum);
+
+      // 独立卡片：务实
+      const tier = (s) =>
+        s <= 20 ? '薄弱' : s <= 40 ? '一般' : s <= 60 ? '均衡' : s <= 80 ? '突出' : '卓越';
+      const tierColor = (s) =>
+        s <= 20
+          ? '#8d939b'
+          : s <= 40
+            ? '#657080'
+            : s <= 60
+              ? '#284b70'
+              : s <= 80
+                ? '#b78324'
+                : '#4caf50';
+
+      const card = document.createElement('div');
+      card.className = 'indie-card';
+      card.innerHTML = `
+        <div class="indie-card__name">实干务实（独立）</div>
+        <div class="indie-card__score" style="color:#b78324">${philosophy.pragmatic}</div>
+        <span class="indie-card__label" style="color:${tierColor(philosophy.pragmatic)};background:${tierColor(philosophy.pragmatic)}15">${tier(philosophy.pragmatic)}</span>
+      `;
+      philosophyLayout.appendChild(card);
+    </script>
+  </body>
+</html>
