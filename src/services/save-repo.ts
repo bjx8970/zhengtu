@@ -1,48 +1,55 @@
 /**
  * 存档仓库
  *
- * v4 基础工程变更：
- * - 使用 SaveEnvelope 封装存档（含 schemaVersion）
- * - 加载时通过迁移管道处理旧版本存档
- * - 迁移失败时保留备份，不静默加载损坏状态
+ * 本版本不兼容任何旧存档，不提供自动迁移。
+ * 仅支持当前 schemaVersion 的完整 SaveEnvelope。
  *
  * Supabase 读写及本地/远程仲裁函数保留给后续云存档阶段。
  */
 
 import type { PlayerSave } from '../types/player';
-import type { SaveEnvelope } from '../types/save';
+import type { SaveEnvelope, SaveDecodeResult } from '../types/save';
 import { getSupabase } from './supabase';
-import { decodeCurrentSave, wrapSaveEnvelope } from '../store/migrations';
+import { decodeCurrentSave, wrapSaveEnvelope } from '../store/save-codec';
 
 const TABLE_NAME = 'game_saves';
 const SLOT_NAME = 'main';
 const LOCAL_KEY = 'zhengtu_autosave';
 
+/** 本地存档加载结果 */
+export type LocalSaveLoadResult =
+  | { status: 'loaded'; state: PlayerSave }
+  | { status: 'empty' }
+  | { status: 'incompatible' | 'corrupted'; detail: string; backupKey?: string };
+
 /**
  * 从 localStorage 读取本地存档。
  *
  * 使用严格解码器，只接受当前版本的完整 SaveEnvelope。
- * 不兼容存档会被备份并返回 null。
+ * 返回结构化结果，便于 UI 显示不兼容提示。
  *
- * @returns PlayerSave 或 null（无存档/不兼容/损坏）
+ * @returns 结构化加载结果
  */
-export function readLocalSave(): PlayerSave | null {
+export function readLocalSave(): LocalSaveLoadResult {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
-    if (!raw) return null;
+    if (!raw) return { status: 'empty' };
 
-    const result = decodeCurrentSave(raw);
+    const result: SaveDecodeResult = decodeCurrentSave(raw);
 
     if (result.success && result.state) {
-      return result.state;
+      return { status: 'loaded', state: result.state };
     }
 
-    // 不兼容或损坏：记录错误
-    console.error('存档加载失败:', result.error, result.detail);
-    return null;
+    // 不兼容或损坏
+    const status = result.error === 'legacy_save_unsupported' ? 'incompatible' : 'corrupted';
+    return {
+      status,
+      detail: result.detail ?? '存档无法加载',
+      backupKey: result.backupKey,
+    };
   } catch (err) {
-    console.error('读取存档失败:', err);
-    return null;
+    return { status: 'corrupted', detail: `读取存档失败: ${err}` };
   }
 }
 
@@ -55,13 +62,15 @@ export function readLocalSave(): PlayerSave | null {
  */
 export function writeLocalSave(save: PlayerSave): void {
   try {
-    // 读取现有 revision（如果存在）
+    // 读取现有 revision（只接受非负有限整数）
     let revision = 0;
     const existing = localStorage.getItem(LOCAL_KEY);
     if (existing) {
       try {
         const parsed = JSON.parse(existing) as Partial<SaveEnvelope>;
-        revision = parsed.revision ?? 0;
+        const candidate = parsed.revision;
+        revision =
+          Number.isInteger(candidate) && (candidate as number) >= 0 ? (candidate as number) : 0;
       } catch {
         // 忽略解析错误
       }

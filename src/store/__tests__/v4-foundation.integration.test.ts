@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { createTestStore, createInitialState } from '../game-store';
 import { CareerLine } from '../../types/enums';
 import type { PlayerSave, SlotOccupant } from '../../types/player';
-import { decodeCurrentSave, wrapSaveEnvelope } from '../migrations';
+import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
 
 /** 创建带有指定行动的槽位状态 */
 function makeSlotsWithActions(actions: Partial<SlotOccupant>[]): PlayerSave['slots'] {

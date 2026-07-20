@@ -31,10 +31,12 @@ describe('存档严格解码器', () => {
       expect(result.state?.characterName).toBe('测试角色');
     });
 
-    it('JSON 解析失败返回 invalid_json', () => {
+    it('JSON 解析失败返回 invalid_json 并创建备份', () => {
       const result = decodeCurrentSave('invalid json{{{');
       expect(result.success).toBe(false);
       expect(result.error).toBe('invalid_json');
+      expect(result.backupKey).toBeDefined();
+      expect(localStorage.getItem(result.backupKey!)).toBe('invalid json{{{');
     });
 
     it('裸 PlayerSave 被识别为不兼容旧存档', () => {

@@ -9,6 +9,7 @@
  * → 完整验证 Envelope 和 PlayerSave → 成功加载
  *
  * 拒绝：裸旧版 PlayerSave、低版本、未来版本、缺失元数据、结构验证失败。
+ * 不兼容或损坏的存档会被移动到只读备份 key，避免重复备份。
  */
 
 import { z } from 'zod';
@@ -16,10 +17,30 @@ import type { PlayerSave } from '../../types/player';
 import type { SaveEnvelope, SaveDecodeResult } from '../../types/save';
 import { CURRENT_SCHEMA_VERSION, CURRENT_CONTENT_VERSION } from '../../types/save';
 
-/** 存档备份的 localStorage key 前缀 */
-const BACKUP_KEY_PREFIX = 'zhengtu_incompatible_backup_';
+/** 不兼容存档备份的 localStorage key */
+const INCOMPATIBLE_BACKUP_KEY = 'zhengtu_incompatible_save';
 
-// ===== Zod Schema 验证 =====
+/**
+ * 将不兼容存档移动到只读备份 key。
+ *
+ * 使用固定 key 避免重复备份耗尽 localStorage。
+ * 已存在备份时不覆盖（保留最早的不兼容存档）。
+ *
+ * @param rawData 原始存档 JSON 字符串
+ * @returns 备份 key（空字符串表示备份失败或已存在）
+ */
+export function backupIncompatibleSave(rawData: string): string {
+  try {
+    // 已存在备份时不重复创建
+    if (localStorage.getItem(INCOMPATIBLE_BACKUP_KEY)) {
+      return INCOMPATIBLE_BACKUP_KEY;
+    }
+    localStorage.setItem(INCOMPATIBLE_BACKUP_KEY, rawData);
+    return INCOMPATIBLE_BACKUP_KEY;
+  } catch {
+    return '';
+  }
+}
 
 /** SlotOccupant 的 Zod schema */
 const SlotOccupantSchema = z.object({
@@ -223,22 +244,6 @@ const SaveEnvelopeSchema = z.object({
 // ===== 公开 API =====
 
 /**
- * 创建不兼容存档的只读备份。
- *
- * @param rawData 原始存档 JSON 字符串
- * @returns 备份 key（空字符串表示备份失败）
- */
-export function createIncompatibleBackup(rawData: string): string {
-  const backupKey = `${BACKUP_KEY_PREFIX}${Date.now()}`;
-  try {
-    localStorage.setItem(backupKey, rawData);
-    return backupKey;
-  } catch {
-    return '';
-  }
-}
-
-/**
  * 严格解码已解析的存档数据。
  *
  * 只接受当前版本的完整 SaveEnvelope，拒绝所有其他格式。
@@ -309,14 +314,21 @@ export function decodeCurrentSave(rawData: string): SaveDecodeResult {
   try {
     data = JSON.parse(rawData);
   } catch {
-    return { success: false, error: 'invalid_json', detail: '存档 JSON 解析失败' };
+    // JSON 解析失败也创建备份
+    const backupKey = backupIncompatibleSave(rawData);
+    return {
+      success: false,
+      error: 'invalid_json',
+      detail: '存档 JSON 解析失败',
+      backupKey: backupKey || undefined,
+    };
   }
 
   const result = decodeCurrentSaveData(data);
 
   // 不兼容或损坏的存档创建只读备份
   if (!result.success && rawData.length > 0) {
-    result.backupKey = createIncompatibleBackup(rawData) || undefined;
+    result.backupKey = backupIncompatibleSave(rawData) || undefined;
   }
 
   return result;
