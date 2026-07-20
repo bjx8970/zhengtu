@@ -94,7 +94,7 @@ const SaveEnvelopeSchema = z.object({
  * 检测原始数据的存档版本。
  *
  * @param data 反序列化后的存档数据
- * @returns 版本号（0 表示无版本号的旧存档）
+ * @returns 版本号（0 表示无版本号的旧存档，-1 表示无法识别）
  */
 export function detectSchemaVersion(data: unknown): number {
   if (!data || typeof data !== 'object') return -1;
@@ -102,6 +102,8 @@ export function detectSchemaVersion(data: unknown): number {
 
   // 有 SaveEnvelope 结构
   if (typeof obj.schemaVersion === 'number') {
+    // 必须是非负有限整数
+    if (!Number.isFinite(obj.schemaVersion) || obj.schemaVersion < 0) return -1;
     return obj.schemaVersion;
   }
 
@@ -180,22 +182,39 @@ export function migrateSave(rawData: string): MigrationResult {
   try {
     data = JSON.parse(rawData);
   } catch {
-    return { success: false, error: '存档 JSON 解析失败', backup: null };
+    // JSON 解析失败也创建备份
+    const backupKey = createBackup(rawData, -1);
+    return { success: false, error: '存档 JSON 解析失败', backup: backupKey || null };
   }
 
   const sourceVersion = detectSchemaVersion(data);
   if (sourceVersion === -1) {
-    return { success: false, error: '无法识别的存档格式', backup: null };
+    const backupKey = createBackup(rawData, -1);
+    return { success: false, error: '无法识别的存档格式', backup: backupKey || null };
+  }
+
+  // 拒绝未来版本存档：旧客户端不能加载新版本存档
+  if (sourceVersion > CURRENT_SCHEMA_VERSION) {
+    const backupKey = createBackup(rawData, sourceVersion);
+    return {
+      success: false,
+      error: `存档版本 v${sourceVersion} 高于当前支持的 v${CURRENT_SCHEMA_VERSION}，请更新客户端`,
+      backup: backupKey || null,
+    };
   }
 
   // 已经是最新版本
-  if (sourceVersion >= CURRENT_SCHEMA_VERSION) {
-    // 提取 state（可能是 SaveEnvelope 或裸 PlayerSave）
+  if (sourceVersion === CURRENT_SCHEMA_VERSION) {
     const obj = data as Record<string, unknown>;
-    const state = (obj.state ?? obj) as PlayerSave;
+    const state = (obj.state ?? obj) as unknown as PlayerSave;
     const validation = validatePlayerSave(state);
     if (!validation.valid) {
-      return { success: false, error: `存档验证失败: ${validation.error}`, backup: null };
+      const backupKey = createBackup(rawData, sourceVersion);
+      return {
+        success: false,
+        error: `存档验证失败: ${validation.error}`,
+        backup: backupKey || null,
+      };
     }
     return { success: true, state, migratedFrom: sourceVersion };
   }

@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { createTestStore, createInitialState } from '../game-store';
 import { CareerLine } from '../../types/enums';
 import type { PlayerSave, SlotOccupant } from '../../types/player';
+import { migrateSave } from '../migrations';
 
 /** 创建带有指定行动的槽位状态 */
 function makeSlotsWithActions(actions: Partial<SlotOccupant>[]): PlayerSave['slots'] {
@@ -333,7 +334,7 @@ describe('v4 基础工程集成测试', () => {
   });
 
   describe('存档迁移兼容性', () => {
-    it('LOAD_SAVE 后旧存档的临时字段被清除', () => {
+    it('迁移管道清除旧存档的临时字段', () => {
       const legacySave = createInitialState({
         currentPositionId: 'admin_l3_0',
         currentLevel: 3,
@@ -344,15 +345,17 @@ describe('v4 基础工程集成测试', () => {
       legacySave._pendingDeviationMultiplier = 0.8;
       legacySave.pendingStyleConflict = true;
 
-      const store = createTestStore();
-      store.dispatch({ type: 'LOAD_SAVE', save: legacySave as unknown as PlayerSave });
-
-      const state = store.getRawState() as unknown as Record<string, unknown>;
-      expect(state._pendingDeviationMultiplier).toBeUndefined();
-      expect(state.pendingStyleConflict).toBeUndefined();
+      // 通过迁移管道处理
+      const result = migrateSave(JSON.stringify(legacySave));
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const state = result.state as unknown as Record<string, unknown>;
+        expect(state._pendingDeviationMultiplier).toBeUndefined();
+        expect(state.pendingStyleConflict).toBeUndefined();
+      }
     });
 
-    it('LOAD_SAVE 后槽位行动补充 runtimeSnapshot', () => {
+    it('迁移管道为槽位行动补充 runtimeSnapshot', () => {
       const legacySave = createInitialState({
         currentPositionId: 'admin_l3_0',
         currentLevel: 3,
@@ -370,15 +373,16 @@ describe('v4 基础工程集成测试', () => {
         cooldownDays: 7,
       };
 
-      const store = createTestStore();
-      store.dispatch({ type: 'LOAD_SAVE', save: legacySave });
-
-      const state = store.getRawState();
-      const occupant = state.slots.primary.occupants[0];
-      expect(occupant?.runtimeSnapshot).toEqual({
-        effectivenessMultiplier: 1,
-        styleConflictTriggered: false,
-      });
+      // 通过迁移管道处理
+      const result = migrateSave(JSON.stringify(legacySave));
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const occupant = result.state.slots.primary.occupants[0];
+        expect(occupant?.runtimeSnapshot).toEqual({
+          effectivenessMultiplier: 1,
+          styleConflictTriggered: false,
+        });
+      }
     });
   });
 });

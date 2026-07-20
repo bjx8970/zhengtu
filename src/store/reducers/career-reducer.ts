@@ -10,6 +10,7 @@
 
 import type { PlayerSave, CareerRecord } from '../../types/player';
 import type { PromotionContext } from '../../types/game';
+import type { PromotionResolvePayload } from '../../types/actions';
 import { PromotionStage, OrgInspectResult } from '../../types/enums';
 import { getConfigLoader } from '../../config/loader';
 import { clamp } from '../../utils/math';
@@ -137,12 +138,6 @@ export function reduceResetPromotion(draft: PlayerSave): void {
   }
   draft.promotionStage = PromotionStage.Idle;
   draft.promotionState = null;
-}
-
-/** PROMOTION_RESOLVE_STAGE 动作参数 */
-export interface PromotionResolvePayload {
-  choices?: { useConnections?: boolean; influenceInspectors?: boolean };
-  _rng?: () => number;
 }
 
 /**

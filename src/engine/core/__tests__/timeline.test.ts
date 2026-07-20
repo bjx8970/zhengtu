@@ -3,13 +3,14 @@
  *
  * 覆盖场景：
  * - 事件按绝对日排序
- * - 同一天内按类型优先级排序
- * - 行动完成在月度结算之前
+ * - 同一天内按类型优先级排序（行动完成 < 月度结算 < 年度考核）
+ * - 月度事件 month 表示刚结束的月份（不出现 month=13）
  * - 跨月、跨年场景
  * - 并发行动各自独立
+ * - 年末行动完成在年度考核之前
  */
 import { describe, it, expect } from 'vitest';
-import { generateTimelineEvents, timeToAbsoluteDay, absoluteDayToTime } from '../timeline';
+import { advanceTimeline } from '../timeline';
 import type { SlotState } from '../../../types/player';
 import { getConfigLoader } from '../../../config/loader';
 
@@ -24,189 +25,175 @@ function makeEmptySlots(): SlotState {
   };
 }
 
-describe('统一时间轴引擎', () => {
-  describe('timeToAbsoluteDay / absoluteDayToTime', () => {
-    it('正确转换时间到绝对日', () => {
-      // 第 1 年 1 月 1 日 = 绝对日 0
-      expect(timeToAbsoluteDay({ year: 1, month: 1, day: 1 }, cfg)).toBe(0);
-      // 第 1 年 1 月 30 日 = 绝对日 29
-      expect(timeToAbsoluteDay({ year: 1, month: 1, day: 30 }, cfg)).toBe(29);
-      // 第 1 年 2 月 1 日 = 绝对日 30
-      expect(timeToAbsoluteDay({ year: 1, month: 2, day: 1 }, cfg)).toBe(30);
-    });
+describe('advanceTimeline', () => {
+  it('空槽位推进一个月只产生月度结算事件', () => {
+    const result = advanceTimeline(
+      { year: 2024, month: 1, day: 1 },
+      30,
+      0,
+      makeEmptySlots(),
+      1990,
+      cfg,
+    );
 
-    it('正确转换绝对日到时间', () => {
-      expect(absoluteDayToTime(0, cfg)).toEqual({ year: 1, month: 1, day: 1 });
-      expect(absoluteDayToTime(29, cfg)).toEqual({ year: 1, month: 1, day: 30 });
-      expect(absoluteDayToTime(30, cfg)).toEqual({ year: 1, month: 2, day: 1 });
-    });
-
-    it('往返转换保持一致', () => {
-      const time = { year: 2024, month: 6, day: 15 };
-      const absDay = timeToAbsoluteDay(time, cfg);
-      const back = absoluteDayToTime(absDay, cfg);
-      expect(back).toEqual(time);
-    });
+    const monthlyEvents = result.events.filter((e) => e.type === 'monthly_settlement');
+    expect(monthlyEvents.length).toBe(1);
+    // 月度事件的 month 表示刚结束的月份
+    if (monthlyEvents[0]!.type === 'monthly_settlement') {
+      expect(monthlyEvents[0]!.month).toBe(1);
+      expect(monthlyEvents[0]!.year).toBe(2024);
+    }
+    // 最终时间正确
+    expect(result.newTime).toEqual({ year: 2024, month: 2, day: 1 });
+    expect(result.newAbsoluteDay).toBe(30);
   });
 
-  describe('generateTimelineEvents', () => {
-    it('空槽位推进一个月只产生月度结算事件', () => {
-      const slots = makeEmptySlots();
-      const events = generateTimelineEvents(
-        { year: 2024, month: 1, day: 1 },
-        30, // 一个月
-        0,
-        slots,
-        1990,
-        1,
-        cfg,
-      );
+  it('行动完成事件在月度结算之前（同一天）', () => {
+    const slots = makeEmptySlots();
+    slots.primary.occupants[0] = {
+      actionId: 'test',
+      deptId: 'dept',
+      actionName: '测试',
+      category: 'minor',
+      startedAtDay: 27,
+      durationDays: 3, // 第 30 天完成（月末）
+      cooldownDays: 7,
+    };
 
-      // 应该有 1 个月度结算事件
-      const monthlyEvents = events.filter((e) => e.type === 'monthly_settlement');
-      expect(monthlyEvents.length).toBe(1);
-    });
+    const result = advanceTimeline({ year: 2024, month: 1, day: 1 }, 30, 0, slots, 1990, cfg);
 
-    it('行动完成事件在月度结算之前（同一天）', () => {
-      const slots = makeEmptySlots();
-      // 行动在第 30 天完成（月末）
-      slots.primary.occupants[0] = {
-        actionId: 'test',
-        deptId: 'dept',
-        actionName: '测试',
-        category: 'minor',
-        startedAtDay: 27,
-        durationDays: 3, // 第 30 天完成
-        cooldownDays: 7,
-      };
+    const actionEvent = result.events.find((e) => e.type === 'action_completion');
+    const monthlyEvent = result.events.find((e) => e.type === 'monthly_settlement');
 
-      const events = generateTimelineEvents(
-        { year: 2024, month: 1, day: 1 },
-        30,
-        0,
-        slots,
-        1990,
-        1,
-        cfg,
-      );
+    expect(actionEvent).toBeDefined();
+    expect(monthlyEvent).toBeDefined();
 
-      // 找到同一天的行动完成和月度结算事件
-      const actionEvent = events.find((e) => e.type === 'action_completion');
-      const monthlyEvent = events.find((e) => e.type === 'monthly_settlement');
+    const actionIdx = result.events.indexOf(actionEvent!);
+    const monthlyIdx = result.events.indexOf(monthlyEvent!);
+    expect(actionIdx).toBeLessThan(monthlyIdx);
+  });
 
-      expect(actionEvent).toBeDefined();
-      expect(monthlyEvent).toBeDefined();
+  it('跨月推进产生正确数量的月度结算且 month 合法', () => {
+    const result = advanceTimeline(
+      { year: 2024, month: 1, day: 1 },
+      90,
+      0,
+      makeEmptySlots(),
+      1990,
+      cfg,
+    );
 
-      // 行动完成应该排在月度结算之前
-      const actionIdx = events.indexOf(actionEvent!);
-      const monthlyIdx = events.indexOf(monthlyEvent!);
-      expect(actionIdx).toBeLessThan(monthlyIdx);
-    });
+    const monthlyEvents = result.events.filter((e) => e.type === 'monthly_settlement');
+    expect(monthlyEvents.length).toBe(3);
 
-    it('跨月推进产生正确数量的月度结算', () => {
-      const slots = makeEmptySlots();
-      const events = generateTimelineEvents(
-        { year: 2024, month: 1, day: 1 },
-        90, // 三个月
-        0,
-        slots,
-        1990,
-        1,
-        cfg,
-      );
+    // 所有月度事件的 month 都在 1-12 范围内
+    for (const event of monthlyEvents) {
+      if (event.type === 'monthly_settlement') {
+        expect(event.month).toBeGreaterThanOrEqual(1);
+        expect(event.month).toBeLessThanOrEqual(12);
+      }
+    }
+  });
 
-      const monthlyEvents = events.filter((e) => e.type === 'monthly_settlement');
-      expect(monthlyEvents.length).toBe(3);
-    });
+  it('跨年推进产生年度考核且 month 不为 13', () => {
+    const result = advanceTimeline(
+      { year: 2024, month: 1, day: 1 },
+      360,
+      0,
+      makeEmptySlots(),
+      1990,
+      cfg,
+    );
 
-    it('跨年推进产生年度考核事件', () => {
-      const slots = makeEmptySlots();
-      const events = generateTimelineEvents(
-        { year: 2024, month: 1, day: 1 },
-        360, // 12 个月
-        0,
-        slots,
-        1990,
-        1,
-        cfg,
-      );
+    const annualEvents = result.events.filter((e) => e.type === 'annual_assessment');
+    expect(annualEvents.length).toBe(1);
 
-      const annualEvents = events.filter((e) => e.type === 'annual_assessment');
-      expect(annualEvents.length).toBe(1);
-    });
+    // 验证没有 month=13 的事件
+    const monthlyEvents = result.events.filter((e) => e.type === 'monthly_settlement');
+    for (const event of monthlyEvents) {
+      if (event.type === 'monthly_settlement') {
+        expect(event.month).not.toBe(13);
+      }
+    }
 
-    it('多个并发行动各自产生独立事件', () => {
-      const slots = makeEmptySlots();
-      slots.primary.occupants[0] = {
-        actionId: 'action1',
-        deptId: 'dept1',
-        actionName: '行动1',
-        category: 'minor',
-        startedAtDay: 0,
-        durationDays: 5,
-        cooldownDays: 7,
-      };
-      slots.primary.occupants[1] = {
-        actionId: 'action2',
-        deptId: 'dept2',
-        actionName: '行动2',
-        category: 'minor',
-        startedAtDay: 0,
-        durationDays: 10,
-        cooldownDays: 7,
-      };
+    // 年度考核的 year 表示刚结束的年份
+    if (annualEvents[0]!.type === 'annual_assessment') {
+      expect(annualEvents[0]!.year).toBe(2024);
+    }
+  });
 
-      const events = generateTimelineEvents(
-        { year: 2024, month: 1, day: 1 },
-        15,
-        0,
-        slots,
-        1990,
-        1,
-        cfg,
-      );
+  it('多个并发行动各自产生独立事件并按时间排序', () => {
+    const slots = makeEmptySlots();
+    slots.primary.occupants[0] = {
+      actionId: 'action1',
+      deptId: 'dept1',
+      actionName: '行动1',
+      category: 'minor',
+      startedAtDay: 0,
+      durationDays: 5,
+      cooldownDays: 7,
+    };
+    slots.primary.occupants[1] = {
+      actionId: 'action2',
+      deptId: 'dept2',
+      actionName: '行动2',
+      category: 'minor',
+      startedAtDay: 0,
+      durationDays: 10,
+      cooldownDays: 7,
+    };
 
-      const actionEvents = events.filter((e) => e.type === 'action_completion');
-      expect(actionEvents.length).toBe(2);
+    const result = advanceTimeline({ year: 2024, month: 1, day: 1 }, 15, 0, slots, 1990, cfg);
 
-      // 第一个行动在第 5 天完成，第二个在第 10 天完成
-      expect(actionEvents[0]!.absoluteDay).toBe(5);
-      expect(actionEvents[1]!.absoluteDay).toBe(10);
-    });
+    const actionEvents = result.events.filter((e) => e.type === 'action_completion');
+    expect(actionEvents.length).toBe(2);
+    expect(actionEvents[0]!.absoluteDay).toBe(5);
+    expect(actionEvents[1]!.absoluteDay).toBe(10);
+  });
 
-    it('行动完成在年度考核之前（年末场景）', () => {
-      const slots = makeEmptySlots();
-      // 行动在年末最后一天完成
-      slots.primary.occupants[0] = {
-        actionId: 'year_end_action',
-        deptId: 'dept',
-        actionName: '年末行动',
-        category: 'minor',
-        startedAtDay: 357, // 12*30 - 3 = 357
-        durationDays: 3, // 第 360 天完成
-        cooldownDays: 7,
-      };
+  it('行动完成在年度考核之前（年末场景）', () => {
+    const slots = makeEmptySlots();
+    slots.primary.occupants[0] = {
+      actionId: 'year_end_action',
+      deptId: 'dept',
+      actionName: '年末行动',
+      category: 'minor',
+      startedAtDay: 357,
+      durationDays: 3, // 第 360 天完成
+      cooldownDays: 7,
+    };
 
-      const events = generateTimelineEvents(
-        { year: 2024, month: 1, day: 1 },
-        360,
-        0,
-        slots,
-        1990,
-        1,
-        cfg,
-      );
+    const result = advanceTimeline({ year: 2024, month: 1, day: 1 }, 360, 0, slots, 1990, cfg);
 
-      const actionEvent = events.find((e) => e.type === 'action_completion');
-      const annualEvent = events.find((e) => e.type === 'annual_assessment');
+    const actionEvent = result.events.find((e) => e.type === 'action_completion');
+    const annualEvent = result.events.find((e) => e.type === 'annual_assessment');
 
-      expect(actionEvent).toBeDefined();
-      expect(annualEvent).toBeDefined();
+    expect(actionEvent).toBeDefined();
+    expect(annualEvent).toBeDefined();
 
-      // 行动完成应该排在年度考核之前
-      const actionIdx = events.indexOf(actionEvent!);
-      const annualIdx = events.indexOf(annualEvent!);
-      expect(actionIdx).toBeLessThan(annualIdx);
-    });
+    const actionIdx = result.events.indexOf(actionEvent!);
+    const annualIdx = result.events.indexOf(annualEvent!);
+    expect(actionIdx).toBeLessThan(annualIdx);
+  });
+
+  it('推进 0 天不产生事件', () => {
+    const result = advanceTimeline(
+      { year: 2024, month: 6, day: 15 },
+      0,
+      100,
+      makeEmptySlots(),
+      1990,
+      cfg,
+    );
+
+    expect(result.events.length).toBe(0);
+    expect(result.newTime).toEqual({ year: 2024, month: 6, day: 15 });
+    expect(result.newAbsoluteDay).toBe(100);
+  });
+
+  it('负天数抛出异常', () => {
+    expect(() =>
+      advanceTimeline({ year: 2024, month: 1, day: 1 }, -1, 0, makeEmptySlots(), 1990, cfg),
+    ).toThrow('Cannot advance by negative days');
   });
 });

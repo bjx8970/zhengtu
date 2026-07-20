@@ -8,10 +8,10 @@
  */
 
 import type { PlayerSave, CompletedActionNotification } from '../../types/player';
-import type { TimeGranularity } from '../../types/enums';
-import type { TimelineEvent, ActionCompletionTimelineEvent } from '../../types/game';
-import { advanceTime, getGranularityDays } from '../../engine/core/time';
-import { generateTimelineEvents } from '../../engine/core/timeline';
+import type { ActionCompletionTimelineEvent } from '../../types/game';
+import type { AdvanceTimePayload } from '../../types/actions';
+import { getGranularityDays } from '../../engine/core/time';
+import { advanceTimeline } from '../../engine/core/timeline';
 import { resolveActionEffects } from '../../engine/core/action';
 import { monthlySettlement } from '../../engine/governance/budget';
 import { calculateKPI, scoreToKPITier } from '../../engine/governance/kpi';
@@ -30,12 +30,6 @@ import {
   applyStyleDelta,
   extractPositionIndex,
 } from './shared';
-
-/** ADVANCE_TIME 动作参数 */
-export interface AdvanceTimePayload {
-  granularity: TimeGranularity;
-  _rng?: () => number;
-}
 
 /**
  * 处理行动完成时间轴事件。
@@ -243,34 +237,28 @@ export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload
   const days = getGranularityDays(payload.granularity, cfg);
   const rng = payload._rng ?? Math.random;
 
-  // 计算起始绝对日
-  const startAbsoluteDay = draft.totalDaysPlayed;
-
-  // 生成排序后的时间轴事件
-  const timelineEvents: TimelineEvent[] = generateTimelineEvents(
+  // v4: 统一时间推进，一次返回最终时间 + 排序事件
+  const result = advanceTimeline(
     draft.time,
     days,
-    startAbsoluteDay,
+    draft.totalDaysPlayed,
     draft.slots,
     draft.birthYear,
-    draft.currentLevel,
     cfg,
   );
 
-  // 先更新时间状态
-  const timeResult = advanceTime(draft.time, days, draft.birthYear, draft.currentLevel, cfg);
   draft.time = {
     ...draft.time,
-    year: timeResult.newState.year,
-    month: timeResult.newState.month,
-    day: timeResult.newState.day,
+    year: result.newTime.year,
+    month: result.newTime.month,
+    day: result.newTime.day,
   };
-  draft.totalDaysPlayed += days;
+  draft.totalDaysPlayed = result.newAbsoluteDay;
 
   // 按时间轴顺序处理所有事件
   const notifications: CompletedActionNotification[] = [];
 
-  for (const event of timelineEvents) {
+  for (const event of result.events) {
     switch (event.type) {
       case 'action_completion':
         processActionCompletion(draft, event, rng, notifications);

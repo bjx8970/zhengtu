@@ -7,20 +7,14 @@
  * - 将行动放入槽位
  */
 
-import type { PlayerSave, SlotOccupant, SlotTierKey } from '../../types/player';
+import type { PlayerSave, SlotOccupant } from '../../types/player';
 import type { ActionRuntimeSnapshot } from '../../types/game';
+import type { StartActionPayload } from '../../types/actions';
 import { startAction } from '../../engine/core/action';
 import { calculateDeviationPenalty } from '../../engine/career/deviation-penalty';
 import { getConfigLoader } from '../../config/loader';
 import { clampAttr } from '../../utils/math';
 import { extractPositionIndex } from './shared';
-
-/** START_ACTION 动作参数 */
-export interface StartActionPayload {
-  deptId: string;
-  actionId: string;
-  tierKey: SlotTierKey;
-}
 
 /**
  * 处理 START_ACTION 动作。
