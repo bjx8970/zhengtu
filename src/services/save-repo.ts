@@ -1,56 +1,107 @@
 /**
  * 存档仓库
  *
- * 当前运行时仅使用 localStorage 实时保存和恢复。
- * Supabase 读写及本地/远程仲裁函数保留给后续云存档阶段，当前 UI 与 store 不调用。
+ * v4 基础工程变更：
+ * - 使用 SaveEnvelope 封装存档（含 schemaVersion）
+ * - 加载时通过迁移管道处理旧版本存档
+ * - 迁移失败时保留备份，不静默加载损坏状态
+ *
+ * Supabase 读写及本地/远程仲裁函数保留给后续云存档阶段。
  */
 
 import type { PlayerSave } from '../types/player';
+import type { SaveEnvelope } from '../types/save';
 import { getSupabase } from './supabase';
+import {
+  migrateSave,
+  wrapSaveEnvelope,
+  validatePlayerSave,
+  extractPlayerSave,
+} from '../store/migrations';
 
 const TABLE_NAME = 'game_saves';
 const SLOT_NAME = 'main';
 const LOCAL_KEY = 'zhengtu_autosave';
 
-/**
- * 校验 JSON 解析结果是否为合法的 PlayerSave 对象。
- */
-function isValidPlayerSave(data: unknown): data is PlayerSave {
-  if (!data || typeof data !== 'object') return false;
-  const obj = data as Record<string, unknown>;
-  const slots = obj.slots as Record<string, unknown> | undefined;
-  const time = obj.time as Record<string, unknown> | undefined;
-  return (
-    typeof obj.currentPositionId === 'string' &&
-    typeof obj.currentLevel === 'number' &&
-    typeof obj.characterName === 'string' &&
-    typeof slots?.primary === 'object' &&
-    typeof slots?.secondary === 'object' &&
-    typeof slots?.reserve === 'object' &&
-    Array.isArray((slots.primary as Record<string, unknown>)?.occupants) &&
-    typeof time?.year === 'number'
-  );
-}
+/** 迁移失败备份的 key 前缀 */
+const MIGRATION_FAILED_KEY = 'zhengtu_migration_failed';
 
-/** 从 localStorage 读取本地存档 */
+/**
+ * 从 localStorage 读取本地存档。
+ *
+ * v4 变更：通过迁移管道处理旧版本存档。
+ * 迁移失败时保存错误信息到 localStorage 并返回 null。
+ *
+ * @returns PlayerSave 或 null（无存档/迁移失败）
+ */
 export function readLocalSave(): PlayerSave | null {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return isValidPlayerSave(parsed) ? parsed : null;
-  } catch {
+
+    // 尝试通过迁移管道处理
+    const result = migrateSave(raw);
+
+    if (result.success) {
+      return result.state;
+    }
+
+    // 迁移失败：记录错误，保留备份
+    console.error('存档迁移失败:', result.error);
+    if (result.backup) {
+      localStorage.setItem(
+        MIGRATION_FAILED_KEY,
+        JSON.stringify({
+          error: result.error,
+          backupKey: result.backup,
+          timestamp: Date.now(),
+        }),
+      );
+    }
+    return null;
+  } catch (err) {
+    console.error('读取存档失败:', err);
     return null;
   }
 }
 
-/** 写入 localStorage（失败时静默忽略） */
+/**
+ * 写入 localStorage。
+ *
+ * v4 变更：使用 SaveEnvelope 封装，包含 schemaVersion。
+ *
+ * @param save 游戏状态
+ */
 export function writeLocalSave(save: PlayerSave): void {
   try {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(save));
+    // 读取现有 revision（如果存在）
+    let revision = 0;
+    const existing = localStorage.getItem(LOCAL_KEY);
+    if (existing) {
+      try {
+        const parsed = JSON.parse(existing) as Partial<SaveEnvelope>;
+        revision = parsed.revision ?? 0;
+      } catch {
+        // 忽略解析错误
+      }
+    }
+
+    const envelope = wrapSaveEnvelope(save, revision);
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(envelope));
   } catch {
     console.warn('Failed to write local save');
   }
+}
+
+/**
+ * 校验 JSON 解析结果是否为合法的 PlayerSave 对象。
+ *
+ * @param data 待校验数据
+ * @returns 是否为合法 PlayerSave
+ */
+function isValidPlayerSave(data: unknown): data is PlayerSave {
+  const result = validatePlayerSave(data);
+  return result.valid;
 }
 
 /** 从 Supabase 读取远程存档 */
@@ -69,7 +120,13 @@ export async function fetchRemoteSave(userId: string): Promise<PlayerSave | null
 
   if (error || !data) return null;
 
-  return isValidPlayerSave(data.save_data) ? (data.save_data as PlayerSave) : null;
+  // 尝试从 SaveEnvelope 或裸 PlayerSave 中提取
+  const extracted = extractPlayerSave(data.save_data);
+  if (extracted && isValidPlayerSave(extracted)) {
+    return extracted;
+  }
+
+  return null;
 }
 
 /**
@@ -83,13 +140,16 @@ export async function upsertSave(save: PlayerSave): Promise<boolean> {
     return true;
   }
 
+  // 使用 SaveEnvelope 封装
+  const envelope = wrapSaveEnvelope(save);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
   const { error } = await sb.from(TABLE_NAME).upsert(
     {
       user_id: save.userId,
       slot_name: SLOT_NAME,
-      save_data: save,
+      save_data: envelope,
       current_level: save.currentLevel,
       current_career_line: save.currentCareerLine,
       current_position_id: save.currentPositionId,
@@ -121,4 +181,30 @@ export function selectNewer(a: PlayerSave | null, b: PlayerSave | null): PlayerS
   if (!a) return b;
   if (!b) return a;
   return (a.updatedAt ?? 0) > (b.updatedAt ?? 0) ? a : b;
+}
+
+/**
+ * 获取上次迁移失败的信息。
+ *
+ * @returns 迁移失败信息或 null
+ */
+export function getMigrationFailureInfo(): {
+  error: string;
+  backupKey: string;
+  timestamp: number;
+} | null {
+  try {
+    const raw = localStorage.getItem(MIGRATION_FAILED_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 清除迁移失败记录。
+ */
+export function clearMigrationFailureInfo(): void {
+  localStorage.removeItem(MIGRATION_FAILED_KEY);
 }

@@ -317,3 +317,66 @@ export interface AnnualActionRecord {
   actionName: string;
   styleAlignment?: string;
 }
+
+// ===== v4 基础工程：统一时间轴 =====
+
+/** 时间轴事件基础接口 */
+interface TimelineEventBase {
+  /** 事件发生的绝对游戏日（从游戏开始计算的天数） */
+  absoluteDay: number;
+}
+
+/** 行动完成时间轴事件 */
+export interface ActionCompletionTimelineEvent extends TimelineEventBase {
+  type: 'action_completion';
+  tierKey: import('./player').SlotTierKey;
+  slotIndex: number;
+  occupant: import('./player').SlotOccupant;
+}
+
+/** 月度结算时间轴事件 */
+export interface MonthlySettlementTimelineEvent extends TimelineEventBase {
+  type: 'monthly_settlement';
+  month: number;
+  year: number;
+}
+
+/** 年度考核时间轴事件 */
+export interface AnnualAssessmentTimelineEvent extends TimelineEventBase {
+  type: 'annual_assessment';
+  year: number;
+}
+
+/** 政治周期时间轴事件（两会/党代会） */
+export interface PoliticalCycleTimelineEvent extends TimelineEventBase {
+  type: 'political_cycle';
+  year: number;
+}
+
+/** 退休检测时间轴事件 */
+export interface RetirementCheckTimelineEvent extends TimelineEventBase {
+  type: 'retirement_check';
+}
+
+/** 统一时间轴事件联合类型 */
+export type TimelineEvent =
+  | ActionCompletionTimelineEvent
+  | MonthlySettlementTimelineEvent
+  | AnnualAssessmentTimelineEvent
+  | PoliticalCycleTimelineEvent
+  | RetirementCheckTimelineEvent;
+
+/**
+ * 行动运行时快照
+ *
+ * 在行动启动时计算并绑定到具体 SlotOccupant 实例，
+ * 避免多行动并发时共享玩家级临时状态。
+ */
+export interface ActionRuntimeSnapshot {
+  /** 理念偏离效果倍率（1 = 无偏离） */
+  effectivenessMultiplier: number;
+  /** 是否触发了风格冲突 */
+  styleConflictTriggered: boolean;
+  /** 行动对应的风格倾向 ID */
+  styleAlignment?: string;
+}

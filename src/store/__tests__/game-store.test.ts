@@ -470,7 +470,8 @@ describe('dispatch - persistence (localStorage)', () => {
     const saved = localStorage.getItem(SAVE_KEY);
     expect(saved).not.toBeNull();
     const content = JSON.parse(saved!);
-    expect(content.characterName).toBe('测试');
+    // v4: 存档使用 SaveEnvelope 封装
+    expect(content.state.characterName).toBe('测试');
   });
 
   it('NEW_GAME 后写入 localStorage', () => {
@@ -496,7 +497,8 @@ describe('dispatch - persistence (localStorage)', () => {
     const saved = localStorage.getItem(SAVE_KEY);
     expect(saved).not.toBeNull();
     const content = JSON.parse(saved!);
-    expect(content.characterName).toBe('新角色');
+    // v4: 存档使用 SaveEnvelope 封装
+    expect(content.state.characterName).toBe('新角色');
   });
 
   it('createTestStore 的 dispatch 不写 localStorage（测试隔离）', () => {
