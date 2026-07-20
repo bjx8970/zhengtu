@@ -185,7 +185,7 @@ export interface PromotionCandidate {
   positionName: string;
   level: number;
   careerLine: CareerLine;
-  /** 不可选原因（为空表示可选） */
+  /** 不可选原因（为空表示可选）// TODO: 后续 PR 实现填充逻辑 */
   blockedReason?: string;
 }
 

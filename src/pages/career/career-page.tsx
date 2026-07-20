@@ -67,7 +67,8 @@ export function CareerPage() {
     () =>
       state.promotionStage !== PromotionStage.Idle &&
       state.promotionStage !== PromotionStage.Completed &&
-      state.promotionStage !== PromotionStage.Failed,
+      state.promotionStage !== PromotionStage.Failed &&
+      state.promotionStage !== PromotionStage.TargetSelection,
   );
 
   const stageIndex = createMemo(() => {
@@ -117,6 +118,13 @@ export function CareerPage() {
       state.promotionStage === PromotionStage.DemocraticVote ||
       state.promotionStage === PromotionStage.OrgInspection,
   );
+
+  /** 缓存晋升候选职位列表，避免每次渲染重建 */
+  const promotionCandidates = createMemo(() => {
+    const lineCfg = getConfigLoader().getCareerLine(state.currentCareerLine);
+    if (!lineCfg) return [];
+    return getPromotionCandidates(state.currentCareerLine, state.currentLevel, lineCfg);
+  });
 
   return (
     <AppShell>
@@ -201,17 +209,7 @@ export function CareerPage() {
                 请选择晋升目标职位：
               </p>
               <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.6rem' }}>
-                <For
-                  each={(() => {
-                    const lineCfg = getConfigLoader().getCareerLine(state.currentCareerLine);
-                    if (!lineCfg) return [];
-                    return getPromotionCandidates(
-                      state.currentCareerLine,
-                      state.currentLevel,
-                      lineCfg,
-                    );
-                  })()}
-                >
+                <For each={promotionCandidates()}>
                   {(candidate) => (
                     <button
                       onClick={() =>
