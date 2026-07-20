@@ -2,27 +2,28 @@
  * 年度考核引擎
  *
  * 核心职责：
- * 1. 基于 KPI 考核结果生成年度评价
+ * 1. 基于五维综合评分 + 等次生成年度评价
  * 2. 判断晋升资格（优秀/称职 → eligible）
  * 3. 处理不合格处罚（冻结晋升届数从配置读取）
  *
  * 纯函数，所有依赖通过参数传入。
  */
 
-import type { AssessmentResult } from '../../types/game';
 import type { GameConfig } from '../../types/config';
 import { KPITier } from '../../types/enums';
 
 /**
  * 执行年度考核。
  *
- * @param kpiResult        KPI 计算结果
- * @param yearsInPosition  当前岗位年限
- * @param config           游戏配置常量
+ * @param comprehensiveScore 五维综合评分
+ * @param tier               考核等次
+ * @param yearsInPosition    当前岗位年限
+ * @param config             游戏配置常量
  * @returns 考核得分 + 等次 + 晋升资格 + 冻结周期 + 说明
  */
 export function annualAssessment(
-  kpiResult: AssessmentResult,
+  comprehensiveScore: number,
+  tier: KPITier,
   yearsInPosition: number,
   config: GameConfig,
 ): {
@@ -32,8 +33,6 @@ export function annualAssessment(
   frozenPeriods: number;
   consequence: string;
 } {
-  const { totalScore, tier } = kpiResult;
-
   let frozenPeriods = 0;
   let consequence = '';
 
@@ -47,7 +46,7 @@ export function annualAssessment(
   const promotionEligible = tier === KPITier.Excellent || tier === KPITier.Competent;
 
   return {
-    score: totalScore,
+    score: comprehensiveScore,
     tier,
     promotionEligible,
     frozenPeriods,

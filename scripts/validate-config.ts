@@ -373,6 +373,25 @@ const ConstantsSchema = z.object({
   initialAttributes: z.record(z.number()),
   kpiTierColors: z.record(z.string()),
   completionBarThresholds: z.object({ excellent: z.number(), good: z.number() }),
+  fiveDimMapping: z.object({
+    virtue: z.record(z.number().min(0).max(1)),
+    capacity: z.record(z.number().min(0).max(1)),
+    diligenceScore: z.record(z.number().min(0).max(1)),
+    honesty: z.record(z.number().min(0).max(1)),
+  }),
+  comprehensiveScoreWeights: z
+    .object({
+      virtue: z.number().min(0).max(1),
+      capacity: z.number().min(0).max(1),
+      diligenceScore: z.number().min(0).max(1),
+      achievement: z.number().min(0).max(1),
+      honesty: z.number().min(0).max(1),
+    })
+    .refine(
+      (w) =>
+        Math.abs(w.virtue + w.capacity + w.diligenceScore + w.achievement + w.honesty - 1) < 0.001,
+      { message: 'comprehensiveScoreWeights 总和必须为 1.0' },
+    ),
   promotion: z.object({
     democraticVote: z.object({
       passThreshold: z.number(),

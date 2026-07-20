@@ -19,6 +19,7 @@ import type {
   SecretaryLevel,
   TimeGranularity,
 } from './enums';
+import type { FiveDimensionScore } from './game';
 import type { ActionCategory } from './config';
 
 /** 槽位等级 key */
@@ -89,7 +90,12 @@ export interface CareerRecord {
   startYear: number;
   /** null 表示当前在职 */
   endYear: number | null;
-  assessmentResults: { year: number; score: number; tier: string }[];
+  assessmentResults: {
+    year: number;
+    score: number;
+    tier: string;
+    dimensions?: FiveDimensionScore;
+  }[];
   /** 跨线转职后旧线索封存 */
   archived: boolean;
 }
@@ -202,7 +208,12 @@ export interface PlayerSave {
 
   // ===== 考核 =====
   comprehensiveScore: number;
-  annualAssessments: { year: number; score: number; tier: string }[];
+  annualAssessments: {
+    year: number;
+    score: number;
+    tier: string;
+    dimensions?: FiveDimensionScore;
+  }[];
 
   // ===== 九大核心属性 =====
   integrity: number;

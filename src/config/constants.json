@@ -61,6 +61,19 @@
     "不称职": "#C44D4D"
   },
   "completionBarThresholds": { "excellent": 1, "good": 0.6 },
+  "fiveDimMapping": {
+    "virtue": { "integrity": 0.4, "stability": 0.3, "ambition": 0.3 },
+    "capacity": { "competence": 0.5, "charisma": 0.2, "network": 0.2, "stability": 0.1 },
+    "diligenceScore": { "diligence": 0.5, "vigor": 0.3, "ambition": 0.2 },
+    "honesty": { "integrity": 0.6, "stability": 0.4 }
+  },
+  "comprehensiveScoreWeights": {
+    "virtue": 0.15,
+    "capacity": 0.2,
+    "diligenceScore": 0.15,
+    "achievement": 0.3,
+    "honesty": 0.2
+  },
   "promotion": {
     "democraticVote": {
       "passThreshold": 60,
