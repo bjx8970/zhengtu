@@ -17,3 +17,8 @@ export * from './career/promotion';
 export * from './career/promotion-final';
 export * from './career/promotion-target';
 export * from './career/philosophy-imbalance';
+export * from './career/spectrum-constraint';
+export * from './career/style-derivation';
+export * from './career/deviation-penalty';
+export * from './career/style-decay';
+export * from './career/extreme-unlocks';

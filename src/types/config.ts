@@ -44,6 +44,8 @@ export interface ActionTemplate {
   effects: ActionEffectDef[];
   /** 解锁所需玩家级别 */
   unlockLevel?: number;
+  /** 该行动倾向的领导风格 ID（Phase C 新增） */
+  styleAlignment?: string;
 }
 
 /** KPI 指标模板 */
@@ -285,4 +287,95 @@ export interface PromotionPathItem {
 export interface BackgroundConfig {
   familyBackgrounds: FamilyBackgroundItem[];
   promotionPaths: PromotionPathItem[];
+}
+
+// ===== Phase C: 领导风格系统配置类型 =====
+
+/** 极端行动定义 */
+export interface ExtremeActionConfig {
+  id: string;
+  name: string;
+  description?: string;
+  styleAlignment: string;
+  requiredScore: number;
+  durationDays: number;
+  category: 'major' | 'minor' | 'routine';
+  cooldownDays: number;
+  budgetDelta: number;
+  effects: ActionEffectDef[];
+  riskDescription?: string;
+  isExtreme: true;
+}
+
+/** 极端事件选项效果 */
+export interface ExtremeEventOption {
+  label: string;
+  description: string;
+  effects: Record<string, number>;
+}
+
+/** 极端事件定义 */
+export interface ExtremeEventConfig {
+  id: string;
+  name: string;
+  description: string;
+  requiredScore: number;
+  triggerProbability: number;
+  options: ExtremeEventOption[];
+}
+
+/** 风格光谱配置 */
+export interface StyleSpectrumConfig {
+  id: string;
+  name: string;
+  description?: string;
+  members: string[];
+  sumCap: number;
+  fuzzyThreshold: number;
+  fuzzyPenalty: number;
+  extremeThreshold: number;
+  extremeHighThreshold: number;
+  extremeActions: Record<string, ExtremeActionConfig[]>;
+  extremeEvents: Record<string, ExtremeEventConfig[]>;
+}
+
+/** 独立风格配置 */
+export interface IndependentStyleConfig {
+  id: string;
+  name: string;
+  description?: string;
+  max: number;
+  defaultDecayRate: number;
+  extremeActions: Record<string, ExtremeActionConfig[]>;
+}
+
+/** 偏离惩罚配置 */
+export interface DeviationPenaltyConfig {
+  effectivenessMultiplier: number;
+  minStyleDiffForOpposition: number;
+  styleConflictThreshold: number;
+}
+
+/** 领导风格系统完整配置 */
+export interface LeadershipStyleConfig {
+  version: number;
+  styleSpectrums: StyleSpectrumConfig[];
+  independentStyles: IndependentStyleConfig[];
+  deviationPenalty: DeviationPenaltyConfig;
+  styleDecayFactor: number;
+  defaultStyleDecayRate: number;
+}
+
+/** 偏离惩罚计算结果 */
+export interface DeviationResult {
+  triggered: boolean;
+  effectivenessMultiplier: number;
+  styleConflictTriggered: boolean;
+  conflictEventId?: string;
+}
+
+/** 极端解锁查询结果 */
+export interface UnlockedExtremeContent {
+  actions: ExtremeActionConfig[];
+  events: ExtremeEventConfig[];
 }

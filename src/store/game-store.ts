@@ -42,6 +42,9 @@ import { annualAssessment as runAnnualAssessment } from '../engine/governance/as
 import { computeFiveDimensions, computeComprehensiveScore } from '../engine/governance/dimensions';
 import { scoreToKPITier } from '../engine/governance/kpi';
 import { getConfigLoader } from '../config/loader';
+import { normalizeAllSpectrums } from '../engine/career/spectrum-constraint';
+import { calculateDeviationPenalty } from '../engine/career/deviation-penalty';
+import { decayStyleScores } from '../engine/career/style-decay';
 import { clamp, clampAttr } from '../utils/math';
 import { writeLocalSave } from '../services/save-repo';
 import { resolveDemocraticVote, resolveOrgInspection } from '../engine/career/promotion';
@@ -231,6 +234,15 @@ function getPlayerAttr(draft: PlayerSave, attr: string): number {
   return (draft as unknown as Record<string, number>)[attr] ?? 0;
 }
 
+/** Phase C: 修改风格评分并自动归一化光谱约束 */
+function applyStyleDelta(draft: PlayerSave, styleId: string, delta: number): void {
+  const styleCfg = getConfigLoader().getLeadershipStyleConfig();
+  const current = draft.philosophy.scores[styleId] ?? 0;
+  draft.philosophy.scores[styleId] = clamp(current + delta, 0, 100);
+  const normalized = normalizeAllSpectrums(draft.philosophy.scores, styleCfg.styleSpectrums);
+  draft.philosophy.scores = normalized;
+}
+
 /** 从 positionId（如 "admin_l3_0"）提取职位索引 */
 function extractPositionIndex(positionId: string): number {
   const idx = parseInt(positionId.split('_').pop() ?? '0', 10);
@@ -301,6 +313,12 @@ function migrateSaveToPhaseA(draft: PlayerSave): void {
   delete save.demoralization;
   delete save.factions;
   delete (save as Record<string, unknown>).superiorFavor;
+}
+
+/** Phase C 存档迁移：旧 scores 归一化到新光谱约束 */
+function migrateSaveToPhaseC(draft: PlayerSave): void {
+  const styleCfg = getConfigLoader().getLeadershipStyleConfig();
+  draft.philosophy.scores = normalizeAllSpectrums(draft.philosophy.scores, styleCfg.styleSpectrums);
 }
 
 /**
@@ -428,6 +446,10 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
             ds.cumulativeConsumption += settlement.deptConsumptions[dept.id] ?? 0;
           }
         }
+
+        // Phase C: 月度风格衰减
+        const styleCfgM = getConfigLoader().getLeadershipStyleConfig();
+        draft.philosophy.scores = decayStyleScores(draft.philosophy.scores, styleCfgM);
         break;
       }
       case 'annual_assessment': {
@@ -526,6 +548,21 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
 
       if (!result.success) break;
 
+      // Phase C: 行动偏离校验
+      if (actionConfig.styleAlignment) {
+        const devResult = calculateDeviationPenalty(
+          draft.philosophy.scores,
+          actionConfig.styleAlignment,
+          getConfigLoader().getLeadershipStyleConfig().styleSpectrums,
+          getConfigLoader().getLeadershipStyleConfig().deviationPenalty,
+        );
+        draft._pendingDeviationMultiplier = devResult.effectivenessMultiplier;
+        // 标记冲突状态供 ADVANCE_TIME 处理
+        if (devResult.styleConflictTriggered) {
+          draft.pendingStyleConflict = true;
+        }
+      }
+
       const occupant: SlotOccupant = {
         actionId: actionConfig.id,
         deptId: action.deptId,
@@ -582,6 +619,9 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       const completed = completeActions(draft.slots, draft.totalDaysPlayed);
       const notifications: CompletedActionNotification[] = [];
 
+      const devMult = draft._pendingDeviationMultiplier ?? 1;
+      delete draft._pendingDeviationMultiplier;
+
       for (const c of completed) {
         const slotOccupant = c.occupant;
         const deptCfg = currentPosition?.departments.find((d) => d.id === slotOccupant.deptId);
@@ -603,18 +643,36 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
               } else if (kpi.operation === 'set') {
                 deptState.kpiValues[kpi.indicatorId] = kpi.delta;
               } else {
-                deptState.kpiValues[kpi.indicatorId] = cur + kpi.delta;
+                deptState.kpiValues[kpi.indicatorId] = cur + kpi.delta * devMult;
               }
             }
           }
           for (const change of effects.playerChanges) {
             if (change.operation === 'add') {
-              applyPlayerAttr(draft, change.attr, change.delta, cfgAdv.attributeBounds);
+              applyPlayerAttr(draft, change.attr, change.delta * devMult, cfgAdv.attributeBounds);
             } else if (change.operation === 'multiply' || change.operation === 'set') {
               const cur = getPlayerAttr(draft, change.attr);
               const newVal = change.operation === 'multiply' ? cur * change.delta : change.delta;
               setPlayerAttrDirect(draft, change.attr, newVal, cfgAdv.attributeBounds);
             }
+          }
+
+          // Phase C: 应用风格增量
+          if (effects.styleDeltas) {
+            for (const [styleId, delta] of Object.entries(effects.styleDeltas)) {
+              applyStyleDelta(draft, styleId, delta);
+            }
+          }
+
+          // Phase C: 处理风格冲突
+          if (draft.pendingStyleConflict) {
+            delete draft.pendingStyleConflict;
+            draft.vigor = clampAttr('vigor', (draft.vigor ?? 100) - 5, cfgAdv.attributeBounds);
+            draft.ambition = clampAttr(
+              'ambition',
+              (draft.ambition ?? 100) - 5,
+              cfgAdv.attributeBounds,
+            );
           }
 
           notifications.push({
@@ -653,6 +711,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
     case 'LOAD_SAVE': {
       Object.assign(draft, action.save);
       migrateSaveToPhaseA(draft);
+      migrateSaveToPhaseC(draft);
       migrateActionState(draft);
       break;
     }
@@ -770,13 +829,20 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       if (!ps) break;
 
       const cfgPromoStore = getConfigLoader().getGameConfig();
+      const styleSpectrums = getConfigLoader().getLeadershipStyleConfig().styleSpectrums;
       const ctxStore = buildPromotionContext(draft);
       const choices = action.choices ?? {};
       const rng = action._rng ?? Math.random;
 
       switch (ps.currentStage) {
         case PromotionStage.DemocraticVote: {
-          const result = resolveDemocraticVote(ctxStore, choices, cfgPromoStore, rng);
+          const result = resolveDemocraticVote(
+            ctxStore,
+            choices,
+            cfgPromoStore,
+            rng,
+            styleSpectrums,
+          );
           ps.stageResults.democraticVotes = result.votes;
           if (result.flaggedForRisk) ps.flaggedForRisk = true;
           if (result.passed) {
@@ -841,7 +907,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           break;
         }
         case PromotionStage.CommitteeVote: {
-          const result = resolveCommitteeVote(ctxStore, cfgPromoStore, rng);
+          const result = resolveCommitteeVote(ctxStore, cfgPromoStore, rng, styleSpectrums);
           ps.stageResults.committeeForVotes = result.forVotes;
           ps.stageResults.committeeAgainstVotes = result.againstVotes;
           if (result.passed) {

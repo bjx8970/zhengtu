@@ -108,6 +108,8 @@ export function resolveActionEffects(
 ): {
   kpiChanges: KPIEffectChange[];
   playerChanges: PlayerEffectChange[];
+  /** Phase C: 行动对玩家风格评分的影响 */
+  styleDeltas: Record<string, number>;
 } {
   const kpiChanges: KPIEffectChange[] = [];
   const playerChanges: PlayerEffectChange[] = [];
@@ -133,5 +135,10 @@ export function resolveActionEffects(
     }
   }
 
-  return { kpiChanges, playerChanges };
+  const styleDeltas: Record<string, number> = {};
+  if (actionConfig.styleAlignment) {
+    const baseDelta = Math.round(actionConfig.durationDays / 7);
+    styleDeltas[actionConfig.styleAlignment] = baseDelta;
+  }
+  return { kpiChanges, playerChanges, styleDeltas };
 }

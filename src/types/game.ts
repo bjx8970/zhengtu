@@ -13,7 +13,6 @@ import type {
   SentimentType,
   OrgInspectResult,
   PromotionStage,
-  LeadershipStyle,
   InvestigationEvidence,
   CareerLine,
 } from './enums';
@@ -192,7 +191,7 @@ export interface PromotionContext {
   yearsInPosition: number;
   politicalCapital: number;
   corruptionRisk: number;
-  styleScores: Record<LeadershipStyle, number>;
+  styleScores: Record<string, number>;
   relations: { colleagues: Record<string, number> };
   assessmentHistory: { score: number; tier: string }[];
   hasDisciplinaryRecord: boolean;
@@ -280,7 +279,7 @@ export interface InvestigationContext {
   evidenceCollected: InvestigationEvidence[];
   playerIntegrity: number;
   playerPoliticalCapital: number;
-  styleScores: Record<LeadershipStyle, number>;
+  styleScores: Record<string, number>;
   hasLawyer: boolean;
 }
 
@@ -311,4 +310,10 @@ export interface RetirementOption {
   label: string;
   description: string;
   risk?: string;
+}
+
+/** Phase C: 风格派生的年度行动记录 */
+export interface AnnualActionRecord {
+  actionName: string;
+  styleAlignment?: string;
 }

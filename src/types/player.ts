@@ -15,7 +15,6 @@ import type {
   PromotionStage,
   OrgInspectResult,
   ReserveCadreTier,
-  LeadershipStyle,
   SecretaryLevel,
   TimeGranularity,
 } from './enums';
@@ -113,7 +112,7 @@ export interface RelationState {
 /** 从政理念风格评分 */
 export interface LeadershipStyleState {
   /** 各风格评分值（0~100），非互斥非归属，仅反映数值倾向 */
-  scores: { [K in LeadershipStyle]: number };
+  scores: Record<string, number>;
 }
 
 /** 接班人培养状态 */
@@ -279,6 +278,12 @@ export interface PlayerSave {
   // ===== 终局状态 =====
   /** 终局状态（L11 达成后激活） */
   endgameReached: boolean;
+
+  /** Phase C: 待处理的风格冲突标记（START_ACTION 设置，ADVANCE_TIME 消费后清除） */
+  pendingStyleConflict?: boolean;
+
+  /** Phase C: START_ACTION 阶段的偏离乘数，ADVANCE_TIME 中应用并清除 */
+  _pendingDeviationMultiplier?: number;
 
   // ===== 元数据 =====
   /** Unix 时间戳，用于本地/远程存档仲裁 */

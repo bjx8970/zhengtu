@@ -6,7 +6,7 @@ import {
   resolvePublicNotice,
   resolveProbation,
 } from '../promotion-final';
-import { calculateImbalancePenalty } from '../philosophy-imbalance';
+import { calculateStyleFuzzinessPenalty } from '../philosophy-imbalance';
 import { getConfigLoader } from '../../../config/loader';
 import { OrgInspectResult } from '../../../types/enums';
 import type { PromotionContext } from '../../../types/game';
@@ -14,6 +14,7 @@ import { createTestStore } from '../../../store/game-store';
 import { KPITier } from '../../../types/enums';
 
 const cfg = getConfigLoader().getGameConfig();
+const styleSpectrums = getConfigLoader().getLeadershipStyleConfig().styleSpectrums;
 
 function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
   return {
@@ -22,7 +23,7 @@ function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
     yearsInPosition: 4,
     politicalCapital: 30,
     corruptionRisk: 10,
-    styleScores: { innovation: 20, pragmatic: 30, principled: 15 },
+    styleScores: { innovation: 70, pragmatic: 30, principled: 10 },
     relations: { colleagues: {} },
     assessmentHistory: [
       { score: 85, tier: '称职' },
@@ -41,19 +42,41 @@ function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
   };
 }
 
-describe('calculateImbalancePenalty', () => {
-  it('单派系有声望 → 0', () => {
-    expect(calculateImbalancePenalty({ innovation: 30, pragmatic: 0, principled: 0 })).toBe(0);
+describe('calculateStyleFuzzinessPenalty', () => {
+  it('清晰风格 → 无惩罚', () => {
+    // innovation-principled 差值 30 > fuzzyThreshold 10 → 非模糊
+    expect(
+      calculateStyleFuzzinessPenalty(
+        { innovation: 30, pragmatic: 0, principled: 0 },
+        styleSpectrums,
+      ),
+    ).toBe(0);
   });
 
-  it('双派系差距大 → 高分惩罚', () => {
-    const result = calculateImbalancePenalty({ innovation: 80, pragmatic: 20, principled: 0 });
+  it('风格模糊 → 触发惩罚因子', () => {
+    // innovation-principled 差值 5 ≤ fuzzyThreshold 10 → 模糊
+    const result = calculateStyleFuzzinessPenalty(
+      {
+        innovation: 50,
+        pragmatic: 20,
+        principled: 55,
+      },
+      styleSpectrums,
+    );
     expect(result).toBeGreaterThan(0);
-    expect(result).toBeLessThanOrEqual(15);
+    expect(result).toBeLessThanOrEqual(1);
   });
 
-  it('三派系均衡 → 低惩罚', () => {
-    const result = calculateImbalancePenalty({ innovation: 30, pragmatic: 30, principled: 30 });
+  it('另一清晰组合 → 无惩罚', () => {
+    // innovation-principled 差值 60 > fuzzyThreshold 10 → 非模糊
+    const result = calculateStyleFuzzinessPenalty(
+      {
+        innovation: 80,
+        pragmatic: 20,
+        principled: 20,
+      },
+      styleSpectrums,
+    );
     expect(result).toBe(0);
   });
 });
@@ -134,7 +157,7 @@ describe('resolveDemocraticVote', () => {
       playerScore: 55,
       charisma: 55,
       superiorFavor: 55,
-      styleScores: { innovation: 0, pragmatic: 0, principled: 0 },
+      styleScores: { innovation: 60, pragmatic: 30, principled: 10 },
     });
     const result = resolveDemocraticVote(ctx, { useConnections: true }, cfg);
     expect(result.passed).toBe(true);
@@ -151,7 +174,7 @@ describe('resolveDemocraticVote', () => {
       playerScore: 60,
       charisma: 60,
       superiorFavor: 60,
-      styleScores: { innovation: 0, pragmatic: 0, principled: 0 },
+      styleScores: { innovation: 70, pragmatic: 30, principled: 10 },
     });
     const result = resolveDemocraticVote(ctx, {}, cfg);
     expect(result.passed).toBe(true);
