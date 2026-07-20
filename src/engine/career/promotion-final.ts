@@ -13,7 +13,7 @@
 
 import type { PromotionContext } from '../../types/game';
 import type { GameConfig } from '../../types/config';
-import { calculateFactionPenalty } from './faction-penalty';
+import { calculateImbalancePenalty } from './philosophy-imbalance';
 
 /**
  * 阶段3 — 多部门联审。
@@ -90,14 +90,14 @@ export function resolveCommitteeVote(
     comm.maxSize,
   );
 
-  const avgReputation =
-    Object.values(ctx.factionReputation).reduce((a, b) => a + b, 0) /
-    Math.max(Object.keys(ctx.factionReputation).length, 1);
+  const avgStyleScore =
+    Object.values(ctx.styleScores).reduce((a, b) => a + b, 0) /
+    Math.max(Object.keys(ctx.styleScores).length, 1);
 
-  const approvalRate = (avgReputation + ctx.superiorFavor) / 200;
+  const approvalRate = avgStyleScore / 100;
 
-  const factionPenalty = calculateFactionPenalty(ctx.factionReputation) / 100;
-  const finalRate = Math.max(approvalRate - factionPenalty, 0.1);
+  const stylePenalty = calculateImbalancePenalty(ctx.styleScores) / 100;
+  const finalRate = Math.max(approvalRate - stylePenalty, 0.1);
 
   let forVotes = 0;
   for (let i = 0; i < committeeSize; i++) {

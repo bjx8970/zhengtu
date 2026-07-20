@@ -107,7 +107,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     currentCareerLine: 'admin' as CareerLine,
     yearsInCurrentPosition: 0,
     slots,
-    health: cfg.initialAttributes['health'] ?? 100,
+    vigor: cfg.initialAttributes['vigor'] ?? 100,
     politicalCapital: cfg.initialAttributes['politicalCapital'] ?? 0,
     remainingBudget: 1000,
     comprehensiveScore: 0,
@@ -117,6 +117,8 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     performance: cfg.initialAttributes['performance'] ?? 0,
     charisma: cfg.initialAttributes['charisma'] ?? 50,
     competence: cfg.initialAttributes['competence'] ?? 50,
+    diligence: cfg.initialAttributes['diligence'] ?? 50,
+    network: cfg.initialAttributes['network'] ?? 0,
     promotionStage: 'idle' as PromotionStage,
     promotionAttempts: 0,
     frozenPeriods: 0,
@@ -134,17 +136,15 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       media: {},
       central: {},
     },
-    factions: {
-      alignment: 'independent',
-      reputation: {
-        reform: 0,
+    philosophy: {
+      scores: {
+        innovation: 0,
         pragmatic: 0,
-        conservative: 0,
+        principled: 0,
       },
     },
-    superiorFavor: cfg.initialAttributes['superiorFavor'] ?? 20,
     reserveTier: 0 as ReserveCadreTier,
-    demoralization: cfg.initialAttributes['demoralization'] ?? 0,
+    ambition: cfg.initialAttributes['ambition'] ?? 100,
     corruptionRisk: cfg.initialAttributes['corruptionRisk'] ?? 0,
     isUnderInvestigation: false,
     time: getInitialTime(),
@@ -258,6 +258,50 @@ function initializeDepartmentStates(draft: PlayerSave): void {
 }
 
 /**
+ * 将旧存档迁移到 Phase A 属性体系。
+ *
+ * 迁移规则：
+ * - health → vigor（直接映射）
+ * - demoralization → ambition（反转：100 - 旧值）
+ * - factions.reputation → philosophy.scores（reform→innovation, conservative→principled）
+ * - 删除旧字段
+ *
+ * @param draft 从旧存档反序列化的 PlayerSave（已通过 Object.assign 合并）
+ */
+function migrateSaveToPhaseA(draft: PlayerSave): void {
+  const save = draft as unknown as Record<string, unknown>;
+
+  if (typeof save.health === 'number' && typeof save.vigor !== 'number') {
+    save.vigor = save.health;
+  }
+
+  if (typeof save.demoralization === 'number' && typeof save.ambition !== 'number') {
+    save.ambition = 100 - (save.demoralization as number);
+  }
+
+  if (save.factions && typeof save.factions === 'object') {
+    const factions = save.factions as Record<string, unknown>;
+    if (factions.reputation && typeof factions.reputation === 'object') {
+      const rep = factions.reputation as Record<string, number>;
+      const existing = (save.philosophy as Record<string, unknown> | undefined)?.scores as
+        Record<string, number> | undefined;
+      save.philosophy = {
+        scores: {
+          innovation: rep.reform ?? existing?.innovation ?? 0,
+          pragmatic: rep.pragmatic ?? existing?.pragmatic ?? 0,
+          principled: rep.conservative ?? existing?.principled ?? 0,
+        },
+      };
+    }
+  }
+
+  delete save.health;
+  delete save.demoralization;
+  delete save.factions;
+  delete (save as Record<string, unknown>).superiorFavor;
+}
+
+/**
  * 补齐旧版本本地存档中尚不存在的行动分类与冷却字段。
  *
  * @param draft 已载入的可变游戏状态
@@ -331,7 +375,7 @@ function buildPromotionContext(draft: PlayerSave): PromotionContext {
     yearsInPosition: draft.yearsInCurrentPosition,
     politicalCapital: draft.politicalCapital,
     corruptionRisk: draft.corruptionRisk,
-    factionReputation: draft.factions.reputation,
+    styleScores: draft.philosophy.scores,
     relations: { colleagues: draft.relations.colleagues },
     assessmentHistory: draft.annualAssessments.map((a) => ({ score: a.score, tier: a.tier })),
     hasDisciplinaryRecord: false, // TODO: 待处分系统实现后动态计算
@@ -339,7 +383,7 @@ function buildPromotionContext(draft: PlayerSave): PromotionContext {
       draft.currentLevel <= 2 || draft.careerHistory.some((r) => r.level <= 2),
     hasMultiRegionExperience: draft.careerHistory.filter((r) => r.archived).length >= 2,
     charisma: draft.charisma,
-    superiorFavor: draft.superiorFavor,
+    superiorFavor: 0, // Phase A: superioFavor 已删除，暂用 0，Phase B/C 重写
     performance: draft.performance,
     competence: draft.competence,
     integrity: draft.integrity,
@@ -478,14 +522,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
 
       if (tierKey === 'reserve') {
         const penalty = cfg.reservePenalty;
-        draft.health = clampAttr(
-          'health',
-          (draft.health ?? 100) + penalty.health,
-          cfg.attributeBounds,
-        );
-        draft.demoralization = clampAttr(
-          'demoralization',
-          (draft.demoralization ?? 0) + penalty.demoralization,
+        draft.vigor = clampAttr('vigor', (draft.vigor ?? 100) + penalty.vigor, cfg.attributeBounds);
+        draft.ambition = clampAttr(
+          'ambition',
+          (draft.ambition ?? 100) + penalty.ambition,
           cfg.attributeBounds,
         );
       }
@@ -589,6 +629,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
     }
     case 'LOAD_SAVE': {
       Object.assign(draft, action.save);
+      migrateSaveToPhaseA(draft);
       migrateActionState(draft);
       break;
     }
@@ -615,14 +656,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             case 'politicalCapital':
               draft.politicalCapital = clamp(draft.politicalCapital + delta, 0, 500);
               break;
-            case 'superiorFavor':
-              draft.superiorFavor = clamp(draft.superiorFavor + delta, 0, 100);
-              break;
-            case 'reform':
+            case 'innovation':
             case 'pragmatic':
-            case 'conservative':
-              draft.factions.reputation[key] = clamp(
-                (draft.factions.reputation[key] ?? 0) + delta,
+            case 'principled':
+              draft.philosophy.scores[key] = clamp(
+                (draft.philosophy.scores[key] ?? 0) + delta,
                 0,
                 100,
               );
@@ -724,9 +762,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnFail,
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
               0,
               100,
             );
@@ -746,9 +783,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
             draft.frozenPeriods = clamp(draft.frozenPeriods + 2, 0, cfgPromoStore.maxFrozenPeriods);
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnRejected,
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnRejected,
               0,
               100,
             );
@@ -773,9 +809,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnFail,
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
               0,
               100,
             );
@@ -792,9 +827,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnFail,
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
               0,
               100,
             );
@@ -811,9 +845,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnFail,
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
               0,
               100,
             );
@@ -886,9 +919,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            draft.demoralization = clamp(
-              (draft.demoralization ?? 0) +
-                cfgPromoStore.promotion.progression.demoralizationOnFail,
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
               0,
               100,
             );

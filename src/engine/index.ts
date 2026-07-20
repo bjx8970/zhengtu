@@ -15,4 +15,4 @@ export * from './governance/assessment';
 export * from './career/promotion';
 export * from './career/promotion-final';
 export * from './career/promotion-target';
-export * from './career/faction-penalty';
+export * from './career/philosophy-imbalance';

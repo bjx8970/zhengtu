@@ -13,7 +13,7 @@ import type {
   SentimentType,
   OrgInspectResult,
   PromotionStage,
-  Faction,
+  LeadershipStyle,
   InvestigationEvidence,
   CareerLine,
 } from './enums';
@@ -192,7 +192,7 @@ export interface PromotionContext {
   yearsInPosition: number;
   politicalCapital: number;
   corruptionRisk: number;
-  factionReputation: Record<Faction, number>;
+  styleScores: Record<LeadershipStyle, number>;
   relations: { colleagues: Record<string, number> };
   assessmentHistory: { score: number; tier: string }[];
   hasDisciplinaryRecord: boolean;
@@ -271,7 +271,7 @@ export interface InvestigationContext {
   evidenceCollected: InvestigationEvidence[];
   playerIntegrity: number;
   playerPoliticalCapital: number;
-  factionReputation: Record<Faction, number>;
+  styleScores: Record<LeadershipStyle, number>;
   hasLawyer: boolean;
 }
 

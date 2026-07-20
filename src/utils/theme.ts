@@ -191,13 +191,16 @@ export function sealStyle() {
 
 /** 属性名到中文显示名的映射 */
 export const ATTR_LABELS: Record<string, string> = {
-  stability: '稳定',
-  competence: '能力',
-  integrity: '廉洁',
+  vigor: '体魄',
+  stability: '定力',
+  competence: '才干',
+  integrity: '品性',
   charisma: '魅力',
   politicalCapital: '政治资本',
-  superiorFavor: '上司好感',
-  reform: '改革派声望',
-  pragmatic: '务实派声望',
-  conservative: '保守派声望',
+  network: '人脉',
+  diligence: '勤勉',
+  ambition: '怀抱',
+  innovation: '开拓创新',
+  pragmatic: '实干务实',
+  principled: '稳健守正',
 };

@@ -21,7 +21,7 @@ function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
     yearsInPosition: 4,
     politicalCapital: 30,
     corruptionRisk: 10,
-    factionReputation: { reform: 20, pragmatic: 30, conservative: 15 },
+    styleScores: { innovation: 20, pragmatic: 30, principled: 15 },
     relations: { colleagues: {} },
     assessmentHistory: [
       { score: 85, tier: '称职' },
@@ -32,7 +32,7 @@ function makeCtx(override?: Partial<PromotionContext>): PromotionContext {
     hasGrassrootsExperience: true,
     hasMultiRegionExperience: false,
     charisma: 60,
-    superiorFavor: 40,
+    superiorFavor: 0,
     performance: 70,
     competence: 65,
     integrity: 55,

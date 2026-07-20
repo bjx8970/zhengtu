@@ -180,8 +180,8 @@ export interface PromotionConfig {
     passThreshold: number;
   };
   progression: {
-    demoralizationOnFail: number;
-    demoralizationOnRejected: number;
+    ambitionOnFail: number;
+    ambitionOnRejected: number;
     politicalCapitalBonusOnSuccess: number;
   };
 }
@@ -189,7 +189,7 @@ export interface PromotionConfig {
 /** 全局游戏配置常量（从 constants.json 读取） */
 export interface GameConfig {
   slotTiers: SlotTiersConfig;
-  reservePenalty: { health: number; demoralization: number };
+  reservePenalty: { vigor: number; ambition: number };
   daysPerMonth: number;
   monthsPerYear: number;
   retirementAge: number;
