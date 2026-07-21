@@ -851,6 +851,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnFail,
+            );
             draft.ambition = clamp(
               (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
               0,
@@ -872,6 +876,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
             draft.frozenPeriods = clamp(draft.frozenPeriods + 2, 0, cfgPromoStore.maxFrozenPeriods);
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnRejected,
+             );
             draft.ambition = clamp(
               (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnRejected,
               0,
@@ -898,6 +906,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnFail,
+             );
             draft.ambition = clamp(
               (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
               0,
@@ -916,6 +928,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnFail,
+            );
             draft.ambition = clamp(
               (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
               0,
@@ -934,6 +950,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnFail,
+            );
             draft.ambition = clamp(
               (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
               0,
@@ -1008,6 +1028,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnFail,
+            );
             draft.ambition = clamp(
               (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
               0,
@@ -1060,4 +1084,9 @@ export function createTestStore(initialOverrides?: Partial<PlayerSave>) {
  */
 export function useGameStore() {
   return { state, dispatch, getState, getRawState };
+}
+
+// 提取此函数以避免在 6 处调用点重复相同的 clamp 逻辑
+function applyDemoralization(draft: PlayerSave, delta: number): void {
+  draft.demoralization = clamp((draft.demoralization ?? 0) + delta, 0, 100);
 }
