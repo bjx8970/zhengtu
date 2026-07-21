@@ -52,7 +52,6 @@ import {
 } from '../engine/career/promotion-final';
 import type { PromotionContext } from '../types/game';
 import type { CareerRecord } from '../types/player';
-import type { GameConfig } from '../types/config';
 
 export type GameState = PlayerSave;
 
@@ -725,7 +724,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnFail, cfgPromoStore);
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnFail,
+              cfgPromoStore,
+            );
           }
           break;
         }
@@ -742,7 +745,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
             draft.frozenPeriods = clamp(draft.frozenPeriods + 2, 0, cfgPromoStore.maxFrozenPeriods);
-            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnRejected, cfgPromoStore);
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnRejected,
+              cfgPromoStore,
+            );
           } else {
             // Suspended — 本次搁置
             draft.promotionStage = PromotionStage.Failed;
@@ -764,7 +771,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnFail, cfgPromoStore);
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnFail,
+              cfgPromoStore,
+            );
           }
           break;
         }
@@ -778,7 +789,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnFail, cfgPromoStore);
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnFail,
+              cfgPromoStore,
+            );
           }
           break;
         }
@@ -792,7 +807,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnFail, cfgPromoStore);
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnFail,
+              cfgPromoStore,
+            );
           }
           break;
         }
@@ -862,7 +881,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
           } else {
             draft.promotionStage = PromotionStage.Failed;
             ps.currentStage = PromotionStage.Failed;
-            applyDemoralization(draft, cfgPromoStore.promotion.progression.demoralizationOnFail, cfgPromoStore);
+            applyDemoralization(
+              draft,
+              cfgPromoStore.promotion.progression.demoralizationOnFail,
+              cfgPromoStore,
+            );
           }
           break;
         }
@@ -912,7 +935,7 @@ export function useGameStore() {
   return { state, dispatch, getState, getRawState };
 }
 
-// 用于 clamp 计算模式的辅助函数
-function applyDemoralization(draft: PlayerSave, delta: number, cfg: GameConfig): void {
+// 提取此函数以避免在 6 处调用点重复相同的 clamp 逻辑
+function applyDemoralization(draft: PlayerSave, delta: number): void {
   draft.demoralization = clamp((draft.demoralization ?? 0) + delta, 0, 100);
 }
