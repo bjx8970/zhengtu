@@ -18,9 +18,6 @@ export type LocalSaveLoadResult =
 /** 当前启动存档状态 */
 let currentResult: LocalSaveLoadResult = { status: 'empty' };
 
-/** 是否已被 NEW_GAME 失效 */
-let invalidated = false;
-
 /**
  * 设置启动时的存档加载结果（仅 main.tsx 启动时调用一次）。
  *
@@ -28,28 +25,15 @@ let invalidated = false;
  */
 export function setStartupSaveResult(result: LocalSaveLoadResult): void {
   currentResult = result;
-  invalidated = false;
 }
 
 /**
  * 获取当前启动存档状态。
  *
- * 若已被 NEW_GAME 失效，返回 'empty'（表示应从 Store 派生状态）。
- *
  * @returns 当前加载结果
  */
 export function getStartupSaveResult(): LocalSaveLoadResult {
-  if (invalidated) return { status: 'empty' };
   return currentResult;
-}
-
-/**
- * 失效启动快照（NEW_GAME 后调用）。
- *
- * 调用后启动页不再显示旧的不兼容提示或过期存档信息。
- */
-export function invalidateStartupSave(): void {
-  invalidated = true;
 }
 
 /** 强制新建游戏标记（用于绕过 CharacterCreation 的已有角色保护） */

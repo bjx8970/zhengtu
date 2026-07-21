@@ -3,7 +3,7 @@
  *
  * 处理角色相关动作：
  * - NEW_GAME：初始化新游戏
- * - LOAD_SAVE：加载已经过迁移管道验证和规范化的存档
+ * - LOAD_SAVE：加载已经 save-codec 严格解码验证的存档
  */
 
 import type { PlayerSave } from '../../types/player';
@@ -15,11 +15,10 @@ import { applyPlayerAttr, initializeDepartmentStates } from './shared';
 /**
  * 处理 LOAD_SAVE 动作。
  *
- * v4 变更：迁移逻辑已收敛到 migrations/ 版本管道。
- * LOAD_SAVE 只负责替换已经验证和规范化的状态。
+ * v4 变更：存档已经 save-codec 严格解码验证，LOAD_SAVE 只负责替换状态。
  *
  * @param draft 当前游戏状态
- * @param save 已经过迁移管道处理的存档
+ * @param save 已经过 save-codec 验证的存档
  */
 export function reduceLoadSave(draft: PlayerSave, save: PlayerSave): void {
   Object.assign(draft, save);

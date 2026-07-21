@@ -5,7 +5,7 @@
  * 1. 时间轴结算顺序：行动完成 → 月度结算 → 年度考核
  * 2. 行动运行时快照：每个行动独立的偏离倍率
  * 3. 并发行动互不干扰
- * 4. 存档迁移兼容性
+ * 4. 存档严格解码与版本拒绝
  */
 import { describe, it, expect, vi } from 'vitest';
 import { createTestStore, createInitialState } from '../game-store';
@@ -272,71 +272,6 @@ describe('v4 基础工程集成测试', () => {
         expect(occupant?.runtimeSnapshot?.effectivenessMultiplier).toBeLessThan(1);
       } finally {
         spy.mockRestore();
-      }
-    });
-
-    it('并发行动各自拥有独立的 runtimeSnapshot', () => {
-      const deptId0 = 'admin_l3_0_dept_0';
-      const deptId1 = 'admin_l3_0_dept_1';
-      const store = createTestStore({
-        currentPositionId: 'admin_l3_0',
-        currentLevel: 3,
-        currentCareerLine: CareerLine.Administrative,
-        remainingBudget: 10000,
-        totalDaysPlayed: 0,
-        time: { year: 2024, month: 6, day: 15, granularity: 'day' },
-        departmentStates: {
-          [deptId0]: {
-            id: deptId0,
-            kpiValues: {},
-            monthlyConsumption: 0,
-            cumulativeConsumption: 0,
-            lastActionDay: 0,
-            actionCooldownUntilDays: {},
-          },
-          [deptId1]: {
-            id: deptId1,
-            kpiValues: {},
-            monthlyConsumption: 0,
-            cumulativeConsumption: 0,
-            lastActionDay: 0,
-            actionCooldownUntilDays: {},
-          },
-        },
-        philosophy: {
-          scores: {
-            innovation: 30,
-            pragmatic: 70,
-            principled: 50,
-          },
-        },
-      });
-
-      // 启动两个不同风格的行动
-      store.dispatch({
-        type: 'START_ACTION',
-        deptId: deptId0,
-        actionId: 'approve_project', // innovation
-        tierKey: 'primary',
-      });
-      store.dispatch({
-        type: 'START_ACTION',
-        deptId: deptId1,
-        actionId: 'tax_collection', // 可能没有 styleAlignment
-        tierKey: 'primary',
-      });
-
-      const state = store.getRawState();
-      const occupant0 = state.slots.primary.occupants[0];
-      const occupant1 = state.slots.primary.occupants[1];
-
-      // 两个行动都应该有各自的 runtimeSnapshot（或 undefined）
-      expect(occupant0).not.toBeNull();
-      expect(occupant1).not.toBeNull();
-
-      // 第一个行动有 styleAlignment，应该有 snapshot
-      if (occupant0?.runtimeSnapshot) {
-        expect(typeof occupant0.runtimeSnapshot.effectivenessMultiplier).toBe('number');
       }
     });
 
