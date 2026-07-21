@@ -222,4 +222,62 @@ describe('存档严格解码器', () => {
       expect(result.error).toBe('invalid_envelope');
     });
   });
+
+  describe('晋升状态机一致性校验', () => {
+    it('promotionStage 与 promotionState.currentStage 矛盾时拒绝', () => {
+      const state = createInitialState();
+      state.promotionStage = 'democratic_vote' as never;
+      state.promotionState = {
+        targetPositionId: 'admin_l2_0',
+        targetLevel: 2,
+        currentStage: 'probation' as never, // 与顶层矛盾
+        stageResults: {},
+      };
+      const envelope = wrapSaveEnvelope(state);
+
+      const result = decodeCurrentSave(JSON.stringify(envelope));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('invalid_envelope');
+    });
+
+    it('非法 currentStage 字符串被拒绝', () => {
+      const state = createInitialState();
+      state.promotionStage = 'invalid_stage' as never;
+      state.promotionState = {
+        targetPositionId: 'admin_l2_0',
+        targetLevel: 2,
+        currentStage: 'invalid_stage' as never,
+        stageResults: {},
+      };
+      const envelope = wrapSaveEnvelope(state);
+
+      const result = decodeCurrentSave(JSON.stringify(envelope));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('invalid_envelope');
+    });
+
+    it('合法且一致的活动阶段能正常解码', () => {
+      const state = createInitialState();
+      state.promotionStage = 'democratic_vote' as never;
+      state.promotionState = {
+        targetPositionId: 'admin_l2_0',
+        targetLevel: 2,
+        currentStage: 'democratic_vote' as never,
+        stageResults: {},
+      };
+      const envelope = wrapSaveEnvelope(state);
+
+      const result = decodeCurrentSave(JSON.stringify(envelope));
+      expect(result.success).toBe(true);
+    });
+
+    it('idle + promotionState null 能正常解码', () => {
+      const state = createInitialState();
+      // 默认就是 idle + null
+      const envelope = wrapSaveEnvelope(state);
+
+      const result = decodeCurrentSave(JSON.stringify(envelope));
+      expect(result.success).toBe(true);
+    });
+  });
 });

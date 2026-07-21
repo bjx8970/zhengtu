@@ -193,7 +193,7 @@ const PlayerSaveSchema = z
         .object({
           targetPositionId: z.string(),
           targetLevel: z.number(),
-          currentStage: z.string(),
+          currentStage: z.string().refine((v) => VALID_PROMOTION_STAGES.includes(v)),
           stageResults: z.record(z.unknown()),
           flaggedForRisk: z.boolean().optional(),
         })
@@ -276,7 +276,18 @@ const PlayerSaveSchema = z
     endgameReached: z.boolean(),
     updatedAt: z.number(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (data) => {
+      // 跨字段校验：promotionState 非 null 时，promotionStage 必须与 currentStage 一致
+      if (data.promotionState !== null) {
+        return data.promotionStage === data.promotionState.currentStage;
+      }
+      // promotionState 为 null 时，promotionStage 应为 idle/completed/failed
+      return ['idle', 'completed', 'failed'].includes(data.promotionStage);
+    },
+    { message: 'promotionStage 与 promotionState.currentStage 不一致' },
+  );
 
 /** SaveEnvelope 的 Zod schema（严格模式，拒绝未知字段） */
 const SaveEnvelopeSchema = z
