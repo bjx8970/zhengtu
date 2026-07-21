@@ -4,14 +4,15 @@
  * 存档外层封装和严格解码基础设施。
  * SaveEnvelope 包裹 PlayerSave，提供 schema 版本追踪和不兼容拒绝能力。
  *
- * 本版本不支持无 SaveEnvelope 封装的裸 PlayerSave 存档，不提供任何旧存档自动迁移。
- * 基础工程重构期间（PR #88）生成的完整 Schema 1 Envelope 继续兼容。
+ * Schema 2：当前版本，严格解码。
+ * Schema 1：拒绝并保留原始只读备份（不实现自动迁移）。
+ * 未来 Schema：拒绝。
  */
 
 import type { PlayerSave } from './player';
 
 /** 当前存档 Schema 版本号，每次不兼容变更递增 */
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 /** 当前内容版本号，用于标识配置/内容包的版本（格式：YYYY.MM.REVISION） */
 export const CURRENT_CONTENT_VERSION = '2026.07.1';

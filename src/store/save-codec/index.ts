@@ -359,7 +359,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     };
   }
 
-  return { success: true, state: envelopeResult.data.state as PlayerSave };
+  return { success: true, state: envelopeResult.data.state as unknown as PlayerSave };
 }
 
 /**

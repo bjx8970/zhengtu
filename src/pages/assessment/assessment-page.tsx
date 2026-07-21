@@ -13,7 +13,6 @@ import { AppShell } from '../../components/app-shell';
 import { PageHeader } from '../../components/page-header';
 import { calculateKPI } from '../../engine/governance/kpi';
 import { getConfigLoader } from '../../config/loader';
-import { parsePositionIndex } from '../../utils/position';
 import { formatNumber } from '../../utils/format';
 import { KPITier } from '../../types/enums';
 import type { KPIResult } from '../../types/game';
@@ -48,19 +47,17 @@ export function AssessmentPage() {
   const { state } = useGameStore();
 
   const positionConfig = createMemo(() => {
-    const posId = state.currentPositionId;
+    const posId = state.career.appointment.positionId;
     if (!posId) return null;
-    const idx = parsePositionIndex(posId);
-    if (idx === null) return null;
-    return getConfigLoader().getPosition(state.currentCareerLine, state.currentLevel, idx);
+    return getConfigLoader().getPositionById(posId);
   });
 
   const kpiResult = createMemo(() => {
     const pos = positionConfig();
     if (!pos) return null;
     return calculateKPI(
-      pos.kpiIndicators,
-      state.departmentStates,
+      getConfigLoader().resolvePositionKpis(pos.id),
+      state.actions.departmentStates,
       getConfigLoader().getGameConfig(),
     );
   });

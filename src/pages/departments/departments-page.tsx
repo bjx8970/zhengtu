@@ -10,7 +10,6 @@ import { useGameStore } from '../../store/game-store';
 import { AppShell } from '../../components/app-shell';
 import { PageHeader } from '../../components/page-header';
 import { getConfigLoader } from '../../config/loader';
-import { parsePositionIndex } from '../../utils/position';
 import type { SlotTierKey, SlotOccupant } from '../../types/player';
 import type { DepartmentConfig } from '../../types/config';
 import { colors, font, meterContainer, darkCardStyle } from '../../utils/theme';
@@ -33,14 +32,16 @@ export function DepartmentsPage() {
   const [selectedDeptIdx, setSelectedDeptIdx] = createSignal<number | null>(null);
 
   const positionConfig = createMemo(() => {
-    const posId = state.currentPositionId;
+    const posId = state.career.appointment.positionId;
     if (!posId) return null;
-    const idx = parsePositionIndex(posId);
-    if (idx === null) return null;
-    return getConfigLoader().getPosition(state.currentCareerLine, state.currentLevel, idx);
+    return getConfigLoader().getPositionById(posId);
   });
 
-  const allDepts = createMemo(() => positionConfig()?.departments ?? []);
+  const allDepts = createMemo(() => {
+    const pos = positionConfig();
+    if (!pos) return [];
+    return getConfigLoader().resolvePositionDepartments(pos.id);
+  });
   const selectedDept = createMemo(() => {
     const idx = selectedDeptIdx();
     if (idx === null) return null;
@@ -91,7 +92,7 @@ export function DepartmentsPage() {
           >
             <For each={allDepts()}>
               {(dept, idx) => {
-                const deptState = state.departmentStates[dept.id];
+                const deptState = state.actions.departmentStates[dept.id];
                 const kpiValues = deptState?.kpiValues ?? {};
                 const firstKpi = Object.entries(kpiValues).slice(0, 2);
                 const firstValue = firstKpi.length > 0 ? Number(firstKpi[0]?.[1] ?? 0) : 0;
@@ -215,10 +216,10 @@ function DeptDetailView(props: { dept: DepartmentConfig; onBack: () => void }) {
         <div style={{ display: 'grid', gap: '12px' }}>
           <For each={props.dept.actions}>
             {(action) => {
-              const deptState = state.departmentStates[props.dept.id];
+              const deptState = state.actions.departmentStates[props.dept.id];
               const cooldownUntil = deptState?.actionCooldownUntilDays?.[action.id] ?? 0;
               const onCooldown =
-                action.category !== 'routine' && state.totalDaysPlayed < cooldownUntil;
+                action.category !== 'routine' && state.time.totalDaysPlayed < cooldownUntil;
 
               return (
                 <div
@@ -293,7 +294,7 @@ function DeptDetailView(props: { dept: DepartmentConfig; onBack: () => void }) {
                         color: colors.warning,
                       }}
                     >
-                      冷却中（{cooldownUntil - state.totalDaysPlayed}天）
+                      冷却中（{cooldownUntil - state.time.totalDaysPlayed}天）
                     </div>
                   </Show>
                   {/* 日程选择按钮 */}
@@ -303,7 +304,7 @@ function DeptDetailView(props: { dept: DepartmentConfig; onBack: () => void }) {
                         const disallowedByCategory =
                           action.category === 'major' && tb.key !== 'primary';
                         if (disallowedByCategory) return null;
-                        const tierGroup = state.slots[tb.key];
+                        const tierGroup = state.actions.slots[tb.key];
                         const hasFree = tierGroup.occupants.some(
                           (o: SlotOccupant | null) => o === null,
                         );

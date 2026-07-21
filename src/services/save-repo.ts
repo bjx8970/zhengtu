@@ -125,12 +125,12 @@ export async function upsertSave(save: PlayerSave): Promise<boolean> {
   const sb = supabase as any;
   const { error } = await sb.from(TABLE_NAME).upsert(
     {
-      user_id: save.userId,
+      user_id: save.character.userId,
       slot_name: SLOT_NAME,
       save_data: envelope,
-      current_level: save.currentLevel,
-      current_career_line: save.currentCareerLine,
-      current_position_id: save.currentPositionId,
+      current_level: 0,
+      current_career_line: '',
+      current_position_id: save.career.appointment.positionId,
       game_year: save.time.year,
       game_month: save.time.month,
       updated_at: new Date().toISOString(),

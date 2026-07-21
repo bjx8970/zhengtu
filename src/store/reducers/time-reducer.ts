@@ -1,5 +1,5 @@
 /**
- * 时间推进 Reducer
+ * 时间推进 Reducer（Schema 2）
  *
  * 处理 ADVANCE_TIME 动作：
  * - 使用统一时间轴确保事件按正确顺序结算
@@ -22,22 +22,10 @@ import {
 import { annualAssessment as runAnnualAssessment } from '../../engine/governance/assessment';
 import { decayStyleScores } from '../../engine/career/style-decay';
 import { getConfigLoader } from '../../config/loader';
-import { clamp, clampAttr } from '../../utils/math';
-import {
-  applyPlayerAttr,
-  setPlayerAttrDirect,
-  getPlayerAttr,
-  applyStyleDelta,
-  extractPositionIndex,
-} from './shared';
+import { clampAttr } from '../../utils/math';
 
 /**
  * 处理行动完成时间轴事件。
- *
- * @param draft 游戏状态
- * @param event 行动完成事件
- * @param rng 随机数生成器
- * @param notifications 通知收集数组
  */
 function processActionCompletion(
   draft: PlayerSave,
@@ -46,188 +34,172 @@ function processActionCompletion(
   notifications: CompletedActionNotification[],
 ): void {
   const cfg = getConfigLoader().getGameConfig();
-  const posIdx = extractPositionIndex(draft.currentPositionId);
-  const currentPosition = getConfigLoader().getPosition(
-    draft.currentCareerLine,
-    draft.currentLevel,
-    posIdx,
-  );
-
-  const occupant = event.occupant;
-  const deptCfg = currentPosition?.departments.find((d) => d.id === occupant.deptId);
-  const aCfg = deptCfg?.actions.find((a) => a.id === occupant.actionId);
-  const deptName = deptCfg?.name ?? occupant.deptId;
+  const positionId = draft.career.appointment.positionId;
+  const departments = getConfigLoader().resolvePositionDepartments(positionId);
+  const deptCfg = departments.find((d) => d.id === event.occupant.deptId);
+  const aCfg = deptCfg?.actions.find((a) => a.id === event.occupant.actionId);
+  const deptName = deptCfg?.name ?? event.occupant.deptId;
 
   // 从行动实例的 runtimeSnapshot 获取偏离倍率
-  const devMult = occupant.runtimeSnapshot?.effectivenessMultiplier ?? 1;
-  const styleConflictTriggered = occupant.runtimeSnapshot?.styleConflictTriggered ?? false;
+  const devMult = event.occupant.runtimeSnapshot?.effectivenessMultiplier ?? 1;
+  const styleConflictTriggered = event.occupant.runtimeSnapshot?.styleConflictTriggered ?? false;
 
   if (aCfg) {
-    const effects = resolveActionEffects(aCfg, rng);
-    const deptState = draft.departmentStates[occupant.deptId];
+    const result = resolveActionEffects(aCfg, rng);
+    const effectLabels: string[] = [];
 
-    if (deptState) {
-      // 写入冷却
-      if (occupant.category !== 'routine') {
-        deptState.actionCooldownUntilDays[occupant.actionId] =
-          occupant.startedAtDay + occupant.durationDays + occupant.cooldownDays;
-      }
-
-      // 应用 KPI 变更（使用行动自己的偏离倍率）
-      for (const kpi of effects.kpiChanges) {
-        const cur = deptState.kpiValues[kpi.indicatorId] ?? 0;
-        if (kpi.operation === 'multiply') {
-          deptState.kpiValues[kpi.indicatorId] = cur * kpi.delta;
-        } else if (kpi.operation === 'set') {
-          deptState.kpiValues[kpi.indicatorId] = kpi.delta;
-        } else {
-          deptState.kpiValues[kpi.indicatorId] = cur + kpi.delta * devMult;
-        }
+    // 应用 KPI 变化（乘以偏离倍率）
+    for (const change of result.kpiChanges) {
+      const deptState = draft.actions.departmentStates[event.occupant.deptId];
+      if (deptState) {
+        const delta = change.delta * devMult;
+        const current = deptState.kpiValues[change.indicatorId] ?? 0;
+        deptState.kpiValues[change.indicatorId] = current + delta;
+        effectLabels.push(`${change.indicatorId} +${delta.toFixed(1)}`);
       }
     }
 
-    // 应用玩家属性变更（使用行动自己的偏离倍率）
-    for (const change of effects.playerChanges) {
-      if (change.operation === 'add') {
-        applyPlayerAttr(draft, change.attr, change.delta * devMult, cfg.attributeBounds);
-      } else if (change.operation === 'multiply' || change.operation === 'set') {
-        const cur = getPlayerAttr(draft, change.attr);
-        const newVal = change.operation === 'multiply' ? cur * change.delta : change.delta;
-        setPlayerAttrDirect(draft, change.attr, newVal, cfg.attributeBounds);
-      }
+    // 应用玩家属性变化
+    for (const change of result.playerChanges) {
+      const char = draft.character as unknown as Record<string, unknown>;
+      const current = typeof char[change.attr] === 'number' ? (char[change.attr] as number) : 0;
+      char[change.attr] = clampAttr(
+        change.attr,
+        current + change.delta * devMult,
+        cfg.attributeBounds,
+      );
+      effectLabels.push(`${change.attr} +${(change.delta * devMult).toFixed(1)}`);
     }
 
-    // 应用风格增量
-    if (effects.styleDeltas) {
-      for (const [styleId, delta] of Object.entries(effects.styleDeltas)) {
-        applyStyleDelta(draft, styleId, delta);
-      }
+    // 应用理念变化
+    for (const [key, delta] of Object.entries(result.styleDeltas)) {
+      const scores = draft.character.philosophy.scores;
+      scores[key] = Math.max(0, Math.min(100, (scores[key] ?? 50) + delta));
     }
 
-    // 处理风格冲突（从行动实例读取，不再使用玩家级标记）
+    // 处理风格冲突
     if (styleConflictTriggered) {
-      draft.vigor = clampAttr('vigor', (draft.vigor ?? 100) - 5, cfg.attributeBounds);
-      draft.ambition = clampAttr('ambition', (draft.ambition ?? 100) - 5, cfg.attributeBounds);
+      draft.character.vigor = clampAttr('vigor', draft.character.vigor - 5, cfg.attributeBounds);
+      draft.character.ambition = clampAttr(
+        'ambition',
+        draft.character.ambition - 5,
+        cfg.attributeBounds,
+      );
     }
 
     notifications.push({
-      actionName: occupant.actionName,
+      actionName: event.occupant.actionName,
       deptName,
-      effects: [
-        ...effects.kpiChanges.map((k) =>
-          k.operation === 'multiply'
-            ? `KPI×${k.delta}`
-            : k.operation === 'set'
-              ? `KPI=${k.delta}`
-              : `KPI${k.delta >= 0 ? '+' : ''}${k.delta}`,
-        ),
-        ...effects.playerChanges.map((p) =>
-          p.operation === 'multiply'
-            ? `${p.attr}×${p.delta}`
-            : p.operation === 'set'
-              ? `${p.attr}=${p.delta}`
-              : `${p.attr}${p.delta >= 0 ? '+' : ''}${p.delta}`,
-        ),
-      ],
-      completedAtDay: occupant.startedAtDay + occupant.durationDays,
+      effects: effectLabels,
+      completedAtDay: event.absoluteDay,
     });
   }
 
-  // 清空槽位
-  draft.slots[event.tierKey].occupants[event.slotIndex] = null;
+  // 释放槽位
+  draft.actions.slots[event.tierKey].occupants[event.slotIndex] = null;
+
+  // 写入冷却
+  if (aCfg && aCfg.cooldownDays > 0) {
+    const deptState = draft.actions.departmentStates[event.occupant.deptId];
+    if (deptState) {
+      const completesAtDay = event.occupant.startedAtDay + event.occupant.durationDays;
+      deptState.actionCooldownUntilDays[event.occupant.actionId] =
+        completesAtDay + aCfg.cooldownDays;
+    }
+  }
 }
 
 /**
  * 处理月度结算时间轴事件。
- *
- * @param draft 游戏状态
  */
 function processMonthlySettlement(draft: PlayerSave): void {
   const loader = getConfigLoader();
-  const position = loader.getPosition(
-    draft.currentCareerLine,
-    draft.currentLevel,
-    extractPositionIndex(draft.currentPositionId),
-  );
-  if (!position) return;
+  const positionId = draft.career.appointment.positionId;
+  const deptConfigs = loader.resolvePositionDepartments(positionId);
 
-  const settlement = monthlySettlement(
-    draft.departmentStates,
-    position.departments,
+  const result = monthlySettlement(
+    draft.actions.departmentStates,
+    deptConfigs,
     draft.remainingBudget,
   );
-  draft.remainingBudget = settlement.newRemaining;
+  draft.remainingBudget = result.newRemaining;
 
-  for (const dept of position.departments) {
-    const ds = draft.departmentStates[dept.id];
-    if (ds) {
-      ds.monthlyConsumption = settlement.deptConsumptions[dept.id] ?? 0;
-      ds.cumulativeConsumption += settlement.deptConsumptions[dept.id] ?? 0;
+  for (const [deptId, consumption] of Object.entries(result.deptConsumptions)) {
+    const deptState = draft.actions.departmentStates[deptId];
+    if (deptState) {
+      deptState.monthlyConsumption = consumption;
+      deptState.cumulativeConsumption += consumption;
     }
   }
 
-  // 月度风格衰减
+  // 理念衰减
   const styleCfg = loader.getLeadershipStyleConfig();
-  draft.philosophy.scores = decayStyleScores(draft.philosophy.scores, styleCfg);
+  draft.character.philosophy.scores = decayStyleScores(draft.character.philosophy.scores, styleCfg);
 }
 
 /**
  * 处理年度考核时间轴事件。
- *
- * @param draft 游戏状态
- * @param year 考核年份
  */
-function processAnnualAssessment(draft: PlayerSave, year: number): void {
+function processAnnualAssessment(draft: PlayerSave): void {
   const loader = getConfigLoader();
   const cfg = loader.getGameConfig();
-  const position = loader.getPosition(
-    draft.currentCareerLine,
-    draft.currentLevel,
-    extractPositionIndex(draft.currentPositionId),
-  );
-  if (!position) return;
+  const positionId = draft.career.appointment.positionId;
+  const deptConfigs = loader.resolvePositionDepartments(positionId);
+  const year = draft.time.year;
 
-  const kpiResult = calculateKPI(position.kpiIndicators, draft.departmentStates, cfg);
-  const dimensions = computeFiveDimensions(
-    {
-      integrity: draft.integrity,
-      stability: draft.stability,
-      ambition: draft.ambition,
-      competence: draft.competence,
-      charisma: draft.charisma,
-      network: draft.network,
-      diligence: draft.diligence,
-      vigor: draft.vigor,
-    },
-    kpiResult.totalScore,
-    cfg,
-  );
+  // 收集所有 KPI 指标
+  const allIndicators = deptConfigs.flatMap((d) => d.kpiIndicators);
+
+  // 计算 KPI 得分
+  const assessResult = calculateKPI(allIndicators, draft.actions.departmentStates, cfg);
+  const kpiTier = scoreToKPITier(assessResult.totalScore, cfg.kpiTierThresholds);
+
+  // 五维考核
+  const playerSnapshot = {
+    integrity: draft.character.integrity,
+    stability: draft.character.stability,
+    ambition: draft.character.ambition,
+    competence: draft.character.competence,
+    charisma: draft.character.charisma,
+    network: draft.character.network,
+    diligence: draft.character.diligence,
+    vigor: draft.character.vigor,
+  };
+  const dimensions = computeFiveDimensions(playerSnapshot, assessResult.totalScore, cfg);
   const comprehensiveScore = computeComprehensiveScore(dimensions, cfg);
-  const tier = scoreToKPITier(comprehensiveScore, cfg.kpiTierThresholds);
-  const assessment = runAnnualAssessment(
-    comprehensiveScore,
-    tier,
-    draft.yearsInCurrentPosition,
-    cfg,
-  );
 
-  draft.comprehensiveScore = assessment.score;
-  if (draft.frozenPeriods > 0) draft.frozenPeriods -= 1;
-  draft.frozenPeriods += assessment.frozenPeriods;
-  draft.frozenPeriods = clamp(draft.frozenPeriods, 0, cfg.maxFrozenPeriods);
-  draft.annualAssessments.push({
+  // 年度考核
+  const yearsInPosition = Math.floor(
+    (draft.time.totalDaysPlayed - draft.career.appointment.startedAtDay) / 360,
+  );
+  const annualResult = runAnnualAssessment(comprehensiveScore, kpiTier, yearsInPosition, cfg);
+
+  draft.assessments.comprehensiveScore = comprehensiveScore;
+  draft.assessments.annualAssessments.push({
     year,
-    score: assessment.score,
-    tier: assessment.tier,
+    score: comprehensiveScore,
+    tier: annualResult.tier,
     dimensions,
   });
-  draft.yearsInCurrentPosition += 1;
+
+  // 考核结果影响属性
+  if (annualResult.tier === '优秀') {
+    draft.character.performance = clampAttr(
+      'performance',
+      draft.character.performance + 3,
+      cfg.attributeBounds,
+    );
+  } else if (annualResult.tier === '不称职') {
+    draft.character.stability = clampAttr(
+      'stability',
+      draft.character.stability - 5,
+      cfg.attributeBounds,
+    );
+  }
 }
 
 /**
  * 处理 ADVANCE_TIME 动作。
- *
- * 核心变更：使用统一时间轴，确保行动完成在月度/年度结算之前处理。
  *
  * @param draft 当前游戏状态（mutable）
  * @param payload 动作参数
@@ -235,29 +207,21 @@ function processAnnualAssessment(draft: PlayerSave, year: number): void {
 export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload): void {
   const cfg = getConfigLoader().getGameConfig();
   const days = getGranularityDays(payload.granularity, cfg);
-  const rng = payload._rng ?? Math.random;
 
-  // 统一时间推进，一次返回最终时间 + 排序事件
+  // 统一时间推进
   const result = advanceTimeline(
     draft.time,
     days,
-    draft.totalDaysPlayed,
-    draft.slots,
-    draft.birthYear,
+    draft.time.totalDaysPlayed,
+    draft.actions.slots,
+    draft.character.birthYear,
     cfg,
   );
 
-  draft.time = {
-    ...draft.time,
-    year: result.newTime.year,
-    month: result.newTime.month,
-    day: result.newTime.day,
-  };
-  draft.totalDaysPlayed = result.newAbsoluteDay;
-
-  // 按时间轴顺序处理所有事件
   const notifications: CompletedActionNotification[] = [];
+  const rng = payload._rng ?? Math.random;
 
+  // 按时间顺序处理事件
   for (const event of result.events) {
     switch (event.type) {
       case 'action_completion':
@@ -267,18 +231,25 @@ export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload
         processMonthlySettlement(draft);
         break;
       case 'annual_assessment':
-        processAnnualAssessment(draft, event.year);
+        processAnnualAssessment(draft);
         break;
-      case 'political_cycle':
-        // Phase 3+ 实现
-        break;
-      case 'retirement_check':
-        // Phase 3+ 实现
+      default:
         break;
     }
   }
 
+  // 更新时间和总天数
+  draft.time.year = result.newTime.year;
+  draft.time.month = result.newTime.month;
+  draft.time.day = result.newTime.day;
+  draft.time.granularity = payload.granularity;
+  draft.time.totalDaysPlayed += days;
+
+  // 更新最近完成行动通知
   if (notifications.length > 0) {
-    draft.lastCompletedActions = [...notifications, ...draft.lastCompletedActions].slice(0, 5);
+    draft.actions.lastCompletedActions = [
+      ...notifications,
+      ...draft.actions.lastCompletedActions,
+    ].slice(0, 5);
   }
 }

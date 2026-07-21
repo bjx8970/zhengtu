@@ -1,0 +1,898 @@
+[
+  {
+    "id": "admin_l1_0",
+    "name": "乡镇科员",
+    "institutionId": "township_govt_01",
+    "regionId": "region_qingyun_town",
+    "institutionLevel": "township",
+    "positionDomain": "local_governance",
+    "leadershipRank": "none",
+    "contentTier": 0,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": ["general_office", "civil_affairs", "agriculture", "public_safety"],
+    "kpiTemplateIds": ["office_efficiency", "livelihood_score", "agricultural_output", "safety"],
+    "annualBudget": 800
+  },
+  {
+    "id": "admin_l1_1",
+    "name": "社区工作员",
+    "institutionId": "subdistrict_01",
+    "regionId": "region_heping_subdistrict",
+    "institutionLevel": "township",
+    "positionDomain": "local_governance",
+    "leadershipRank": "none",
+    "contentTier": 0,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": ["community_service", "civil_affairs", "environment", "cultural"],
+    "kpiTemplateIds": [
+      "resident_satisfaction",
+      "livelihood_score",
+      "environment_score",
+      "cultural_activity"
+    ],
+    "annualBudget": 600
+  },
+  {
+    "id": "admin_l1_2",
+    "name": "乡镇办事员",
+    "institutionId": "township_govt_01",
+    "regionId": "region_qingyun_town",
+    "institutionLevel": "township",
+    "positionDomain": "local_governance",
+    "leadershipRank": "none",
+    "contentTier": 0,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": ["general_office", "finance", "agriculture", "statistics"],
+    "kpiTemplateIds": [
+      "office_efficiency",
+      "fiscal_revenue",
+      "agricultural_output",
+      "data_accuracy"
+    ],
+    "annualBudget": 700
+  },
+  {
+    "id": "admin_l2_0",
+    "name": "副镇长",
+    "institutionId": "township_govt_01",
+    "regionId": "region_qingyun_town",
+    "institutionLevel": "township",
+    "positionDomain": "local_governance",
+    "leadershipRank": "township_deputy",
+    "contentTier": 2,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": ["urban_dev", "finance", "public_safety", "civil_affairs"],
+    "kpiTemplateIds": ["gdp_growth", "fiscal_revenue", "safety", "livelihood_score"],
+    "annualBudget": 2000
+  },
+  {
+    "id": "admin_l2_1",
+    "name": "乡镇办公室主任",
+    "institutionId": "township_govt_01",
+    "regionId": "region_qingyun_town",
+    "institutionLevel": "township",
+    "positionDomain": "local_governance",
+    "leadershipRank": "township_deputy",
+    "contentTier": 2,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": ["general_office", "human_resources", "propaganda_dept", "logistics"],
+    "kpiTemplateIds": [
+      "office_efficiency",
+      "staff_satisfaction",
+      "propaganda_score",
+      "cost_control"
+    ],
+    "annualBudget": 1500
+  },
+  {
+    "id": "admin_l2_2",
+    "name": "民政助理",
+    "institutionId": "township_govt_01",
+    "regionId": "region_qingyun_town",
+    "institutionLevel": "township",
+    "positionDomain": "local_governance",
+    "leadershipRank": "township_deputy",
+    "contentTier": 2,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "civil_affairs",
+      "social_security",
+      "disability_service",
+      "elderly_care"
+    ],
+    "kpiTemplateIds": [
+      "livelihood_score",
+      "social_security_coverage",
+      "disability_service",
+      "elderly_care"
+    ],
+    "annualBudget": 1800
+  },
+  {
+    "id": "admin_l3_0",
+    "name": "镇长",
+    "institutionId": "township_govt_01",
+    "regionId": "region_qingyun_town",
+    "institutionLevel": "township",
+    "positionDomain": "local_governance",
+    "leadershipRank": "township_chief",
+    "contentTier": 3,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "urban_dev",
+      "finance",
+      "public_safety",
+      "civil_affairs",
+      "agriculture"
+    ],
+    "kpiTemplateIds": [
+      "gdp_growth",
+      "fiscal_revenue",
+      "livelihood_score",
+      "project_completion",
+      "safety"
+    ],
+    "annualBudget": 5000
+  },
+  {
+    "id": "admin_l3_1",
+    "name": "乡镇党委委员",
+    "institutionId": "township_party_01",
+    "regionId": "region_qingyun_town",
+    "institutionLevel": "township",
+    "positionDomain": "party_organs",
+    "leadershipRank": "township_chief",
+    "contentTier": 3,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "party_org",
+      "propaganda_dept",
+      "human_resources",
+      "discipline_inspect"
+    ],
+    "kpiTemplateIds": [
+      "party_building",
+      "propaganda_score",
+      "staff_satisfaction",
+      "anti_corruption"
+    ],
+    "annualBudget": 3500
+  },
+  {
+    "id": "admin_l3_2",
+    "name": "科室主任",
+    "institutionId": "county_govt_01",
+    "regionId": "region_yongning_county",
+    "institutionLevel": "township",
+    "positionDomain": "local_governance",
+    "leadershipRank": "township_chief",
+    "contentTier": 3,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": ["general_office", "finance", "human_resources", "statistics"],
+    "kpiTemplateIds": [
+      "office_efficiency",
+      "fiscal_revenue",
+      "staff_satisfaction",
+      "data_accuracy"
+    ],
+    "annualBudget": 3000
+  },
+  {
+    "id": "admin_l3_3",
+    "name": "副乡镇党委书记",
+    "institutionId": "township_party_01",
+    "regionId": "region_qingyun_town",
+    "institutionLevel": "township",
+    "positionDomain": "party_organs",
+    "leadershipRank": "township_chief",
+    "contentTier": 3,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": ["party_org", "general_office", "public_safety", "civil_affairs"],
+    "kpiTemplateIds": ["party_building", "office_efficiency", "safety", "livelihood_score"],
+    "annualBudget": 4000
+  },
+  {
+    "id": "admin_l4_0",
+    "name": "副县长",
+    "institutionId": "county_govt_01",
+    "regionId": "region_yongning_county",
+    "institutionLevel": "county",
+    "positionDomain": "local_governance",
+    "leadershipRank": "county_deputy",
+    "contentTier": 4,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "county_government",
+      "finance",
+      "civil_affairs",
+      "public_safety",
+      "agriculture"
+    ],
+    "kpiTemplateIds": [
+      "county_gdp",
+      "fiscal_revenue",
+      "livelihood_score",
+      "safety",
+      "agricultural_output"
+    ],
+    "annualBudget": 12000
+  },
+  {
+    "id": "admin_l4_1",
+    "name": "副区长",
+    "institutionId": "district_govt_01",
+    "regionId": "region_jinjiang_district",
+    "institutionLevel": "county",
+    "positionDomain": "local_governance",
+    "leadershipRank": "county_deputy",
+    "contentTier": 4,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "district_administration",
+      "urban_dev",
+      "community_service",
+      "environment",
+      "cultural"
+    ],
+    "kpiTemplateIds": [
+      "urbanization_rate",
+      "gdp_growth",
+      "resident_satisfaction",
+      "environment_score",
+      "cultural_activity"
+    ],
+    "annualBudget": 10000
+  },
+  {
+    "id": "admin_l4_2",
+    "name": "市局副局长",
+    "institutionId": "city_bureau_01",
+    "regionId": "region_lingchuan_city",
+    "institutionLevel": "county",
+    "positionDomain": "local_governance",
+    "leadershipRank": "county_deputy",
+    "contentTier": 4,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "general_office",
+      "human_resources",
+      "statistics",
+      "discipline_inspect"
+    ],
+    "kpiTemplateIds": [
+      "office_efficiency",
+      "staff_satisfaction",
+      "data_accuracy",
+      "anti_corruption"
+    ],
+    "annualBudget": 8000
+  },
+  {
+    "id": "admin_l4_3",
+    "name": "县委常委",
+    "institutionId": "county_party_01",
+    "regionId": "region_yongning_county",
+    "institutionLevel": "county",
+    "positionDomain": "party_organs",
+    "leadershipRank": "county_deputy",
+    "contentTier": 4,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "party_org",
+      "propaganda_dept",
+      "discipline_inspect",
+      "human_resources"
+    ],
+    "kpiTemplateIds": [
+      "party_building",
+      "propaganda_score",
+      "anti_corruption",
+      "staff_satisfaction"
+    ],
+    "annualBudget": 9000
+  },
+  {
+    "id": "admin_l5_0",
+    "name": "县长",
+    "institutionId": "county_govt_01",
+    "regionId": "region_yongning_county",
+    "institutionLevel": "county",
+    "positionDomain": "local_governance",
+    "leadershipRank": "county_chief",
+    "contentTier": 5,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "county_government",
+      "finance",
+      "urban_dev",
+      "civil_affairs",
+      "public_safety"
+    ],
+    "kpiTemplateIds": [
+      "county_gdp",
+      "fiscal_revenue",
+      "project_completion",
+      "livelihood_score",
+      "safety"
+    ],
+    "annualBudget": 25000
+  },
+  {
+    "id": "admin_l5_1",
+    "name": "区长",
+    "institutionId": "district_govt_01",
+    "regionId": "region_jinjiang_district",
+    "institutionLevel": "county",
+    "positionDomain": "local_governance",
+    "leadershipRank": "county_chief",
+    "contentTier": 5,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "district_administration",
+      "finance",
+      "urban_dev",
+      "education_bureau",
+      "health_bureau"
+    ],
+    "kpiTemplateIds": [
+      "urbanization_rate",
+      "fiscal_revenue",
+      "gdp_growth",
+      "education_coverage",
+      "health_service"
+    ],
+    "annualBudget": 22000
+  },
+  {
+    "id": "admin_l5_2",
+    "name": "市局局长",
+    "institutionId": "city_bureau_01",
+    "regionId": "region_lingchuan_city",
+    "institutionLevel": "county",
+    "positionDomain": "local_governance",
+    "leadershipRank": "county_chief",
+    "contentTier": 5,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "general_office",
+      "human_resources",
+      "finance",
+      "statistics",
+      "discipline_inspect"
+    ],
+    "kpiTemplateIds": [
+      "office_efficiency",
+      "staff_satisfaction",
+      "fiscal_health",
+      "data_accuracy",
+      "anti_corruption"
+    ],
+    "annualBudget": 18000
+  },
+  {
+    "id": "admin_l5_3",
+    "name": "县委书记",
+    "institutionId": "county_party_01",
+    "regionId": "region_yongning_county",
+    "institutionLevel": "county",
+    "positionDomain": "party_organs",
+    "leadershipRank": "county_chief",
+    "contentTier": 5,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "party_org",
+      "propaganda_dept",
+      "discipline_inspect",
+      "human_resources",
+      "general_office"
+    ],
+    "kpiTemplateIds": [
+      "party_building",
+      "propaganda_score",
+      "anti_corruption",
+      "staff_satisfaction",
+      "office_efficiency"
+    ],
+    "annualBudget": 20000
+  },
+  {
+    "id": "admin_l6_0",
+    "name": "副市长",
+    "institutionId": "city_govt_01",
+    "regionId": "region_lingchuan_city",
+    "institutionLevel": "prefecture",
+    "positionDomain": "local_governance",
+    "leadershipRank": "prefecture_deputy",
+    "contentTier": 6,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "municipal_coordination",
+      "economic_development",
+      "finance",
+      "urban_planning",
+      "social_governance"
+    ],
+    "kpiTemplateIds": [
+      "regional_gdp",
+      "economic_structure",
+      "fiscal_revenue",
+      "innovation_index",
+      "public_satisfaction"
+    ],
+    "annualBudget": 80000
+  },
+  {
+    "id": "admin_l6_1",
+    "name": "省厅副厅长",
+    "institutionId": "provincial_dept_01",
+    "regionId": "region_jiangyuan_province",
+    "institutionLevel": "prefecture",
+    "positionDomain": "local_governance",
+    "leadershipRank": "prefecture_deputy",
+    "contentTier": 6,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "provincial_department",
+      "human_resources",
+      "finance",
+      "discipline_inspect"
+    ],
+    "kpiTemplateIds": [
+      "governance_quality",
+      "staff_satisfaction",
+      "fiscal_health",
+      "anti_corruption"
+    ],
+    "annualBudget": 60000
+  },
+  {
+    "id": "admin_l6_2",
+    "name": "市委常委",
+    "institutionId": "city_party_01",
+    "regionId": "region_lingchuan_city",
+    "institutionLevel": "prefecture",
+    "positionDomain": "party_organs",
+    "leadershipRank": "prefecture_deputy",
+    "contentTier": 6,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "party_org",
+      "propaganda_dept",
+      "discipline_inspect",
+      "municipal_coordination",
+      "regional_cooperation"
+    ],
+    "kpiTemplateIds": [
+      "party_building",
+      "propaganda_score",
+      "anti_corruption",
+      "regional_gdp",
+      "regional_integration"
+    ],
+    "annualBudget": 70000
+  },
+  {
+    "id": "admin_l7_0",
+    "name": "市长",
+    "institutionId": "city_govt_01",
+    "regionId": "region_lingchuan_city",
+    "institutionLevel": "prefecture",
+    "positionDomain": "local_governance",
+    "leadershipRank": "prefecture_chief",
+    "contentTier": 7,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "municipal_coordination",
+      "economic_development",
+      "finance",
+      "urban_planning",
+      "social_governance"
+    ],
+    "kpiTemplateIds": [
+      "regional_gdp",
+      "economic_structure",
+      "fiscal_revenue",
+      "innovation_index",
+      "public_satisfaction"
+    ],
+    "annualBudget": 150000
+  },
+  {
+    "id": "admin_l7_1",
+    "name": "省厅厅长",
+    "institutionId": "provincial_dept_01",
+    "regionId": "region_jiangyuan_province",
+    "institutionLevel": "prefecture",
+    "positionDomain": "local_governance",
+    "leadershipRank": "prefecture_chief",
+    "contentTier": 7,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "provincial_department",
+      "human_resources",
+      "finance",
+      "discipline_inspect",
+      "general_office"
+    ],
+    "kpiTemplateIds": [
+      "governance_quality",
+      "staff_satisfaction",
+      "fiscal_health",
+      "anti_corruption",
+      "office_efficiency"
+    ],
+    "annualBudget": 120000
+  },
+  {
+    "id": "admin_l7_2",
+    "name": "市委书记",
+    "institutionId": "city_party_01",
+    "regionId": "region_lingchuan_city",
+    "institutionLevel": "prefecture",
+    "positionDomain": "party_organs",
+    "leadershipRank": "prefecture_chief",
+    "contentTier": 7,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "party_org",
+      "propaganda_dept",
+      "discipline_inspect",
+      "municipal_coordination",
+      "regional_cooperation"
+    ],
+    "kpiTemplateIds": [
+      "party_building",
+      "propaganda_score",
+      "anti_corruption",
+      "regional_gdp",
+      "regional_integration"
+    ],
+    "annualBudget": 180000
+  },
+  {
+    "id": "admin_l8_0",
+    "name": "副省长",
+    "institutionId": "province_govt_01",
+    "regionId": "region_jiangyuan_province",
+    "institutionLevel": "province",
+    "positionDomain": "local_governance",
+    "leadershipRank": "province_deputy",
+    "contentTier": 8,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "provincial_leadership",
+      "strategic_planning",
+      "provincial_finance",
+      "economic_development",
+      "social_governance"
+    ],
+    "kpiTemplateIds": [
+      "provincial_gdp",
+      "strategic_execution",
+      "people_livelihood",
+      "reform_progress",
+      "stability_index"
+    ],
+    "annualBudget": 400000
+  },
+  {
+    "id": "admin_l8_1",
+    "name": "省委常委",
+    "institutionId": "province_party_01",
+    "regionId": "region_jiangyuan_province",
+    "institutionLevel": "province",
+    "positionDomain": "party_organs",
+    "leadershipRank": "province_deputy",
+    "contentTier": 8,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "provincial_committee",
+      "provincial_org",
+      "provincial_discipline",
+      "propaganda_dept",
+      "strategic_planning"
+    ],
+    "kpiTemplateIds": [
+      "political_ecology",
+      "party_building",
+      "anti_corruption",
+      "reform_progress",
+      "stability_index"
+    ],
+    "annualBudget": 350000
+  },
+  {
+    "id": "admin_l8_2",
+    "name": "省人大副主任",
+    "institutionId": "province_congress_01",
+    "regionId": "region_jiangyuan_province",
+    "institutionLevel": "province",
+    "positionDomain": "congress",
+    "leadershipRank": "province_deputy",
+    "contentTier": 8,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "provincial_leadership",
+      "provincial_finance",
+      "general_office",
+      "human_resources"
+    ],
+    "kpiTemplateIds": [
+      "governance_quality",
+      "people_livelihood",
+      "fiscal_health",
+      "staff_satisfaction"
+    ],
+    "annualBudget": 300000
+  },
+  {
+    "id": "admin_l9_0",
+    "name": "省长",
+    "institutionId": "province_govt_01",
+    "regionId": "region_jiangyuan_province",
+    "institutionLevel": "province",
+    "positionDomain": "local_governance",
+    "leadershipRank": "province_chief",
+    "contentTier": 9,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "provincial_leadership",
+      "strategic_planning",
+      "provincial_finance",
+      "economic_development",
+      "social_governance"
+    ],
+    "kpiTemplateIds": [
+      "provincial_gdp",
+      "strategic_execution",
+      "people_livelihood",
+      "reform_progress",
+      "stability_index"
+    ],
+    "annualBudget": 700000
+  },
+  {
+    "id": "admin_l9_1",
+    "name": "省委书记",
+    "institutionId": "province_party_01",
+    "regionId": "region_jiangyuan_province",
+    "institutionLevel": "province",
+    "positionDomain": "party_organs",
+    "leadershipRank": "province_chief",
+    "contentTier": 9,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "provincial_committee",
+      "provincial_org",
+      "provincial_discipline",
+      "propaganda_dept",
+      "strategic_planning"
+    ],
+    "kpiTemplateIds": [
+      "political_ecology",
+      "party_building",
+      "anti_corruption",
+      "reform_progress",
+      "stability_index"
+    ],
+    "annualBudget": 800000
+  },
+  {
+    "id": "admin_l9_2",
+    "name": "省政协主席",
+    "institutionId": "province_cppcc_01",
+    "regionId": "region_jiangyuan_province",
+    "institutionLevel": "province",
+    "positionDomain": "cppcc",
+    "leadershipRank": "province_chief",
+    "contentTier": 9,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "provincial_leadership",
+      "provincial_finance",
+      "general_office",
+      "human_resources",
+      "regional_cooperation"
+    ],
+    "kpiTemplateIds": [
+      "governance_quality",
+      "people_livelihood",
+      "fiscal_health",
+      "staff_satisfaction",
+      "regional_integration"
+    ],
+    "annualBudget": 500000
+  },
+  {
+    "id": "admin_l10_0",
+    "name": "国家部委副部长",
+    "institutionId": "ministry_01",
+    "regionId": "region_capital",
+    "institutionLevel": "central",
+    "positionDomain": "local_governance",
+    "leadershipRank": "national_deputy",
+    "contentTier": 10,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "central_coordination",
+      "national_reform",
+      "national_finance",
+      "central_org",
+      "central_discipline"
+    ],
+    "kpiTemplateIds": [
+      "national_governance",
+      "reform_depth",
+      "fiscal_sustainability",
+      "cadre_quality",
+      "integrity_index"
+    ],
+    "annualBudget": 1200000
+  },
+  {
+    "id": "admin_l10_1",
+    "name": "省委常委兼副省长",
+    "institutionId": "province_govt_01",
+    "regionId": "region_jiangyuan_province",
+    "institutionLevel": "central",
+    "positionDomain": "local_governance",
+    "leadershipRank": "national_deputy",
+    "contentTier": 10,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "provincial_committee",
+      "provincial_leadership",
+      "strategic_planning",
+      "provincial_finance",
+      "provincial_org"
+    ],
+    "kpiTemplateIds": [
+      "political_ecology",
+      "provincial_gdp",
+      "strategic_execution",
+      "people_livelihood",
+      "stability_index"
+    ],
+    "annualBudget": 1000000
+  },
+  {
+    "id": "admin_l10_2",
+    "name": "中央委员",
+    "institutionId": "central_party_01",
+    "regionId": "region_capital",
+    "institutionLevel": "central",
+    "positionDomain": "party_organs",
+    "leadershipRank": "national_deputy",
+    "contentTier": 10,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "central_committee",
+      "central_org",
+      "central_discipline",
+      "central_coordination",
+      "national_reform"
+    ],
+    "kpiTemplateIds": [
+      "political_unity",
+      "party_building",
+      "anti_corruption",
+      "national_governance",
+      "reform_depth"
+    ],
+    "annualBudget": 1500000
+  },
+  {
+    "id": "admin_l11_0",
+    "name": "国家部委部长",
+    "institutionId": "ministry_01",
+    "regionId": "region_capital",
+    "institutionLevel": "central",
+    "positionDomain": "local_governance",
+    "leadershipRank": "national_chief",
+    "contentTier": 11,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "central_coordination",
+      "national_reform",
+      "national_finance",
+      "central_org",
+      "central_discipline"
+    ],
+    "kpiTemplateIds": [
+      "national_governance",
+      "reform_depth",
+      "fiscal_sustainability",
+      "cadre_quality",
+      "integrity_index"
+    ],
+    "annualBudget": 2000000
+  },
+  {
+    "id": "admin_l11_1",
+    "name": "省委书记兼省长",
+    "institutionId": "province_party_01",
+    "regionId": "region_jiangyuan_province",
+    "institutionLevel": "central",
+    "positionDomain": "party_organs",
+    "leadershipRank": "national_chief",
+    "contentTier": 11,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "provincial_committee",
+      "provincial_leadership",
+      "strategic_planning",
+      "provincial_finance",
+      "provincial_org"
+    ],
+    "kpiTemplateIds": [
+      "political_ecology",
+      "provincial_gdp",
+      "strategic_execution",
+      "people_livelihood",
+      "stability_index"
+    ],
+    "annualBudget": 1800000
+  },
+  {
+    "id": "admin_l11_2",
+    "name": "中央政治局委员",
+    "institutionId": "central_party_01",
+    "regionId": "region_capital",
+    "institutionLevel": "central",
+    "positionDomain": "party_organs",
+    "leadershipRank": "national_chief",
+    "contentTier": 11,
+    "vacancyCount": 1,
+    "requirements": [],
+    "departmentTemplateIds": [
+      "central_committee",
+      "central_org",
+      "central_discipline",
+      "central_coordination",
+      "national_reform"
+    ],
+    "kpiTemplateIds": [
+      "political_unity",
+      "party_building",
+      "anti_corruption",
+      "national_governance",
+      "reform_depth"
+    ],
+    "annualBudget": 2500000
+  }
+]

@@ -1,0 +1,104 @@
+{
+  "township_govt_01": {
+    "id": "township_govt_01",
+    "name": "青云镇人民政府",
+    "level": "township",
+    "regionId": "region_qingyun_town"
+  },
+  "township_party_01": {
+    "id": "township_party_01",
+    "name": "中共青云镇委员会",
+    "level": "township",
+    "regionId": "region_qingyun_town"
+  },
+  "subdistrict_01": {
+    "id": "subdistrict_01",
+    "name": "和平街道办事处",
+    "level": "township",
+    "regionId": "region_heping_subdistrict"
+  },
+  "county_govt_01": {
+    "id": "county_govt_01",
+    "name": "永宁县人民政府",
+    "level": "county",
+    "regionId": "region_yongning_county"
+  },
+  "county_party_01": {
+    "id": "county_party_01",
+    "name": "中共永宁县委员会",
+    "level": "county",
+    "regionId": "region_yongning_county"
+  },
+  "district_govt_01": {
+    "id": "district_govt_01",
+    "name": "锦江区人民政府",
+    "level": "county",
+    "regionId": "region_jinjiang_district"
+  },
+  "city_bureau_01": {
+    "id": "city_bureau_01",
+    "name": "陵川市财政局",
+    "level": "county",
+    "regionId": "region_lingchuan_city"
+  },
+  "city_govt_01": {
+    "id": "city_govt_01",
+    "name": "陵川市人民政府",
+    "level": "prefecture",
+    "regionId": "region_lingchuan_city"
+  },
+  "city_party_01": {
+    "id": "city_party_01",
+    "name": "中共陵川市委员会",
+    "level": "prefecture",
+    "regionId": "region_lingchuan_city"
+  },
+  "provincial_dept_01": {
+    "id": "provincial_dept_01",
+    "name": "江原省发展和改革委员会",
+    "level": "prefecture",
+    "regionId": "region_jiangyuan_province"
+  },
+  "province_govt_01": {
+    "id": "province_govt_01",
+    "name": "江原省人民政府",
+    "level": "province",
+    "regionId": "region_jiangyuan_province"
+  },
+  "province_party_01": {
+    "id": "province_party_01",
+    "name": "中共江原省委员会",
+    "level": "province",
+    "regionId": "region_jiangyuan_province"
+  },
+  "province_congress_01": {
+    "id": "province_congress_01",
+    "name": "江原省人民代表大会常务委员会",
+    "level": "province",
+    "regionId": "region_jiangyuan_province"
+  },
+  "province_cppcc_01": {
+    "id": "province_cppcc_01",
+    "name": "中国人民政治协商会议江原省委员会",
+    "level": "province",
+    "regionId": "region_jiangyuan_province"
+  },
+  "ministry_01": {
+    "id": "ministry_01",
+    "name": "国家发展和改革委员会",
+    "level": "central",
+    "regionId": "region_capital"
+  },
+  "ministry_02": {
+    "id": "ministry_02",
+    "name": "财政部",
+    "level": "central",
+    "regionId": "region_capital"
+  },
+  "central_party_01": {
+    "id": "central_party_01",
+    "name": "中共中央",
+    "level": "central",
+    "regionId": "region_capital"
+  }
+}
