@@ -235,10 +235,14 @@ release/0.1.0-alpha.2
 
 ### 正式版本体系建立前的旧存档
 
-- 不支持自动迁移
+- 裸 PlayerSave 存档（无 SaveEnvelope 封装）不支持自动迁移
 - 不静默加载、不静默覆盖
 - 保留只读备份
 - 显示明确提示
+
+### 基础工程重构期间的存档
+
+基础工程重构（PR #88）生成的 `schemaVersion: 1` 存档在当前版本仍可加载。解码器仅校验 `schemaVersion`，不校验 `contentVersion`。
 
 ### 从 0.1.0-alpha.1 开始的后续存档
 
