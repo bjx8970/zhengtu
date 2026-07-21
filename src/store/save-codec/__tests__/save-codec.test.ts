@@ -170,5 +170,56 @@ describe('存档严格解码器', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('invalid_envelope');
     });
+
+    it('state.time 中的未知字段被拒绝', () => {
+      const state = createInitialState();
+      (state.time as unknown as Record<string, unknown>).newField = 'data';
+      const envelope = wrapSaveEnvelope(state);
+
+      const result = decodeCurrentSave(JSON.stringify(envelope));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('invalid_envelope');
+    });
+
+    it('slots.primary.occupants[0] 中的未知字段被拒绝', () => {
+      const state = createInitialState();
+      state.slots.primary.occupants[0] = {
+        actionId: 'test',
+        deptId: 'dept',
+        actionName: '测试',
+        category: 'minor',
+        startedAtDay: 0,
+        durationDays: 3,
+        cooldownDays: 7,
+        hackedProp: true,
+      } as never;
+      const envelope = wrapSaveEnvelope(state);
+
+      const result = decodeCurrentSave(JSON.stringify(envelope));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('invalid_envelope');
+    });
+
+    it('careerHistory 项中的未知字段被拒绝', () => {
+      const state = createInitialState();
+      state.careerHistory = [
+        {
+          positionId: 'admin_l1_0',
+          positionName: '科员',
+          level: 1,
+          careerLine: 'admin',
+          startYear: 2012,
+          endYear: 2015,
+          assessmentResults: [],
+          archived: false,
+          unknownProp: 'x',
+        } as never,
+      ];
+      const envelope = wrapSaveEnvelope(state);
+
+      const result = decodeCurrentSave(JSON.stringify(envelope));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('invalid_envelope');
+    });
   });
 });

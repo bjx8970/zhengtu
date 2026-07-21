@@ -59,37 +59,44 @@ export function backupIncompatibleSave(rawData: string): string {
 }
 
 /** SlotOccupant 的 Zod schema */
-const SlotOccupantSchema = z.object({
-  actionId: z.string(),
-  deptId: z.string(),
-  actionName: z.string(),
-  category: z.enum(['major', 'minor', 'routine']),
-  startedAtDay: z.number(),
-  durationDays: z.number(),
-  cooldownDays: z.number(),
-  runtimeSnapshot: z
-    .object({
-      effectivenessMultiplier: z.number(),
-      styleConflictTriggered: z.boolean(),
-      styleAlignment: z.string().optional(),
-    })
-    .optional(),
-});
+const SlotOccupantSchema = z
+  .object({
+    actionId: z.string(),
+    deptId: z.string(),
+    actionName: z.string(),
+    category: z.enum(['major', 'minor', 'routine']),
+    startedAtDay: z.number(),
+    durationDays: z.number(),
+    cooldownDays: z.number(),
+    runtimeSnapshot: z
+      .object({
+        effectivenessMultiplier: z.number(),
+        styleConflictTriggered: z.boolean(),
+        styleAlignment: z.string().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /** SlotTierGroup 的 Zod schema */
-const SlotTierGroupSchema = z.object({
-  label: z.string(),
-  count: z.number(),
-  occupants: z.array(z.nullable(SlotOccupantSchema)),
-});
+const SlotTierGroupSchema = z
+  .object({
+    label: z.string(),
+    count: z.number(),
+    occupants: z.array(z.nullable(SlotOccupantSchema)),
+  })
+  .strict();
 
 /** GameTime 的 Zod schema（含范围校验） */
-const GameTimeSchema = z.object({
-  year: z.number().int().min(1),
-  month: z.number().int().min(1).max(12),
-  day: z.number().int().min(1).max(30),
-  granularity: z.enum(['day', 'week', 'month']),
-});
+const GameTimeSchema = z
+  .object({
+    year: z.number().int().min(1),
+    month: z.number().int().min(1).max(12),
+    day: z.number().int().min(1).max(30),
+    granularity: z.enum(['day', 'week', 'month']),
+  })
+  .strict();
 
 /** 合法职业线枚举 */
 const VALID_CAREER_LINES = ['admin', 'party', 'discipline', 'mass'];
@@ -110,14 +117,16 @@ const VALID_PROMOTION_STAGES = [
 ];
 
 /** DepartmentState 的 Zod schema */
-const DepartmentStateSchema = z.object({
-  id: z.string(),
-  kpiValues: z.record(z.number()),
-  monthlyConsumption: z.number(),
-  cumulativeConsumption: z.number(),
-  lastActionDay: z.number(),
-  actionCooldownUntilDays: z.record(z.number()),
-});
+const DepartmentStateSchema = z
+  .object({
+    id: z.string(),
+    kpiValues: z.record(z.number()),
+    monthlyConsumption: z.number(),
+    cumulativeConsumption: z.number(),
+    lastActionDay: z.number(),
+    actionCooldownUntilDays: z.record(z.number()),
+  })
+  .strict();
 
 /** PlayerSave 完整验证 schema */
 const PlayerSaveSchema = z
@@ -126,7 +135,7 @@ const PlayerSaveSchema = z
     userId: z.string(),
     characterName: z.string(),
     gender: z.enum(['男', '女']),
-    birthPlace: z.object({ province: z.string(), city: z.string() }),
+    birthPlace: z.object({ province: z.string(), city: z.string() }).strict(),
     birthYear: z.number().int(),
     gaokaoScore: z.number(),
     gaokaoTier: z.string(),
@@ -139,30 +148,35 @@ const PlayerSaveSchema = z
     currentLevel: z.number().int().min(1).max(11),
     currentCareerLine: z.string().refine((v) => VALID_CAREER_LINES.includes(v)),
     yearsInCurrentPosition: z.number().min(0),
-    slots: z.object({
-      primary: SlotTierGroupSchema,
-      secondary: SlotTierGroupSchema,
-      reserve: SlotTierGroupSchema,
-    }),
+    slots: z
+      .object({
+        primary: SlotTierGroupSchema,
+        secondary: SlotTierGroupSchema,
+        reserve: SlotTierGroupSchema,
+      })
+      .strict(),
     vigor: z.number(),
     politicalCapital: z.number(),
     remainingBudget: z.number(),
     comprehensiveScore: z.number(),
     annualAssessments: z.array(
-      z.object({
-        year: z.number(),
-        score: z.number(),
-        tier: z.string(),
-        dimensions: z
-          .object({
-            virtue: z.number(),
-            capacity: z.number(),
-            diligenceScore: z.number(),
-            achievement: z.number(),
-            honesty: z.number(),
-          })
-          .optional(),
-      }),
+      z
+        .object({
+          year: z.number(),
+          score: z.number(),
+          tier: z.string(),
+          dimensions: z
+            .object({
+              virtue: z.number(),
+              capacity: z.number(),
+              diligenceScore: z.number(),
+              achievement: z.number(),
+              honesty: z.number(),
+            })
+            .strict()
+            .optional(),
+        })
+        .strict(),
     ),
     integrity: z.number(),
     stability: z.number(),
@@ -175,75 +189,89 @@ const PlayerSaveSchema = z
     promotionAttempts: z.number().min(0),
     frozenPeriods: z.number().min(0),
     promotionState: z.nullable(
-      z.object({
-        targetPositionId: z.string(),
-        targetLevel: z.number(),
-        currentStage: z.string(),
-        stageResults: z.record(z.unknown()),
-        flaggedForRisk: z.boolean().optional(),
-      }),
+      z
+        .object({
+          targetPositionId: z.string(),
+          targetLevel: z.number(),
+          currentStage: z.string(),
+          stageResults: z.record(z.unknown()),
+          flaggedForRisk: z.boolean().optional(),
+        })
+        .strict(),
     ),
     transferCount: z.number(),
     isLineLocked: z.boolean(),
     departmentStates: z.record(DepartmentStateSchema),
     careerHistory: z.array(
-      z.object({
-        positionId: z.string(),
-        positionName: z.string(),
-        level: z.number(),
-        careerLine: z.string(),
-        startYear: z.number(),
-        endYear: z.nullable(z.number()),
-        assessmentResults: z.array(z.unknown()),
-        archived: z.boolean(),
-      }),
+      z
+        .object({
+          positionId: z.string(),
+          positionName: z.string(),
+          level: z.number(),
+          careerLine: z.string(),
+          startYear: z.number(),
+          endYear: z.nullable(z.number()),
+          assessmentResults: z.array(z.unknown()),
+          archived: z.boolean(),
+        })
+        .strict(),
     ),
     secretary: z.nullable(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-        experience: z.number(),
-        level: z.string(),
-      }),
+      z
+        .object({
+          id: z.string(),
+          name: z.string(),
+          experience: z.number(),
+          level: z.string(),
+        })
+        .strict(),
     ),
-    relations: z.object({
-      classmates: z.record(z.number()),
-      colleagues: z.record(z.number()),
-      business: z.record(z.number()),
-      academic: z.record(z.number()),
-      media: z.record(z.number()),
-      central: z.record(z.number()),
-    }),
-    philosophy: z.object({ scores: z.record(z.number()) }),
+    relations: z
+      .object({
+        classmates: z.record(z.number()),
+        colleagues: z.record(z.number()),
+        business: z.record(z.number()),
+        academic: z.record(z.number()),
+        media: z.record(z.number()),
+        central: z.record(z.number()),
+      })
+      .strict(),
+    philosophy: z.object({ scores: z.record(z.number()) }).strict(),
     reserveTier: z.number(),
     ambition: z.number(),
     corruptionRisk: z.number(),
     isUnderInvestigation: z.boolean(),
     time: GameTimeSchema,
     successor: z.nullable(
-      z.object({
-        id: z.nullable(z.string()),
-        name: z.string(),
-        investment: z.number(),
-        readiness: z.number(),
-      }),
+      z
+        .object({
+          id: z.nullable(z.string()),
+          name: z.string(),
+          investment: z.number(),
+          readiness: z.number(),
+        })
+        .strict(),
     ),
-    thinkTank: z.object({
-      science: z.nullable(z.string()),
-      economics: z.nullable(z.string()),
-      law: z.nullable(z.string()),
-    }),
-    mentees: z.array(z.object({ id: z.string(), progress: z.number() })),
+    thinkTank: z
+      .object({
+        science: z.nullable(z.string()),
+        economics: z.nullable(z.string()),
+        law: z.nullable(z.string()),
+      })
+      .strict(),
+    mentees: z.array(z.object({ id: z.string(), progress: z.number() }).strict()),
     achievements: z.array(z.string()),
     totalActions: z.number().min(0),
     totalDaysPlayed: z.number().min(0),
     lastCompletedActions: z.array(
-      z.object({
-        actionName: z.string(),
-        deptName: z.string(),
-        effects: z.array(z.string()),
-        completedAtDay: z.number(),
-      }),
+      z
+        .object({
+          actionName: z.string(),
+          deptName: z.string(),
+          effects: z.array(z.string()),
+          completedAtDay: z.number(),
+        })
+        .strict(),
     ),
     endgameReached: z.boolean(),
     updatedAt: z.number(),
