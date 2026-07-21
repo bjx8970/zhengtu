@@ -727,7 +727,6 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnFail,
-              cfgPromoStore,
             );
           }
           break;
@@ -748,7 +747,6 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnRejected,
-              cfgPromoStore,
             );
           } else {
             // Suspended — 本次搁置
@@ -774,7 +772,6 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnFail,
-              cfgPromoStore,
             );
           }
           break;
@@ -792,7 +789,6 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnFail,
-              cfgPromoStore,
             );
           }
           break;
@@ -810,7 +806,6 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnFail,
-              cfgPromoStore,
             );
           }
           break;
@@ -884,7 +879,6 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnFail,
-              cfgPromoStore,
             );
           }
           break;
