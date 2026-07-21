@@ -52,7 +52,8 @@ function makePromotionReadyState(overrides?: Partial<PlayerSave>): Partial<Playe
     competence: 70,
     integrity: 70,
     performance: 70,
-    superiorFavor: 60,
+    network: 60,
+    philosophy: { scores: { innovation: 60, pragmatic: 60, principled: 60 } },
     politicalCapital: 40,
     corruptionRisk: 0,
     time: { year: 2015, month: 1, day: 1, granularity: 'day' },
@@ -129,9 +130,9 @@ describe('核心流程集成测试', () => {
       if (expectedBonus.politicalCapital !== undefined) {
         expect(state.politicalCapital).toBe(expectedBonus.politicalCapital);
       }
-      // 验证 superiorFavor 加成
-      if (expectedBonus.superiorFavor !== undefined) {
-        expect(state.superiorFavor).toBe(20 + expectedBonus.superiorFavor);
+      // 验证 network 加成
+      if (expectedBonus.network !== undefined) {
+        expect(state.network).toBe(expectedBonus.network);
       }
     });
 
@@ -365,7 +366,7 @@ describe('核心流程集成测试', () => {
         competence: 70,
         integrity: 70,
         performance: 70,
-        superiorFavor: 60,
+        network: 60,
         politicalCapital: 50,
         corruptionRisk: 0,
         remainingBudget: 50000,
@@ -382,26 +383,26 @@ describe('核心流程集成测试', () => {
       });
     }
 
-    it('民主推荐失败（低属性） → demoralization 增加 + Failed', () => {
-      // baseScore = playerScore*0.4 + charisma*0.3 + superiorFavor*0.3
-      // 要让 baseScore < 60：comprehensiveScore=30, charisma=30, superiorFavor=30
-      // → 12 + 9 + 9 = 30 < 60 → 失败
+    it('民主推荐失败（低属性） → 怀抱下降 + Failed', () => {
+      // baseScore = playerScore*0.5 + charisma*0.5
+      // 要让 baseScore < 60：comprehensiveScore=30, charisma=30
+      // → 15 + 15 = 30 < 60 → 失败
       const store = makeStoreAtStage(PromotionStage.DemocraticVote, {
         comprehensiveScore: 30,
         charisma: 30,
-        superiorFavor: 30,
+        network: 30,
       });
-      const demBefore = store.getRawState().demoralization ?? 0;
+      const ambBefore = store.getRawState().ambition ?? 0;
 
       store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE', _rng: allPassRng });
 
       const state = store.getRawState();
       expect(state.promotionStage).toBe(PromotionStage.Failed);
       const cfg = getConfigLoader().getGameConfig();
-      expect(state.demoralization).toBe(demBefore + cfg.promotion.progression.demoralizationOnFail);
+      expect(state.ambition).toBe(ambBefore - cfg.promotion.progression.ambitionOnFail);
     });
 
-    it('组织考察被否决(Rejected) → frozenPeriods +2 + demoralization 增加', () => {
+    it('组织考察被否决(Rejected) → frozenPeriods +2 + 怀抱下降', () => {
       // score = performance*0.3 + competence*0.3 + playerScore*0.2 + integrity*0.2
       // 要让 score < 40（suspendedThreshold）：全部属性=20
       // → 6 + 6 + 4 + 4 = 20 < 40 → Rejected
@@ -411,7 +412,7 @@ describe('核心流程集成测试', () => {
         comprehensiveScore: 20,
         integrity: 20,
       });
-      const demBefore = store.getRawState().demoralization ?? 0;
+      const ambBefore = store.getRawState().ambition ?? 0;
 
       store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE' });
 
@@ -420,75 +421,73 @@ describe('核心流程集成测试', () => {
       const cfg = getConfigLoader().getGameConfig();
       // Rejected → frozenPeriods +2
       expect(state.frozenPeriods).toBe(2);
-      expect(state.demoralization).toBe(
-        demBefore + cfg.promotion.progression.demoralizationOnRejected,
-      );
+      expect(state.ambition).toBe(ambBefore - cfg.promotion.progression.ambitionOnRejected);
     });
 
-    it('联审失败（高腐败风险） → demoralization 增加 + Failed', () => {
+    it('联审失败（高腐败风险） → 怀抱下降 + Failed', () => {
       // corruptionRisk >= 50 → 纪委否决
       // rng=0.95 → 信访和其他部门也失败
       const store = makeStoreAtStage(PromotionStage.JointReview, {
         corruptionRisk: 80,
       });
-      const demBefore = store.getRawState().demoralization ?? 0;
+      const ambBefore = store.getRawState().ambition ?? 0;
 
       store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE', _rng: highFailRng });
 
       const state = store.getRawState();
       expect(state.promotionStage).toBe(PromotionStage.Failed);
       const cfg = getConfigLoader().getGameConfig();
-      expect(state.demoralization).toBe(demBefore + cfg.promotion.progression.demoralizationOnFail);
+      expect(state.ambition).toBe(ambBefore - cfg.promotion.progression.ambitionOnFail);
     });
 
-    it('常委会票决失败 → demoralization 增加 + Failed', () => {
-      // finalRate = max((avgReputation + superiorFavor)/200 - factionPenalty, 0.1)
-      // factionReputation 全 0 → avgReputation=0, finalRate=max(0+60/200, 0.1)=0.3
+    it('常委会票决失败 → 怀抱下降 + Failed', () => {
+      // finalRate = max(avgStyleScore/100 - imbalancePenalty, 0.1)
+      // styleScores 全 60 → avgStyleScore=60, finalRate=max(60/100-0, 0.1)=0.6
       // rng=0.95 > 0.3 → 所有票反对 → 失败
       const store = makeStoreAtStage(PromotionStage.CommitteeVote, {
-        superiorFavor: 10, // 降低 finalRate 到 0.05 → max(0.05, 0.1) = 0.1
+        network: 10, // 降低 finalRate 到 0.05 → max(0.05, 0.1) = 0.1
       });
-      const demBefore = store.getRawState().demoralization ?? 0;
+      const ambBefore = store.getRawState().ambition ?? 0;
 
       store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE', _rng: highFailRng });
 
       const state = store.getRawState();
       expect(state.promotionStage).toBe(PromotionStage.Failed);
       const cfg = getConfigLoader().getGameConfig();
-      expect(state.demoralization).toBe(demBefore + cfg.promotion.progression.demoralizationOnFail);
+      expect(state.ambition).toBe(ambBefore - cfg.promotion.progression.ambitionOnFail);
     });
 
-    it('公示失败（举报） → demoralization 增加 + Failed', () => {
+    it('公示失败（举报） → 怀抱下降 + Failed', () => {
       // complaintProb = corruptionRisk * complaintProbPerRisk = 100 * 0.005 = 0.5
       // rng=0.0 < 0.5 → 触发举报 → 失败
       const store = makeStoreAtStage(PromotionStage.PublicNotice, {
         corruptionRisk: 100,
       });
-      const demBefore = store.getRawState().demoralization ?? 0;
+      const ambBefore = store.getRawState().ambition ?? 0;
 
       store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE', _rng: lowFailRng });
 
       const state = store.getRawState();
       expect(state.promotionStage).toBe(PromotionStage.Failed);
       const cfg = getConfigLoader().getGameConfig();
-      expect(state.demoralization).toBe(demBefore + cfg.promotion.progression.demoralizationOnFail);
+      expect(state.ambition).toBe(ambBefore - cfg.promotion.progression.ambitionOnFail);
     });
 
-    it('试用期失败（低能力） → demoralization 增加 + Failed', () => {
+    it('试用期失败（低能力） → 怀抱下降 + Failed', () => {
       // score = competence*0.5 + playerScore*0.3 + rng()*20
       // competence=10, playerScore=10, rng=0.0 → 5 + 3 + 0 = 8 < 55 → 失败
       const store = makeStoreAtStage(PromotionStage.Probation, {
         competence: 10,
         comprehensiveScore: 10,
       });
-      const demBefore = store.getRawState().demoralization ?? 0;
+      const ambBefore = store.getRawState().ambition ?? 0;
 
       store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE', _rng: lowFailRng });
 
       const state = store.getRawState();
       expect(state.promotionStage).toBe(PromotionStage.Failed);
       const cfg = getConfigLoader().getGameConfig();
-      expect(state.demoralization).toBe(demBefore + cfg.promotion.progression.demoralizationOnFail);
+      expect(state.ambition).toBe(ambBefore - cfg.promotion.progression.ambitionOnFail);
       // 试用期失败不改变职级
       expect(state.currentLevel).toBe(1);
     });
@@ -497,7 +496,7 @@ describe('核心流程集成测试', () => {
       const store = makeStoreAtStage(PromotionStage.DemocraticVote, {
         comprehensiveScore: 30,
         charisma: 30,
-        superiorFavor: 30,
+        network: 30,
       });
       store.dispatch({ type: 'PROMOTION_RESOLVE_STAGE', _rng: allPassRng });
       expect(store.getRawState().promotionStage).toBe(PromotionStage.Failed);

@@ -85,7 +85,7 @@ describe('行政线 L1-L11 全链路回归测试', () => {
       competence: 20,
       integrity: 20,
       performance: 20,
-      superiorFavor: 20,
+      network: 20,
       corruptionRisk: 0,
       politicalCapital: 100,
     });

@@ -94,11 +94,11 @@ export enum SentimentType {
   Positive = '正面',
 }
 
-/** 三大政治派系（内部标识用英文，显示用中文） */
-export enum Faction {
-  Reform = 'reform',
+/** 三种从政理念风格（内部标识用英文，显示用中文） */
+export enum LeadershipStyle {
+  Innovation = 'innovation',
   Pragmatic = 'pragmatic',
-  Conservative = 'conservative',
+  Principled = 'principled',
 }
 
 /** 秘书等级（按经验值递增） */

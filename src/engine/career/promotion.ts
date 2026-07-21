@@ -11,9 +11,9 @@
  */
 
 import type { PromotionContext } from '../../types/game';
-import type { PromotionRequirement, GameConfig } from '../../types/config';
+import type { PromotionRequirement, GameConfig, StyleSpectrumConfig } from '../../types/config';
 import { OrgInspectResult } from '../../types/enums';
-import { calculateFactionPenalty } from './faction-penalty';
+import { calculateStyleFuzzinessPenalty } from './philosophy-imbalance';
 
 /**
  * 晋升门槛校验。
@@ -55,13 +55,14 @@ export function checkPrerequisites(
 /**
  * 阶段1 — 民主推荐。
  *
- * 得票 = 考核得分×0.4 + 魅力×0.3 + 上司好感×0.3
+ * 得票 = 考核得分×0.5 + 魅力×0.5
  * 玩家可动用人脉拉票 (+10 分，30% 概率留负面记录)。
  *
- * @param ctx     晋升上下文
- * @param choices 玩家选择 { useConnections }
- * @param cfg     晋升配置常量
- * @param rng     随机数生成器（默认 Math.random）
+ * @param ctx        晋升上下文
+ * @param choices    玩家选择 { useConnections }
+ * @param cfg        晋升配置常量
+ * @param rng        随机数生成器（默认 Math.random）
+ * @param spectrums  风格光谱配置列表
  * @returns 是否通过 + 得票数 + 详情 + 可能的负面标记
  */
 export function resolveDemocraticVote(
@@ -69,6 +70,7 @@ export function resolveDemocraticVote(
   choices: { useConnections?: boolean },
   cfg: GameConfig,
   rng: () => number = Math.random,
+  spectrums: StyleSpectrumConfig[] = [],
 ): {
   passed: boolean;
   votes: number;
@@ -76,7 +78,7 @@ export function resolveDemocraticVote(
   flaggedForRisk?: boolean;
 } {
   const promo = cfg.promotion.democraticVote;
-  let baseScore = ctx.playerScore * 0.4 + ctx.charisma * 0.3 + ctx.superiorFavor * 0.3;
+  let baseScore = ctx.playerScore * 0.5 + ctx.charisma * 0.5;
 
   let flaggedForRisk = false;
 
@@ -87,8 +89,8 @@ export function resolveDemocraticVote(
     }
   }
 
-  const factionPenalty = calculateFactionPenalty(ctx.factionReputation);
-  baseScore -= factionPenalty;
+  const fuzzinessFactor = calculateStyleFuzzinessPenalty(ctx.styleScores, spectrums);
+  baseScore -= baseScore * fuzzinessFactor;
 
   const passed = baseScore >= promo.passThreshold;
 

@@ -39,7 +39,7 @@ const FEATURES: readonly FeatureEntry[] = [
   {
     id: 'relations',
     label: '人脉关系',
-    description: '上级、同僚与派系关系网络',
+    description: '从政理念与上级关系网络',
     icon: '联',
     status: 'planned',
     phase: 'Phase 2',

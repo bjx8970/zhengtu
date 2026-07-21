@@ -15,10 +15,10 @@ import type {
   PromotionStage,
   OrgInspectResult,
   ReserveCadreTier,
-  Faction,
   SecretaryLevel,
   TimeGranularity,
 } from './enums';
+import type { FiveDimensionScore } from './game';
 import type { ActionCategory } from './config';
 
 /** 槽位等级 key */
@@ -89,7 +89,12 @@ export interface CareerRecord {
   startYear: number;
   /** null 表示当前在职 */
   endYear: number | null;
-  assessmentResults: { year: number; score: number; tier: string }[];
+  assessmentResults: {
+    year: number;
+    score: number;
+    tier: string;
+    dimensions?: FiveDimensionScore;
+  }[];
   /** 跨线转职后旧线索封存 */
   archived: boolean;
 }
@@ -104,12 +109,10 @@ export interface RelationState {
   central: Record<string, number>;
 }
 
-/** 派系归属与声望 */
-export interface FactionState {
-  /** 当前所属派系，independent 表示独立 */
-  alignment: Faction | 'independent';
-  /** 各派系声望值 */
-  reputation: { [K in Faction]: number };
+/** 从政理念风格评分 */
+export interface LeadershipStyleState {
+  /** 各风格评分值（0~100），非互斥非归属，仅反映数值倾向 */
+  scores: Record<string, number>;
 }
 
 /** 接班人培养状态 */
@@ -195,8 +198,8 @@ export interface PlayerSave {
 
   // ===== 资源（行动队列 + 属性） =====
   slots: SlotState;
-  /** 健康值（0~100），备用槽位扣减 */
-  health: number;
+  /** 体魄（0~100），备用槽位扣减 */
+  vigor: number;
   /** 政治资本（0~500） */
   politicalCapital: number;
   /** 剩余预算（万元） */
@@ -204,14 +207,23 @@ export interface PlayerSave {
 
   // ===== 考核 =====
   comprehensiveScore: number;
-  annualAssessments: { year: number; score: number; tier: string }[];
+  annualAssessments: {
+    year: number;
+    score: number;
+    tier: string;
+    dimensions?: FiveDimensionScore;
+  }[];
 
-  // ===== 五大核心属性 =====
+  // ===== 九大核心属性 =====
   integrity: number;
   stability: number;
   performance: number;
   charisma: number;
   competence: number;
+  /** 人脉聚合值（0~100，由 relations 六类关系加权派生） */
+  network: number;
+  /** 勤勉（0~100），反映工作投入度 */
+  diligence: number;
 
   // ===== 晋升 =====
   promotionStage: PromotionStage;
@@ -236,14 +248,12 @@ export interface PlayerSave {
   // ===== 秘书 =====
   secretary: SecretaryState | null;
 
-  // ===== 人脉与派系 =====
+  // ===== 人脉与从政理念 =====
   relations: RelationState;
-  factions: FactionState;
-  /** 直属上司好感值（0~100） */
-  superiorFavor: number;
+  philosophy: LeadershipStyleState;
   reserveTier: ReserveCadreTier;
-  /** 消沉值（连续未晋升累积，影响考核） */
-  demoralization: number;
+  /** 怀抱（0~100，进取心指标，旧档消沉值反转为 100-demoralization） */
+  ambition: number;
 
   // ===== 风险 =====
   /** 贪腐风险值（0~100，越高越容易被双规） */
@@ -268,6 +278,12 @@ export interface PlayerSave {
   // ===== 终局状态 =====
   /** 终局状态（L11 达成后激活） */
   endgameReached: boolean;
+
+  /** Phase C: 待处理的风格冲突标记（START_ACTION 设置，ADVANCE_TIME 消费后清除） */
+  pendingStyleConflict?: boolean;
+
+  /** Phase C: START_ACTION 阶段的偏离乘数，ADVANCE_TIME 中应用并清除 */
+  _pendingDeviationMultiplier?: number;
 
   // ===== 元数据 =====
   /** Unix 时间戳，用于本地/远程存档仲裁 */

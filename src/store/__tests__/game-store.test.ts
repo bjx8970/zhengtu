@@ -43,12 +43,11 @@ describe('createInitialState', () => {
     expect(state.currentLevel).toBe(3);
   });
 
-  it('initializes faction reputation to zero', () => {
+  it('initializes philosophy scores to zero', () => {
     const state = createInitialState();
-    expect(state.factions.alignment).toBe('independent');
-    expect(state.factions.reputation.reform).toBe(0);
-    expect(state.factions.reputation.pragmatic).toBe(0);
-    expect(state.factions.reputation.conservative).toBe(0);
+    expect(state.philosophy.scores.innovation).toBe(0);
+    expect(state.philosophy.scores.pragmatic).toBe(0);
+    expect(state.philosophy.scores.principled).toBe(0);
   });
 
   it('initializes empty relations', () => {
@@ -699,8 +698,8 @@ describe('dispatch - action categories (integration)', () => {
   });
 
   describe('备用槽位处罚', () => {
-    it('minor 选 reserve 成功后扣健康并加消沉', () => {
-      const s = mkStore({ health: 100, demoralization: 0 });
+    it('minor 选 reserve 成功后扣体魄并降怀抱', () => {
+      const s = mkStore({ vigor: 100, ambition: 100 });
       s.dispatch({
         type: 'START_ACTION',
         deptId: minorDeptId,
@@ -709,12 +708,12 @@ describe('dispatch - action categories (integration)', () => {
       });
       const state = s.getRawState();
       expect(state.slots.reserve.occupants[0]?.actionId).toBe(minorActionId);
-      expect(state.health).toBe(95);
-      expect(state.demoralization).toBe(3);
+      expect(state.vigor).toBe(95);
+      expect(state.ambition).toBe(97);
     });
 
     it('处罚受属性边界钳位', () => {
-      const s = mkStore({ health: 2, demoralization: 98 });
+      const s = mkStore({ vigor: 2, ambition: 2 });
       s.dispatch({
         type: 'START_ACTION',
         deptId: minorDeptId,
@@ -722,8 +721,8 @@ describe('dispatch - action categories (integration)', () => {
         tierKey: 'reserve',
       });
       const state = s.getRawState();
-      expect(state.health).toBeGreaterThanOrEqual(0);
-      expect(state.demoralization).toBeLessThanOrEqual(100);
+      expect(state.vigor).toBeGreaterThanOrEqual(0);
+      expect(state.ambition).toBeGreaterThanOrEqual(0);
     });
   });
 

@@ -37,6 +37,8 @@ import constantsData from './constants.json' with { type: 'json' };
 import regionData from './templates/regions.json' with { type: 'json' };
 import universityData from './templates/universities.json' with { type: 'json' };
 import backgroundData from './templates/backgrounds.json' with { type: 'json' };
+import leadershipStyleData from './templates/leadership-styles.json' with { type: 'json' };
+import type { LeadershipStyleConfig } from '../types/config';
 import type { GameEvent } from '../types/game';
 import type { DepartmentTemplate } from '../types/config';
 
@@ -73,6 +75,7 @@ class ConfigLoader {
   private regionConfig: RegionConfig;
   private universityConfig: UniversityConfig;
   private backgroundConfig: BackgroundConfig;
+  private leadershipStyleConfig: LeadershipStyleConfig;
   readonly gameConfig: GameConfig;
 
   constructor() {
@@ -84,6 +87,7 @@ class ConfigLoader {
     this.regionConfig = regionData as unknown as RegionConfig;
     this.universityConfig = universityData as unknown as UniversityConfig;
     this.backgroundConfig = backgroundData as unknown as BackgroundConfig;
+    this.leadershipStyleConfig = leadershipStyleData as unknown as LeadershipStyleConfig;
   }
 
   /** 查询完整职业线配置 */
@@ -160,6 +164,11 @@ class ConfigLoader {
   /** 按 ID 查找晋升通道 */
   getPromotionPath(id: string): PromotionPathItem | null {
     return this.backgroundConfig.promotionPaths.find((p) => p.id === id) ?? null;
+  }
+
+  /** 获取领导风格配置 */
+  getLeadershipStyleConfig(): LeadershipStyleConfig {
+    return this.leadershipStyleConfig;
   }
 
   /** 获取全局游戏常量 */

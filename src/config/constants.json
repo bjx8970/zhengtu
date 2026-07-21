@@ -4,7 +4,7 @@
     "secondary": { "label": "次要", "count": 2, "description": "常规工作槽位" },
     "reserve": { "label": "备用", "count": 1, "description": "加班槽位，消耗健康" }
   },
-  "reservePenalty": { "health": -5, "demoralization": 3 },
+  "reservePenalty": { "vigor": -5, "ambition": -3 },
   "daysPerMonth": 30,
   "monthsPerYear": 12,
   "retirementAge": 65,
@@ -28,10 +28,11 @@
     "charisma": [0, 100],
     "competence": [0, 100],
     "corruptionRisk": [0, 100],
-    "superiorFavor": [0, 100],
+    "network": [0, 100],
+    "diligence": [0, 100],
     "politicalCapital": [0, 500],
-    "demoralization": [0, 100],
-    "health": [0, 100]
+    "ambition": [0, 100],
+    "vigor": [0, 100]
   },
   "kpiTierThresholds": { "excellent": 90, "competent": 75, "basic": 60 },
   "completionRateCap": 1.5,
@@ -47,10 +48,11 @@
     "charisma": 50,
     "competence": 50,
     "corruptionRisk": 0,
-    "superiorFavor": 20,
+    "network": 0,
+    "diligence": 50,
     "politicalCapital": 0,
-    "demoralization": 0,
-    "health": 100
+    "ambition": 100,
+    "vigor": 100
   },
   "kpiTierColors": {
     "优秀": "#4CAF50",
@@ -59,6 +61,19 @@
     "不称职": "#C44D4D"
   },
   "completionBarThresholds": { "excellent": 1, "good": 0.6 },
+  "fiveDimMapping": {
+    "virtue": { "integrity": 0.4, "stability": 0.3, "ambition": 0.3 },
+    "capacity": { "competence": 0.5, "charisma": 0.2, "network": 0.2, "stability": 0.1 },
+    "diligenceScore": { "diligence": 0.5, "vigor": 0.3, "ambition": 0.2 },
+    "honesty": { "integrity": 0.6, "stability": 0.4 }
+  },
+  "comprehensiveScoreWeights": {
+    "virtue": 0.15,
+    "capacity": 0.2,
+    "diligenceScore": 0.15,
+    "achievement": 0.3,
+    "honesty": 0.2
+  },
   "promotion": {
     "democraticVote": {
       "passThreshold": 60,
@@ -89,8 +104,8 @@
       "passThreshold": 55
     },
     "progression": {
-      "demoralizationOnFail": 5,
-      "demoralizationOnRejected": 8,
+      "ambitionOnFail": 5,
+      "ambitionOnRejected": 8,
       "politicalCapitalBonusOnSuccess": 10
     }
   }

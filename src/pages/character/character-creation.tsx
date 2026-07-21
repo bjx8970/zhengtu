@@ -1,5 +1,5 @@
 /**
- * 建档页面（5 步向导）
+ * 建档页面（6 步向导）
  *
  * 创建游戏角色的向导流程：
  * 1. 基本信息 — 姓名 + 性别
@@ -7,6 +7,7 @@
  * 3. 高考成绩 — 随机生成 + 可重掷
  * 4. 院校选择 — 档次 → 院校级联（向下兼容）
  * 5. 家庭背景 + 晋升通道 — 双列选择 + 加成预览
+ * 6. 职业线选择 — 行政/党群/纪检/群团四选一
  *
  * 完成后 dispatch(NEW_GAME) 并跳转仪表盘。
  */
@@ -24,6 +25,7 @@ import { StepBirthplace } from './StepBirthplace';
 import { StepGaokao } from './StepGaokao';
 import { StepSchool } from './StepSchool';
 import { StepBackground } from './StepBackground';
+import { StepCareerLine } from './StepCareerLine';
 
 const INITIAL_DATA: CharacterData = {
   characterName: '',
@@ -37,6 +39,7 @@ const INITIAL_DATA: CharacterData = {
   familyBackground: 'worker',
   promotionPath: 'gongwuyuan',
   isPreparatory: false,
+  careerLine: CareerLine.Administrative,
 };
 
 export function CharacterCreation() {
@@ -49,7 +52,7 @@ export function CharacterCreation() {
 
   const [step, setStep] = createSignal(0);
   const [data, setData] = createSignal<CharacterData>({ ...INITIAL_DATA });
-  const TOTAL = 5;
+  const TOTAL = 6;
 
   const loader = getConfigLoader();
   const provinces = createMemo(() => loader.getRegions().provinces);
@@ -81,7 +84,7 @@ export function CharacterCreation() {
 
   function handleComplete() {
     const cfg = loader.getGameConfig();
-    const startLine = CareerLine.Administrative;
+    const startLine = data().careerLine;
     const startPos = loader.getPosition(startLine, 1, 0);
     const startYear = cfg.startYear + (data().isPreparatory ? 1 : 0);
 
@@ -99,6 +102,7 @@ export function CharacterCreation() {
         familyBackground: data().familyBackground,
         promotionPath: data().promotionPath,
         isPreparatory: data().isPreparatory,
+        currentCareerLine: data().careerLine,
         currentPositionId: startPos?.id ?? 'admin_l1_0',
         remainingBudget: startPos?.annualBudget ?? cfg.budgetByLevel[1] ?? 0,
       },
@@ -119,6 +123,8 @@ export function CharacterCreation() {
         return !!d.university && !!d.universityTier;
       case 4:
         return !!d.familyBackground && !!d.promotionPath;
+      case 5:
+        return !!d.careerLine;
       default:
         return false;
     }
@@ -193,6 +199,9 @@ export function CharacterCreation() {
             paths={paths()}
             updateField={updateField}
           />
+        </Show>
+        <Show when={step() === 5}>
+          <StepCareerLine data={data()} updateField={updateField} />
         </Show>
       </div>
 

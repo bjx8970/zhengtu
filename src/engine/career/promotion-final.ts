@@ -12,8 +12,8 @@
  */
 
 import type { PromotionContext } from '../../types/game';
-import type { GameConfig } from '../../types/config';
-import { calculateFactionPenalty } from './faction-penalty';
+import type { GameConfig, StyleSpectrumConfig } from '../../types/config';
+import { calculateStyleFuzzinessPenalty } from './philosophy-imbalance';
 
 /**
  * 阶段3 — 多部门联审。
@@ -65,18 +65,20 @@ export function resolveJointReview(
  * 阶段4 — 常委会票决。
  *
  * 常委人数 = min(7 + floor(level/interval) * sizePerLevel, maxSize)
- * 赞成率 = (平均派系声望 + 上司好感) / 200 - 派系惩罚
+ * 赞成率 = 平均风格评分 / 100 - 风格失衡修正
  * 每张票独立模拟，赞成过半即通过。
  *
- * @param ctx 晋升上下文
- * @param cfg 晋升配置常量
- * @param rng 随机数生成器（默认 Math.random）
+ * @param ctx       晋升上下文
+ * @param cfg       晋升配置常量
+ * @param rng       随机数生成器（默认 Math.random）
+ * @param spectrums 风格光谱配置列表
  * @returns 是否通过 + 赞成/反对票数 + 详情
  */
 export function resolveCommitteeVote(
   ctx: PromotionContext,
   cfg: GameConfig,
   rng: () => number = Math.random,
+  spectrums: StyleSpectrumConfig[] = [],
 ): {
   passed: boolean;
   forVotes: number;
@@ -90,14 +92,14 @@ export function resolveCommitteeVote(
     comm.maxSize,
   );
 
-  const avgReputation =
-    Object.values(ctx.factionReputation).reduce((a, b) => a + b, 0) /
-    Math.max(Object.keys(ctx.factionReputation).length, 1);
+  const avgStyleScore =
+    Object.values(ctx.styleScores).reduce((a, b) => a + b, 0) /
+    Math.max(Object.keys(ctx.styleScores).length, 1);
 
-  const approvalRate = (avgReputation + ctx.superiorFavor) / 200;
+  const approvalRate = avgStyleScore / 100;
 
-  const factionPenalty = calculateFactionPenalty(ctx.factionReputation) / 100;
-  const finalRate = Math.max(approvalRate - factionPenalty, 0.1);
+  const fuzziness = calculateStyleFuzzinessPenalty(ctx.styleScores, spectrums);
+  const finalRate = Math.max(approvalRate - fuzziness, 0.1);
 
   let forVotes = 0;
   for (let i = 0; i < committeeSize; i++) {

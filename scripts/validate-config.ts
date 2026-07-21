@@ -24,6 +24,7 @@ import mass from '../src/config/career-lines/mass.json' with { type: 'json' };
 import regionData from '../src/config/templates/regions.json' with { type: 'json' };
 import universityData from '../src/config/templates/universities.json' with { type: 'json' };
 import backgroundData from '../src/config/templates/backgrounds.json' with { type: 'json' };
+import leadershipStyles from '../src/config/templates/leadership-styles.json' with { type: 'json' };
 
 const departments = { ...deptCore, ...deptExtra };
 
@@ -351,7 +352,7 @@ const ConstantsSchema = z.object({
     secondary: z.object({ label: z.string(), count: z.number(), description: z.string() }),
     reserve: z.object({ label: z.string(), count: z.number(), description: z.string() }),
   }),
-  reservePenalty: z.object({ health: z.number(), demoralization: z.number() }),
+  reservePenalty: z.object({ vigor: z.number(), ambition: z.number() }),
   daysPerMonth: z.number().min(1),
   monthsPerYear: z.number().min(1),
   retirementAge: z.number().min(1),
@@ -373,6 +374,25 @@ const ConstantsSchema = z.object({
   initialAttributes: z.record(z.number()),
   kpiTierColors: z.record(z.string()),
   completionBarThresholds: z.object({ excellent: z.number(), good: z.number() }),
+  fiveDimMapping: z.object({
+    virtue: z.record(z.number().min(0).max(1)),
+    capacity: z.record(z.number().min(0).max(1)),
+    diligenceScore: z.record(z.number().min(0).max(1)),
+    honesty: z.record(z.number().min(0).max(1)),
+  }),
+  comprehensiveScoreWeights: z
+    .object({
+      virtue: z.number().min(0).max(1),
+      capacity: z.number().min(0).max(1),
+      diligenceScore: z.number().min(0).max(1),
+      achievement: z.number().min(0).max(1),
+      honesty: z.number().min(0).max(1),
+    })
+    .refine(
+      (w) =>
+        Math.abs(w.virtue + w.capacity + w.diligenceScore + w.achievement + w.honesty - 1) < 0.001,
+      { message: 'comprehensiveScoreWeights 总和必须为 1.0' },
+    ),
   promotion: z.object({
     democraticVote: z.object({
       passThreshold: z.number(),
@@ -403,11 +423,83 @@ const ConstantsSchema = z.object({
       passThreshold: z.number(),
     }),
     progression: z.object({
-      demoralizationOnFail: z.number().min(0),
-      demoralizationOnRejected: z.number().min(0),
+      ambitionOnFail: z.number().min(0),
+      ambitionOnRejected: z.number().min(0),
       politicalCapitalBonusOnSuccess: z.number().min(0),
     }),
   }),
+});
+
+const ExtremeActionSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  styleAlignment: z.string().min(1),
+  requiredScore: z.number().min(0).max(100),
+  durationDays: z.number().int().min(1),
+  category: z.enum(['major', 'minor', 'routine']),
+  cooldownDays: z.number().int().min(0),
+  budgetDelta: z.number(),
+  effects: z.array(z.any()).min(1),
+  riskDescription: z.string().optional(),
+  isExtreme: z.literal(true),
+});
+
+const ExtremeEventOptionSchema = z.object({
+  label: z.string().min(1),
+  description: z.string(),
+  effects: z.record(z.number()),
+});
+
+const ExtremeEventSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string(),
+  requiredScore: z.number().min(0).max(100),
+  triggerProbability: z.number().min(0).max(1),
+  options: z.array(ExtremeEventOptionSchema).min(1).max(4),
+});
+
+const SpectrumConfigSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().optional(),
+    members: z.array(z.string()).min(2),
+    sumCap: z.number().min(1),
+    fuzzyThreshold: z.number().min(0),
+    fuzzyPenalty: z.number().min(-1).max(0),
+    extremeThreshold: z.number().min(0).max(100),
+    extremeHighThreshold: z.number().min(0).max(100),
+    extremeActions: z.record(z.array(ExtremeActionSchema)),
+    extremeEvents: z.record(z.array(ExtremeEventSchema)),
+  })
+  .refine((s) => s.extremeHighThreshold >= s.extremeThreshold, {
+    message: 'extremeHighThreshold 必须 >= extremeThreshold',
+  });
+
+const IndependentStyleSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  max: z.number().min(1),
+  defaultDecayRate: z.number().min(0).max(1),
+  extremeActions: z.record(z.array(ExtremeActionSchema)),
+});
+
+const DeviationPenaltySchema = z.object({
+  effectivenessMultiplier: z.number().min(0).max(1),
+  minStyleDiffForOpposition: z.number().min(0),
+  styleConflictThreshold: z.number().min(0).max(100),
+});
+
+const LeadershipStyleSchema = z.object({
+  version: z.number(),
+  styleSpectrums: z.array(SpectrumConfigSchema),
+  independentStyles: z.array(IndependentStyleSchema),
+  deviationPenalty: DeviationPenaltySchema,
+  styleDecayFactor: z.number().min(0).max(1),
+  defaultStyleDecayRate: z.number().min(0).max(1),
 });
 
 import constants from '../src/config/constants.json' with { type: 'json' };
@@ -498,6 +590,53 @@ if (!bResult.success) {
   console.log(
     `   ✅ backgrounds.json (${backgroundData.familyBackgrounds.length} 背景 + ${backgroundData.promotionPaths.length} 通道)`,
   );
+}
+
+console.log('\n--- 领导风格配置校验 ---\n');
+
+const lsResult = LeadershipStyleSchema.safeParse(leadershipStyles);
+if (!lsResult.success) {
+  for (const issue of lsResult.error.issues) {
+    console.error(`❌ leadership-styles.json [${issue.path.join('.')}] ${issue.message}`);
+    errors++;
+  }
+} else {
+  const allStyleIds = new Set<string>();
+  for (const spectrum of leadershipStyles.styleSpectrums) {
+    console.log(
+      `   ✅ 光谱 "${spectrum.id}" (${spectrum.members.join(', ')}), sumCap=${spectrum.sumCap}`,
+    );
+    for (const member of spectrum.members) {
+      if (allStyleIds.has(member)) {
+        console.error(`❌ 风格 ID "${member}" 在多个光谱中重复`);
+        errors++;
+      } else {
+        allStyleIds.add(member);
+      }
+    }
+    for (const key of Object.keys(spectrum.extremeActions)) {
+      if (!spectrum.members.includes(key)) {
+        console.error(`❌ 光谱 "${spectrum.id}" extremeActions key "${key}" 不在 members 中`);
+        errors++;
+      }
+    }
+    for (const key of Object.keys(spectrum.extremeEvents)) {
+      if (!spectrum.members.includes(key)) {
+        console.error(`❌ 光谱 "${spectrum.id}" extremeEvents key "${key}" 不在 members 中`);
+        errors++;
+      }
+    }
+  }
+  for (const ind of leadershipStyles.independentStyles) {
+    if (allStyleIds.has(ind.id)) {
+      console.error(`❌ 独立风格 ID "${ind.id}" 与光谱成员重复`);
+      errors++;
+    } else {
+      allStyleIds.add(ind.id);
+    }
+    console.log(`   ✅ 独立风格 "${ind.id}", max=${ind.max}`);
+  }
+  console.log(`   ✅ 共 ${allStyleIds.size} 个唯一风格 ID`);
 }
 
 if (errors > 0) {

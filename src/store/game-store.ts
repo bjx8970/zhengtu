@@ -39,7 +39,12 @@ import { advanceTime, getGranularityDays } from '../engine/core/time';
 import { monthlySettlement } from '../engine/governance/budget';
 import { calculateKPI } from '../engine/governance/kpi';
 import { annualAssessment as runAnnualAssessment } from '../engine/governance/assessment';
+import { computeFiveDimensions, computeComprehensiveScore } from '../engine/governance/dimensions';
+import { scoreToKPITier } from '../engine/governance/kpi';
 import { getConfigLoader } from '../config/loader';
+import { normalizeAllSpectrums } from '../engine/career/spectrum-constraint';
+import { calculateDeviationPenalty } from '../engine/career/deviation-penalty';
+import { decayStyleScores } from '../engine/career/style-decay';
 import { clamp, clampAttr } from '../utils/math';
 import { writeLocalSave } from '../services/save-repo';
 import { resolveDemocraticVote, resolveOrgInspection } from '../engine/career/promotion';
@@ -107,7 +112,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     currentCareerLine: 'admin' as CareerLine,
     yearsInCurrentPosition: 0,
     slots,
-    health: cfg.initialAttributes['health'] ?? 100,
+    vigor: cfg.initialAttributes['vigor'] ?? 100,
     politicalCapital: cfg.initialAttributes['politicalCapital'] ?? 0,
     remainingBudget: 1000,
     comprehensiveScore: 0,
@@ -117,6 +122,8 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     performance: cfg.initialAttributes['performance'] ?? 0,
     charisma: cfg.initialAttributes['charisma'] ?? 50,
     competence: cfg.initialAttributes['competence'] ?? 50,
+    diligence: cfg.initialAttributes['diligence'] ?? 50,
+    network: cfg.initialAttributes['network'] ?? 0,
     promotionStage: 'idle' as PromotionStage,
     promotionAttempts: 0,
     frozenPeriods: 0,
@@ -134,17 +141,15 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       media: {},
       central: {},
     },
-    factions: {
-      alignment: 'independent',
-      reputation: {
-        reform: 0,
+    philosophy: {
+      scores: {
+        innovation: 0,
         pragmatic: 0,
-        conservative: 0,
+        principled: 0,
       },
     },
-    superiorFavor: cfg.initialAttributes['superiorFavor'] ?? 20,
     reserveTier: 0 as ReserveCadreTier,
-    demoralization: cfg.initialAttributes['demoralization'] ?? 0,
+    ambition: cfg.initialAttributes['ambition'] ?? 100,
     corruptionRisk: cfg.initialAttributes['corruptionRisk'] ?? 0,
     isUnderInvestigation: false,
     time: getInitialTime(),
@@ -229,6 +234,15 @@ function getPlayerAttr(draft: PlayerSave, attr: string): number {
   return (draft as unknown as Record<string, number>)[attr] ?? 0;
 }
 
+/** Phase C: 修改风格评分并自动归一化光谱约束 */
+function applyStyleDelta(draft: PlayerSave, styleId: string, delta: number): void {
+  const styleCfg = getConfigLoader().getLeadershipStyleConfig();
+  const current = draft.philosophy.scores[styleId] ?? 0;
+  draft.philosophy.scores[styleId] = clamp(current + delta, 0, 100);
+  const normalized = normalizeAllSpectrums(draft.philosophy.scores, styleCfg.styleSpectrums);
+  draft.philosophy.scores = normalized;
+}
+
 /** 从 positionId（如 "admin_l3_0"）提取职位索引 */
 function extractPositionIndex(positionId: string): number {
   const idx = parseInt(positionId.split('_').pop() ?? '0', 10);
@@ -255,6 +269,56 @@ function initializeDepartmentStates(draft: PlayerSave): void {
       actionCooldownUntilDays: {},
     };
   }
+}
+
+/**
+ * 将旧存档迁移到 Phase A 属性体系。
+ *
+ * 迁移规则：
+ * - health → vigor（直接映射）
+ * - demoralization → ambition（反转：100 - 旧值）
+ * - factions.reputation → philosophy.scores（reform→innovation, conservative→principled）
+ * - 删除旧字段
+ *
+ * @param draft 从旧存档反序列化的 PlayerSave（已通过 Object.assign 合并）
+ */
+function migrateSaveToPhaseA(draft: PlayerSave): void {
+  const save = draft as unknown as Record<string, unknown>;
+
+  if (typeof save.health === 'number' && typeof save.vigor !== 'number') {
+    save.vigor = save.health;
+  }
+
+  if (typeof save.demoralization === 'number' && typeof save.ambition !== 'number') {
+    save.ambition = 100 - (save.demoralization as number);
+  }
+
+  if (save.factions && typeof save.factions === 'object') {
+    const factions = save.factions as Record<string, unknown>;
+    if (factions.reputation && typeof factions.reputation === 'object') {
+      const rep = factions.reputation as Record<string, number>;
+      const existing = (save.philosophy as Record<string, unknown> | undefined)?.scores as
+        Record<string, number> | undefined;
+      save.philosophy = {
+        scores: {
+          innovation: rep.reform ?? existing?.innovation ?? 0,
+          pragmatic: rep.pragmatic ?? existing?.pragmatic ?? 0,
+          principled: rep.conservative ?? existing?.principled ?? 0,
+        },
+      };
+    }
+  }
+
+  delete save.health;
+  delete save.demoralization;
+  delete save.factions;
+  delete (save as Record<string, unknown>).superiorFavor;
+}
+
+/** Phase C 存档迁移：旧 scores 归一化到新光谱约束 */
+function migrateSaveToPhaseC(draft: PlayerSave): void {
+  const styleCfg = getConfigLoader().getLeadershipStyleConfig();
+  draft.philosophy.scores = normalizeAllSpectrums(draft.philosophy.scores, styleCfg.styleSpectrums);
 }
 
 /**
@@ -331,7 +395,7 @@ function buildPromotionContext(draft: PlayerSave): PromotionContext {
     yearsInPosition: draft.yearsInCurrentPosition,
     politicalCapital: draft.politicalCapital,
     corruptionRisk: draft.corruptionRisk,
-    factionReputation: draft.factions.reputation,
+    styleScores: draft.philosophy.scores,
     relations: { colleagues: draft.relations.colleagues },
     assessmentHistory: draft.annualAssessments.map((a) => ({ score: a.score, tier: a.tier })),
     hasDisciplinaryRecord: false, // TODO: 待处分系统实现后动态计算
@@ -339,7 +403,7 @@ function buildPromotionContext(draft: PlayerSave): PromotionContext {
       draft.currentLevel <= 2 || draft.careerHistory.some((r) => r.level <= 2),
     hasMultiRegionExperience: draft.careerHistory.filter((r) => r.archived).length >= 2,
     charisma: draft.charisma,
-    superiorFavor: draft.superiorFavor,
+    superiorFavor: 0, // Phase A: superiorFavor 已删除，暂用 0，Phase B/C 重写
     performance: draft.performance,
     competence: draft.competence,
     integrity: draft.integrity,
@@ -382,14 +446,38 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
             ds.cumulativeConsumption += settlement.deptConsumptions[dept.id] ?? 0;
           }
         }
+
+        // Phase C: 月度风格衰减
+        const styleCfgM = getConfigLoader().getLeadershipStyleConfig();
+        draft.philosophy.scores = decayStyleScores(draft.philosophy.scores, styleCfgM);
         break;
       }
       case 'annual_assessment': {
         if (!position) break;
-        // KPI 考核
+        // Phase B: KPI 计算 → 五维分项 → 综合评分 → 等次
         const kpiResult = calculateKPI(position.kpiIndicators, draft.departmentStates, cfg);
-        // 年度评价
-        const assessment = runAnnualAssessment(kpiResult, draft.yearsInCurrentPosition, cfg);
+        const dimensions = computeFiveDimensions(
+          {
+            integrity: draft.integrity,
+            stability: draft.stability,
+            ambition: draft.ambition,
+            competence: draft.competence,
+            charisma: draft.charisma,
+            network: draft.network,
+            diligence: draft.diligence,
+            vigor: draft.vigor,
+          },
+          kpiResult.totalScore,
+          cfg,
+        );
+        const comprehensiveScore = computeComprehensiveScore(dimensions, cfg);
+        const tier = scoreToKPITier(comprehensiveScore, cfg.kpiTierThresholds);
+        const assessment = runAnnualAssessment(
+          comprehensiveScore,
+          tier,
+          draft.yearsInCurrentPosition,
+          cfg,
+        );
         draft.comprehensiveScore = assessment.score;
         // 冻结期每年递减 1，再累加不称职处罚
         if (draft.frozenPeriods > 0) draft.frozenPeriods -= 1;
@@ -399,6 +487,7 @@ function resolveTriggers(draft: PlayerSave, triggers: TimeTrigger[]): void {
           year: trigger.year ?? draft.time.year,
           score: assessment.score,
           tier: assessment.tier,
+          dimensions,
         });
         draft.yearsInCurrentPosition += 1;
         break;
@@ -459,6 +548,21 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
 
       if (!result.success) break;
 
+      // Phase C: 行动偏离校验
+      if (actionConfig.styleAlignment) {
+        const devResult = calculateDeviationPenalty(
+          draft.philosophy.scores,
+          actionConfig.styleAlignment,
+          getConfigLoader().getLeadershipStyleConfig().styleSpectrums,
+          getConfigLoader().getLeadershipStyleConfig().deviationPenalty,
+        );
+        draft._pendingDeviationMultiplier = devResult.effectivenessMultiplier;
+        // 标记冲突状态供 ADVANCE_TIME 处理
+        if (devResult.styleConflictTriggered) {
+          draft.pendingStyleConflict = true;
+        }
+      }
+
       const occupant: SlotOccupant = {
         actionId: actionConfig.id,
         deptId: action.deptId,
@@ -478,14 +582,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
 
       if (tierKey === 'reserve') {
         const penalty = cfg.reservePenalty;
-        draft.health = clampAttr(
-          'health',
-          (draft.health ?? 100) + penalty.health,
-          cfg.attributeBounds,
-        );
-        draft.demoralization = clampAttr(
-          'demoralization',
-          (draft.demoralization ?? 0) + penalty.demoralization,
+        draft.vigor = clampAttr('vigor', (draft.vigor ?? 100) + penalty.vigor, cfg.attributeBounds);
+        draft.ambition = clampAttr(
+          'ambition',
+          (draft.ambition ?? 100) + penalty.ambition,
           cfg.attributeBounds,
         );
       }
@@ -519,6 +619,9 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       const completed = completeActions(draft.slots, draft.totalDaysPlayed);
       const notifications: CompletedActionNotification[] = [];
 
+      const devMult = draft._pendingDeviationMultiplier ?? 1;
+      delete draft._pendingDeviationMultiplier;
+
       for (const c of completed) {
         const slotOccupant = c.occupant;
         const deptCfg = currentPosition?.departments.find((d) => d.id === slotOccupant.deptId);
@@ -540,18 +643,36 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
               } else if (kpi.operation === 'set') {
                 deptState.kpiValues[kpi.indicatorId] = kpi.delta;
               } else {
-                deptState.kpiValues[kpi.indicatorId] = cur + kpi.delta;
+                deptState.kpiValues[kpi.indicatorId] = cur + kpi.delta * devMult;
               }
             }
           }
           for (const change of effects.playerChanges) {
             if (change.operation === 'add') {
-              applyPlayerAttr(draft, change.attr, change.delta, cfgAdv.attributeBounds);
+              applyPlayerAttr(draft, change.attr, change.delta * devMult, cfgAdv.attributeBounds);
             } else if (change.operation === 'multiply' || change.operation === 'set') {
               const cur = getPlayerAttr(draft, change.attr);
               const newVal = change.operation === 'multiply' ? cur * change.delta : change.delta;
               setPlayerAttrDirect(draft, change.attr, newVal, cfgAdv.attributeBounds);
             }
+          }
+
+          // Phase C: 应用风格增量
+          if (effects.styleDeltas) {
+            for (const [styleId, delta] of Object.entries(effects.styleDeltas)) {
+              applyStyleDelta(draft, styleId, delta);
+            }
+          }
+
+          // Phase C: 处理风格冲突
+          if (draft.pendingStyleConflict) {
+            delete draft.pendingStyleConflict;
+            draft.vigor = clampAttr('vigor', (draft.vigor ?? 100) - 5, cfgAdv.attributeBounds);
+            draft.ambition = clampAttr(
+              'ambition',
+              (draft.ambition ?? 100) - 5,
+              cfgAdv.attributeBounds,
+            );
           }
 
           notifications.push({
@@ -589,6 +710,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
     }
     case 'LOAD_SAVE': {
       Object.assign(draft, action.save);
+      migrateSaveToPhaseA(draft);
+      migrateSaveToPhaseC(draft);
       migrateActionState(draft);
       break;
     }
@@ -615,14 +738,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             case 'politicalCapital':
               draft.politicalCapital = clamp(draft.politicalCapital + delta, 0, 500);
               break;
-            case 'superiorFavor':
-              draft.superiorFavor = clamp(draft.superiorFavor + delta, 0, 100);
-              break;
-            case 'reform':
+            case 'innovation':
             case 'pragmatic':
-            case 'conservative':
-              draft.factions.reputation[key] = clamp(
-                (draft.factions.reputation[key] ?? 0) + delta,
+            case 'principled':
+              draft.philosophy.scores[key] = clamp(
+                (draft.philosophy.scores[key] ?? 0) + delta,
                 0,
                 100,
               );
@@ -709,13 +829,20 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
       if (!ps) break;
 
       const cfgPromoStore = getConfigLoader().getGameConfig();
+      const styleSpectrums = getConfigLoader().getLeadershipStyleConfig().styleSpectrums;
       const ctxStore = buildPromotionContext(draft);
       const choices = action.choices ?? {};
       const rng = action._rng ?? Math.random;
 
       switch (ps.currentStage) {
         case PromotionStage.DemocraticVote: {
-          const result = resolveDemocraticVote(ctxStore, choices, cfgPromoStore, rng);
+          const result = resolveDemocraticVote(
+            ctxStore,
+            choices,
+            cfgPromoStore,
+            rng,
+            styleSpectrums,
+          );
           ps.stageResults.democraticVotes = result.votes;
           if (result.flaggedForRisk) ps.flaggedForRisk = true;
           if (result.passed) {
@@ -727,6 +854,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnFail,
+            );
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
+              0,
+              100,
             );
           }
           break;
@@ -747,6 +879,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnRejected,
+             );
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnRejected,
+              0,
+              100,
             );
           } else {
             // Suspended — 本次搁置
@@ -772,12 +909,17 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnFail,
+             );
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
+              0,
+              100,
             );
           }
           break;
         }
         case PromotionStage.CommitteeVote: {
-          const result = resolveCommitteeVote(ctxStore, cfgPromoStore, rng);
+          const result = resolveCommitteeVote(ctxStore, cfgPromoStore, rng, styleSpectrums);
           ps.stageResults.committeeForVotes = result.forVotes;
           ps.stageResults.committeeAgainstVotes = result.againstVotes;
           if (result.passed) {
@@ -789,6 +931,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnFail,
+            );
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
+              0,
+              100,
             );
           }
           break;
@@ -806,6 +953,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnFail,
+            );
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
+              0,
+              100,
             );
           }
           break;
@@ -879,6 +1031,11 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
             applyDemoralization(
               draft,
               cfgPromoStore.promotion.progression.demoralizationOnFail,
+            );
+            draft.ambition = clamp(
+              (draft.ambition ?? 100) - cfgPromoStore.promotion.progression.ambitionOnFail,
+              0,
+              100,
             );
           }
           break;

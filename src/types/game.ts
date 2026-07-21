@@ -13,7 +13,6 @@ import type {
   SentimentType,
   OrgInspectResult,
   PromotionStage,
-  Faction,
   InvestigationEvidence,
   CareerLine,
 } from './enums';
@@ -192,7 +191,7 @@ export interface PromotionContext {
   yearsInPosition: number;
   politicalCapital: number;
   corruptionRisk: number;
-  factionReputation: Record<Faction, number>;
+  styleScores: Record<string, number>;
   relations: { colleagues: Record<string, number> };
   assessmentHistory: { score: number; tier: string }[];
   hasDisciplinaryRecord: boolean;
@@ -228,6 +227,15 @@ export interface KPIResult {
   weight: number;
   /** 加权分 = completionRate × weight × 100 */
   weightedScore: number;
+}
+
+/** 德能勤绩廉五维分项得分 */
+export interface FiveDimensionScore {
+  virtue: number;
+  capacity: number;
+  diligenceScore: number;
+  achievement: number;
+  honesty: number;
 }
 
 /** 年度考核结果 */
@@ -271,7 +279,7 @@ export interface InvestigationContext {
   evidenceCollected: InvestigationEvidence[];
   playerIntegrity: number;
   playerPoliticalCapital: number;
-  factionReputation: Record<Faction, number>;
+  styleScores: Record<string, number>;
   hasLawyer: boolean;
 }
 
@@ -302,4 +310,10 @@ export interface RetirementOption {
   label: string;
   description: string;
   risk?: string;
+}
+
+/** Phase C: 风格派生的年度行动记录 */
+export interface AnnualActionRecord {
+  actionName: string;
+  styleAlignment?: string;
 }
