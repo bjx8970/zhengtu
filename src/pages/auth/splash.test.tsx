@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@solidjs/testing-library';
 import { createInitialState, dispatch } from '../../store/game-store';
-import { setStartupSaveResult, invalidateStartupSave } from '../../services/startup-save-state';
+import { setStartupSaveResult } from '../../services/startup-save-state';
 import { SplashPage } from './splash';
 
 describe('SplashPage local archive entry', () => {
@@ -15,6 +15,8 @@ describe('SplashPage local archive entry', () => {
     localStorage.clear();
     window.location.hash = '';
     setStartupSaveResult({ status: 'empty' });
+    // 重置 Store 为空状态，避免测试间泄漏
+    dispatch({ type: 'LOAD_SAVE', save: createInitialState() });
   });
 
   afterEach(() => {
@@ -75,19 +77,27 @@ describe('SplashPage local archive entry', () => {
     expect(screen.queryByText(/检测到旧版本存档/)).not.toBeInTheDocument();
   });
 
-  it('NEW_GAME 后返回启动页不再显示旧档警告', () => {
+  it('NEW_GAME 后返回启动页显示新角色摘要', () => {
     setStartupSaveResult({
       status: 'legacy',
       detail: '不兼容旧存档',
     });
 
-    // 模拟 NEW_GAME 失效启动快照
-    invalidateStartupSave();
+    // 模拟 NEW_GAME 已写入角色到 Store
+    const state = createInitialState({
+      characterName: '新角色',
+      currentPositionId: 'admin_l1_0',
+      currentLevel: 1,
+      time: { year: 2012, month: 1, day: 1, granularity: 'day' },
+    });
+    dispatch({ type: 'LOAD_SAVE', save: state });
 
     render(() => <SplashPage />);
 
     // 不应继续显示旧档警告
     expect(screen.queryByText(/检测到旧版本存档/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /开始新游戏/ })).toBeInTheDocument();
+    // 应显示新角色摘要和继续游戏
+    expect(screen.getByText('新角色 · L1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /继续游戏/ })).toBeInTheDocument();
   });
 });

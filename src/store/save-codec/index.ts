@@ -17,26 +17,42 @@ import type { PlayerSave } from '../../types/player';
 import type { SaveEnvelope, SaveDecodeResult } from '../../types/save';
 import { CURRENT_SCHEMA_VERSION, CURRENT_CONTENT_VERSION } from '../../types/save';
 
-/** 不兼容存档备份的 localStorage key */
-const INCOMPATIBLE_BACKUP_KEY = 'zhengtu_incompatible_save';
+/** 不兼容存档备份的 localStorage key 前缀 */
+const BACKUP_KEY_PREFIX = 'zhengtu_incompatible_save';
+/** 最大备份数量 */
+const MAX_BACKUPS = 3;
 
 /**
- * 将不兼容存档移动到只读备份 key。
+ * 将不兼容存档移动到只读备份。
  *
- * 使用固定 key 避免重复备份耗尽 localStorage。
- * 已存在备份时不覆盖（保留最早的不兼容存档）。
+ * 相同内容不重复备份，不同内容创建新备份（最多保留 MAX_BACKUPS 份）。
  *
  * @param rawData 原始存档 JSON 字符串
- * @returns 备份 key（空字符串表示备份失败或已存在）
+ * @returns 备份 key（空字符串表示备份失败）
  */
 export function backupIncompatibleSave(rawData: string): string {
   try {
-    // 已存在备份时不重复创建
-    if (localStorage.getItem(INCOMPATIBLE_BACKUP_KEY)) {
-      return INCOMPATIBLE_BACKUP_KEY;
+    // 检查是否已有相同内容的备份
+    for (let i = 0; i < MAX_BACKUPS; i++) {
+      const key = i === 0 ? BACKUP_KEY_PREFIX : `${BACKUP_KEY_PREFIX}_${i}`;
+      const existing = localStorage.getItem(key);
+      if (existing === rawData) {
+        return key; // 相同内容已备份
+      }
     }
-    localStorage.setItem(INCOMPATIBLE_BACKUP_KEY, rawData);
-    return INCOMPATIBLE_BACKUP_KEY;
+
+    // 找到第一个空槽位
+    for (let i = 0; i < MAX_BACKUPS; i++) {
+      const key = i === 0 ? BACKUP_KEY_PREFIX : `${BACKUP_KEY_PREFIX}_${i}`;
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, rawData);
+        return key;
+      }
+    }
+
+    // 所有槽位已满，覆盖最旧的（第一个）
+    localStorage.setItem(BACKUP_KEY_PREFIX, rawData);
+    return BACKUP_KEY_PREFIX;
   } catch {
     return '';
   }

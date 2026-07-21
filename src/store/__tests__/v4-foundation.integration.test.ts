@@ -7,11 +7,12 @@
  * 3. 并发行动互不干扰
  * 4. 存档迁移兼容性
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createTestStore, createInitialState } from '../game-store';
 import { CareerLine } from '../../types/enums';
 import type { PlayerSave, SlotOccupant } from '../../types/player';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
+import { getConfigLoader } from '../../config/loader';
 
 /** 创建带有指定行动的槽位状态 */
 function makeSlotsWithActions(actions: Partial<SlotOccupant>[]): PlayerSave['slots'] {
@@ -209,6 +210,69 @@ describe('v4 基础工程集成测试', () => {
       expect(occupant?.actionId).toBe('approve_project');
       // 无 styleAlignment 的行动不创建 runtimeSnapshot
       expect(occupant?.runtimeSnapshot).toBeUndefined();
+    });
+
+    it('START_ACTION 时有 styleAlignment 的行动创建完整 runtimeSnapshot', () => {
+      const deptId = 'admin_l3_0_dept_0';
+      const loader = getConfigLoader();
+
+      // 使用 spyOn 拦截 getPosition，给返回的行动添加 styleAlignment
+      const originalGetPosition = loader.getPosition.bind(loader);
+      const spy = vi.spyOn(loader, 'getPosition').mockImplementation((line, level, idx) => {
+        const pos = originalGetPosition(line, level, idx);
+        if (pos && level === 3) {
+          // 深拷贝并添加 styleAlignment
+          const modified = structuredClone(pos);
+          const action = modified.departments[0]?.actions.find((a) => a.id === 'approve_project');
+          if (action) action.styleAlignment = 'innovation';
+          return modified;
+        }
+        return pos;
+      });
+
+      try {
+        const store = createTestStore({
+          currentPositionId: 'admin_l3_0',
+          currentLevel: 3,
+          currentCareerLine: CareerLine.Administrative,
+          remainingBudget: 10000,
+          totalDaysPlayed: 0,
+          time: { year: 2024, month: 6, day: 15, granularity: 'day' },
+          departmentStates: {
+            [deptId]: {
+              id: deptId,
+              kpiValues: {},
+              monthlyConsumption: 0,
+              cumulativeConsumption: 0,
+              lastActionDay: 0,
+              actionCooldownUntilDays: {},
+            },
+          },
+          philosophy: {
+            scores: { innovation: 20, pragmatic: 80, principled: 50 },
+          },
+        });
+
+        store.dispatch({
+          type: 'START_ACTION',
+          deptId,
+          actionId: 'approve_project',
+          tierKey: 'primary',
+        });
+
+        const state = store.getRawState();
+        const occupant = state.slots.primary.occupants[0];
+        expect(occupant).not.toBeNull();
+        // 有 styleAlignment 时必须创建完整快照
+        expect(occupant?.runtimeSnapshot).toBeDefined();
+        expect(occupant?.runtimeSnapshot?.styleAlignment).toBe('innovation');
+        expect(typeof occupant?.runtimeSnapshot?.effectivenessMultiplier).toBe('number');
+        expect(typeof occupant?.runtimeSnapshot?.styleConflictTriggered).toBe('boolean');
+        // pragmatic(80) vs innovation(20)，差值 60 应触发偏离
+        expect(occupant?.runtimeSnapshot?.effectivenessMultiplier).toBeLessThan(1);
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it('并发行动各自拥有独立的 runtimeSnapshot', () => {

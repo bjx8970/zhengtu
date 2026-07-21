@@ -20,7 +20,6 @@ import type { TimeGranularity } from '../types/enums';
 import type { PlayerSave, GameTime, SlotOccupant, SlotTierKey } from '../types/player';
 import { getConfigLoader } from '../config/loader';
 import { writeLocalSave } from '../services/save-repo';
-import { invalidateStartupSave } from '../services/startup-save-state';
 
 // Reducer 模块
 import { reduceStartAction } from './reducers/action-reducer';
@@ -196,7 +195,6 @@ function reduceGameState(draft: PlayerSave, action: GameAction): void {
     }
     case 'NEW_GAME': {
       reduceNewGame(draft, { data: action.data }, () => createInitialState());
-      invalidateStartupSave();
       break;
     }
     case 'RESET_PROMOTION': {

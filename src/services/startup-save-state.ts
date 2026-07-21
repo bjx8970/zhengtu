@@ -51,3 +51,24 @@ export function getStartupSaveResult(): LocalSaveLoadResult {
 export function invalidateStartupSave(): void {
   invalidated = true;
 }
+
+/** 强制新建游戏标记（用于绕过 CharacterCreation 的已有角色保护） */
+let forceNewGameFlag = false;
+
+/**
+ * 设置强制新建标记（点击“重新建档”时调用）。
+ */
+export function setForceNewGame(value: boolean): void {
+  forceNewGameFlag = value;
+}
+
+/**
+ * 检查并消费强制新建标记。
+ *
+ * @returns 是否处于强制新建模式
+ */
+export function consumeForceNewGame(): boolean {
+  const val = forceNewGameFlag;
+  forceNewGameFlag = false;
+  return val;
+}

@@ -6,7 +6,7 @@
 
 import { Show } from 'solid-js';
 import { navigate } from '../../router';
-import { getStartupSaveResult } from '../../services/startup-save-state';
+import { getStartupSaveResult, setForceNewGame } from '../../services/startup-save-state';
 import { useGameStore } from '../../store/game-store';
 import { formatDate } from '../../utils/format';
 import { font } from '../../utils/theme';
@@ -19,11 +19,13 @@ import { font } from '../../utils/theme';
 export function SplashPage() {
   const { state } = useGameStore();
   const saveResult = getStartupSaveResult();
-  const hasSave = saveResult.status === 'loaded';
+  // 可继续状态从 Store 派生：有角色名和职位即可继续
+  const hasSave = Boolean(state.characterName && state.currentPositionId);
   const hasError =
-    saveResult.status === 'legacy' ||
-    saveResult.status === 'future' ||
-    saveResult.status === 'corrupted';
+    !hasSave &&
+    (saveResult.status === 'legacy' ||
+      saveResult.status === 'future' ||
+      saveResult.status === 'corrupted');
 
   return (
     <main class="document-page" style={{ display: 'grid', 'place-items': 'center' }}>
@@ -144,7 +146,10 @@ export function SplashPage() {
                     继续游戏 →
                   </button>
                   <button
-                    onClick={() => navigate('/character')}
+                    onClick={() => {
+                      setForceNewGame(true);
+                      navigate('/character');
+                    }}
                     style={{
                       padding: '0.8rem 1.2rem',
                       border: '1px solid var(--border-color)',
