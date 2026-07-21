@@ -1,10 +1,10 @@
 /**
  * 存档版本类型定义
  *
- * v4 基础工程引入的存档外层封装和严格解码基础设施。
+ * 存档外层封装和严格解码基础设施。
  * SaveEnvelope 包裹 PlayerSave，提供 schema 版本追踪和不兼容拒绝能力。
  *
- * 本版本明确不兼容旧存档，不提供任何旧存档自动迁移。
+ * 本版本明确不兼容正式版本体系建立前的旧存档，不提供任何旧存档自动迁移。
  */
 
 import type { PlayerSave } from './player';
@@ -12,8 +12,8 @@ import type { PlayerSave } from './player';
 /** 当前存档 Schema 版本号，每次不兼容变更递增 */
 export const CURRENT_SCHEMA_VERSION = 1;
 
-/** 当前内容版本号，用于标识配置/内容包的版本 */
-export const CURRENT_CONTENT_VERSION = '4.0.0-alpha';
+/** 当前内容版本号，用于标识配置/内容包的版本（格式：YYYY.MM.REVISION） */
+export const CURRENT_CONTENT_VERSION = '2026.07.1';
 
 /**
  * 存档外层封装

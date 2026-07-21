@@ -1,9 +1,9 @@
 {
   "name": "zhengtu",
   "private": true,
-  "version": "3.0.0",
+  "version": "0.1.0-alpha.1",
   "type": "module",
-  "description": "政途人生 v3.0 — 仕途模拟游戏",
+  "description": "政途人生 — 公务员职业生涯模拟游戏",
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "vite",

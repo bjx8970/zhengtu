@@ -318,7 +318,7 @@ export interface AnnualActionRecord {
   styleAlignment?: string;
 }
 
-// ===== v4 基础工程：统一时间轴 =====
+// ===== 统一时间轴 =====
 
 /** 时间轴事件基础接口 */
 interface TimelineEventBase {

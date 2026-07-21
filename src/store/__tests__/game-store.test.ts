@@ -453,7 +453,7 @@ describe('dispatch - persistence (localStorage)', () => {
     const saved = localStorage.getItem(SAVE_KEY);
     expect(saved).not.toBeNull();
     const content = JSON.parse(saved!);
-    // v4: 存档使用 SaveEnvelope 封装
+    // 存档使用 SaveEnvelope 封装
     expect(content.state.characterName).toBe('测试');
   });
 
@@ -480,7 +480,7 @@ describe('dispatch - persistence (localStorage)', () => {
     const saved = localStorage.getItem(SAVE_KEY);
     expect(saved).not.toBeNull();
     const content = JSON.parse(saved!);
-    // v4: 存档使用 SaveEnvelope 封装
+    // 存档使用 SaveEnvelope 封装
     expect(content.state.characterName).toBe('新角色');
   });
 

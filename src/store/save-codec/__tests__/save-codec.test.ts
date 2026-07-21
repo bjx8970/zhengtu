@@ -148,7 +148,7 @@ describe('存档严格解码器', () => {
       expect(envelope.revision).toBe(6);
       expect(envelope.state).toBe(state);
       expect(envelope.savedAt).toBeGreaterThan(0);
-      expect(envelope.contentVersion).toBe('4.0.0-alpha');
+      expect(envelope.contentVersion).toBe('2026.07.1');
     });
   });
 

@@ -176,7 +176,7 @@ export function SplashPage() {
             'border-top': '1px solid var(--border-color-light)',
           }}
         >
-          <span>重写版 · v4 alpha · 本地存档</span>
+          <span>政途人生 · {__APP_VERSION__} · 本地存档</span>
           <span>治大国如烹小鲜</span>
         </footer>
       </section>

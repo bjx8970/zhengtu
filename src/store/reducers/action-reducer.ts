@@ -19,7 +19,7 @@ import { extractPositionIndex } from './shared';
 /**
  * 处理 START_ACTION 动作。
  *
- * v4 变更：理念偏离倍率绑定到 SlotOccupant.runtimeSnapshot，
+ * 理念偏离倍率绑定到 SlotOccupant.runtimeSnapshot，
  * 不再使用玩家级 _pendingDeviationMultiplier。
  *
  * @param draft 当前游戏状态（mutable）
@@ -50,7 +50,7 @@ export function reduceStartAction(draft: PlayerSave, payload: StartActionPayload
 
   if (!result.success) return;
 
-  // v4: 计算理念偏离快照并绑定到行动实例
+  // 计算理念偏离快照并绑定到行动实例
   let runtimeSnapshot: ActionRuntimeSnapshot | undefined;
   if (actionConfig.styleAlignment) {
     const devResult = calculateDeviationPenalty(
