@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { decodeCurrentSave, decodeCurrentSaveData, wrapSaveEnvelope } from '../index';
-import { CURRENT_SCHEMA_VERSION } from '../../../types/save';
+import { CURRENT_SCHEMA_VERSION, CURRENT_CONTENT_VERSION } from '../../../types/save';
 import { createInitialState } from '../../game-store';
 
 describe('存档严格解码器', () => {
@@ -94,7 +94,7 @@ describe('存档严格解码器', () => {
     it('损坏的当前版本状态被拒绝', () => {
       const corrupted = {
         schemaVersion: CURRENT_SCHEMA_VERSION,
-        contentVersion: '4.0.0-alpha',
+        contentVersion: CURRENT_CONTENT_VERSION,
         revision: 1,
         savedAt: Date.now(),
         state: { invalid: 'data' },
@@ -148,7 +148,7 @@ describe('存档严格解码器', () => {
       expect(envelope.revision).toBe(6);
       expect(envelope.state).toBe(state);
       expect(envelope.savedAt).toBeGreaterThan(0);
-      expect(envelope.contentVersion).toBe('4.0.0-alpha');
+      expect(envelope.contentVersion).toBe('2026.07.1');
     });
   });
 

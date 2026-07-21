@@ -1,5 +1,5 @@
 /**
- * v4 基础工程集成测试
+ * 基础工程集成测试
  *
  * 覆盖核心变更：
  * 1. 时间轴结算顺序：行动完成 → 月度结算 → 年度考核
@@ -38,7 +38,7 @@ function makeSlotsWithActions(actions: Partial<SlotOccupant>[]): PlayerSave['slo
   };
 }
 
-describe('v4 基础工程集成测试', () => {
+describe('基础工程集成测试', () => {
   describe('时间轴结算顺序', () => {
     it('行动在月末前完成时，先结算行动再进行月度结算', () => {
       const deptId = 'admin_l3_0_dept_0';

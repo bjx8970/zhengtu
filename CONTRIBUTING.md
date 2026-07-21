@@ -53,7 +53,7 @@ summary:  中文，祈使句，不加句号
   fix(store): 修复推进时间后槽位未重置的问题
   test(engine): 补充时间引擎跨年边界用例
   refactor(config): 合并 departments 与 departments-extra
-  chore(deps): 升级 vitest 到 v4
+  chore(deps): 升级 vitest 到 v3
   docs: 补充 ARCHITECTURE.md 数据流图
 ```
 

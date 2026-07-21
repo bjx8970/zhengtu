@@ -1,3 +1,11 @@
+> **状态：历史设计文档**
+> 说明：本文形成于正式版本体系建立之前，其中“v3.0”不代表当前软件版本。
+> 当前产品与架构方向请参阅：
+> - [docs/CAREER_REDESIGN_GUIDE.md](docs/CAREER_REDESIGN_GUIDE.md)
+> - [docs/VERSIONING.md](docs/VERSIONING.md)
+> - [ARCHITECTURE.md](ARCHITECTURE.md)
+> - [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md)
+
 # 政途人生 v3.0 技术设计文档
 
 ## 1. 概述

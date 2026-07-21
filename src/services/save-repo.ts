@@ -55,7 +55,7 @@ export function readLocalSave(): LocalSaveLoadResult {
 /**
  * 写入 localStorage。
  *
- * v4 变更：使用 SaveEnvelope 封装，包含 schemaVersion。
+ * 使用 SaveEnvelope 封装，包含 schemaVersion。
  *
  * @param save 游戏状态
  */

@@ -15,7 +15,7 @@ import { applyPlayerAttr, initializeDepartmentStates } from './shared';
 /**
  * 处理 LOAD_SAVE 动作。
  *
- * v4 变更：存档已经 save-codec 严格解码验证，LOAD_SAVE 只负责替换状态。
+ * 存档已经 save-codec 严格解码验证，LOAD_SAVE 只负责替换状态。
  *
  * @param draft 当前游戏状态
  * @param save 已经过 save-codec 验证的存档

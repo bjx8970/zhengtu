@@ -5,9 +5,9 @@
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 状态变更后组件自动细粒度响应（Solid 字段级追踪）
- * 4. 每次 dispatch 实时写入 localStorage
+ * 4. 仅在实际状态变化时写入 localStorage
  *
- * v4 基础工程变更：
+ * 基础工程变更：
  * - 领域逻辑拆分到 reducers/ 子模块
  * - 时间推进使用统一时间轴（行动完成 → 月度结算 → 年度考核）
  * - 理念偏离倍率绑定到行动实例（SlotOccupant.runtimeSnapshot）
@@ -168,7 +168,7 @@ const [state, setState] = createStore<GameState>(createInitialState());
 /**
  * 纯状态 reducer：接收 draft 和 action，直接修改 draft。
  *
- * v4: 委托给各领域 reducer 模块处理。
+ * 委托给各领域 reducer 模块处理。
  * 返回是否发生了实际状态变化。
  */
 function reduceGameState(draft: PlayerSave, action: GameAction): boolean {

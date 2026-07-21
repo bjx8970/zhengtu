@@ -58,7 +58,7 @@ function processActionCompletion(
   const aCfg = deptCfg?.actions.find((a) => a.id === occupant.actionId);
   const deptName = deptCfg?.name ?? occupant.deptId;
 
-  // v4: 从行动实例的 runtimeSnapshot 获取偏离倍率
+  // 从行动实例的 runtimeSnapshot 获取偏离倍率
   const devMult = occupant.runtimeSnapshot?.effectivenessMultiplier ?? 1;
   const styleConflictTriggered = occupant.runtimeSnapshot?.styleConflictTriggered ?? false;
 
@@ -104,7 +104,7 @@ function processActionCompletion(
       }
     }
 
-    // v4: 处理风格冲突（从行动实例读取，不再使用玩家级标记）
+    // 处理风格冲突（从行动实例读取，不再使用玩家级标记）
     if (styleConflictTriggered) {
       draft.vigor = clampAttr('vigor', (draft.vigor ?? 100) - 5, cfg.attributeBounds);
       draft.ambition = clampAttr('ambition', (draft.ambition ?? 100) - 5, cfg.attributeBounds);
@@ -227,7 +227,7 @@ function processAnnualAssessment(draft: PlayerSave, year: number): void {
 /**
  * 处理 ADVANCE_TIME 动作。
  *
- * v4 核心变更：使用统一时间轴，确保行动完成在月度/年度结算之前处理。
+ * 核心变更：使用统一时间轴，确保行动完成在月度/年度结算之前处理。
  *
  * @param draft 当前游戏状态（mutable）
  * @param payload 动作参数
@@ -237,7 +237,7 @@ export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload
   const days = getGranularityDays(payload.granularity, cfg);
   const rng = payload._rng ?? Math.random;
 
-  // v4: 统一时间推进，一次返回最终时间 + 排序事件
+  // 统一时间推进，一次返回最终时间 + 排序事件
   const result = advanceTimeline(
     draft.time,
     days,
