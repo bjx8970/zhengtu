@@ -6,7 +6,7 @@
 
 import { Show } from 'solid-js';
 import { navigate } from '../../router';
-import { startupSaveResult } from '../../main';
+import { getStartupSaveResult } from '../../services/startup-save-state';
 import { useGameStore } from '../../store/game-store';
 import { formatDate } from '../../utils/format';
 import { font } from '../../utils/theme';
@@ -18,9 +18,12 @@ import { font } from '../../utils/theme';
  */
 export function SplashPage() {
   const { state } = useGameStore();
-  const hasSave = startupSaveResult.status === 'loaded';
-  const isIncompatible =
-    startupSaveResult.status === 'incompatible' || startupSaveResult.status === 'corrupted';
+  const saveResult = getStartupSaveResult();
+  const hasSave = saveResult.status === 'loaded';
+  const hasError =
+    saveResult.status === 'legacy' ||
+    saveResult.status === 'future' ||
+    saveResult.status === 'corrupted';
 
   return (
     <main class="document-page" style={{ display: 'grid', 'place-items': 'center' }}>
@@ -77,7 +80,7 @@ export function SplashPage() {
               when={hasSave}
               fallback={
                 <>
-                  <Show when={isIncompatible}>
+                  <Show when={hasError}>
                     <div
                       style={{
                         padding: '0.9rem 1rem',
@@ -89,8 +92,20 @@ export function SplashPage() {
                         'line-height': '1.6',
                       }}
                     >
-                      检测到旧版本存档。本次大型改版不支持继续使用该存档，请重新开始。
-                      原始存档已保留为只读备份。
+                      <Show
+                        when={saveResult.status === 'future'}
+                        fallback={
+                          <Show
+                            when={saveResult.status === 'legacy'}
+                            fallback={'存档数据损坏，无法加载。原始数据已保留为备份。'}
+                          >
+                            检测到旧版本存档。本次大型改版不支持继续使用该存档，请重新开始。
+                            原始存档已保留为只读备份。
+                          </Show>
+                        }
+                      >
+                        检测到更新版本的存档。请更新客户端后再试。原始存档已保留，不会被覆盖。
+                      </Show>
                     </div>
                   </Show>
                   <button

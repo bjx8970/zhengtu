@@ -172,7 +172,7 @@ describe('v4 基础工程集成测试', () => {
   });
 
   describe('行动运行时快照', () => {
-    it('START_ACTION 时计算并绑定 runtimeSnapshot', () => {
+    it('START_ACTION 时无 styleAlignment 的行动不创建 runtimeSnapshot', () => {
       const deptId = 'admin_l3_0_dept_0';
       const store = createTestStore({
         currentPositionId: 'admin_l3_0',
@@ -191,34 +191,24 @@ describe('v4 基础工程集成测试', () => {
             actionCooldownUntilDays: {},
           },
         },
-        // 设置理念分数，使 approve_project (innovation) 产生偏离
         philosophy: {
-          scores: {
-            innovation: 20,
-            pragmatic: 80, // 主导风格
-            principled: 50,
-          },
+          scores: { innovation: 20, pragmatic: 80, principled: 50 },
         },
       });
 
       store.dispatch({
         type: 'START_ACTION',
         deptId,
-        actionId: 'approve_project', // styleAlignment: innovation
+        actionId: 'approve_project', // 无 styleAlignment
         tierKey: 'primary',
       });
 
       const state = store.getRawState();
       const occupant = state.slots.primary.occupants[0];
       expect(occupant).not.toBeNull();
-      // runtimeSnapshot 只在行动有 styleAlignment 时创建
-      // 如果有 runtimeSnapshot，验证其结构
-      if (occupant?.runtimeSnapshot) {
-        expect(typeof occupant.runtimeSnapshot.effectivenessMultiplier).toBe('number');
-        expect(typeof occupant.runtimeSnapshot.styleConflictTriggered).toBe('boolean');
-      }
-      // 无论是否有 styleAlignment，行动都应该成功启动
       expect(occupant?.actionId).toBe('approve_project');
+      // 无 styleAlignment 的行动不创建 runtimeSnapshot
+      expect(occupant?.runtimeSnapshot).toBeUndefined();
     });
 
     it('并发行动各自拥有独立的 runtimeSnapshot', () => {
@@ -361,7 +351,7 @@ describe('v4 基础工程集成测试', () => {
   });
 
   describe('审查补强测试', () => {
-    it('年末考核有/无行动对照：行动影响当年分数', () => {
+    it('年末考核有/无行动对照：同日完成行动影响当年分数', () => {
       const deptId = 'admin_l3_0_dept_0';
       const baseOverrides = {
         currentPositionId: 'admin_l3_0',
@@ -387,22 +377,24 @@ describe('v4 基础工程集成测试', () => {
       for (let i = 0; i < 12; i++) {
         noActionStore.dispatch({ type: 'ADVANCE_TIME', granularity: 'month', _rng: () => 0.5 });
       }
-      const noActionScore = noActionStore.getRawState().comprehensiveScore;
+      const noActionAssessment = noActionStore.getRawState().annualAssessments[0];
 
-      // 有行动组：年初启动一个行动，年末前完成
+      // 有行动组：行动在第 360 天完成（与年度考核同日）
       const withActionStore = createTestStore({
         ...baseOverrides,
         slots: makeSlotsWithActions([
-          { actionId: 'approve_project', deptId, startedAtDay: 0, durationDays: 3 },
+          { actionId: 'approve_project', deptId, startedAtDay: 357, durationDays: 3 },
         ]),
       });
       for (let i = 0; i < 12; i++) {
         withActionStore.dispatch({ type: 'ADVANCE_TIME', granularity: 'month', _rng: () => 0.5 });
       }
-      const withActionScore = withActionStore.getRawState().comprehensiveScore;
+      const withActionAssessment = withActionStore.getRawState().annualAssessments[0];
 
-      // 有行动的考核分数应高于无行动
-      expect(withActionScore).toBeGreaterThan(noActionScore);
+      // 同日完成的行动应影响当年考核分数
+      expect(withActionAssessment).toBeDefined();
+      expect(noActionAssessment).toBeDefined();
+      expect(withActionAssessment!.score).toBeGreaterThan(noActionAssessment!.score);
     });
 
     it('两个不同倍率行动并发：分别按各自倍率结算', () => {
@@ -424,7 +416,7 @@ describe('v4 基础工程集成测试', () => {
             actionCooldownUntilDays: {},
           },
         },
-        // A: 3天完成，倍率 0.5；B: 10天完成，倍率 1.0
+        // A: 3天完成，倍率 0.5；B: 8天完成，倍率 1.0
         slots: makeSlotsWithActions([
           {
             actionId: 'approve_project',
@@ -434,18 +426,16 @@ describe('v4 基础工程集成测试', () => {
             runtimeSnapshot: {
               effectivenessMultiplier: 0.5,
               styleConflictTriggered: false,
-              styleAlignment: 'innovation',
             },
           },
           {
             actionId: 'urban_planning',
             deptId,
             startedAtDay: 0,
-            durationDays: 10,
+            durationDays: 8,
             runtimeSnapshot: {
               effectivenessMultiplier: 1.0,
               styleConflictTriggered: false,
-              styleAlignment: 'pragmatic',
             },
           },
         ]),
@@ -476,6 +466,12 @@ describe('v4 基础工程集成测试', () => {
       expect(state.slots.primary.occupants[1]).toBeNull();
       // 两条完成通知
       expect(state.lastCompletedActions.length).toBe(2);
+      // 验证 KPI 效果：A 倍率 0.5，B 倍率 1.0
+      // approve_project: project_completion +10 * 0.5 = 5
+      // urban_planning: planning_score +5 * 1.0 = 5
+      const kpi = state.departmentStates[deptId]?.kpiValues ?? {};
+      expect(kpi['project_completion']).toBe(5); // 10 * 0.5
+      expect(kpi['planning_score']).toBe(5); // 5 * 1.0
     });
 
     it('拒绝未来 schemaVersion 存档', () => {

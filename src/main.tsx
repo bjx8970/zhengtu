@@ -13,17 +13,16 @@
 import { render } from 'solid-js/web';
 import { App } from './app';
 import { dispatch } from './store/game-store';
-import { readLocalSave, type LocalSaveLoadResult } from './services/save-repo';
-
-/** 启动时一次性读取的存档加载结果（避免组件渲染时重复读取） */
-export let startupSaveResult: LocalSaveLoadResult = { status: 'empty' };
+import { readLocalSave } from './services/save-repo';
+import { setStartupSaveResult } from './services/startup-save-state';
 
 const root = document.getElementById('root');
 if (root) {
-  // 启动时读取一次，结果传给应用状态
-  startupSaveResult = readLocalSave();
-  if (startupSaveResult.status === 'loaded') {
-    dispatch({ type: 'LOAD_SAVE', save: startupSaveResult.state });
+  // 启动时读取一次，结果存入独立服务
+  const saveResult = readLocalSave();
+  setStartupSaveResult(saveResult);
+  if (saveResult.status === 'loaded') {
+    dispatch({ type: 'LOAD_SAVE', save: saveResult.state });
   }
 
   root.innerHTML = '';

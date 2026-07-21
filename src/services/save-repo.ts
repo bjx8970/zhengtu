@@ -9,18 +9,13 @@
 
 import type { PlayerSave } from '../types/player';
 import type { SaveEnvelope, SaveDecodeResult } from '../types/save';
+import type { LocalSaveLoadResult } from './startup-save-state';
 import { getSupabase } from './supabase';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../store/save-codec';
 
 const TABLE_NAME = 'game_saves';
 const SLOT_NAME = 'main';
 const LOCAL_KEY = 'zhengtu_autosave';
-
-/** 本地存档加载结果 */
-export type LocalSaveLoadResult =
-  | { status: 'loaded'; state: PlayerSave }
-  | { status: 'empty' }
-  | { status: 'incompatible' | 'corrupted'; detail: string; backupKey?: string };
 
 /**
  * 从 localStorage 读取本地存档。
@@ -41,13 +36,17 @@ export function readLocalSave(): LocalSaveLoadResult {
       return { status: 'loaded', state: result.state };
     }
 
-    // 不兼容或损坏
-    const status = result.error === 'legacy_save_unsupported' ? 'incompatible' : 'corrupted';
-    return {
-      status,
-      detail: result.detail ?? '存档无法加载',
-      backupKey: result.backupKey,
-    };
+    // 按错误类别分别返回
+    const detail = result.detail ?? '存档无法加载';
+    const backupKey = result.backupKey;
+    switch (result.error) {
+      case 'legacy_save_unsupported':
+        return { status: 'legacy', detail, backupKey };
+      case 'future_version':
+        return { status: 'future', detail, backupKey };
+      default:
+        return { status: 'corrupted', detail, backupKey };
+    }
   } catch (err) {
     return { status: 'corrupted', detail: `读取存档失败: ${err}` };
   }
