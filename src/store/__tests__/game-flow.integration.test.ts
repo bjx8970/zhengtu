@@ -236,7 +236,9 @@ describe('核心流程集成测试', () => {
       // 验证 localStorage 有存档
       const saved = localStorage.getItem(SAVE_KEY);
       expect(saved).not.toBeNull();
-      const savedData = JSON.parse(saved ?? '{}') as PlayerSave;
+      // v4: 存档使用 SaveEnvelope 封装
+      const savedEnvelope = JSON.parse(saved ?? '{}') as { state: PlayerSave };
+      const savedData = savedEnvelope.state;
       expect(savedData.characterName).toBe('存档测试');
       expect(savedData.time.year).toBe(2013);
       expect(savedData.time.month).toBe(6);

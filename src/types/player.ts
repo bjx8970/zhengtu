@@ -18,7 +18,7 @@ import type {
   SecretaryLevel,
   TimeGranularity,
 } from './enums';
-import type { FiveDimensionScore } from './game';
+import type { FiveDimensionScore, ActionRuntimeSnapshot } from './game';
 import type { ActionCategory } from './config';
 
 /** 槽位等级 key */
@@ -35,6 +35,13 @@ export interface SlotOccupant {
   durationDays: number;
   /** 启动时的冷却天数快照 */
   cooldownDays: number;
+  /**
+   * 行动启动时的理念偏离快照（v4 基础工程）
+   *
+   * 每个行动实例独立保存自己的偏离倍率和冲突状态，
+   * 不再依赖玩家级临时字段。
+   */
+  runtimeSnapshot?: ActionRuntimeSnapshot;
 }
 
 /** 单个槽位等级组 */
@@ -278,12 +285,6 @@ export interface PlayerSave {
   // ===== 终局状态 =====
   /** 终局状态（L11 达成后激活） */
   endgameReached: boolean;
-
-  /** Phase C: 待处理的风格冲突标记（START_ACTION 设置，ADVANCE_TIME 消费后清除） */
-  pendingStyleConflict?: boolean;
-
-  /** Phase C: START_ACTION 阶段的偏离乘数，ADVANCE_TIME 中应用并清除 */
-  _pendingDeviationMultiplier?: number;
 
   // ===== 元数据 =====
   /** Unix 时间戳，用于本地/远程存档仲裁 */

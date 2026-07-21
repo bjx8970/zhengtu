@@ -15,6 +15,7 @@ import { createSignal, createMemo, Show, For } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { getConfigLoader } from '../../config/loader';
 import { navigate } from '../../router';
+import { consumeForceNewGame } from '../../services/startup-save-state';
 import { CareerLine } from '../../types/enums';
 import type { CharacterData } from '../../types/character';
 import { generateGaokaoScore } from '../../utils/gaokao';
@@ -45,7 +46,7 @@ const INITIAL_DATA: CharacterData = {
 export function CharacterCreation() {
   const { state, dispatch } = useGameStore();
 
-  if (state.characterName) {
+  if (state.characterName && !consumeForceNewGame()) {
     navigate('/main');
     return null;
   }

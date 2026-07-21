@@ -9,6 +9,7 @@ export * from './core/time';
 export * from './core/action';
 export * from './core/effect';
 export * from './core/event';
+export * from './core/timeline';
 export * from './governance/kpi';
 export * from './governance/budget';
 export * from './governance/assessment';

@@ -1,53 +1,82 @@
 /**
  * 存档仓库
  *
- * 当前运行时仅使用 localStorage 实时保存和恢复。
- * Supabase 读写及本地/远程仲裁函数保留给后续云存档阶段，当前 UI 与 store 不调用。
+ * 本版本不兼容任何旧存档，不提供自动迁移。
+ * 仅支持当前 schemaVersion 的完整 SaveEnvelope。
+ *
+ * Supabase 读写及本地/远程仲裁函数保留给后续云存档阶段。
  */
 
 import type { PlayerSave } from '../types/player';
+import type { SaveEnvelope, SaveDecodeResult } from '../types/save';
+import type { LocalSaveLoadResult } from './startup-save-state';
 import { getSupabase } from './supabase';
+import { decodeCurrentSave, wrapSaveEnvelope } from '../store/save-codec';
 
 const TABLE_NAME = 'game_saves';
 const SLOT_NAME = 'main';
 const LOCAL_KEY = 'zhengtu_autosave';
 
 /**
- * 校验 JSON 解析结果是否为合法的 PlayerSave 对象。
+ * 从 localStorage 读取本地存档。
+ *
+ * 使用严格解码器，只接受当前版本的完整 SaveEnvelope。
+ * 返回结构化结果，便于 UI 显示不兼容提示。
+ *
+ * @returns 结构化加载结果
  */
-function isValidPlayerSave(data: unknown): data is PlayerSave {
-  if (!data || typeof data !== 'object') return false;
-  const obj = data as Record<string, unknown>;
-  const slots = obj.slots as Record<string, unknown> | undefined;
-  const time = obj.time as Record<string, unknown> | undefined;
-  return (
-    typeof obj.currentPositionId === 'string' &&
-    typeof obj.currentLevel === 'number' &&
-    typeof obj.characterName === 'string' &&
-    typeof slots?.primary === 'object' &&
-    typeof slots?.secondary === 'object' &&
-    typeof slots?.reserve === 'object' &&
-    Array.isArray((slots.primary as Record<string, unknown>)?.occupants) &&
-    typeof time?.year === 'number'
-  );
-}
-
-/** 从 localStorage 读取本地存档 */
-export function readLocalSave(): PlayerSave | null {
+export function readLocalSave(): LocalSaveLoadResult {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return isValidPlayerSave(parsed) ? parsed : null;
-  } catch {
-    return null;
+    if (!raw) return { status: 'empty' };
+
+    const result: SaveDecodeResult = decodeCurrentSave(raw);
+
+    if (result.success && result.state) {
+      return { status: 'loaded', state: result.state };
+    }
+
+    // 按错误类别分别返回
+    const detail = result.detail ?? '存档无法加载';
+    const backupKey = result.backupKey;
+    switch (result.error) {
+      case 'legacy_save_unsupported':
+        return { status: 'legacy', detail, backupKey };
+      case 'future_version':
+        return { status: 'future', detail, backupKey };
+      default:
+        return { status: 'corrupted', detail, backupKey };
+    }
+  } catch (err) {
+    return { status: 'corrupted', detail: `读取存档失败: ${err}` };
   }
 }
 
-/** 写入 localStorage（失败时静默忽略） */
+/**
+ * 写入 localStorage。
+ *
+ * v4 变更：使用 SaveEnvelope 封装，包含 schemaVersion。
+ *
+ * @param save 游戏状态
+ */
 export function writeLocalSave(save: PlayerSave): void {
   try {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(save));
+    // 读取现有 revision（只接受非负有限整数）
+    let revision = 0;
+    const existing = localStorage.getItem(LOCAL_KEY);
+    if (existing) {
+      try {
+        const parsed = JSON.parse(existing) as Partial<SaveEnvelope>;
+        const candidate = parsed.revision;
+        revision =
+          Number.isInteger(candidate) && (candidate as number) >= 0 ? (candidate as number) : 0;
+      } catch {
+        // 忽略解析错误
+      }
+    }
+
+    const envelope = wrapSaveEnvelope(save, revision);
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(envelope));
   } catch {
     console.warn('Failed to write local save');
   }
@@ -69,7 +98,13 @@ export async function fetchRemoteSave(userId: string): Promise<PlayerSave | null
 
   if (error || !data) return null;
 
-  return isValidPlayerSave(data.save_data) ? (data.save_data as PlayerSave) : null;
+  // 使用相同的严格解码器
+  const result = decodeCurrentSave(JSON.stringify(data.save_data));
+  if (result.success && result.state) {
+    return result.state;
+  }
+
+  return null;
 }
 
 /**
@@ -83,13 +118,16 @@ export async function upsertSave(save: PlayerSave): Promise<boolean> {
     return true;
   }
 
+  // 使用 SaveEnvelope 封装
+  const envelope = wrapSaveEnvelope(save);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
   const { error } = await sb.from(TABLE_NAME).upsert(
     {
       user_id: save.userId,
       slot_name: SLOT_NAME,
-      save_data: save,
+      save_data: envelope,
       current_level: save.currentLevel,
       current_career_line: save.currentCareerLine,
       current_position_id: save.currentPositionId,

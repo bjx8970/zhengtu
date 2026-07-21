@@ -190,35 +190,18 @@ describe('dispatch - ADVANCE_TIME (integration)', () => {
     });
   }
 
-  describe('旧存档迁移', () => {
-    it('载入时按当前配置补齐行动分类、冷却天数和部门冷却表', () => {
+  describe('旧存档不兼容', () => {
+    it('裸旧版存档通过 LOAD_SAVE 加载时保持原样（不迁移）', () => {
       const legacySave = structuredClone(mkStore().getRawState());
       const occupant = occ(actionId, deptId, '审批项目', 0, 3);
-      const legacyOccupant = occupant as unknown as Record<string, unknown>;
-      delete legacyOccupant['category'];
-      delete legacyOccupant['cooldownDays'];
       legacySave.slots.primary.occupants[0] = occupant;
 
-      const legacyDepartment = legacySave.departmentStates[deptId] as unknown as Record<
-        string,
-        unknown
-      >;
-      delete legacyDepartment['actionCooldownUntilDays'];
-
+      // LOAD_SAVE 直接赋值，不做迁移
       const store = createTestStore();
       store.dispatch({ type: 'LOAD_SAVE', save: legacySave });
 
-      const migrated = store.getRawState();
-      expect(migrated.slots.primary.occupants[0]).toMatchObject({
-        category: 'minor',
-        cooldownDays: 7,
-      });
-      expect(migrated.departmentStates[deptId]?.actionCooldownUntilDays).toEqual({});
-
-      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'week' });
-      expect(store.getRawState().departmentStates[deptId]?.actionCooldownUntilDays[actionId]).toBe(
-        10,
-      );
+      const loaded = store.getRawState();
+      expect(loaded.slots.primary.occupants[0]?.actionId).toBe(actionId);
     });
   });
 
@@ -470,7 +453,8 @@ describe('dispatch - persistence (localStorage)', () => {
     const saved = localStorage.getItem(SAVE_KEY);
     expect(saved).not.toBeNull();
     const content = JSON.parse(saved!);
-    expect(content.characterName).toBe('测试');
+    // v4: 存档使用 SaveEnvelope 封装
+    expect(content.state.characterName).toBe('测试');
   });
 
   it('NEW_GAME 后写入 localStorage', () => {
@@ -496,7 +480,8 @@ describe('dispatch - persistence (localStorage)', () => {
     const saved = localStorage.getItem(SAVE_KEY);
     expect(saved).not.toBeNull();
     const content = JSON.parse(saved!);
-    expect(content.characterName).toBe('新角色');
+    // v4: 存档使用 SaveEnvelope 封装
+    expect(content.state.characterName).toBe('新角色');
   });
 
   it('createTestStore 的 dispatch 不写 localStorage（测试隔离）', () => {
@@ -511,6 +496,74 @@ describe('dispatch - persistence (localStorage)', () => {
 
     store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
     expect(localStorage.getItem(SAVE_KEY)).toBeNull();
+  });
+
+  it('LOAD_SAVE 不触发持久化（避免启动时覆盖原存档）', () => {
+    localStorage.clear();
+    dispatch({
+      type: 'LOAD_SAVE',
+      save: createInitialState({
+        characterName: '加载测试',
+        currentPositionId: 'admin_l3_0',
+        currentLevel: 3,
+        currentCareerLine: CareerLine.Administrative,
+      }),
+    });
+
+    // LOAD_SAVE 不应写入 localStorage
+    expect(localStorage.getItem(SAVE_KEY)).toBeNull();
+  });
+
+  it('无效动作不触发持久化', () => {
+    localStorage.clear();
+    dispatch({
+      type: 'LOAD_SAVE',
+      save: createInitialState({
+        characterName: '测试',
+        currentPositionId: 'admin_l3_0',
+        currentLevel: 3,
+        currentCareerLine: CareerLine.Administrative,
+        remainingBudget: 0, // 预算不足
+      }),
+    });
+
+    // 预算不足时 START_ACTION 被拒绝，不应写入
+    dispatch({
+      type: 'START_ACTION',
+      deptId: 'admin_l3_0_dept_0',
+      actionId: 'approve_project',
+      tierKey: 'primary',
+    });
+    expect(localStorage.getItem(SAVE_KEY)).toBeNull();
+  });
+
+  it('START_ACTION 成功后更新 updatedAt', () => {
+    const store = createTestStore({
+      currentPositionId: 'admin_l3_0',
+      currentLevel: 3,
+      currentCareerLine: CareerLine.Administrative,
+      remainingBudget: 10000,
+      time: { year: 2024, month: 6, day: 15, granularity: 'day' },
+      departmentStates: {
+        admin_l3_0_dept_0: {
+          id: 'admin_l3_0_dept_0',
+          kpiValues: {},
+          monthlyConsumption: 0,
+          cumulativeConsumption: 0,
+          lastActionDay: 0,
+          actionCooldownUntilDays: {},
+        },
+      },
+      updatedAt: 1000,
+    });
+
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: 'admin_l3_0_dept_0',
+      actionId: 'approve_project',
+      tierKey: 'primary',
+    });
+    expect(store.getRawState().updatedAt).toBeGreaterThan(1000);
   });
 
   it('NEW_GAME 初始化当前职位的所有部门', () => {
