@@ -281,6 +281,4 @@ export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload
   if (notifications.length > 0) {
     draft.lastCompletedActions = [...notifications, ...draft.lastCompletedActions].slice(0, 5);
   }
-
-  draft.updatedAt = Date.now();
 }

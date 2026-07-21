@@ -498,6 +498,74 @@ describe('dispatch - persistence (localStorage)', () => {
     expect(localStorage.getItem(SAVE_KEY)).toBeNull();
   });
 
+  it('LOAD_SAVE 不触发持久化（避免启动时覆盖原存档）', () => {
+    localStorage.clear();
+    dispatch({
+      type: 'LOAD_SAVE',
+      save: createInitialState({
+        characterName: '加载测试',
+        currentPositionId: 'admin_l3_0',
+        currentLevel: 3,
+        currentCareerLine: CareerLine.Administrative,
+      }),
+    });
+
+    // LOAD_SAVE 不应写入 localStorage
+    expect(localStorage.getItem(SAVE_KEY)).toBeNull();
+  });
+
+  it('无效动作不触发持久化', () => {
+    localStorage.clear();
+    dispatch({
+      type: 'LOAD_SAVE',
+      save: createInitialState({
+        characterName: '测试',
+        currentPositionId: 'admin_l3_0',
+        currentLevel: 3,
+        currentCareerLine: CareerLine.Administrative,
+        remainingBudget: 0, // 预算不足
+      }),
+    });
+
+    // 预算不足时 START_ACTION 被拒绝，不应写入
+    dispatch({
+      type: 'START_ACTION',
+      deptId: 'admin_l3_0_dept_0',
+      actionId: 'approve_project',
+      tierKey: 'primary',
+    });
+    expect(localStorage.getItem(SAVE_KEY)).toBeNull();
+  });
+
+  it('START_ACTION 成功后更新 updatedAt', () => {
+    const store = createTestStore({
+      currentPositionId: 'admin_l3_0',
+      currentLevel: 3,
+      currentCareerLine: CareerLine.Administrative,
+      remainingBudget: 10000,
+      time: { year: 2024, month: 6, day: 15, granularity: 'day' },
+      departmentStates: {
+        admin_l3_0_dept_0: {
+          id: 'admin_l3_0_dept_0',
+          kpiValues: {},
+          monthlyConsumption: 0,
+          cumulativeConsumption: 0,
+          lastActionDay: 0,
+          actionCooldownUntilDays: {},
+        },
+      },
+      updatedAt: 1000,
+    });
+
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: 'admin_l3_0_dept_0',
+      actionId: 'approve_project',
+      tierKey: 'primary',
+    });
+    expect(store.getRawState().updatedAt).toBeGreaterThan(1000);
+  });
+
   it('NEW_GAME 初始化当前职位的所有部门', () => {
     const store = createTestStore();
     store.dispatch({

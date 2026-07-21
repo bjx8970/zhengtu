@@ -169,55 +169,61 @@ const [state, setState] = createStore<GameState>(createInitialState());
  * 纯状态 reducer：接收 draft 和 action，直接修改 draft。
  *
  * v4: 委托给各领域 reducer 模块处理。
+ * 返回是否发生了实际状态变化。
  */
-function reduceGameState(draft: PlayerSave, action: GameAction): void {
+function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
   switch (action.type) {
     case 'START_ACTION': {
-      if (!canAct(draft.promotionStage)) break;
+      if (!canAct(draft.promotionStage)) return false;
+      const before = draft.totalActions;
       reduceStartAction(draft, {
         deptId: action.deptId,
         actionId: action.actionId,
         tierKey: action.tierKey,
       });
-      break;
+      return draft.totalActions !== before;
     }
     case 'ADVANCE_TIME': {
-      if (!canAct(draft.promotionStage)) break;
+      if (!canAct(draft.promotionStage)) return false;
       reduceAdvanceTime(draft, {
         granularity: action.granularity,
         _rng: action._rng,
       });
-      break;
+      return true;
     }
     case 'LOAD_SAVE': {
       reduceLoadSave(draft, action.save);
-      break;
+      return false; // LOAD_SAVE 不触发持久化
     }
     case 'NEW_GAME': {
       reduceNewGame(draft, { data: action.data }, () => createInitialState());
-      break;
+      return true;
     }
     case 'RESET_PROMOTION': {
+      const beforeStage = draft.promotionStage;
       reduceResetPromotion(draft);
-      break;
+      return draft.promotionStage !== beforeStage;
     }
     case 'START_PROMOTION': {
+      const beforeStage = draft.promotionStage;
       reduceStartPromotion(draft);
-      break;
+      return draft.promotionStage !== beforeStage;
     }
     case 'SELECT_PROMOTION_TARGET': {
+      const beforeStage = draft.promotionStage;
       reduceSelectPromotionTarget(draft, action.positionId);
-      break;
+      return draft.promotionStage !== beforeStage;
     }
     case 'PROMOTION_RESOLVE_STAGE': {
+      const beforeStage = draft.promotionStage;
       reducePromotionResolveStage(draft, {
         choices: action.choices,
         _rng: action._rng,
       });
-      break;
+      return draft.promotionStage !== beforeStage;
     }
     default:
-      break;
+      return false;
   }
 }
 
@@ -234,14 +240,24 @@ export function getRawState(): PlayerSave {
 /**
  * 派发动作修改游戏状态。
  *
- * 所有状态变更的唯一入口。引擎函数在此处被调用，
- * 结果通过 produce() 直接修改 draft，Solid 自动追踪变更并通知组件。
+ * 所有状态变更的唯一入口。仅在实际状态变化时更新 updatedAt 并持久化。
+ * LOAD_SAVE 不触发持久化（避免启动时覆盖原存档）。
  */
 export function dispatch(action: GameAction): void {
-  setState(produce((draft) => reduceGameState(draft, action)));
+  let changed = false;
+  setState(
+    produce((draft) => {
+      changed = reduceGameState(draft, action);
+      if (changed) {
+        draft.updatedAt = Date.now();
+      }
+    }),
+  );
 
-  // 每次操作实时写入本地
-  writeLocalSave(unwrap(state));
+  // 仅在实际状态变化时写入本地
+  if (changed) {
+    writeLocalSave(unwrap(state));
+  }
 }
 
 /**
@@ -255,7 +271,14 @@ export function createTestStore(initialOverrides?: Partial<PlayerSave>) {
     state: testState,
     getRawState: () => unwrap(testState),
     dispatch: (action: GameAction) =>
-      testSetState(produce((draft) => reduceGameState(draft, action))),
+      testSetState(
+        produce((draft) => {
+          const changed = reduceGameState(draft, action);
+          if (changed) {
+            draft.updatedAt = Date.now();
+          }
+        }),
+      ),
   };
 }
 

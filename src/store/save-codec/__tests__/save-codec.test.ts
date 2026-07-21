@@ -151,4 +151,24 @@ describe('存档严格解码器', () => {
       expect(envelope.contentVersion).toBe('4.0.0-alpha');
     });
   });
+
+  describe('严格模式拒绝未知字段', () => {
+    it('Envelope 顶层未知字段被拒绝', () => {
+      const state = createInitialState();
+      const envelope = { ...wrapSaveEnvelope(state), unknownField: 'hack' };
+
+      const result = decodeCurrentSave(JSON.stringify(envelope));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('invalid_envelope');
+    });
+
+    it('state 顶层未知字段被拒绝', () => {
+      const state = createInitialState();
+      const envelope = wrapSaveEnvelope({ ...state, hackedField: 123 } as typeof state);
+
+      const result = decodeCurrentSave(JSON.stringify(envelope));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('invalid_envelope');
+    });
+  });
 });
