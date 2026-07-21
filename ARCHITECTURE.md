@@ -32,10 +32,10 @@ src/
 ├── pages/
 │   ├── auth/splash.tsx          # 启动页（存档状态提示）
 │   ├── character/               # 六步建档
-│   ├── home/home-page.tsx       # 综合 Dashboard
-│   ├── departments/             # 部门行动页面
+│   ├── home/home-page.tsx       # 综合 Dashboard（日程概览 + 跳转入口）
+│   ├── departments/             # 部门治理（行动安排与槽位管理）
 │   ├── assessment/              # 考核详情页面
-│   └── career/                  # 职业履历页面
+│   └── career/                  # 晋升任命（完整晋升状态机）
 ├── styles/                      # 全局 CSS 与设计令牌
 ├── types/
 │   ├── player.ts                # PlayerSave、SlotOccupant 等

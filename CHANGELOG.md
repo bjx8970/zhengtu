@@ -8,7 +8,7 @@
 
 ## [0.1.0-alpha.1] - 2026-07-21
 
-首个纳入正式版本管理的构建。此版本之前的存档不受支持。
+首个纳入正式版本管理的构建。不支持无 SaveEnvelope 封装的裸 PlayerSave 存档；基础工程重构期间（PR #88）生成的完整 Schema 1 Envelope 继续兼容。
 
 ### Added
 
@@ -42,7 +42,7 @@
 ### Removed
 
 - 删除玩家级临时字段 `_pendingDeviationMultiplier` 和 `pendingStyleConflict`
-- 删除旧存档自动迁移代码（本版本明确不兼容旧存档）
+- 删除旧存档自动迁移代码（本版本不支持裸 PlayerSave 及非当前 Schema 的存档）
 
 ### Save compatibility
 
