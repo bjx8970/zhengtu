@@ -16,9 +16,32 @@ import { PolicyStatusSchema } from './governance/types';
 
 // ===== 条件表达式 =====
 
-/** 信号字段条件：检查触发信号的某个字段 */
+/** 信号载荷字段白名单（从 DomainSignalSnapshot 载荷派生） */
+export const SIGNAL_PAYLOAD_FIELDS = [
+  'actionInstanceId',
+  'actionId',
+  'deptId',
+  'regionId',
+  'institutionId',
+  'policyInstanceId',
+  'policyId',
+  'phaseId',
+  'metricId',
+  'value',
+  'experienceId',
+  'positionId',
+  'previousPositionId',
+  'year',
+  'score',
+  'tier',
+  'eventInstanceId',
+  'eventId',
+  'optionId',
+] as const;
+
+/** 信号字段条件：检查触发信号的某个字段（仅允许白名单字段） */
 export interface SignalFieldCondition {
-  signalField: string;
+  signalField: (typeof SIGNAL_PAYLOAD_FIELDS)[number];
   op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
   value: number | string | boolean;
 }
@@ -60,9 +83,10 @@ export type EventHistoryCondition =
   | { eventHistory: string; check: 'occurred' | 'not_occurred' }
   | { eventHistory: string; check: 'count_gte' | 'count_lte'; value: number };
 
-/** 政策状态条件（按 check 类型判别） */
+/** 政策状态条件（按 check 类型判别，status_is 复用 PolicyStatus） */
 export type PolicyStateCondition =
-  | { policyState: string; check: 'status_is' | 'phase_is'; value: string }
+  | { policyState: string; check: 'status_is'; value: import('./governance/types').PolicyStatus }
+  | { policyState: string; check: 'phase_is'; value: string }
   | { policyState: string; check: 'metric_gte' | 'metric_lte'; value: number };
 
 /** 履历条件（按 experience 类型判别） */
@@ -99,10 +123,10 @@ export type ConditionExpression =
 
 // ===== 条件表达式 Zod Schema（所有分支 .strict() 拒绝未知字段） =====
 
-/** 信号字段条件 Schema */
+/** 信号字段条件 Schema（仅允许白名单字段） */
 const SignalFieldConditionSchema = z
   .object({
-    signalField: z.string().min(1),
+    signalField: z.enum(SIGNAL_PAYLOAD_FIELDS),
     op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']),
     value: z.union([z.number(), z.string(), z.boolean()]),
   })
@@ -180,13 +204,20 @@ const EventHistoryConditionSchema = z.union([
     .strict(),
 ]);
 
-/** 政策状态条件 Schema（按 check 判别） */
+/** 政策状态条件 Schema（按 check 判别，status_is 复用 PolicyStatusSchema） */
 const PolicyStateConditionSchema = z.union([
   z
     .object({
       policyState: z.string().min(1),
-      check: z.enum(['status_is', 'phase_is']),
-      value: z.string(),
+      check: z.literal('status_is'),
+      value: PolicyStatusSchema,
+    })
+    .strict(),
+  z
+    .object({
+      policyState: z.string().min(1),
+      check: z.literal('phase_is'),
+      value: z.string().min(1),
     })
     .strict(),
   z
@@ -278,8 +309,8 @@ export type EffectTarget = (typeof EFFECT_TARGETS)[number];
 /** 效果目标 Zod Schema */
 export const EffectTargetSchema = z.enum(EFFECT_TARGETS);
 
-/** 效果操作类型 */
-export const EFFECT_OPERATIONS = ['add', 'multiply', 'set', 'append', 'remove'] as const;
+/** 效果操作类型（仅保留当前支持的操作） */
+export const EFFECT_OPERATIONS = ['add', 'multiply', 'set'] as const;
 
 /** 效果操作类型 */
 export type EffectOperation = (typeof EFFECT_OPERATIONS)[number];
@@ -330,7 +361,7 @@ export type EffectDefinition =
       value: number;
       subjectId: string;
     }
-  | { target: 'world.fact'; operation: 'set'; value: boolean | string | number; subjectId?: string }
+  | { target: 'world.fact'; operation: 'set'; value: boolean | string | number; subjectId: string }
   | { target: 'assessment.score'; operation: 'add'; value: number; subjectId?: string };
 
 /** 效果定义 Zod Schema（按目标类别判别，拒绝无效组合） */
@@ -353,13 +384,13 @@ export const EffectDefinitionSchema = z.union([
       subjectId: z.string().min(1),
     })
     .strict(),
-  // 世界事实目标：set + scalar
+  // 世界事实目标：set + scalar + subjectId 必填
   z
     .object({
       target: z.literal('world.fact'),
       operation: z.literal('set'),
       value: z.union([z.boolean(), z.string(), z.number()]),
-      subjectId: z.string().optional(),
+      subjectId: z.string().min(1),
     })
     .strict(),
   // 考核分数目标：add + number
