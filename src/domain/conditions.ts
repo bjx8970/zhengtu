@@ -16,8 +16,10 @@ import { PolicyStatusSchema } from './governance/types';
 
 // ===== 条件表达式 =====
 
-/** 信号载荷字段白名单（从 DomainSignalSnapshot 载荷派生） */
-export const SIGNAL_PAYLOAD_FIELDS = [
+/** 信号载荷字段分类（从 DomainSignalSnapshot 载荷派生，避免手工双份维护） */
+
+/** 字符串 ID 字段（仅允许 eq/neq + string） */
+export const SIGNAL_STRING_FIELDS = [
   'actionInstanceId',
   'actionId',
   'deptId',
@@ -27,24 +29,27 @@ export const SIGNAL_PAYLOAD_FIELDS = [
   'policyId',
   'phaseId',
   'metricId',
-  'value',
   'experienceId',
   'positionId',
-  'previousPositionId',
-  'year',
-  'score',
-  'tier',
   'eventInstanceId',
   'eventId',
-  'optionId',
 ] as const;
 
-/** 信号字段条件：检查触发信号的某个字段（仅允许白名单字段） */
-export interface SignalFieldCondition {
-  signalField: (typeof SIGNAL_PAYLOAD_FIELDS)[number];
-  op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
-  value: number | string | boolean;
-}
+/** 数值字段（允许数值比较 + number） */
+export const SIGNAL_NUMERIC_FIELDS = ['value', 'year', 'score'] as const;
+
+/** 可空字符串字段（允许 eq/neq + string） */
+export const SIGNAL_NULLABLE_FIELDS = ['previousPositionId', 'optionId', 'tier'] as const;
+
+/** 信号字段条件：按字段类别判别联合，约束操作符和值类型 */
+export type SignalFieldCondition =
+  | { signalField: (typeof SIGNAL_STRING_FIELDS)[number]; op: 'eq' | 'neq'; value: string }
+  | {
+      signalField: (typeof SIGNAL_NUMERIC_FIELDS)[number];
+      op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
+      value: number;
+    }
+  | { signalField: (typeof SIGNAL_NULLABLE_FIELDS)[number]; op: 'eq' | 'neq'; value: string };
 
 /** 职业条件：按检查类型判别联合，复用领域枚举约束值类型 */
 export type CareerCondition =
@@ -123,14 +128,33 @@ export type ConditionExpression =
 
 // ===== 条件表达式 Zod Schema（所有分支 .strict() 拒绝未知字段） =====
 
-/** 信号字段条件 Schema（仅允许白名单字段） */
-const SignalFieldConditionSchema = z
-  .object({
-    signalField: z.enum(SIGNAL_PAYLOAD_FIELDS),
-    op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']),
-    value: z.union([z.number(), z.string(), z.boolean()]),
-  })
-  .strict();
+/** 信号字段条件 Schema（按字段类别判别，约束操作符和值类型） */
+const SignalFieldConditionSchema = z.union([
+  // 字符串 ID 字段：仅 eq/neq + string
+  z
+    .object({
+      signalField: z.enum(SIGNAL_STRING_FIELDS),
+      op: z.enum(['eq', 'neq']),
+      value: z.string(),
+    })
+    .strict(),
+  // 数值字段：数值比较 + number
+  z
+    .object({
+      signalField: z.enum(SIGNAL_NUMERIC_FIELDS),
+      op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']),
+      value: z.number(),
+    })
+    .strict(),
+  // 可空字符串字段：eq/neq + string
+  z
+    .object({
+      signalField: z.enum(SIGNAL_NULLABLE_FIELDS),
+      op: z.enum(['eq', 'neq']),
+      value: z.string(),
+    })
+    .strict(),
+]);
 
 /** 职业条件 Schema（按检查类型判别联合，复用领域枚举） */
 const CareerConditionSchema = z.union([

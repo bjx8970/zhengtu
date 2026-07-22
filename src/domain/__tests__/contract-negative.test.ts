@@ -17,8 +17,38 @@ describe('ConditionExpression 负向测试', () => {
     expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it('接受合法 signalField', () => {
+  it('接受合法 signalField（字符串 ID + eq + string）', () => {
     const valid = { signalField: 'actionId', op: 'eq', value: 'test' };
+    expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('拒绝字符串 ID 字段使用数值比较', () => {
+    const invalid = { signalField: 'actionId', op: 'gte', value: 5 };
+    expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝字符串 ID 字段使用 number 值', () => {
+    const invalid = { signalField: 'actionId', op: 'eq', value: 42 };
+    expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('接受数值字段使用数值比较', () => {
+    const valid = { signalField: 'year', op: 'gte', value: 2020 };
+    expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('拒绝数值字段使用 string 值', () => {
+    const invalid = { signalField: 'year', op: 'eq', value: '2026' };
+    expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝可空字段使用数值比较', () => {
+    const invalid = { signalField: 'optionId', op: 'gt', value: true };
+    expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('接受可空字段使用 eq + string', () => {
+    const valid = { signalField: 'optionId', op: 'eq', value: 'opt_1' };
     expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
   });
 
