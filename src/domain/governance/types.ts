@@ -56,32 +56,44 @@ export type DomainSignal = (typeof DOMAIN_SIGNALS)[number];
 /** 领域信号 Zod Schema */
 export const DomainSignalSchema = z.enum(DOMAIN_SIGNALS);
 
-/** 领域信号快照（按信号类型判别联合，各类型有固定载荷） */
+/** 领域信号快照（按信号类型判别联合，各类型有固定载荷 + 实例身份） */
 export type DomainSignalSnapshot =
   | {
       signalType: 'action.completed';
       occurredAtDay: number;
-      data: { actionId: string; deptId: string; regionId: string; institutionId: string };
+      data: {
+        actionInstanceId: string;
+        actionId: string;
+        deptId: string;
+        regionId: string;
+        institutionId: string;
+      };
     }
   | {
       signalType: 'policy.approved';
       occurredAtDay: number;
-      data: { policyId: string; regionId: string };
+      data: { policyInstanceId: string; policyId: string; regionId: string };
     }
   | {
       signalType: 'policy.phase_changed';
       occurredAtDay: number;
-      data: { policyId: string; phaseId: string };
+      data: { policyInstanceId: string; policyId: string; phaseId: string };
     }
   | {
       signalType: 'policy.metric_changed';
       occurredAtDay: number;
-      data: { policyId: string; metricId: string; value: number };
+      data: { policyInstanceId: string; policyId: string; metricId: string; value: number };
     }
   | {
       signalType: 'appointment.changed';
       occurredAtDay: number;
-      data: { positionId: string; institutionId: string; regionId: string };
+      data: {
+        experienceId: string;
+        positionId: string;
+        institutionId: string;
+        regionId: string;
+        previousPositionId: string | null;
+      };
     }
   | {
       signalType: 'assessment.completed';
@@ -96,10 +108,10 @@ export type DomainSignalSnapshot =
   | {
       signalType: 'event.resolved';
       occurredAtDay: number;
-      data: { eventId: string; optionId: string };
+      data: { eventInstanceId: string; eventId: string; optionId: string | null };
     };
 
-/** 领域信号快照 Zod Schema（按 signalType 判别） */
+/** 领域信号快照 Zod Schema（按 signalType 判别，含实例身份） */
 export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
   z
     .object({
@@ -107,6 +119,7 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
       occurredAtDay: z.number(),
       data: z
         .object({
+          actionInstanceId: z.string(),
           actionId: z.string(),
           deptId: z.string(),
           regionId: z.string(),
@@ -119,21 +132,32 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
     .object({
       signalType: z.literal('policy.approved'),
       occurredAtDay: z.number(),
-      data: z.object({ policyId: z.string(), regionId: z.string() }).strict(),
+      data: z
+        .object({ policyInstanceId: z.string(), policyId: z.string(), regionId: z.string() })
+        .strict(),
     })
     .strict(),
   z
     .object({
       signalType: z.literal('policy.phase_changed'),
       occurredAtDay: z.number(),
-      data: z.object({ policyId: z.string(), phaseId: z.string() }).strict(),
+      data: z
+        .object({ policyInstanceId: z.string(), policyId: z.string(), phaseId: z.string() })
+        .strict(),
     })
     .strict(),
   z
     .object({
       signalType: z.literal('policy.metric_changed'),
       occurredAtDay: z.number(),
-      data: z.object({ policyId: z.string(), metricId: z.string(), value: z.number() }).strict(),
+      data: z
+        .object({
+          policyInstanceId: z.string(),
+          policyId: z.string(),
+          metricId: z.string(),
+          value: z.number(),
+        })
+        .strict(),
     })
     .strict(),
   z
@@ -141,7 +165,13 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
       signalType: z.literal('appointment.changed'),
       occurredAtDay: z.number(),
       data: z
-        .object({ positionId: z.string(), institutionId: z.string(), regionId: z.string() })
+        .object({
+          experienceId: z.string(),
+          positionId: z.string(),
+          institutionId: z.string(),
+          regionId: z.string(),
+          previousPositionId: z.string().nullable(),
+        })
         .strict(),
     })
     .strict(),
@@ -163,7 +193,13 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
     .object({
       signalType: z.literal('event.resolved'),
       occurredAtDay: z.number(),
-      data: z.object({ eventId: z.string(), optionId: z.string() }).strict(),
+      data: z
+        .object({
+          eventInstanceId: z.string(),
+          eventId: z.string(),
+          optionId: z.string().nullable(),
+        })
+        .strict(),
     })
     .strict(),
 ]);
