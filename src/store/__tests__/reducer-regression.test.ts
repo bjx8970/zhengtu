@@ -9,11 +9,34 @@
  * - 行动效果结算 add/multiply/set 语义与 devMult
  * - 冷却使用 SlotOccupant 快照
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createTestStore, createInitialState, dispatch } from '../game-store';
 import { wrapSaveEnvelope } from '../save-codec';
 import { getConfigLoader } from '../../config/loader';
 import type { PlayerSave, SlotOccupant } from '../../types/player';
+
+// 可控的 resolveActionEffects mock（用于测试结算语义）
+let mockEffects: {
+  kpiChanges: unknown[];
+  playerChanges: unknown[];
+  styleDeltas: Record<string, number>;
+} | null = null;
+
+vi.mock('../../engine/core/action', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../engine/core/action')>();
+  return {
+    ...original,
+    resolveActionEffects: (actionConfig: unknown, rng: unknown) => {
+      if (mockEffects) {
+        return mockEffects as ReturnType<typeof original.resolveActionEffects>;
+      }
+      return original.resolveActionEffects(
+        actionConfig as Parameters<typeof original.resolveActionEffects>[0],
+        rng as Parameters<typeof original.resolveActionEffects>[1],
+      );
+    },
+  };
+});
 
 describe('NEW_GAME 建档加成', () => {
   it('应用家庭背景与晋升通道的属性加成', () => {
@@ -49,22 +72,71 @@ describe('NEW_GAME 建档加成', () => {
       );
     }
 
+    // 验证普通角色属性加成分支（如 integrity/competence 等）
+    for (const key of [
+      'integrity',
+      'stability',
+      'competence',
+      'charisma',
+      'network',
+      'diligence',
+    ]) {
+      if (expectedBonuses[key]) {
+        const char = state.character as unknown as Record<string, number>;
+        const initChar = initial.character as unknown as Record<string, number>;
+        expect(char[key]).toBe((initChar[key] ?? 0) + expectedBonuses[key]);
+      }
+    }
+
+    // 验证理念分数加成分支（innovation/pragmatic/principled）
+    for (const key of ['innovation', 'pragmatic', 'principled']) {
+      if (expectedBonuses[key]) {
+        expect(state.character.philosophy.scores[key]).toBe(
+          (initial.character.philosophy.scores[key] ?? 50) + expectedBonuses[key],
+        );
+      }
+    }
+
     // 验证家庭背景和晋升通道被正确设置
     expect(state.character.familyBackground).toBe('cadre');
     expect(state.character.promotionPath).toBe('xuandiao');
   });
 
-  it('NEW_GAME 使用 initialPositionId 配置而非硬编码', () => {
-    const store = createTestStore();
-    const cfg = getConfigLoader().getGameConfig();
+  it('NEW_GAME 使用 initialPositionId 配置而非硬编码（spy 验证）', () => {
+    const loader = getConfigLoader();
+    const originalConfig = loader.getGameConfig();
 
-    store.dispatch({
-      type: 'NEW_GAME',
-      data: { characterName: '测试' },
+    // 将 initialPositionId 临时改为另一个合法职位
+    const altPositionId = 'admin_l2_0';
+    const altPosition = loader.getPositionById(altPositionId);
+    expect(altPosition).not.toBeNull();
+
+    const spy = vi.spyOn(loader, 'getGameConfig').mockReturnValue({
+      ...originalConfig,
+      initialPositionId: altPositionId,
     });
 
-    const state = store.getRawState();
-    expect(state.career.appointment.positionId).toBe(cfg.initialPositionId);
+    try {
+      const store = createTestStore();
+      store.dispatch({
+        type: 'NEW_GAME',
+        data: { characterName: '测试' },
+      });
+
+      const state = store.getRawState();
+      // 验证 appointment、budget、部门状态全部来自配置职位
+      expect(state.career.appointment.positionId).toBe(altPositionId);
+      expect(state.career.appointment.institutionId).toBe(altPosition!.institutionId);
+      expect(state.career.appointment.regionId).toBe(altPosition!.regionId);
+      expect(state.remainingBudget).toBe(altPosition!.annualBudget);
+      // 部门状态应来自该职位的部门
+      const expectedDepts = loader.resolvePositionDepartments(altPositionId);
+      for (const dept of expectedDepts) {
+        expect(state.actions.departmentStates[dept.id]).toBeDefined();
+      }
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
@@ -121,9 +193,9 @@ describe('行动效果结算语义', () => {
           count: 3,
           occupants: [
             {
-              actionId: occupant.actionId ?? 'approve_project',
+              actionId: occupant.actionId ?? 'document_processing',
               deptId: occupant.deptId ?? 'admin_l1_0_dept_0',
-              actionName: '审批项目',
+              actionName: '公文处理',
               category: 'major',
               startedAtDay: occupant.startedAtDay ?? 0,
               durationDays: occupant.durationDays ?? 3,
@@ -161,6 +233,11 @@ describe('行动效果结算语义', () => {
       }),
     });
 
+    const kpiBefore =
+      store.getRawState().actions.departmentStates['admin_l1_0_dept_0']?.kpiValues[
+        'office_efficiency'
+      ] ?? 0;
+
     store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
     store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
     store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
@@ -168,6 +245,131 @@ describe('行动效果结算语义', () => {
     const state = store.getRawState();
     // 行动完成后槽位应释放
     expect(state.actions.slots.primary.occupants[0]).toBeNull();
+    // KPI 应有变化（document_processing 影响 office_efficiency）
+    const kpiAfter =
+      state.actions.departmentStates['admin_l1_0_dept_0']?.kpiValues['office_efficiency'] ?? 0;
+    expect(kpiAfter).not.toBe(kpiBefore);
+    expect(kpiAfter).toBeGreaterThan(kpiBefore);
+  });
+
+  it('add 操作应用 devMult 倍率', () => {
+    mockEffects = {
+      kpiChanges: [{ indicatorId: 'project_completion', operation: 'add', delta: 10 }],
+      playerChanges: [],
+      styleDeltas: {},
+    };
+
+    try {
+      const store = createTestStore({
+        actions: makeSlotsWithAction({
+          startedAtDay: 0,
+          durationDays: 3,
+          runtimeSnapshot: { effectivenessMultiplier: 0.5, styleConflictTriggered: false },
+        }),
+      });
+
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+      const state = store.getRawState();
+      // add 应用 devMult: 10 + 10*0.5 = 15
+      expect(
+        state.actions.departmentStates['admin_l1_0_dept_0']?.kpiValues['project_completion'],
+      ).toBe(15);
+    } finally {
+      mockEffects = null;
+    }
+  });
+
+  it('multiply 操作不应用 devMult 倍率', () => {
+    mockEffects = {
+      kpiChanges: [{ indicatorId: 'project_completion', operation: 'multiply', delta: 2 }],
+      playerChanges: [],
+      styleDeltas: {},
+    };
+
+    try {
+      const store = createTestStore({
+        actions: makeSlotsWithAction({
+          startedAtDay: 0,
+          durationDays: 3,
+          runtimeSnapshot: { effectivenessMultiplier: 0.5, styleConflictTriggered: false },
+        }),
+      });
+
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+      const state = store.getRawState();
+      // multiply 不应用 devMult: 10 * 2 = 20（而非 10 * 2 * 0.5）
+      expect(
+        state.actions.departmentStates['admin_l1_0_dept_0']?.kpiValues['project_completion'],
+      ).toBe(20);
+    } finally {
+      mockEffects = null;
+    }
+  });
+
+  it('set 操作不应用 devMult 倍率', () => {
+    mockEffects = {
+      kpiChanges: [{ indicatorId: 'project_completion', operation: 'set', delta: 99 }],
+      playerChanges: [],
+      styleDeltas: {},
+    };
+
+    try {
+      const store = createTestStore({
+        actions: makeSlotsWithAction({
+          startedAtDay: 0,
+          durationDays: 3,
+          runtimeSnapshot: { effectivenessMultiplier: 0.5, styleConflictTriggered: false },
+        }),
+      });
+
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+      const state = store.getRawState();
+      // set 直接设置: 99（不应用 devMult）
+      expect(
+        state.actions.departmentStates['admin_l1_0_dept_0']?.kpiValues['project_completion'],
+      ).toBe(99);
+    } finally {
+      mockEffects = null;
+    }
+  });
+
+  it('角色属性效果应用 devMult 倍率', () => {
+    mockEffects = {
+      kpiChanges: [],
+      playerChanges: [{ attr: 'competence', operation: 'add', delta: 10 }],
+      styleDeltas: {},
+    };
+
+    try {
+      const initial = createInitialState();
+      const store = createTestStore({
+        character: { ...initial.character, competence: 50 },
+        actions: makeSlotsWithAction({
+          startedAtDay: 0,
+          durationDays: 3,
+          runtimeSnapshot: { effectivenessMultiplier: 0.5, styleConflictTriggered: false },
+        }),
+      });
+
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+      const state = store.getRawState();
+      // add 应用 devMult: 50 + 10*0.5 = 55
+      expect(state.character.competence).toBe(55);
+    } finally {
+      mockEffects = null;
+    }
   });
 
   it('冷却使用 SlotOccupant.cooldownDays 快照', () => {
