@@ -21,11 +21,7 @@ import {
   CAREER_OPPORTUNITY_TYPES,
   CAREER_OPPORTUNITY_STATUSES,
 } from '../../domain/career/types';
-import {
-  POLICY_STATUSES,
-  DOMAIN_SIGNALS,
-  DomainSignalSnapshotSchema,
-} from '../../domain/governance/types';
+import { POLICY_STATUSES, DomainSignalSnapshotSchema } from '../../domain/governance/types';
 import {
   EVENT_PRIORITIES,
   EVENT_PRESENTATIONS,
@@ -189,7 +185,7 @@ const GovernanceStateSchema = z
   })
   .strict();
 
-/** EventRuntimeState Schema（sourceSignal 使用领域枚举，triggerContext 使用 DomainSignalSnapshot） */
+/** EventRuntimeState Schema（triggerContext 为单一信号事实来源，事件链支持分支） */
 const EventRuntimeStateSchema = z
   .object({
     activeBlockingEventId: z.string().nullable(),
@@ -202,7 +198,6 @@ const EventRuntimeStateSchema = z
           priority: z.enum(EVENT_PRIORITIES),
           presentation: z.enum(EVENT_PRESENTATIONS),
           triggeredAtDay: z.number(),
-          sourceSignal: z.enum(DOMAIN_SIGNALS),
           triggerContext: DomainSignalSnapshotSchema,
           deadlineDay: z.number().nullable(),
           chainInstanceId: z.string().nullable(),
@@ -215,7 +210,6 @@ const EventRuntimeStateSchema = z
           instanceId: z.string(),
           eventId: z.string(),
           activateAtDay: z.number(),
-          sourceSignal: z.enum(DOMAIN_SIGNALS),
           triggerContext: DomainSignalSnapshotSchema,
           chainInstanceId: z.string().nullable(),
         })
@@ -239,10 +233,11 @@ const EventRuntimeStateSchema = z
           instanceId: z.string(),
           chainId: z.string(),
           status: z.enum(EVENT_CHAIN_STATUSES),
-          currentStepIndex: z.number(),
-          sourceContext: z.record(z.union([z.string(), z.number()])),
+          activeNodeIds: z.array(z.string()),
+          completedNodeIds: z.array(z.string()),
+          sourceEntityType: z.enum(['policy', 'project', 'region', 'story']),
+          sourceEntityId: z.string(),
           startedAtDay: z.number(),
-          completedStepIds: z.array(z.string()),
         })
         .strict(),
     ),

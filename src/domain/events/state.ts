@@ -14,7 +14,7 @@ import type {
   EventPriority,
   EventPresentation,
 } from './types';
-import type { DomainSignal, DomainSignalSnapshot } from '../governance/types';
+import type { DomainSignalSnapshot } from '../governance/types';
 
 /** 事件实例 */
 export interface EventInstance {
@@ -30,9 +30,7 @@ export interface EventInstance {
   presentation: EventPresentation;
   /** 触发的绝对游戏日 */
   triggeredAtDay: number;
-  /** 来源信号类型 */
-  sourceSignal: DomainSignal;
-  /** 触发时上下文快照（使用 DomainSignalSnapshot 而非开放 Record） */
+  /** 触发信号快照（单一事实来源，不再单独保存 sourceSignal） */
   triggerContext: DomainSignalSnapshot;
   /** 截止时间（null 表示无截止） */
   deadlineDay: number | null;
@@ -48,9 +46,7 @@ export interface ScheduledEventInstance {
   eventId: string;
   /** 计划激活的绝对游戏日 */
   activateAtDay: number;
-  /** 来源信号 */
-  sourceSignal: DomainSignal;
-  /** 触发时上下文快照 */
+  /** 触发信号快照 */
   triggerContext: DomainSignalSnapshot;
   /** 所属事件链实例 ID */
   chainInstanceId: string | null;
@@ -70,7 +66,7 @@ export interface EventHistoryRecord {
   outcome: string;
 }
 
-/** 事件链实例 */
+/** 事件链实例（支持分支） */
 export interface EventChainInstance {
   /** 唯一实例 ID */
   instanceId: string;
@@ -78,14 +74,16 @@ export interface EventChainInstance {
   chainId: string;
   /** 当前状态 */
   status: EventChainStatus;
-  /** 当前步骤索引 */
-  currentStepIndex: number;
-  /** 来源上下文（政策/项目/地区/剧情） */
-  sourceContext: Record<string, string | number>;
+  /** 当前活动节点 ID 列表（支持分支，多个活动节点） */
+  activeNodeIds: string[];
+  /** 已完成节点 ID 列表 */
+  completedNodeIds: string[];
+  /** 来源实体类型（政策/项目/地区/剧情） */
+  sourceEntityType: 'policy' | 'project' | 'region' | 'story';
+  /** 来源实体 ID */
+  sourceEntityId: string;
   /** 开始的绝对游戏日 */
   startedAtDay: number;
-  /** 已完成的步骤 ID 列表 */
-  completedStepIds: string[];
 }
 
 /** 事件运行时状态（PlayerSave 子状态） */

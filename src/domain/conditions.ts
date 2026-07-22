@@ -89,70 +89,84 @@ export type ConditionExpression =
   | ExperienceCondition
   | FactCondition;
 
-// ===== 条件表达式 Zod Schema =====
+// ===== 条件表达式 Zod Schema（所有分支 .strict() 拒绝未知字段） =====
 
 /** 信号字段条件 Schema */
-const SignalFieldConditionSchema = z.object({
-  signalField: z.string(),
-  op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']),
-  value: z.union([z.number(), z.string(), z.boolean()]),
-});
+const SignalFieldConditionSchema = z
+  .object({
+    signalField: z.string().min(1),
+    op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']),
+    value: z.union([z.number(), z.string(), z.boolean()]),
+  })
+  .strict();
 
-/** 职业条件 Schema */
-const CareerConditionSchema = z.object({
-  careerCheck: z.enum([
-    'institution_level',
-    'position_domain',
-    'leadership_rank',
-    'civil_service_rank',
-    'years_in_position',
-    'has_experience',
-  ]),
-  value: z.union([z.string(), z.number()]),
-  op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']).optional(),
-});
+/** 职业条件 Schema（按检查类型约束值类型） */
+const CareerConditionSchema = z
+  .object({
+    careerCheck: z.enum([
+      'institution_level',
+      'position_domain',
+      'leadership_rank',
+      'civil_service_rank',
+      'years_in_position',
+      'has_experience',
+    ]),
+    value: z.union([z.string(), z.number()]),
+    op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']).optional(),
+  })
+  .strict();
 
 /** 世界指标条件 Schema */
-const WorldMetricConditionSchema = z.object({
-  worldMetric: z.string(),
-  op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']),
-  value: z.number(),
-});
+const WorldMetricConditionSchema = z
+  .object({
+    worldMetric: z.string().min(1),
+    op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']),
+    value: z.number(),
+  })
+  .strict();
 
 /** 事件历史条件 Schema */
-const EventHistoryConditionSchema = z.object({
-  eventHistory: z.string(),
-  check: z.enum(['occurred', 'not_occurred', 'count_gte', 'count_lte']),
-  value: z.number().optional(),
-});
+const EventHistoryConditionSchema = z
+  .object({
+    eventHistory: z.string().min(1),
+    check: z.enum(['occurred', 'not_occurred', 'count_gte', 'count_lte']),
+    value: z.number().optional(),
+  })
+  .strict();
 
 /** 政策状态条件 Schema */
-const PolicyStateConditionSchema = z.object({
-  policyState: z.string(),
-  check: z.enum(['status_is', 'phase_is', 'metric_gte', 'metric_lte']),
-  value: z.union([z.string(), z.number()]),
-});
+const PolicyStateConditionSchema = z
+  .object({
+    policyState: z.string().min(1),
+    check: z.enum(['status_is', 'phase_is', 'metric_gte', 'metric_lte']),
+    value: z.union([z.string(), z.number()]),
+  })
+  .strict();
 
 /** 履历条件 Schema */
-const ExperienceConditionSchema = z.object({
-  experience: z.enum(['region_count', 'domain_count', 'level_count', 'has_institution']),
-  op: z.enum(['gte', 'lte', 'eq']),
-  value: z.union([z.number(), z.string()]),
-});
+const ExperienceConditionSchema = z
+  .object({
+    experience: z.enum(['region_count', 'domain_count', 'level_count', 'has_institution']),
+    op: z.enum(['gte', 'lte', 'eq']),
+    value: z.union([z.number(), z.string()]),
+  })
+  .strict();
 
 /** 世界事实条件 Schema */
-const FactConditionSchema = z.object({
-  fact: z.string(),
-  op: z.enum(['is_true', 'is_false', 'eq', 'neq']),
-  value: z.union([z.boolean(), z.number(), z.string()]).optional(),
-});
+const FactConditionSchema = z
+  .object({
+    fact: z.string().min(1),
+    op: z.enum(['is_true', 'is_false', 'eq', 'neq']),
+    value: z.union([z.boolean(), z.number(), z.string()]).optional(),
+  })
+  .strict();
 
-/** 条件表达式 Zod Schema（递归） */
+/** 条件表达式 Zod Schema（递归，所有分支 .strict()） */
 export const ConditionExpressionSchema: z.ZodType<ConditionExpression> = z.lazy(() =>
   z.union([
-    z.object({ all: z.array(ConditionExpressionSchema) }),
-    z.object({ any: z.array(ConditionExpressionSchema) }),
-    z.object({ not: ConditionExpressionSchema }),
+    z.object({ all: z.array(ConditionExpressionSchema) }).strict(),
+    z.object({ any: z.array(ConditionExpressionSchema) }).strict(),
+    z.object({ not: ConditionExpressionSchema }).strict(),
     SignalFieldConditionSchema,
     CareerConditionSchema,
     WorldMetricConditionSchema,
@@ -199,26 +213,48 @@ export const EFFECT_OPERATIONS = ['add', 'multiply', 'set', 'append', 'remove'] 
 export type EffectOperation = (typeof EFFECT_OPERATIONS)[number];
 
 /**
- * 统一效果定义
+ * 统一效果定义（判别联合）
  *
- * 行动、政策、事件和职业机会复用同一效果执行器。
- * 效果目标由代码白名单控制，配置不能绕过状态机或删除存档字段。
+ * 按操作类型区分：
+ * - 数值效果（add/multiply）：value 必须为 number
+ * - 设置效果（set）：value 可为 number/string/boolean
+ * - 集合效果（append/remove）：value 必须为 string，需要 subjectId
  */
-export interface EffectDefinition {
-  target: EffectTarget;
-  operation: EffectOperation;
-  value: number | string | boolean;
-  /** 可选：效果作用的具体对象 ID（如指标名、专长名） */
-  subjectId?: string;
-}
+export type EffectDefinition =
+  | { target: EffectTarget; operation: 'add' | 'multiply'; value: number; subjectId?: string }
+  | { target: EffectTarget; operation: 'set'; value: number | string | boolean; subjectId?: string }
+  | { target: EffectTarget; operation: 'append' | 'remove'; value: string; subjectId: string };
 
-/** 效果定义 Zod Schema */
-export const EffectDefinitionSchema = z.object({
-  target: EffectTargetSchema,
-  operation: z.enum(EFFECT_OPERATIONS),
-  value: z.union([z.number(), z.string(), z.boolean()]),
-  subjectId: z.string().optional(),
-});
+/** 效果定义 Zod Schema（判别联合，拒绝无效组合） */
+export const EffectDefinitionSchema = z.union([
+  // 数值效果：add/multiply + number
+  z
+    .object({
+      target: EffectTargetSchema,
+      operation: z.enum(['add', 'multiply']),
+      value: z.number(),
+      subjectId: z.string().optional(),
+    })
+    .strict(),
+  // 设置效果：set + any scalar
+  z
+    .object({
+      target: EffectTargetSchema,
+      operation: z.literal('set'),
+      value: z.union([z.number(), z.string(), z.boolean()]),
+      subjectId: z.string().optional(),
+    })
+    .strict(),
+  // 集合效果：append/remove + string + 必须 subjectId
+  z
+    .object({
+      target: EffectTargetSchema,
+      operation: z.enum(['append', 'remove']),
+      value: z.string(),
+      subjectId: z.string().min(1),
+    })
+    .strict(),
+]);
 
 // 重新导出领域类型供条件 Schema 使用
 export {
