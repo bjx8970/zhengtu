@@ -233,9 +233,10 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
  * 仅在实际状态变化时写入 localStorage 和更新 updatedAt。
  */
 export function dispatch(action: GameAction): void {
+  let changed = false;
   setState(
     produce((draft) => {
-      const changed = reduceGameState(draft, action);
+      changed = reduceGameState(draft, action);
       if (changed) {
         draft.updatedAt = Date.now();
       }
@@ -243,7 +244,7 @@ export function dispatch(action: GameAction): void {
   );
 
   // 仅在实际变化时持久化（LOAD_SAVE 不触发）
-  if (action.type !== 'LOAD_SAVE') {
+  if (changed && action.type !== 'LOAD_SAVE') {
     writeLocalSave(unwrap(state));
   }
 }

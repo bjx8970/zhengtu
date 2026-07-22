@@ -48,7 +48,7 @@ function processActionCompletion(
     const result = resolveActionEffects(aCfg, rng);
     const effectLabels: string[] = [];
 
-    // 应用 KPI 变化（乘以偏离倍率，支持 add/multiply/set 操作）
+    // 应用 KPI 变化（仅 add 操作应用偏离倍率）
     for (const change of result.kpiChanges) {
       const deptState = draft.actions.departmentStates[event.occupant.deptId];
       if (deptState) {
@@ -57,8 +57,10 @@ function processActionCompletion(
         if (change.operation === 'set') {
           newVal = change.delta;
         } else if (change.operation === 'multiply') {
-          newVal = current * (change.delta * devMult);
+          // multiply 不应用偏离倍率，直接使用原始因子
+          newVal = current * change.delta;
         } else {
+          // add 应用偏离倍率
           newVal = current + change.delta * devMult;
         }
         deptState.kpiValues[change.indicatorId] = newVal;
@@ -66,7 +68,7 @@ function processActionCompletion(
       }
     }
 
-    // 应用玩家属性变化（支持 add/multiply/set 操作）
+    // 应用玩家属性变化（仅 add 操作应用偏离倍率）
     for (const change of result.playerChanges) {
       const char = draft.character as unknown as Record<string, unknown>;
       const current = typeof char[change.attr] === 'number' ? (char[change.attr] as number) : 0;
@@ -74,8 +76,10 @@ function processActionCompletion(
       if (change.operation === 'set') {
         newVal = change.delta;
       } else if (change.operation === 'multiply') {
-        newVal = current * (change.delta * devMult);
+        // multiply 不应用偏离倍率
+        newVal = current * change.delta;
       } else {
+        // add 应用偏离倍率
         newVal = current + change.delta * devMult;
       }
       char[change.attr] = clampAttr(change.attr, newVal, cfg.attributeBounds);
@@ -109,13 +113,13 @@ function processActionCompletion(
   // 释放槽位
   draft.actions.slots[event.tierKey].occupants[event.slotIndex] = null;
 
-  // 写入冷却
-  if (aCfg && aCfg.cooldownDays > 0) {
+  // 写入冷却（使用行动实例的 cooldownDays 快照，而非重新读取配置）
+  if (event.occupant.cooldownDays > 0) {
     const deptState = draft.actions.departmentStates[event.occupant.deptId];
     if (deptState) {
       const completesAtDay = event.occupant.startedAtDay + event.occupant.durationDays;
       deptState.actionCooldownUntilDays[event.occupant.actionId] =
-        completesAtDay + aCfg.cooldownDays;
+        completesAtDay + event.occupant.cooldownDays;
     }
   }
 }
@@ -153,8 +157,13 @@ function processMonthlySettlement(draft: PlayerSave): void {
  *
  * @param draft 游戏状态
  * @param assessmentYear 考核年度（从事件中获取，而非 draft.time）
+ * @param absoluteDay 事件发生的绝对游戏日
  */
-function processAnnualAssessment(draft: PlayerSave, assessmentYear: number): void {
+function processAnnualAssessment(
+  draft: PlayerSave,
+  assessmentYear: number,
+  absoluteDay: number,
+): void {
   const loader = getConfigLoader();
   const cfg = loader.getGameConfig();
   const positionId = draft.career.appointment.positionId;
@@ -183,9 +192,7 @@ function processAnnualAssessment(draft: PlayerSave, assessmentYear: number): voi
   const comprehensiveScore = computeComprehensiveScore(dimensions, cfg);
 
   // 年度考核
-  const yearsInPosition = Math.floor(
-    (draft.time.totalDaysPlayed - draft.career.appointment.startedAtDay) / 360,
-  );
+  const yearsInPosition = Math.floor((absoluteDay - draft.career.appointment.startedAtDay) / 360);
   const annualResult = runAnnualAssessment(comprehensiveScore, kpiTier, yearsInPosition, cfg);
 
   draft.assessments.comprehensiveScore = comprehensiveScore;
@@ -245,7 +252,7 @@ export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload
         processMonthlySettlement(draft);
         break;
       case 'annual_assessment':
-        processAnnualAssessment(draft, event.year);
+        processAnnualAssessment(draft, event.year, event.absoluteDay);
         break;
       default:
         break;

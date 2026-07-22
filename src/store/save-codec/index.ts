@@ -4,17 +4,34 @@
  * 只接受当前版本（Schema 2）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
  *
- * 严格流程：
- * 读取原始数据 → 必须是完整 SaveEnvelope → schemaVersion 必须等于 CURRENT
- * → 完整验证 Envelope 和 PlayerSave → 成功加载
- *
- * 拒绝：裸旧版 PlayerSave、Schema 1、未来版本、缺失元数据、结构验证失败。
+ * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
 
 import { z } from 'zod';
 import type { PlayerSave } from '../../types/player';
 import type { SaveEnvelope, SaveDecodeResult } from '../../types/save';
 import { CURRENT_SCHEMA_VERSION, CURRENT_CONTENT_VERSION } from '../../types/save';
+import {
+  INSTITUTION_LEVELS,
+  POSITION_DOMAINS,
+  LEADERSHIP_RANKS,
+  CIVIL_SERVICE_RANKS,
+  APPOINTMENT_TYPES,
+  APPOINTMENT_REASONS,
+  CAREER_OPPORTUNITY_TYPES,
+  CAREER_OPPORTUNITY_STATUSES,
+} from '../../domain/career/types';
+import {
+  POLICY_STATUSES,
+  DOMAIN_SIGNALS,
+  DomainSignalSnapshotSchema,
+} from '../../domain/governance/types';
+import {
+  EVENT_PRIORITIES,
+  EVENT_PRESENTATIONS,
+  EVENT_INSTANCE_STATUSES,
+  EVENT_CHAIN_STATUSES,
+} from '../../domain/events/types';
 
 /** 不兼容存档备份的 localStorage key 前缀 */
 const BACKUP_KEY_PREFIX = 'zhengtu_incompatible_save';
@@ -39,7 +56,6 @@ export function backupIncompatibleSave(rawData: string): string {
         return key;
       }
     }
-    // 所有槽位已满，覆盖最旧的
     localStorage.setItem(BACKUP_KEY_PREFIX, rawData);
     return BACKUP_KEY_PREFIX;
   } catch {
@@ -47,68 +63,7 @@ export function backupIncompatibleSave(rawData: string): string {
   }
 }
 
-// ===== Schema 2 Zod 验证 =====
-
-/** 领域枚举值 */
-const INSTITUTION_LEVELS = ['township', 'county', 'prefecture', 'province', 'central'] as const;
-const POSITION_DOMAINS = [
-  'local_governance',
-  'party_organs',
-  'government_general',
-  'government_specialized',
-  'discipline_inspection',
-  'congress',
-  'cppcc',
-  'mass_organs',
-  'central_institutions',
-  'national_security',
-] as const;
-const LEADERSHIP_RANKS = [
-  'none',
-  'township_deputy',
-  'township_chief',
-  'county_deputy',
-  'county_chief',
-  'prefecture_deputy',
-  'prefecture_chief',
-  'province_deputy',
-  'province_chief',
-  'national_deputy',
-  'national_chief',
-] as const;
-const CIVIL_SERVICE_RANKS = [
-  'clerk_2',
-  'clerk_1',
-  'section_member_4',
-  'section_member_3',
-  'section_member_2',
-  'section_member_1',
-  'researcher_4',
-  'researcher_3',
-  'researcher_2',
-  'researcher_1',
-  'inspector_2',
-  'inspector_1',
-] as const;
-const APPOINTMENT_TYPES = ['substantive', 'acting', 'temporary', 'secondment'] as const;
-const APPOINTMENT_REASONS = [
-  'initial_assignment',
-  'promotion',
-  'lateral_transfer',
-  'rotation',
-  'temporary_assignment',
-  'secondment',
-  'demotion',
-] as const;
-const POLICY_STATUSES = [
-  'proposed',
-  'approved',
-  'implementing',
-  'suspended',
-  'completed',
-  'failed',
-  'repealed',
-] as const;
+// ===== Schema 2 Zod 验证（领域枚举来自 domain/ 单一事实来源） =====
 
 /** CurrentAppointment Schema */
 const CurrentAppointmentSchema = z
@@ -141,11 +96,13 @@ const CareerExperienceSchema = z
     endedAtDay: z.number().nullable(),
     appointmentReason: z.enum(APPOINTMENT_REASONS),
     assessmentResults: z.array(
-      z.object({
-        year: z.number(),
-        score: z.number(),
-        tier: z.string(),
-      }),
+      z
+        .object({
+          year: z.number(),
+          score: z.number(),
+          tier: z.string(),
+        })
+        .strict(),
     ),
   })
   .strict();
@@ -154,15 +111,8 @@ const CareerExperienceSchema = z
 const CareerOpportunitySchema = z
   .object({
     id: z.string(),
-    type: z.enum([
-      'promotion',
-      'lateral_transfer',
-      'rotation',
-      'secondment',
-      'demotion',
-      'retirement',
-    ]),
-    status: z.enum(['available', 'applied', 'under_review', 'accepted', 'rejected', 'expired']),
+    type: z.enum(CAREER_OPPORTUNITY_TYPES),
+    status: z.enum(CAREER_OPPORTUNITY_STATUSES),
     targetPositionId: z.string(),
     targetInstitutionId: z.string(),
     targetRegionId: z.string(),
@@ -172,14 +122,21 @@ const CareerOpportunitySchema = z
   })
   .strict();
 
-/** CareerProcess Schema */
+/** CareerProcess Schema（stageResults 使用明确结构） */
 const CareerProcessSchema = z
   .object({
     type: z.enum(['selection', 'inspection', 'probation']),
     opportunityId: z.string(),
     currentStage: z.string(),
     startedAtDay: z.number(),
-    stageResults: z.record(z.unknown()),
+    stageResults: z
+      .object({
+        voteFor: z.number().optional(),
+        voteAgainst: z.number().optional(),
+        inspectionResult: z.string().optional(),
+        passed: z.boolean().optional(),
+      })
+      .strict(),
   })
   .strict();
 
@@ -232,7 +189,7 @@ const GovernanceStateSchema = z
   })
   .strict();
 
-/** EventRuntimeState Schema */
+/** EventRuntimeState Schema（sourceSignal 使用领域枚举，triggerContext 使用 DomainSignalSnapshot） */
 const EventRuntimeStateSchema = z
   .object({
     activeBlockingEventId: z.string().nullable(),
@@ -241,12 +198,12 @@ const EventRuntimeStateSchema = z
         .object({
           instanceId: z.string(),
           eventId: z.string(),
-          status: z.enum(['pending', 'active', 'resolved', 'expired', 'cancelled']),
-          priority: z.enum(['low', 'normal', 'high', 'urgent']),
-          presentation: z.enum(['blocking', 'inbox', 'automatic']),
+          status: z.enum(EVENT_INSTANCE_STATUSES),
+          priority: z.enum(EVENT_PRIORITIES),
+          presentation: z.enum(EVENT_PRESENTATIONS),
           triggeredAtDay: z.number(),
-          sourceSignal: z.string(),
-          triggerContext: z.record(z.union([z.number(), z.string(), z.boolean()])),
+          sourceSignal: z.enum(DOMAIN_SIGNALS),
+          triggerContext: DomainSignalSnapshotSchema,
           deadlineDay: z.number().nullable(),
           chainInstanceId: z.string().nullable(),
         })
@@ -258,8 +215,8 @@ const EventRuntimeStateSchema = z
           instanceId: z.string(),
           eventId: z.string(),
           activateAtDay: z.number(),
-          sourceSignal: z.string(),
-          triggerContext: z.record(z.union([z.number(), z.string(), z.boolean()])),
+          sourceSignal: z.enum(DOMAIN_SIGNALS),
+          triggerContext: DomainSignalSnapshotSchema,
           chainInstanceId: z.string().nullable(),
         })
         .strict(),
@@ -281,7 +238,7 @@ const EventRuntimeStateSchema = z
         .object({
           instanceId: z.string(),
           chainId: z.string(),
-          status: z.enum(['active', 'completed', 'failed', 'abandoned']),
+          status: z.enum(EVENT_CHAIN_STATUSES),
           currentStepIndex: z.number(),
           sourceContext: z.record(z.union([z.string(), z.number()])),
           startedAtDay: z.number(),
@@ -428,7 +385,7 @@ const CharacterStateSchema = z
   })
   .strict();
 
-/** PlayerSave Schema（Schema 2） */
+/** PlayerSave Schema（Schema 2，.strict() 拒绝旧职业字段） */
 const PlayerSaveSchema = z
   .object({
     character: CharacterStateSchema,
@@ -530,9 +487,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
 
   const obj = data as Record<string, unknown>;
 
-  // 检查是否为 SaveEnvelope 结构
   if (typeof obj.schemaVersion !== 'number') {
-    // 裸 PlayerSave（无 Envelope）
     return {
       success: false,
       error: 'legacy_save_unsupported',
@@ -540,7 +495,6 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     };
   }
 
-  // Schema 版本检查
   if (obj.schemaVersion < CURRENT_SCHEMA_VERSION) {
     return {
       success: false,
@@ -556,7 +510,6 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     };
   }
 
-  // 完整 Envelope 验证
   const result = SaveEnvelopeSchema.safeParse(data);
   if (!result.success) {
     return { success: false, error: 'invalid_envelope', detail: result.error.message };

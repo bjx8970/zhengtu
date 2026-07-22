@@ -14,7 +14,7 @@ import type {
   EventPriority,
   EventPresentation,
 } from './types';
-import type { DomainSignal } from '../governance/types';
+import type { DomainSignal, DomainSignalSnapshot } from '../governance/types';
 
 /** 事件实例 */
 export interface EventInstance {
@@ -32,8 +32,8 @@ export interface EventInstance {
   triggeredAtDay: number;
   /** 来源信号类型 */
   sourceSignal: DomainSignal;
-  /** 触发时上下文快照 */
-  triggerContext: Record<string, number | string | boolean>;
+  /** 触发时上下文快照（使用 DomainSignalSnapshot 而非开放 Record） */
+  triggerContext: DomainSignalSnapshot;
   /** 截止时间（null 表示无截止） */
   deadlineDay: number | null;
   /** 所属事件链实例 ID（null 表示独立事件） */
@@ -51,7 +51,7 @@ export interface ScheduledEventInstance {
   /** 来源信号 */
   sourceSignal: DomainSignal;
   /** 触发时上下文快照 */
-  triggerContext: Record<string, number | string | boolean>;
+  triggerContext: DomainSignalSnapshot;
   /** 所属事件链实例 ID */
   chainInstanceId: string | null;
 }

@@ -100,6 +100,14 @@ export interface CareerOpportunity {
   reason: string;
 }
 
+/** 职业流程阶段结果（明确结构，非开放 Record） */
+export interface CareerProcessStageResults {
+  voteFor?: number;
+  voteAgainst?: number;
+  inspectionResult?: string;
+  passed?: boolean;
+}
+
 /** 进行中的职业流程（如选拔、考察） */
 export interface CareerProcess {
   /** 流程类型 */
@@ -111,7 +119,7 @@ export interface CareerProcess {
   /** 开始日 */
   startedAtDay: number;
   /** 各阶段结果 */
-  stageResults: Record<string, unknown>;
+  stageResults: CareerProcessStageResults;
 }
 
 /** 职业状态（PlayerSave 子状态） */

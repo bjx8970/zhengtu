@@ -55,3 +55,22 @@ export type DomainSignal = (typeof DOMAIN_SIGNALS)[number];
 
 /** 领域信号 Zod Schema */
 export const DomainSignalSchema = z.enum(DOMAIN_SIGNALS);
+
+/** 领域信号快照（事件触发时持久化的上下文） */
+export interface DomainSignalSnapshot {
+  /** 信号类型 */
+  signalType: DomainSignal;
+  /** 发生的绝对游戏日 */
+  occurredAtDay: number;
+  /** 信号携带的数据 */
+  data: Record<string, number | string | boolean>;
+}
+
+/** 领域信号快照 Zod Schema */
+export const DomainSignalSnapshotSchema = z
+  .object({
+    signalType: DomainSignalSchema,
+    occurredAtDay: z.number(),
+    data: z.record(z.union([z.number(), z.string(), z.boolean()])),
+  })
+  .strict();
