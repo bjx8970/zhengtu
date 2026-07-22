@@ -9,6 +9,7 @@
 import type { PlayerSave } from '../../types/player';
 import type { NewGamePayload } from '../../types/actions';
 import { getConfigLoader } from '../../config/loader';
+import { clampAttr } from '../../utils/math';
 
 /**
  * 处理 LOAD_SAVE 动作。
@@ -66,8 +67,37 @@ export function reduceNewGame(
     draft.character.philosophy = d.philosophy as PlayerSave['character']['philosophy'];
   }
 
-  // 初始任职（默认乡镇科员）
-  const firstPosition = cfg.getPositionById('admin_l1_0');
+  // 应用家庭背景与晋升通道的属性加成
+  const gameCfg = cfg.getGameConfig();
+  const bonuses: Record<string, number> = {};
+  const bgId = draft.character.familyBackground;
+  const pathId = draft.character.promotionPath;
+  if (bgId) {
+    const bg = cfg.getFamilyBackground(bgId);
+    if (bg) Object.assign(bonuses, bg.bonuses);
+  }
+  if (pathId) {
+    const path = cfg.getPromotionPath(pathId);
+    if (path) Object.assign(bonuses, path.bonuses);
+  }
+  for (const [key, delta] of Object.entries(bonuses)) {
+    if (key === 'politicalCapital') {
+      draft.character.politicalCapital = Math.max(
+        0,
+        Math.min(500, draft.character.politicalCapital + delta),
+      );
+    } else if (key === 'innovation' || key === 'pragmatic' || key === 'principled') {
+      const scores = draft.character.philosophy.scores;
+      scores[key] = Math.max(0, Math.min(100, (scores[key] ?? 50) + delta));
+    } else {
+      const char = draft.character as unknown as Record<string, unknown>;
+      const current = typeof char[key] === 'number' ? (char[key] as number) : 0;
+      char[key] = clampAttr(key, current + delta, gameCfg.attributeBounds);
+    }
+  }
+
+  // 初始任职（从配置读取 initialPositionId）
+  const firstPosition = cfg.getPositionById(gameCfg.initialPositionId);
   if (firstPosition) {
     draft.career.appointment = {
       positionId: firstPosition.id,

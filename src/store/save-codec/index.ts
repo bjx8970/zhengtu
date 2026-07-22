@@ -470,15 +470,17 @@ export function validatePlayerSave(data: unknown): { valid: boolean; error?: str
 /**
  * 将 PlayerSave 封装为 SaveEnvelope。
  *
+ * revision 为递增修订号：传入现有 revision，返回 revision + 1。
+ *
  * @param state 游戏状态
- * @param revision 修订号（默认 0）
- * @returns SaveEnvelope
+ * @param existingRevision 现有修订号（默认 0，首次保存）
+ * @returns SaveEnvelope（revision 已递增）
  */
-export function wrapSaveEnvelope(state: PlayerSave, revision = 0): SaveEnvelope {
+export function wrapSaveEnvelope(state: PlayerSave, existingRevision = 0): SaveEnvelope {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     contentVersion: CURRENT_CONTENT_VERSION,
-    revision,
+    revision: existingRevision + 1,
     savedAt: Date.now(),
     state,
   };

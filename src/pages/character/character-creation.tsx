@@ -85,7 +85,7 @@ export function CharacterCreation() {
 
   function handleComplete() {
     const cfg = loader.getGameConfig();
-    const startPos = loader.getPositionById('admin_l1_0');
+    const startPos = loader.getPositionById(cfg.initialPositionId);
     const startYear = cfg.startYear + (data().isPreparatory ? 1 : 0);
 
     dispatch({
