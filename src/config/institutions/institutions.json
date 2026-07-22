@@ -100,5 +100,11 @@
     "name": "中共中央",
     "level": "central",
     "regionId": "region_capital"
+  },
+  "state_council_01": {
+    "id": "state_council_01",
+    "name": "中华人民共和国国务院",
+    "level": "central",
+    "regionId": "region_capital"
   }
 }

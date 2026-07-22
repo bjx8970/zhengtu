@@ -871,10 +871,10 @@
   {
     "id": "admin_l11_2",
     "name": "国务院副总理",
-    "institutionId": "central_party_01",
+    "institutionId": "state_council_01",
     "regionId": "region_capital",
     "institutionLevel": "central",
-    "positionDomain": "central_institutions",
+    "positionDomain": "government_general",
     "leadershipRank": "national_deputy",
     "contentTier": 11,
     "vacancyCount": 1,

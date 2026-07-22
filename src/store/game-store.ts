@@ -78,12 +78,14 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
   const cfg = getConfigLoader().getGameConfig();
   const loader = getConfigLoader();
 
-  // 从配置获取初始职位
-  const initialPosition = loader.getPositionById('admin_l1_0');
+  // 从配置获取初始职位（缺失时直接抛错，不回退）
+  const initialPosition = loader.getPositionById(cfg.initialPositionId);
+  if (!initialPosition) {
+    throw new Error(`Initial position "${cfg.initialPositionId}" not found in config`);
+  }
 
-  // 属性初始值使用边界最小值（配置驱动）
-  const bounds = cfg.attributeBounds;
-  const minAttr = (key: string) => (bounds[key] ? bounds[key][0] : 0);
+  // 属性初始值从 constants.json.initialAttributes 读取
+  const initAttrs = cfg.initialAttributes;
 
   const base: PlayerSave = {
     character: {
@@ -100,17 +102,17 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       familyBackground: 'peasant',
       promotionPath: 'gongwuyuan',
       isPreparatory: false,
-      vigor: 100, // vigor 初始为满值（特殊处理）
-      politicalCapital: minAttr('politicalCapital'),
-      integrity: minAttr('integrity'),
-      stability: minAttr('stability'),
-      performance: minAttr('performance'),
-      charisma: minAttr('charisma'),
-      competence: minAttr('competence'),
-      network: minAttr('network'),
-      diligence: minAttr('diligence'),
-      ambition: minAttr('ambition'),
-      corruptionRisk: minAttr('corruptionRisk'),
+      vigor: initAttrs['vigor'] ?? 100,
+      politicalCapital: initAttrs['politicalCapital'] ?? 0,
+      integrity: initAttrs['integrity'] ?? 50,
+      stability: initAttrs['stability'] ?? 50,
+      performance: initAttrs['performance'] ?? 0,
+      charisma: initAttrs['charisma'] ?? 50,
+      competence: initAttrs['competence'] ?? 50,
+      network: initAttrs['network'] ?? 0,
+      diligence: initAttrs['diligence'] ?? 50,
+      ambition: initAttrs['ambition'] ?? 100,
+      corruptionRisk: initAttrs['corruptionRisk'] ?? 0,
       isUnderInvestigation: false,
       philosophy: { scores: { innovation: 50, pragmatic: 50, principled: 50 } },
       relations: {
@@ -131,12 +133,12 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     },
     career: {
       appointment: {
-        positionId: initialPosition?.id ?? 'admin_l1_0',
-        institutionId: initialPosition?.institutionId ?? 'township_govt_01',
-        regionId: initialPosition?.regionId ?? 'region_qingyun_town',
-        institutionLevel: initialPosition?.institutionLevel ?? 'township',
-        positionDomain: initialPosition?.positionDomain ?? 'local_governance',
-        leadershipRank: initialPosition?.leadershipRank ?? 'none',
+        positionId: initialPosition.id,
+        institutionId: initialPosition.institutionId,
+        regionId: initialPosition.regionId,
+        institutionLevel: initialPosition.institutionLevel,
+        positionDomain: initialPosition.positionDomain,
+        leadershipRank: initialPosition.leadershipRank,
         startedAtDay: 0,
         appointmentType: 'substantive',
         probationEndsAtDay: 360,
@@ -176,7 +178,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       comprehensiveScore: 0,
       annualAssessments: [],
     },
-    remainingBudget: initialPosition?.annualBudget ?? 800,
+    remainingBudget: initialPosition.annualBudget,
     updatedAt: Date.now(),
   };
 
