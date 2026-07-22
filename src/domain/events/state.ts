@@ -78,8 +78,8 @@ export interface EventChainInstance {
   activeNodeIds: string[];
   /** 已完成节点 ID 列表 */
   completedNodeIds: string[];
-  /** 来源实体类型（政策/项目/地区/剧情） */
-  sourceEntityType: 'policy' | 'project' | 'region' | 'story';
+  /** 来源实体类型（政策/项目/任职/地区/剧情） */
+  sourceEntityType: 'policy' | 'project' | 'appointment' | 'region' | 'story';
   /** 来源实体 ID */
   sourceEntityId: string;
   /** 开始的绝对游戏日 */

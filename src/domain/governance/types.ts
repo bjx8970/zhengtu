@@ -56,21 +56,114 @@ export type DomainSignal = (typeof DOMAIN_SIGNALS)[number];
 /** 领域信号 Zod Schema */
 export const DomainSignalSchema = z.enum(DOMAIN_SIGNALS);
 
-/** 领域信号快照（事件触发时持久化的上下文） */
-export interface DomainSignalSnapshot {
-  /** 信号类型 */
-  signalType: DomainSignal;
-  /** 发生的绝对游戏日 */
-  occurredAtDay: number;
-  /** 信号携带的数据 */
-  data: Record<string, number | string | boolean>;
-}
+/** 领域信号快照（按信号类型判别联合，各类型有固定载荷） */
+export type DomainSignalSnapshot =
+  | {
+      signalType: 'action.completed';
+      occurredAtDay: number;
+      data: { actionId: string; deptId: string; regionId: string; institutionId: string };
+    }
+  | {
+      signalType: 'policy.approved';
+      occurredAtDay: number;
+      data: { policyId: string; regionId: string };
+    }
+  | {
+      signalType: 'policy.phase_changed';
+      occurredAtDay: number;
+      data: { policyId: string; phaseId: string };
+    }
+  | {
+      signalType: 'policy.metric_changed';
+      occurredAtDay: number;
+      data: { policyId: string; metricId: string; value: number };
+    }
+  | {
+      signalType: 'appointment.changed';
+      occurredAtDay: number;
+      data: { positionId: string; institutionId: string; regionId: string };
+    }
+  | {
+      signalType: 'assessment.completed';
+      occurredAtDay: number;
+      data: { year: number; score: number; tier: string };
+    }
+  | {
+      signalType: 'world.metric_changed';
+      occurredAtDay: number;
+      data: { metricId: string; value: number };
+    }
+  | {
+      signalType: 'event.resolved';
+      occurredAtDay: number;
+      data: { eventId: string; optionId: string };
+    };
 
-/** 领域信号快照 Zod Schema */
-export const DomainSignalSnapshotSchema = z
-  .object({
-    signalType: DomainSignalSchema,
-    occurredAtDay: z.number(),
-    data: z.record(z.union([z.number(), z.string(), z.boolean()])),
-  })
-  .strict();
+/** 领域信号快照 Zod Schema（按 signalType 判别） */
+export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
+  z
+    .object({
+      signalType: z.literal('action.completed'),
+      occurredAtDay: z.number(),
+      data: z
+        .object({
+          actionId: z.string(),
+          deptId: z.string(),
+          regionId: z.string(),
+          institutionId: z.string(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalType: z.literal('policy.approved'),
+      occurredAtDay: z.number(),
+      data: z.object({ policyId: z.string(), regionId: z.string() }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalType: z.literal('policy.phase_changed'),
+      occurredAtDay: z.number(),
+      data: z.object({ policyId: z.string(), phaseId: z.string() }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalType: z.literal('policy.metric_changed'),
+      occurredAtDay: z.number(),
+      data: z.object({ policyId: z.string(), metricId: z.string(), value: z.number() }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalType: z.literal('appointment.changed'),
+      occurredAtDay: z.number(),
+      data: z
+        .object({ positionId: z.string(), institutionId: z.string(), regionId: z.string() })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalType: z.literal('assessment.completed'),
+      occurredAtDay: z.number(),
+      data: z.object({ year: z.number(), score: z.number(), tier: z.string() }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalType: z.literal('world.metric_changed'),
+      occurredAtDay: z.number(),
+      data: z.object({ metricId: z.string(), value: z.number() }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalType: z.literal('event.resolved'),
+      occurredAtDay: z.number(),
+      data: z.object({ eventId: z.string(), optionId: z.string() }).strict(),
+    })
+    .strict(),
+]);

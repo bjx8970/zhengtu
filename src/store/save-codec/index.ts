@@ -235,7 +235,7 @@ const EventRuntimeStateSchema = z
           status: z.enum(EVENT_CHAIN_STATUSES),
           activeNodeIds: z.array(z.string()),
           completedNodeIds: z.array(z.string()),
-          sourceEntityType: z.enum(['policy', 'project', 'region', 'story']),
+          sourceEntityType: z.enum(['policy', 'project', 'appointment', 'region', 'story']),
           sourceEntityId: z.string(),
           startedAtDay: z.number(),
         })
@@ -437,6 +437,21 @@ const SaveEnvelopeSchema = z
     state: PlayerSaveSchema,
   })
   .strict();
+
+// ===== 静态一致性检查：确保 Schema 与 TypeScript 类型不漂移 =====
+
+/**
+ * 编译期双向可赋值检查。
+ * 如果 PlayerSaveSchema 与 PlayerSave 不一致，此处会产生类型错误。
+ */
+type SchemaInferred = z.infer<typeof PlayerSaveSchema>;
+type _AssertSchemaToType = SchemaInferred extends PlayerSave ? true : never;
+type _AssertTypeToSchema = PlayerSave extends SchemaInferred ? true : never;
+// 强制使用以避免 unused 警告
+const _schemaConsistencyCheck: _AssertSchemaToType = true;
+const _typeConsistencyCheck: _AssertTypeToSchema = true;
+void _schemaConsistencyCheck;
+void _typeConsistencyCheck;
 
 // ===== 公开 API =====
 

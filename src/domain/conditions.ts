@@ -23,18 +23,30 @@ export interface SignalFieldCondition {
   value: number | string | boolean;
 }
 
-/** 职业条件：检查当前任职状态 */
-export interface CareerCondition {
-  careerCheck:
-    | 'institution_level'
-    | 'position_domain'
-    | 'leadership_rank'
-    | 'civil_service_rank'
-    | 'years_in_position'
-    | 'has_experience';
-  value: string | number;
-  op?: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
-}
+/** 职业条件：按检查类型判别联合，复用领域枚举约束值类型 */
+export type CareerCondition =
+  | {
+      careerCheck: 'institution_level';
+      value: import('./career/types').InstitutionLevel;
+      op?: 'eq' | 'neq';
+    }
+  | {
+      careerCheck: 'position_domain';
+      value: import('./career/types').PositionDomain;
+      op?: 'eq' | 'neq';
+    }
+  | {
+      careerCheck: 'leadership_rank';
+      value: import('./career/types').LeadershipRank;
+      op?: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
+    }
+  | {
+      careerCheck: 'civil_service_rank';
+      value: import('./career/types').CivilServiceRank;
+      op?: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
+    }
+  | { careerCheck: 'years_in_position'; value: number; op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq' }
+  | { careerCheck: 'has_experience'; value: string; op?: 'eq' };
 
 /** 世界指标条件 */
 export interface WorldMetricCondition {
@@ -100,21 +112,51 @@ const SignalFieldConditionSchema = z
   })
   .strict();
 
-/** 职业条件 Schema（按检查类型约束值类型） */
-const CareerConditionSchema = z
-  .object({
-    careerCheck: z.enum([
-      'institution_level',
-      'position_domain',
-      'leadership_rank',
-      'civil_service_rank',
-      'years_in_position',
-      'has_experience',
-    ]),
-    value: z.union([z.string(), z.number()]),
-    op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']).optional(),
-  })
-  .strict();
+/** 职业条件 Schema（按检查类型判别联合，复用领域枚举） */
+const CareerConditionSchema = z.union([
+  z
+    .object({
+      careerCheck: z.literal('institution_level'),
+      value: InstitutionLevelSchema,
+      op: z.enum(['eq', 'neq']).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('position_domain'),
+      value: PositionDomainSchema,
+      op: z.enum(['eq', 'neq']).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('leadership_rank'),
+      value: LeadershipRankSchema,
+      op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('civil_service_rank'),
+      value: CivilServiceRankSchema,
+      op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte']).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('years_in_position'),
+      value: z.number(),
+      op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('has_experience'),
+      value: z.string().min(1),
+      op: z.literal('eq').optional(),
+    })
+    .strict(),
+]);
 
 /** 世界指标条件 Schema */
 const WorldMetricConditionSchema = z
