@@ -52,6 +52,36 @@ describe('ConditionExpression 负向测试', () => {
     expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
   });
 
+  it('接受可空字段使用 eq + null（自动事件无选项）', () => {
+    const valid = { signalField: 'optionId', op: 'eq', value: null };
+    expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('接受可空字段使用 neq + null（首次任职）', () => {
+    const valid = { signalField: 'previousPositionId', op: 'neq', value: null };
+    expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('拒绝可空字段使用数值比较', () => {
+    const invalid = { signalField: 'optionId', op: 'gt', value: 5 };
+    expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝可空字段使用 number 值', () => {
+    const invalid = { signalField: 'previousPositionId', op: 'eq', value: 42 };
+    expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝 tier 字段使用 null 值（tier 是普通字符串字段）', () => {
+    const invalid = { signalField: 'tier', op: 'eq', value: null };
+    expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('接受 tier 字段使用 eq + string', () => {
+    const valid = { signalField: 'tier', op: 'eq', value: 'excellent' };
+    expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
+  });
+
   it('拒绝 careerCheck years_in_position + string value', () => {
     const invalid = { careerCheck: 'years_in_position', value: 'five', op: 'gte' };
     expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);

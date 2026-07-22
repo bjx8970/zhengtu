@@ -33,13 +33,14 @@ export const SIGNAL_STRING_FIELDS = [
   'positionId',
   'eventInstanceId',
   'eventId',
+  'tier',
 ] as const;
 
 /** 数值字段（允许数值比较 + number） */
 export const SIGNAL_NUMERIC_FIELDS = ['value', 'year', 'score'] as const;
 
-/** 可空字符串字段（允许 eq/neq + string） */
-export const SIGNAL_NULLABLE_FIELDS = ['previousPositionId', 'optionId', 'tier'] as const;
+/** 可空字符串字段（允许 eq/neq + string|null，可表达 null 语义） */
+export const SIGNAL_NULLABLE_FIELDS = ['previousPositionId', 'optionId'] as const;
 
 /** 信号字段条件：按字段类别判别联合，约束操作符和值类型 */
 export type SignalFieldCondition =
@@ -49,7 +50,11 @@ export type SignalFieldCondition =
       op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
       value: number;
     }
-  | { signalField: (typeof SIGNAL_NULLABLE_FIELDS)[number]; op: 'eq' | 'neq'; value: string };
+  | {
+      signalField: (typeof SIGNAL_NULLABLE_FIELDS)[number];
+      op: 'eq' | 'neq';
+      value: string | null;
+    };
 
 /** 职业条件：按检查类型判别联合，复用领域枚举约束值类型 */
 export type CareerCondition =
@@ -146,12 +151,12 @@ const SignalFieldConditionSchema = z.union([
       value: z.number(),
     })
     .strict(),
-  // 可空字符串字段：eq/neq + string
+  // 可空字符串字段：eq/neq + string|null（可表达 null 语义）
   z
     .object({
       signalField: z.enum(SIGNAL_NULLABLE_FIELDS),
       op: z.enum(['eq', 'neq']),
-      value: z.string(),
+      value: z.union([z.string(), z.null()]),
     })
     .strict(),
 ]);
