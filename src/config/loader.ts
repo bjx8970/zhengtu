@@ -25,6 +25,7 @@ import type {
 } from '../types/config';
 import type { PositionConfigV2, InstitutionConfig } from '../types/position-v2';
 import type { InstitutionLevel } from '../domain/career/types';
+import { PositionConfigArraySchema, InstitutionConfigMapSchema } from './schemas';
 import deptTemplateData from './templates/departments.json' with { type: 'json' };
 import deptExtraData from './templates/departments-extra.json' with { type: 'json' };
 import kpiData from './templates/kpis.json' with { type: 'json' };
@@ -44,8 +45,12 @@ const ALL_DEPT_TEMPLATES: RawDeptMap = {
 };
 
 const ALL_KPI_TEMPLATES = kpiData as Record<string, KPITemplate>;
-const ALL_POSITIONS = positionsData as PositionConfigV2[];
-const ALL_INSTITUTIONS = institutionsData as Record<string, InstitutionConfig>;
+
+// 使用正式 Schema 解析配置（单一事实来源）
+const parsedPositions = PositionConfigArraySchema.parse(positionsData);
+const parsedInstitutions = InstitutionConfigMapSchema.parse(institutionsData);
+const ALL_POSITIONS = parsedPositions;
+const ALL_INSTITUTIONS = parsedInstitutions;
 
 /**
  * ConfigLoader 单例（Schema 2）

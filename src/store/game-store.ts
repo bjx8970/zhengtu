@@ -14,7 +14,6 @@
 
 import { createStore, produce, unwrap } from 'solid-js/store';
 import type { PlayerSave } from '../types/player';
-import type { CareerState } from '../domain/career/state';
 import type { GovernanceState } from '../domain/governance/state';
 import type { EventRuntimeState } from '../domain/events/state';
 import type { WorldState } from '../domain/world-state';
@@ -37,28 +36,6 @@ export type GameAction =
       tierKey: 'primary' | 'secondary' | 'reserve';
     }
   | { type: 'ADVANCE_TIME'; granularity: 'day' | 'week' | 'month'; _rng?: () => number };
-
-/** 创建默认职业状态（初始任职：乡镇科员） */
-function createDefaultCareerState(): CareerState {
-  return {
-    appointment: {
-      positionId: 'admin_l1_0',
-      institutionId: 'township_govt_01',
-      regionId: 'region_qingyun_town',
-      institutionLevel: 'township',
-      positionDomain: 'local_governance',
-      leadershipRank: 'none',
-      startedAtDay: 0,
-      appointmentType: 'substantive',
-      probationEndsAtDay: 360,
-    },
-    civilServiceRank: 'clerk_2',
-    experiences: [],
-    specialties: {},
-    opportunities: [],
-    activeProcess: null,
-  };
-}
 
 /** 创建默认治理状态 */
 function createDefaultGovernanceState(): GovernanceState {
@@ -99,6 +76,14 @@ function createDefaultWorldState(): WorldState {
  */
 export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave {
   const cfg = getConfigLoader().getGameConfig();
+  const loader = getConfigLoader();
+
+  // 从配置获取初始职位
+  const initialPosition = loader.getPositionById('admin_l1_0');
+
+  // 属性初始值使用边界最小值（配置驱动）
+  const bounds = cfg.attributeBounds;
+  const minAttr = (key: string) => (bounds[key] ? bounds[key][0] : 0);
 
   const base: PlayerSave = {
     character: {
@@ -115,17 +100,17 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       familyBackground: 'peasant',
       promotionPath: 'gongwuyuan',
       isPreparatory: false,
-      vigor: 100,
-      politicalCapital: 0,
-      integrity: 50,
-      stability: 50,
-      performance: 50,
-      charisma: 50,
-      competence: 50,
-      network: 50,
-      diligence: 50,
-      ambition: 50,
-      corruptionRisk: 0,
+      vigor: 100, // vigor 初始为满值（特殊处理）
+      politicalCapital: minAttr('politicalCapital'),
+      integrity: minAttr('integrity'),
+      stability: minAttr('stability'),
+      performance: minAttr('performance'),
+      charisma: minAttr('charisma'),
+      competence: minAttr('competence'),
+      network: minAttr('network'),
+      diligence: minAttr('diligence'),
+      ambition: minAttr('ambition'),
+      corruptionRisk: minAttr('corruptionRisk'),
       isUnderInvestigation: false,
       philosophy: { scores: { innovation: 50, pragmatic: 50, principled: 50 } },
       relations: {
@@ -138,30 +123,47 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       },
     },
     time: {
-      year: 2012,
+      year: cfg.startYear,
       month: 7,
       day: 1,
       granularity: 'day',
       totalDaysPlayed: 0,
     },
-    career: createDefaultCareerState(),
+    career: {
+      appointment: {
+        positionId: initialPosition?.id ?? 'admin_l1_0',
+        institutionId: initialPosition?.institutionId ?? 'township_govt_01',
+        regionId: initialPosition?.regionId ?? 'region_qingyun_town',
+        institutionLevel: initialPosition?.institutionLevel ?? 'township',
+        positionDomain: initialPosition?.positionDomain ?? 'local_governance',
+        leadershipRank: initialPosition?.leadershipRank ?? 'none',
+        startedAtDay: 0,
+        appointmentType: 'substantive',
+        probationEndsAtDay: 360,
+      },
+      civilServiceRank: 'clerk_2',
+      experiences: [],
+      specialties: {},
+      opportunities: [],
+      activeProcess: null,
+    },
     governance: createDefaultGovernanceState(),
     events: createDefaultEventRuntimeState(),
     world: createDefaultWorldState(),
     actions: {
       slots: {
         primary: {
-          label: '主要',
+          label: cfg.slotTiers.primary.label,
           count: cfg.slotTiers.primary.count,
           occupants: Array(cfg.slotTiers.primary.count).fill(null),
         },
         secondary: {
-          label: '次要',
+          label: cfg.slotTiers.secondary.label,
           count: cfg.slotTiers.secondary.count,
           occupants: Array(cfg.slotTiers.secondary.count).fill(null),
         },
         reserve: {
-          label: '备用',
+          label: cfg.slotTiers.reserve.label,
           count: cfg.slotTiers.reserve.count,
           occupants: Array(cfg.slotTiers.reserve.count).fill(null),
         },
@@ -174,7 +176,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       comprehensiveScore: 0,
       annualAssessments: [],
     },
-    remainingBudget: 800,
+    remainingBudget: initialPosition?.annualBudget ?? 800,
     updatedAt: Date.now(),
   };
 
