@@ -34,7 +34,10 @@ export function reduceNewGame(
   payload: NewGamePayload,
   createFresh: () => PlayerSave,
 ): void {
+  // 先完全重置为 fresh state，避免继承旧存档的事件、政策、履历等
   const fresh = createFresh();
+  Object.assign(draft, fresh);
+
   const d = payload.data;
   const cfg = getConfigLoader();
 

@@ -25,8 +25,11 @@ import regionData from '../src/config/templates/regions.json' with { type: 'json
 import universityData from '../src/config/templates/universities.json' with { type: 'json' };
 import backgroundData from '../src/config/templates/backgrounds.json' with { type: 'json' };
 import leadershipStyles from '../src/config/templates/leadership-styles.json' with { type: 'json' };
+import positionsData from '../src/config/positions/positions.json' with { type: 'json' };
+import institutionsData from '../src/config/institutions/institutions.json' with { type: 'json' };
 
 const departments = { ...deptCore, ...deptExtra };
+const departmentsLookup = departments as Record<string, unknown>;
 
 /** 所有职业线配置 */
 const ALL_CAREER_LINES: { id: string; name: string; data: typeof admin }[] = [
@@ -637,6 +640,142 @@ if (!lsResult.success) {
     console.log(`   ✅ 独立风格 "${ind.id}", max=${ind.max}`);
   }
   console.log(`   ✅ 共 ${allStyleIds.size} 个唯一风格 ID`);
+}
+
+// ===== 新版职位配置校验（Schema 2） =====
+console.log('\n--- 新版职位配置校验 (positions.json) ---\n');
+
+const VALID_INST_LEVELS = ['township', 'county', 'prefecture', 'province', 'central'];
+const VALID_DOMAINS = [
+  'local_governance',
+  'party_organs',
+  'government_general',
+  'government_specialized',
+  'discipline_inspection',
+  'congress',
+  'cppcc',
+  'mass_organs',
+  'central_institutions',
+  'national_security',
+];
+const VALID_RANKS = [
+  'none',
+  'township_deputy',
+  'township_chief',
+  'county_deputy',
+  'county_chief',
+  'prefecture_deputy',
+  'prefecture_chief',
+  'province_deputy',
+  'province_chief',
+  'national_deputy',
+  'national_chief',
+];
+
+const positions = positionsData as Array<Record<string, unknown>>;
+const institutions = institutionsData as Record<string, Record<string, unknown>>;
+const posIds = new Set<string>();
+const instIds = new Set<string>(Object.keys(institutions));
+
+console.log(`   职位数量: ${positions.length}`);
+console.log(`   机构数量: ${instIds.size}`);
+
+for (const pos of positions) {
+  const id = pos.id as string;
+  // ID 唯一性
+  if (posIds.has(id)) {
+    console.error(`❌ 职位 ID "${id}" 重复`);
+    errors++;
+  }
+  posIds.add(id);
+
+  // 必填字段
+  for (const field of [
+    'name',
+    'institutionId',
+    'regionId',
+    'institutionLevel',
+    'positionDomain',
+    'leadershipRank',
+    'contentTier',
+    'vacancyCount',
+    'annualBudget',
+  ]) {
+    if (pos[field] === undefined || pos[field] === null) {
+      console.error(`❌ 职位 "${id}" 缺少字段 ${field}`);
+      errors++;
+    }
+  }
+
+  // 禁止旧字段
+  if ('level' in pos || 'careerLine' in pos || 'promotionRequirements' in pos) {
+    console.error(`❌ 职位 "${id}" 包含旧字段 (level/careerLine/promotionRequirements)`);
+    errors++;
+  }
+
+  // 枚举值校验
+  if (!VALID_INST_LEVELS.includes(pos.institutionLevel as string)) {
+    console.error(`❌ 职位 "${id}" institutionLevel "${pos.institutionLevel}" 不合法`);
+    errors++;
+  }
+  if (!VALID_DOMAINS.includes(pos.positionDomain as string)) {
+    console.error(`❌ 职位 "${id}" positionDomain "${pos.positionDomain}" 不合法`);
+    errors++;
+  }
+  if (!VALID_RANKS.includes(pos.leadershipRank as string)) {
+    console.error(`❌ 职位 "${id}" leadershipRank "${pos.leadershipRank}" 不合法`);
+    errors++;
+  }
+
+  // 机构引用存在性
+  if (!instIds.has(pos.institutionId as string)) {
+    console.error(`❌ 职位 "${id}" 引用的机构 "${pos.institutionId}" 不存在`);
+    errors++;
+  }
+
+  // 部门模板引用存在性
+  const deptIds = pos.departmentTemplateIds as string[];
+  if (Array.isArray(deptIds)) {
+    for (const deptId of deptIds) {
+      if (!departmentsLookup[deptId]) {
+        console.error(`❌ 职位 "${id}" 引用的部门模板 "${deptId}" 不存在`);
+        errors++;
+      }
+    }
+  }
+
+  // KPI 模板引用存在性
+  const kpiIds = pos.kpiTemplateIds as string[];
+  if (Array.isArray(kpiIds)) {
+    for (const kpiId of kpiIds) {
+      if (!(kpis as Record<string, unknown>)[kpiId]) {
+        console.error(`❌ 职位 "${id}" 引用的 KPI 模板 "${kpiId}" 不存在`);
+        errors++;
+      }
+    }
+  }
+}
+
+// 机构配置校验
+for (const [instId, inst] of Object.entries(institutions)) {
+  if (!inst.id || inst.id !== instId) {
+    console.error(`❌ 机构 "${instId}" ID 不匹配`);
+    errors++;
+  }
+  if (!VALID_INST_LEVELS.includes(inst.level as string)) {
+    console.error(`❌ 机构 "${instId}" level "${inst.level}" 不合法`);
+    errors++;
+  }
+  if (!inst.regionId) {
+    console.error(`❌ 机构 "${instId}" 缺少 regionId`);
+    errors++;
+  }
+}
+
+if (errors === 0) {
+  console.log(`   ✅ ${positions.length} 个职位全部通过新版 Schema 校验`);
+  console.log(`   ✅ ${instIds.size} 个机构配置有效`);
+  console.log(`   ✅ 所有引用完整，无旧字段残留`);
 }
 
 if (errors > 0) {

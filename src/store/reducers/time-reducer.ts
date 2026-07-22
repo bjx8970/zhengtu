@@ -48,27 +48,38 @@ function processActionCompletion(
     const result = resolveActionEffects(aCfg, rng);
     const effectLabels: string[] = [];
 
-    // 应用 KPI 变化（乘以偏离倍率）
+    // 应用 KPI 变化（乘以偏离倍率，支持 add/multiply/set 操作）
     for (const change of result.kpiChanges) {
       const deptState = draft.actions.departmentStates[event.occupant.deptId];
       if (deptState) {
-        const delta = change.delta * devMult;
         const current = deptState.kpiValues[change.indicatorId] ?? 0;
-        deptState.kpiValues[change.indicatorId] = current + delta;
-        effectLabels.push(`${change.indicatorId} +${delta.toFixed(1)}`);
+        let newVal: number;
+        if (change.operation === 'set') {
+          newVal = change.delta;
+        } else if (change.operation === 'multiply') {
+          newVal = current * (change.delta * devMult);
+        } else {
+          newVal = current + change.delta * devMult;
+        }
+        deptState.kpiValues[change.indicatorId] = newVal;
+        effectLabels.push(`${change.indicatorId} ${change.operation} ${change.delta}`);
       }
     }
 
-    // 应用玩家属性变化
+    // 应用玩家属性变化（支持 add/multiply/set 操作）
     for (const change of result.playerChanges) {
       const char = draft.character as unknown as Record<string, unknown>;
       const current = typeof char[change.attr] === 'number' ? (char[change.attr] as number) : 0;
-      char[change.attr] = clampAttr(
-        change.attr,
-        current + change.delta * devMult,
-        cfg.attributeBounds,
-      );
-      effectLabels.push(`${change.attr} +${(change.delta * devMult).toFixed(1)}`);
+      let newVal: number;
+      if (change.operation === 'set') {
+        newVal = change.delta;
+      } else if (change.operation === 'multiply') {
+        newVal = current * (change.delta * devMult);
+      } else {
+        newVal = current + change.delta * devMult;
+      }
+      char[change.attr] = clampAttr(change.attr, newVal, cfg.attributeBounds);
+      effectLabels.push(`${change.attr} ${change.operation} ${change.delta}`);
     }
 
     // 应用理念变化
@@ -139,13 +150,16 @@ function processMonthlySettlement(draft: PlayerSave): void {
 
 /**
  * 处理年度考核时间轴事件。
+ *
+ * @param draft 游戏状态
+ * @param assessmentYear 考核年度（从事件中获取，而非 draft.time）
  */
-function processAnnualAssessment(draft: PlayerSave): void {
+function processAnnualAssessment(draft: PlayerSave, assessmentYear: number): void {
   const loader = getConfigLoader();
   const cfg = loader.getGameConfig();
   const positionId = draft.career.appointment.positionId;
   const deptConfigs = loader.resolvePositionDepartments(positionId);
-  const year = draft.time.year;
+  const year = assessmentYear;
 
   // 收集所有 KPI 指标
   const allIndicators = deptConfigs.flatMap((d) => d.kpiIndicators);
@@ -231,7 +245,7 @@ export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload
         processMonthlySettlement(draft);
         break;
       case 'annual_assessment':
-        processAnnualAssessment(draft);
+        processAnnualAssessment(draft, event.year);
         break;
       default:
         break;
