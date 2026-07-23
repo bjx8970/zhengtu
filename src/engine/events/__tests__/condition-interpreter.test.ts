@@ -219,9 +219,15 @@ describe('条件解释器 - 事件历史', () => {
         {
           eventId: 'flood_emergency',
           instanceId: 'i1',
-          resolvedAtDay: 50,
+          finalStatus: 'resolved',
+          triggeredAtDay: 50,
+          completedAtDay: 50,
+          sourceKey: '',
+          chainInstanceId: null,
+          titleSnapshot: '',
           chosenOptionId: 'a',
-          outcome: '',
+          chosenOptionLabel: null,
+          appliedEffects: [],
         },
       ];
     });
@@ -232,8 +238,32 @@ describe('条件解释器 - 事件历史', () => {
   it('count_gte/count_lte', () => {
     const ctx = makeContext((c) => {
       c.state.events.history = [
-        { eventId: 'ev', instanceId: 'i1', resolvedAtDay: 1, chosenOptionId: null, outcome: '' },
-        { eventId: 'ev', instanceId: 'i2', resolvedAtDay: 2, chosenOptionId: null, outcome: '' },
+        {
+          eventId: 'ev',
+          instanceId: 'i1',
+          finalStatus: 'resolved',
+          triggeredAtDay: 1,
+          completedAtDay: 1,
+          sourceKey: '',
+          chainInstanceId: null,
+          titleSnapshot: '',
+          chosenOptionId: null,
+          chosenOptionLabel: null,
+          appliedEffects: [],
+        },
+        {
+          eventId: 'ev',
+          instanceId: 'i2',
+          finalStatus: 'resolved',
+          triggeredAtDay: 2,
+          completedAtDay: 2,
+          sourceKey: '',
+          chainInstanceId: null,
+          titleSnapshot: '',
+          chosenOptionId: null,
+          chosenOptionLabel: null,
+          appliedEffects: [],
+        },
       ];
     });
     expect(evalCond({ eventHistory: 'ev', check: 'count_gte', value: 2 }, ctx)).toBe(true);

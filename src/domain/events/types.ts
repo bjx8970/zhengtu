@@ -70,3 +70,45 @@ export type EventChainStatus = (typeof EVENT_CHAIN_STATUSES)[number];
 
 /** 事件链状态 Zod Schema */
 export const EventChainStatusSchema = z.enum(EVENT_CHAIN_STATUSES);
+
+// ===== 事件冷却 =====
+
+/** 事件判定时制作用域 */
+export type CooldownScope = 'global' | 'source' | 'chain';
+
+/** 事件判定时制作用域 Zod Schema */
+export const CooldownScopeSchema = z.enum(['global', 'source', 'chain']);
+
+/** 事件冷却记录 */
+export interface EventCooldownRecord {
+  eventId: string;
+  scope: CooldownScope;
+  scopeId: string | null;
+  untilDay: number;
+}
+
+/** 计划事件取消规范 */
+export interface ScheduledEventCancellation {
+  eventId: string;
+  scope: 'same_chain' | 'same_source' | 'all';
+}
+
+/** 计划事件取消规范 Zod Schema */
+export const ScheduledEventCancellationSchema = z
+  .object({
+    eventId: z.string().min(1),
+    scope: z.enum(['same_chain', 'same_source', 'all']),
+  })
+  .strict();
+
+// ===== 编排诊断 =====
+
+/** 编排诊断信息（按判别联合具体阻隔原因） */
+export type EventOrchestrationDiagnostic =
+  | { type: 'condition_failed'; eventId: string }
+  | { type: 'repeat_blocked'; eventId: string }
+  | { type: 'cooldown_blocked'; eventId: string; untilDay: number }
+  | { type: 'probability_failed'; eventId: string }
+  | { type: 'mutex_not_selected'; eventId: string; selectedEventId: string }
+  | { type: 'duplicate_signal'; signalId: string }
+  | { type: 'instance_created'; eventId: string; instanceId: string };

@@ -18,7 +18,11 @@
 import { z } from 'zod';
 import { DomainSignalSchema } from '../governance/types';
 import { ConditionExpressionSchema, EffectDefinitionSchema } from '../conditions';
-import { EventPrioritySchema, EventPresentationSchema } from './types';
+import {
+  EventPrioritySchema,
+  EventPresentationSchema,
+  ScheduledEventCancellationSchema,
+} from './types';
 
 // ===== 事件分类 =====
 
@@ -157,9 +161,13 @@ export interface EventOptionDefinition {
   effects: import('../conditions').EffectDefinition[];
   /** 调度的后续事件（可选） */
   schedule?: ScheduledFollowupDefinition[];
-  /** 取消的计划事件 ID 列表（可选） */
+  /** 取消的计划事件 ID 列表（可选，旧格式） */
   cancelScheduledEvents?: string[];
-  /** 设置的世界事实（可选） */
+  /** 选项冷却天数（可选） */
+  cooldownDays?: number;
+  /** 计划事件取消规范（按作用域，可选） */
+  cancelScheduled?: import('./types').ScheduledEventCancellation[];
+  /** 设置的世界事实（可选，已废弃，使用 world_fact effect 替代） */
   setFacts?: FactMutationDefinition[];
 }
 
@@ -176,9 +184,11 @@ export interface EventOutcomePayload {
   effects: import('../conditions').EffectDefinition[];
   /** 调度的后续事件（可选） */
   schedule?: ScheduledFollowupDefinition[];
-  /** 取消的计划事件 ID 列表（可选） */
+  /** 取消的计划事件 ID 列表（可选，旧格式） */
   cancelScheduledEvents?: string[];
-  /** 设置的世界事实（可选） */
+  /** 计划事件取消规范（按作用域，可选） */
+  cancelScheduled?: import('./types').ScheduledEventCancellation[];
+  /** 设置的世界事实（可选，已废弃） */
   setFacts?: FactMutationDefinition[];
 }
 
@@ -214,6 +224,10 @@ export interface EventDefinition {
   repeatPolicy: EventRepeatPolicy;
   /** 激活定义 */
   activation: EventActivationDefinition;
+  /** 互斥组 ID（可选，从 trigger.mutexGroup 复制） */
+  mutexGroup?: string;
+  /** 内容版本（用于快照标记） */
+  contentVersion?: string;
   /** 选项列表（blocking/inbox 事件） */
   options: EventOptionDefinition[];
   /** 自动事件载荷（仅 automatic 事件，可选但验证要求存在） */
@@ -290,6 +304,8 @@ const EventOptionDefinitionSchema = z
     effects: z.array(EffectDefinitionSchema),
     schedule: z.array(ScheduledFollowupDefinitionSchema).optional(),
     cancelScheduledEvents: z.array(z.string().min(1)).optional(),
+    cooldownDays: z.number().int().nonnegative().optional(),
+    cancelScheduled: z.array(ScheduledEventCancellationSchema).optional(),
     setFacts: z.array(FactMutationDefinitionSchema).optional(),
   })
   .strict();
@@ -300,6 +316,7 @@ const EventOutcomePayloadSchema = z
     effects: z.array(EffectDefinitionSchema),
     schedule: z.array(ScheduledFollowupDefinitionSchema).optional(),
     cancelScheduledEvents: z.array(z.string().min(1)).optional(),
+    cancelScheduled: z.array(ScheduledEventCancellationSchema).optional(),
     setFacts: z.array(FactMutationDefinitionSchema).optional(),
   })
   .strict();
@@ -318,6 +335,8 @@ export const EventDefinitionSchema = z
     trigger: EventTriggerDefinitionSchema,
     repeatPolicy: EventRepeatPolicySchema,
     activation: EventActivationDefinitionSchema,
+    mutexGroup: z.string().min(1).optional(),
+    contentVersion: z.string().optional(),
     options: z.array(EventOptionDefinitionSchema),
     automaticOutcome: EventOutcomePayloadSchema.optional(),
   })
