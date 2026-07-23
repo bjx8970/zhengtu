@@ -416,10 +416,15 @@ export function validateEventDefinitions(
               `事件 ${event.id} ${scopeLabel}: 后续事件 "${followup.eventId}" 的条件引用的信号字段在可触发来源中不可达`,
             );
           }
-          // not 安全性按该后续条件树独立校验，上下文为其自身适用来源
+          // not 安全性按该后续条件树独立校验。
+          // followup 使用触发父事件的原始信号快照，实际可见来源为
+          // 触发条件适用来源 ∩ followup 自身适用来源（父触发条件已排除的来源不会出现）。
+          const followupNotContext = new Set(
+            [...followupSources].filter((i) => conditionApplicableSources.has(i)),
+          );
           validateNegatedSafety(
             followup.condition,
-            followupSources,
+            followupNotContext,
             false,
             sourceFieldSets,
             event.id,

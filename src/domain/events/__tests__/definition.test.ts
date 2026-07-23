@@ -665,6 +665,41 @@ describe('validateEventDefinitions 引用完整性', () => {
     const errors = validateEventDefinitions([event, f1, f2]);
     expect(errors.some((e) => e.includes('not') && e.includes('not(false)'))).toBe(false);
   });
+
+  it('父触发条件限定来源后 followup 的 not 不对不可能来源误拒', () => {
+    // 父触发条件要求 experienceId（仅 appointment.changed）→ 可触发来源限定为 appointment.changed
+    // followup 条件 any(not(regionId == forbidden), worldFact)
+    // world.metric_changed 永远无法触发父事件，故 not(regionId) 不需对其保证 → 应通过
+    const event = makeEvent({
+      trigger: {
+        sources: ['world.metric_changed', 'appointment.changed'],
+        condition: { signalField: 'experienceId', op: 'eq', value: 'x' },
+      },
+      options: [
+        {
+          id: 'o',
+          label: 'a',
+          description: '',
+          effects: [],
+          schedule: [
+            {
+              eventId: 'f1',
+              delayDays: 5,
+              condition: {
+                any: [
+                  { not: { signalField: 'regionId', op: 'eq', value: 'forbidden' } },
+                  { fact: 'some_fact', op: 'is_true' },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const f1 = makeEvent({ id: 'f1' });
+    const errors = validateEventDefinitions([event, f1]);
+    expect(errors.some((e) => e.includes('not') && e.includes('not(false)'))).toBe(false);
+  });
 });
 
 describe('SIGNAL_TYPE_PAYLOAD_FIELDS 一致性', () => {
