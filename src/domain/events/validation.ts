@@ -104,51 +104,97 @@ function collectConditionSignalFields(cond: ConditionExpression, out: Set<string
   }
 }
 
-/** 条件字段来源分析结果 */
-interface ConditionFieldAnalysis {
-  /** 被 not 取反引用的信号字段（缺失时 not(false)=true 会错误触发） */
-  negatedFields: Set<string>;
-  /** all 节点子树引用的字段组（须共存于至少一个来源） */
-  allGroups: Set<string>[];
+/**
+ * 递归计算条件表达式的适用来源集合。
+ *
+ * 语义：
+ * - 独立于信号的原子条件：适用于所有来源
+ * - signal 原子条件：适用于包含该字段的来源
+ * - all：子节点适用来源交集
+ * - any：子节点适用来源并集
+ * - not：继承子节点适用来源
+ *
+ * @param cond 条件表达式
+ * @param sourceFieldSets 每个触发来源的载荷字段集合
+ * @returns 适用来源索引集合
+ */
+function computeApplicableSources(
+  cond: ConditionExpression,
+  sourceFieldSets: Set<string>[],
+): Set<number> {
+  const allIndices = () => new Set<number>(sourceFieldSets.map((_, i) => i));
+  const fieldSources = (field: string) =>
+    new Set<number>(sourceFieldSets.flatMap((fs, i) => (fs.has(field) ? [i] : [])));
+
+  if ('all' in cond) {
+    // all：子节点适用来源交集
+    let result: Set<number> | null = null;
+    for (const child of cond.all) {
+      const childSources = computeApplicableSources(child, sourceFieldSets);
+      if (result === null) {
+        result = childSources;
+      } else {
+        const current: Set<number> = result;
+        result = new Set([...current].filter((i) => childSources.has(i)));
+      }
+    }
+    return result ?? allIndices();
+  }
+  if ('any' in cond) {
+    // any：子节点适用来源并集
+    const result = new Set<number>();
+    for (const child of cond.any) {
+      for (const i of computeApplicableSources(child, sourceFieldSets)) result.add(i);
+    }
+    return result;
+  }
+  if ('not' in cond) {
+    // not：继承子节点适用来源
+    return computeApplicableSources(cond.not, sourceFieldSets);
+  }
+  if ('signalField' in cond) {
+    return fieldSources(cond.signalField);
+  }
+  if ('policyRef' in cond && cond.policyRef.source === 'signal') {
+    return fieldSources('policyInstanceId');
+  }
+  // 独立于信号的原子条件：适用于所有来源
+  return allIndices();
 }
 
 /**
- * 递归分析条件表达式的信号字段引用上下文。
+ * 收集被 not 取反引用的信号字段。
  *
- * - 跟踪 not 取反：被取反的字段缺失会导致 not(false)=true 错误触发
- * - 跟踪 all 组合：all 子树引用的字段须共存于同一来源
+ * 被取反的字段若在某个来源缺失，会因 not(false)=true 错误触发，
+ * 因此这些字段须在所有触发来源中都存在。
  *
  * @param cond 条件表达式
  * @param negated 是否处于奇数层 not 下
- * @param result 分析结果
+ * @param out 输出集合
  */
-function analyzeConditionFields(
+function collectNegatedSignalFields(
   cond: ConditionExpression,
   negated: boolean,
-  result: ConditionFieldAnalysis,
+  out: Set<string>,
 ): void {
   if ('all' in cond) {
-    // 收集 all 子树的所有信号字段作为一个共存组
-    const group = new Set<string>();
-    collectConditionSignalFields(cond, group);
-    if (group.size > 0) result.allGroups.push(group);
-    cond.all.forEach((c) => analyzeConditionFields(c, negated, result));
+    cond.all.forEach((c) => collectNegatedSignalFields(c, negated, out));
     return;
   }
   if ('any' in cond) {
-    cond.any.forEach((c) => analyzeConditionFields(c, negated, result));
+    cond.any.forEach((c) => collectNegatedSignalFields(c, negated, out));
     return;
   }
   if ('not' in cond) {
-    analyzeConditionFields(cond.not, !negated, result);
+    collectNegatedSignalFields(cond.not, !negated, out);
     return;
   }
   if ('signalField' in cond) {
-    if (negated) result.negatedFields.add(cond.signalField);
+    if (negated) out.add(cond.signalField);
     return;
   }
   if ('policyRef' in cond && cond.policyRef.source === 'signal') {
-    if (negated) result.negatedFields.add('policyInstanceId');
+    if (negated) out.add('policyInstanceId');
   }
 }
 
@@ -274,11 +320,10 @@ export function validateEventDefinitions(
 
     // 条件引用的信号字段（含触发条件与后续调度条件）
     const conditionSignalFields = new Set<string>();
-    // 条件字段来源分析（not 安全性 + all 共存性）
-    const conditionAnalysis: ConditionFieldAnalysis = {
-      negatedFields: new Set<string>(),
-      allGroups: [],
-    };
+    // 被 not 取反引用的信号字段（须在所有来源存在）
+    const negatedSignalFields = new Set<string>();
+    // 条件适用来源（递归计算，用于可达性判断）
+    let conditionApplicableSources = new Set<number>(sourceFieldSets.map((_, i) => i));
     // 效果引用的信号字段
     const effectSignalFields = new Set<string>();
     const fixedInstitutions = new Set<string>();
@@ -286,7 +331,11 @@ export function validateEventDefinitions(
 
     if (event.trigger.condition) {
       collectConditionSignalFields(event.trigger.condition, conditionSignalFields);
-      analyzeConditionFields(event.trigger.condition, false, conditionAnalysis);
+      collectNegatedSignalFields(event.trigger.condition, false, negatedSignalFields);
+      conditionApplicableSources = computeApplicableSources(
+        event.trigger.condition,
+        sourceFieldSets,
+      );
     }
 
     // 校验载荷（选项或 automaticOutcome）中的效果引用与后续/取消引用
@@ -304,7 +353,12 @@ export function validateEventDefinitions(
         // 后续调度条件使用父事件的触发信号上下文，纳入相同的来源字段兼容性校验
         if (followup.condition) {
           collectConditionSignalFields(followup.condition, conditionSignalFields);
-          analyzeConditionFields(followup.condition, false, conditionAnalysis);
+          collectNegatedSignalFields(followup.condition, false, negatedSignalFields);
+          // 后续条件适用来源与触发条件取交集
+          const followupSources = computeApplicableSources(followup.condition, sourceFieldSets);
+          conditionApplicableSources = new Set(
+            [...conditionApplicableSources].filter((i) => followupSources.has(i)),
+          );
         }
         if (followup.delayDays === 0) {
           const edges = zeroDelayGraph.get(event.id) ?? [];
@@ -345,24 +399,18 @@ export function validateEventDefinitions(
       }
     }
 
+    // 条件可达性：递归计算的适用来源须非空（否则无任何来源能评估该条件）
+    if (conditionSignalFields.size > 0 && conditionApplicableSources.size === 0) {
+      errors.push(
+        `事件 ${event.id}: 条件引用的信号字段组合不存在于任何单一触发来源，事件将永久不可达`,
+      );
+    }
+
     // not 安全性：被取反的字段须在每个触发来源中都存在（否则 not(缺失=false)=true 错误触发）
-    for (const field of conditionAnalysis.negatedFields) {
+    for (const field of negatedSignalFields) {
       if (!effectAvailableFields.has(field)) {
         errors.push(
           `事件 ${event.id}: 条件中 not 取反引用信号字段 "${field}" 并非在所有触发来源 [${event.trigger.sources.join(', ')}] 中都存在，缺失来源将因 not(false) 错误触发`,
-        );
-      }
-    }
-
-    // all 共存性：all 子树引用的字段须共存于至少一个触发来源（否则无来源能同时满足）
-    for (const group of conditionAnalysis.allGroups) {
-      const groupFields = [...group];
-      const hasCommonSource = sourceFieldSets.some((fieldSet) =>
-        groupFields.every((f) => fieldSet.has(f)),
-      );
-      if (!hasCommonSource) {
-        errors.push(
-          `事件 ${event.id}: 条件 all 引用的信号字段 [${groupFields.join(', ')}] 不存在于任何单一触发来源，事件将永久不可达`,
         );
       }
     }

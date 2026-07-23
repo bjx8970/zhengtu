@@ -432,7 +432,7 @@ describe('validateEventDefinitions 引用完整性', () => {
       },
     });
     const errors = validateEventDefinitions([event]);
-    expect(errors.some((e) => e.includes('all') && e.includes('不可达'))).toBe(true);
+    expect(errors.some((e) => e.includes('不可达'))).toBe(true);
   });
 
   it('all 引用共存于同一来源的字段通过', () => {
@@ -449,7 +449,60 @@ describe('validateEventDefinitions 引用完整性', () => {
       },
     });
     const errors = validateEventDefinitions([event]);
-    expect(errors.some((e) => e.includes('all') && e.includes('不可达'))).toBe(false);
+    expect(errors.some((e) => e.includes('不可达'))).toBe(false);
+  });
+
+  it('all([any(A,B), 非信号条件]) 合法多来源通过', () => {
+    // actionId 仅在 action.completed，score 仅在 assessment.completed
+    // any(actionId, score) 适用于两个来源；worldMetric 条件独立于信号适用于所有来源
+    // all 交集 = {action.completed, assessment.completed} 非空 → 可达
+    const event = makeEvent({
+      trigger: {
+        sources: ['action.completed', 'assessment.completed'],
+        condition: {
+          all: [
+            {
+              any: [
+                { signalField: 'actionId', op: 'eq', value: 'x' },
+                { signalField: 'score', op: 'gte', value: 80 },
+              ],
+            },
+            { worldMetric: 'gdp', op: 'gte', value: 100 },
+          ],
+        },
+      },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('不可达'))).toBe(false);
+  });
+
+  it('all([any(A,B), any(C,D)]) 合法多来源通过', () => {
+    // any(actionId, score) 适用 {action.completed, assessment.completed}
+    // any(deptId, tier) 适用 {action.completed, assessment.completed}
+    // 交集非空 → 可达
+    const event = makeEvent({
+      trigger: {
+        sources: ['action.completed', 'assessment.completed'],
+        condition: {
+          all: [
+            {
+              any: [
+                { signalField: 'actionId', op: 'eq', value: 'x' },
+                { signalField: 'score', op: 'gte', value: 80 },
+              ],
+            },
+            {
+              any: [
+                { signalField: 'deptId', op: 'eq', value: 'y' },
+                { signalField: 'tier', op: 'eq', value: 'excellent' },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('不可达'))).toBe(false);
   });
 
   it('not(signalField) 在部分来源缺失字段被拒绝（避免 not(false) 错误触发）', () => {
