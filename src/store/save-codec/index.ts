@@ -208,6 +208,8 @@ const EventExecutableSnapshotSchema = z
     mutexGroup: z.string().nullable(),
     contentVersion: z.string(),
     deadlineDays: z.number().nullable(),
+    chainId: z.string().nullable(),
+    nodeId: z.string().nullable(),
   })
   .strict();
 
@@ -505,8 +507,8 @@ const SaveEnvelopeSchema = z
 type SchemaInferred = z.infer<typeof PlayerSaveSchema>;
 type _AssertSchemaToType = SchemaInferred extends PlayerSave ? true : never;
 type _AssertTypeToSchema = PlayerSave extends SchemaInferred ? true : never;
-const _schemaConsistencyCheck: _AssertSchemaToType = true as unknown as never;
-const _typeConsistencyCheck: _AssertTypeToSchema = true as unknown as never;
+const _schemaConsistencyCheck: _AssertSchemaToType = true;
+const _typeConsistencyCheck: _AssertTypeToSchema = true;
 void _schemaConsistencyCheck;
 void _typeConsistencyCheck;
 
@@ -643,6 +645,8 @@ export function migrateSchema3To4(raw: Record<string, unknown>): Record<string, 
           mutexGroup: null,
           contentVersion: '',
           deadlineDays: null,
+          chainId: null,
+          nodeId: null,
         };
         // 移除旧字段
         delete inst.priority;
@@ -665,6 +669,8 @@ export function migrateSchema3To4(raw: Record<string, unknown>): Record<string, 
           mutexGroup: null,
           contentVersion: '',
           deadlineDays: null,
+          chainId: null,
+          nodeId: null,
         };
       }
     }

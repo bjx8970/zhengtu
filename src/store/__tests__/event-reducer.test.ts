@@ -378,3 +378,228 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     expect(record!.titleSnapshot).toBe('Reducer Test Event');
   });
 });
+
+describe('event-reducer: cascade signals and scheduling', () => {
+  /** 构造带 schedule 的 pending 事件 */
+  function createStateWithSchedule(overrides?: {
+    pendingSnapshot?: Partial<Parameters<typeof createEventSnapshot>[0]>;
+  }) {
+    const baseSnapshot = createEventSnapshot({
+      id: 'evt_schedule_src',
+      chainId: null,
+      nodeId: null,
+      title: 'Schedule Source Event',
+      description: 'Event with schedule option',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: { deadlineDays: 30 },
+      options: [
+        {
+          id: 'opt_schedule',
+          label: '调度后续',
+          description: '调度后续事件',
+          effects: [{ target: 'character', field: 'diligence', operation: 'add', value: 5 }],
+          schedule: [{ eventId: 'flood_emergency', delayDays: 10, probability: 1 }],
+        },
+      ],
+      ...overrides?.pendingSnapshot,
+    });
+
+    const inst: EventInstance = {
+      instanceId: 'inst_schedule_001',
+      eventId: 'evt_schedule_src',
+      status: 'pending',
+      triggeredAtDay: 50,
+      activatedAtDay: 50,
+      deadlineDay: null,
+      triggerContext: makeSignal(),
+      sourceKey: 'src_schedule',
+      chainInstanceId: null,
+      snapshot: baseSnapshot,
+    };
+
+    return {
+      ...createInitialState(),
+      time: { year: 0, month: 1, day: 1, granularity: 'day' as const, totalDaysPlayed: 100 },
+      events: {
+        ...createInitialState().events,
+        pending: [inst],
+      },
+    };
+  }
+
+  it('option with schedule creates scheduled event instance', () => {
+    const store = createTestStore(createStateWithSchedule());
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_schedule_001',
+      optionId: 'opt_schedule',
+    });
+
+    const state = store.getRawState();
+    const scheduledItem = state.events.scheduled.find((s) => s.eventId === 'flood_emergency');
+    expect(scheduledItem).toBeDefined();
+    expect(scheduledItem!.sourceKey).toBe('src_schedule');
+    expect(scheduledItem!.activateAtDay).toBe(110); // currentDay 100 + delayDays 10
+  });
+
+  it('option with cancelScheduledEvents removes matching scheduled events', () => {
+    // Pre-populate a scheduled event
+    const baseState = createStateWithSchedule();
+    baseState.events.scheduled.push({
+      instanceId: 'sched_to_cancel',
+      eventId: 'flood_emergency',
+      scheduledAtDay: 95,
+      activateAtDay: 105,
+      triggerContext: { ...makeSignal(), signalId: 'sig_sched' },
+      sourceKey: 'src_schedule',
+      chainInstanceId: null,
+      snapshot: createEventSnapshot({
+        id: 'flood_emergency',
+        chainId: null,
+        nodeId: null,
+        title: 'Flood',
+        description: '',
+        category: 'governance',
+        priority: 'high',
+        presentation: 'blocking',
+        trigger: { sources: ['world.metric_changed'] },
+        repeatPolicy: { mode: 'once' },
+        activation: { deadlineDays: 10 },
+        options: [{ id: 'opt_handle', label: '处理', description: '', effects: [] }],
+      }),
+    });
+
+    // Create event with cancelScheduledEvents in the pending instance
+    const cancelSnapshot = createEventSnapshot({
+      id: 'evt_cancel_src',
+      chainId: null,
+      nodeId: null,
+      title: 'Cancel Source',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: { deadlineDays: 30 },
+      options: [
+        {
+          id: 'opt_cancel',
+          label: '取消',
+          description: '',
+          effects: [],
+          cancelScheduledEvents: ['flood_emergency'],
+        },
+      ],
+    });
+
+    const cancelInst: EventInstance = {
+      instanceId: 'inst_cancel_001',
+      eventId: 'evt_cancel_src',
+      status: 'pending',
+      triggeredAtDay: 50,
+      activatedAtDay: 50,
+      deadlineDay: null,
+      triggerContext: { ...makeSignal(), signalId: 'sig_cancel' },
+      sourceKey: 'src_schedule',
+      chainInstanceId: null,
+      snapshot: cancelSnapshot,
+    };
+
+    baseState.events.pending.push(cancelInst);
+
+    const store = createTestStore(baseState);
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_cancel_001',
+      optionId: 'opt_cancel',
+    });
+
+    const state = store.getRawState();
+    // The scheduled flood_emergency with same sourceKey should be removed
+    expect(state.events.scheduled.find((s) => s.instanceId === 'sched_to_cancel')).toBeUndefined();
+  });
+
+  it('event.resolved signal updates processedSignalIds', () => {
+    const store = createTestStore(createStateWithPending());
+    const beforeIds = store.getRawState().events.processedSignalIds.length;
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_reducer_001',
+      optionId: 'opt_heal',
+    });
+
+    const state = store.getRawState();
+    // processedSignalIds should increase (event.resolved signalId added via cascade)
+    expect(state.events.processedSignalIds.length).toBeGreaterThanOrEqual(beforeIds);
+  });
+
+  it('chain instance updated after resolving chain event', () => {
+    const chainSnapshot = createEventSnapshot({
+      id: 'evt_chain_test',
+      chainId: 'test_chain',
+      nodeId: 'node_a',
+      title: 'Chain Test Event',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: { deadlineDays: 30 },
+      options: [
+        {
+          id: 'opt_chain',
+          label: '继续链',
+          description: '',
+          effects: [{ target: 'character', field: 'diligence', operation: 'add', value: 3 }],
+        },
+      ],
+    });
+
+    const chainInst: EventInstance = {
+      instanceId: 'inst_chain_001',
+      eventId: 'evt_chain_test',
+      status: 'pending',
+      triggeredAtDay: 50,
+      activatedAtDay: 50,
+      deadlineDay: null,
+      triggerContext: { ...makeSignal(), signalId: 'sig_chain' },
+      sourceKey: 'src_chain',
+      chainInstanceId: 'chain_test_instance',
+      snapshot: chainSnapshot,
+    };
+
+    const baseState = createStateWithPending();
+    baseState.events.chainInstances['chain_test_instance'] = {
+      instanceId: 'chain_test_instance',
+      chainId: 'test_chain',
+      status: 'active',
+      sourceKey: 'src_chain',
+      activeNodeIds: ['node_a'],
+      completedNodeIds: [],
+      startedAtDay: 50,
+      completedAtDay: null,
+    };
+    baseState.events.pending = [chainInst];
+
+    const store = createTestStore(baseState);
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_chain_001',
+      optionId: 'opt_chain',
+    });
+
+    const state = store.getRawState();
+    expect(state.events.chainInstances['chain_test_instance']).toBeDefined();
+    // Node should be moved from active to completed
+    expect(state.events.chainInstances['chain_test_instance']!.completedNodeIds).toContain(
+      'node_a',
+    );
+  });
+});

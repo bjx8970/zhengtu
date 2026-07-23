@@ -192,10 +192,12 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
   if (instance.chainInstanceId) {
     const ci = state.events.chainInstances[instance.chainInstanceId];
     if (ci) {
+      // 解析节点标识符：优先使用快照中的 nodeId，回退到 eventId
+      const resolvedNodeId = instance.snapshot.nodeId ?? instance.eventId;
       chainUpdate = {
         ...ci,
-        activeNodeIds: ci.activeNodeIds.filter((n) => n !== instance.eventId),
-        completedNodeIds: [...ci.completedNodeIds, instance.eventId],
+        activeNodeIds: ci.activeNodeIds.filter((n) => n !== resolvedNodeId),
+        completedNodeIds: [...ci.completedNodeIds, resolvedNodeId],
         completedAtDay: ci.activeNodeIds.length <= 1 ? currentDay : ci.completedAtDay,
       };
     }

@@ -35,6 +35,10 @@ export interface EventExecutableSnapshot {
   contentVersion: string;
   /** 截止天数（从激活日开始计算，null 表示无截止） */
   deadlineDays: number | null;
+  /** 事件链 ID（null 表示不属于链） */
+  chainId: string | null;
+  /** 链内节点 ID（null 表示非链节点） */
+  nodeId: string | null;
 }
 
 /** 事件实例 */

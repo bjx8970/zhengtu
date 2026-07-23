@@ -69,6 +69,8 @@ export function createEventSnapshot(def: EventDefinition): EventExecutableSnapsh
     mutexGroup: def.mutexGroup ?? def.trigger.mutexGroup ?? null,
     contentVersion: def.contentVersion ?? CURRENT_CONTENT_VERSION,
     deadlineDays: def.activation.deadlineDays ?? null,
+    chainId: def.chainId ?? null,
+    nodeId: def.nodeId ?? null,
   };
 }
 
@@ -496,6 +498,9 @@ function resolveSingleSignal(
     }
   }
 
+  // 每个信号最多一个 blocking 事件标记为 active，其余标记为 pending
+  let hasBlockingActive = false;
+
   for (const def of selectedDefs) {
     const instanceId = idFactory();
     const activateDay = calculateActivateDay(sig.occurredAtDay, def, rng);
@@ -537,7 +542,12 @@ function resolveSingleSignal(
         snapshot,
       });
     } else {
-      const status: 'active' | 'pending' = def.presentation === 'blocking' ? 'active' : 'pending';
+      // 首个 blocking 事件标记为 active；同一信号内的后续 blocking 事件标记为 pending
+      const status: 'active' | 'pending' =
+        def.presentation === 'blocking' && !hasBlockingActive ? 'active' : 'pending';
+      if (def.presentation === 'blocking') {
+        hasBlockingActive = true;
+      }
       const inst: EventInstance = {
         instanceId,
         eventId: def.id,
