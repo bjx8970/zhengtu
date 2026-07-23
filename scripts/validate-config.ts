@@ -25,8 +25,11 @@ import regionData from '../src/config/templates/regions.json' with { type: 'json
 import universityData from '../src/config/templates/universities.json' with { type: 'json' };
 import backgroundData from '../src/config/templates/backgrounds.json' with { type: 'json' };
 import leadershipStyles from '../src/config/templates/leadership-styles.json' with { type: 'json' };
+import positionsData from '../src/config/positions/positions.json' with { type: 'json' };
+import institutionsData from '../src/config/institutions/institutions.json' with { type: 'json' };
 
 const departments = { ...deptCore, ...deptExtra };
+const departmentsLookup = departments as Record<string, unknown>;
 
 /** 所有职业线配置 */
 const ALL_CAREER_LINES: { id: string; name: string; data: typeof admin }[] = [
@@ -637,6 +640,91 @@ if (!lsResult.success) {
     console.log(`   ✅ 独立风格 "${ind.id}", max=${ind.max}`);
   }
   console.log(`   ✅ 共 ${allStyleIds.size} 个唯一风格 ID`);
+}
+
+// ===== 新版职位配置校验（复用正式 Schema 单一事实来源） =====
+console.log('\n--- 新版职位配置校验 (positions.json) ---\n');
+
+import {
+  PositionConfigArraySchema,
+  InstitutionConfigMapSchema,
+  validatePositionInstitutionConsistency,
+} from '../src/config/schemas';
+
+// 使用正式 Schema 解析（与 ConfigLoader 共用同一入口）
+const parsedPositionsResult = PositionConfigArraySchema.safeParse(positionsData);
+if (!parsedPositionsResult.success) {
+  console.error(`❌ positions.json 未通过 PositionConfigSchema 校验：`);
+  for (const issue of parsedPositionsResult.error.issues) {
+    console.error(`   ${issue.path.join('.')}: ${issue.message}`);
+    errors++;
+  }
+}
+
+const parsedInstitutionsResult = InstitutionConfigMapSchema.safeParse(institutionsData);
+if (!parsedInstitutionsResult.success) {
+  console.error(`❌ institutions.json 未通过 InstitutionConfigSchema 校验：`);
+  for (const issue of parsedInstitutionsResult.error.issues) {
+    console.error(`   ${issue.path.join('.')}: ${issue.message}`);
+    errors++;
+  }
+}
+
+if (parsedPositionsResult.success && parsedInstitutionsResult.success) {
+  const validPositions = parsedPositionsResult.data;
+  const validInstitutions = parsedInstitutionsResult.data;
+  const posIds = new Set<string>();
+
+  console.log(`   职位数量: ${validPositions.length}`);
+  console.log(`   机构数量: ${Object.keys(validInstitutions).length}`);
+
+  for (const pos of validPositions) {
+    // ID 唯一性
+    if (posIds.has(pos.id)) {
+      console.error(`❌ 职位 ID "${pos.id}" 重复`);
+      errors++;
+    }
+    posIds.add(pos.id);
+
+    // 职位与机构交叉一致性（层级 + 地区）
+    const inst = validInstitutions[pos.institutionId];
+    const consistencyErrors = validatePositionInstitutionConsistency(pos, inst);
+    for (const err of consistencyErrors) {
+      console.error(`❌ ${err}`);
+      errors++;
+    }
+
+    // 部门模板引用存在性
+    for (const deptId of pos.departmentTemplateIds) {
+      if (!departmentsLookup[deptId]) {
+        console.error(`❌ 职位 "${pos.id}" 引用的部门模板 "${deptId}" 不存在`);
+        errors++;
+      }
+    }
+
+    // KPI 模板引用存在性
+    for (const kpiId of pos.kpiTemplateIds) {
+      if (!(kpis as Record<string, unknown>)[kpiId]) {
+        console.error(`❌ 职位 "${pos.id}" 引用的 KPI 模板 "${kpiId}" 不存在`);
+        errors++;
+      }
+    }
+  }
+
+  // 机构 ID 与键一致性
+  for (const [key, inst] of Object.entries(validInstitutions)) {
+    if (inst.id !== key) {
+      console.error(`❌ 机构键 "${key}" 与 id "${inst.id}" 不匹配`);
+      errors++;
+    }
+  }
+
+  if (errors === 0) {
+    console.log(`   ✅ ${validPositions.length} 个职位全部通过正式 Schema 校验`);
+    console.log(`   ✅ ${Object.keys(validInstitutions).length} 个机构配置有效`);
+    console.log(`   ✅ 职位—机构交叉一致性通过（层级 + 地区）`);
+    console.log(`   ✅ 所有部门/KPI 引用完整`);
+  }
 }
 
 if (errors > 0) {

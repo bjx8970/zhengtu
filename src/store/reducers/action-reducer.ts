@@ -1,5 +1,5 @@
 /**
- * 行动 Reducer
+ * 行动 Reducer（Schema 2）
  *
  * 处理 START_ACTION 动作：
  * - 校验行动合法性（分类、预算、冷却、槽位）
@@ -14,7 +14,6 @@ import { startAction } from '../../engine/core/action';
 import { calculateDeviationPenalty } from '../../engine/career/deviation-penalty';
 import { getConfigLoader } from '../../config/loader';
 import { clampAttr } from '../../utils/math';
-import { extractPositionIndex } from './shared';
 
 /**
  * 处理 START_ACTION 动作。
@@ -28,21 +27,21 @@ import { extractPositionIndex } from './shared';
 export function reduceStartAction(draft: PlayerSave, payload: StartActionPayload): void {
   const loader = getConfigLoader();
   const cfg = loader.getGameConfig();
-  const positionIndex = extractPositionIndex(draft.currentPositionId);
-  const position = loader.getPosition(draft.currentCareerLine, draft.currentLevel, positionIndex);
-  if (!position) return;
+  const positionId = draft.career.appointment.positionId;
 
-  const deptConfig = position.departments.find((d) => d.id === payload.deptId);
+  // 使用新版 ConfigLoader 按稳定 ID 查询
+  const departments = loader.resolvePositionDepartments(positionId);
+  const deptConfig = departments.find((d) => d.id === payload.deptId);
   if (!deptConfig) return;
   const actionConfig = deptConfig.actions.find((a) => a.id === payload.actionId);
   if (!actionConfig) return;
 
-  const deptState = draft.departmentStates[payload.deptId];
+  const deptState = draft.actions.departmentStates[payload.deptId];
   const result = startAction({
     action: actionConfig,
-    slotState: draft.slots,
+    slotState: draft.actions.slots,
     remainingBudget: draft.remainingBudget,
-    currentDay: draft.totalDaysPlayed,
+    currentDay: draft.time.totalDaysPlayed,
     deptId: payload.deptId,
     tierKey: payload.tierKey,
     cooldownUntilDay: deptState?.actionCooldownUntilDays?.[payload.actionId] ?? 0,
@@ -54,7 +53,7 @@ export function reduceStartAction(draft: PlayerSave, payload: StartActionPayload
   let runtimeSnapshot: ActionRuntimeSnapshot | undefined;
   if (actionConfig.styleAlignment) {
     const devResult = calculateDeviationPenalty(
-      draft.philosophy.scores,
+      draft.character.philosophy.scores,
       actionConfig.styleAlignment,
       loader.getLeadershipStyleConfig().styleSpectrums,
       loader.getLeadershipStyleConfig().deviationPenalty,
@@ -71,7 +70,7 @@ export function reduceStartAction(draft: PlayerSave, payload: StartActionPayload
     deptId: payload.deptId,
     actionName: actionConfig.name,
     category: actionConfig.category,
-    startedAtDay: draft.totalDaysPlayed,
+    startedAtDay: draft.time.totalDaysPlayed,
     durationDays: actionConfig.durationDays,
     cooldownDays: actionConfig.cooldownDays,
     runtimeSnapshot,
@@ -79,23 +78,27 @@ export function reduceStartAction(draft: PlayerSave, payload: StartActionPayload
 
   const tierKey = result.tierKey;
   const slotIdx = result.slotIndex;
-  draft.slots[tierKey].occupants[slotIdx] = occupant;
+  draft.actions.slots[tierKey].occupants[slotIdx] = occupant;
 
   draft.remainingBudget -= actionConfig.budgetDelta;
-  draft.totalActions += 1;
+  draft.actions.totalActions += 1;
 
   // 备用槽位惩罚
   if (tierKey === 'reserve') {
     const penalty = cfg.reservePenalty;
-    draft.vigor = clampAttr('vigor', (draft.vigor ?? 100) + penalty.vigor, cfg.attributeBounds);
-    draft.ambition = clampAttr(
+    draft.character.vigor = clampAttr(
+      'vigor',
+      (draft.character.vigor ?? 100) + penalty.vigor,
+      cfg.attributeBounds,
+    );
+    draft.character.ambition = clampAttr(
       'ambition',
-      (draft.ambition ?? 100) + penalty.ambition,
+      (draft.character.ambition ?? 100) + penalty.ambition,
       cfg.attributeBounds,
     );
   }
 
   if (deptState) {
-    deptState.lastActionDay = draft.totalDaysPlayed;
+    deptState.lastActionDay = draft.time.totalDaysPlayed;
   }
 }

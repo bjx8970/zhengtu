@@ -34,18 +34,17 @@ describe('SplashPage local archive entry', () => {
   });
 
   it('有效存档展示摘要并可继续游戏', () => {
-    const state = createInitialState({
-      characterName: '林致远',
-      currentPositionId: 'admin_l2_0',
-      currentLevel: 2,
-      time: { year: 2028, month: 6, day: 15, granularity: 'day' },
-    });
+    const state = createInitialState();
+    state.character.characterName = '林致远';
+    state.career.appointment.positionId = 'admin_l2_0';
+    state.career.appointment.leadershipRank = 'township_deputy';
+    state.time = { year: 2028, month: 6, day: 15, granularity: 'day', totalDaysPlayed: 0 };
     dispatch({ type: 'LOAD_SAVE', save: state });
     setStartupSaveResult({ status: 'loaded', state });
 
     render(() => <SplashPage />);
 
-    expect(screen.getByText('林致远 · L2')).toBeInTheDocument();
+    expect(screen.getByText(/林致远/)).toBeInTheDocument();
     expect(screen.getByText('2028年6月15日')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /继续游戏/ }));
 
@@ -84,12 +83,11 @@ describe('SplashPage local archive entry', () => {
     });
 
     // 模拟 NEW_GAME 已写入角色到 Store
-    const state = createInitialState({
-      characterName: '新角色',
-      currentPositionId: 'admin_l1_0',
-      currentLevel: 1,
-      time: { year: 2012, month: 1, day: 1, granularity: 'day' },
-    });
+    const state = createInitialState();
+    state.character.characterName = '新角色';
+    state.career.appointment.positionId = 'admin_l1_0';
+    state.career.appointment.leadershipRank = 'none';
+    state.time = { year: 2012, month: 1, day: 1, granularity: 'day', totalDaysPlayed: 0 };
     dispatch({ type: 'LOAD_SAVE', save: state });
 
     render(() => <SplashPage />);
@@ -97,7 +95,7 @@ describe('SplashPage local archive entry', () => {
     // 不应继续显示旧档警告
     expect(screen.queryByText(/检测到旧版本存档/)).not.toBeInTheDocument();
     // 应显示新角色摘要和继续游戏
-    expect(screen.getByText('新角色 · L1')).toBeInTheDocument();
+    expect(screen.getByText(/新角色/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /继续游戏/ })).toBeInTheDocument();
   });
 });

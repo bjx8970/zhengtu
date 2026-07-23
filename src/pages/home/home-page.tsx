@@ -16,7 +16,7 @@ import { AlertBanner, type AlertItem } from '../../components/alert-banner';
 import { calculateKPI } from '../../engine/governance/kpi';
 import { getConfigLoader } from '../../config/loader';
 import { formatDate } from '../../utils/format';
-import { parsePositionIndex } from '../../utils/position';
+import { LEADERSHIP_RANK_LABELS } from '../../domain/career/types';
 import type { SlotOccupant, SlotTierKey } from '../../types/player';
 import { colors, font } from '../../utils/theme';
 
@@ -95,11 +95,9 @@ export function HomePage() {
   const { state, dispatch } = useGameStore();
 
   const positionConfig = createMemo(() => {
-    const posId = state.currentPositionId;
+    const posId = state.career.appointment.positionId;
     if (!posId) return null;
-    const idx = parsePositionIndex(posId);
-    if (idx === null) return null;
-    return getConfigLoader().getPosition(state.currentCareerLine, state.currentLevel, idx);
+    return getConfigLoader().getPositionById(posId);
   });
 
   const dateStr = createMemo(() => formatDate(state.time.year, state.time.month, state.time.day));
@@ -108,8 +106,8 @@ export function HomePage() {
     const pos = positionConfig();
     if (!pos) return null;
     return calculateKPI(
-      pos.kpiIndicators,
-      state.departmentStates,
+      getConfigLoader().resolvePositionKpis(pos.id),
+      state.actions.departmentStates,
       getConfigLoader().getGameConfig(),
     );
   });
@@ -130,13 +128,13 @@ export function HomePage() {
 
   /** 按分组获取日程占用列表 */
   function getTierOccupants(tierKey: SlotTierKey) {
-    const tier = state.slots[tierKey];
+    const tier = state.actions.slots[tierKey];
     return tier.occupants;
   }
 
   /** 计算占用数/总数 */
   function getTierCount(tierKey: SlotTierKey) {
-    const tier = state.slots[tierKey];
+    const tier = state.actions.slots[tierKey];
     const occupied = tier.occupants.filter((o: SlotOccupant | null) => o !== null).length;
     return { occupied, total: tier.count };
   }
@@ -174,7 +172,7 @@ export function HomePage() {
               color: '#fff',
             }}
           >
-            {state.characterName ? state.characterName.charAt(0) : '?'}
+            {state.character.characterName ? state.character.characterName.charAt(0) : '?'}
           </div>
           <div>
             <div
@@ -184,7 +182,7 @@ export function HomePage() {
                 'font-family': font.title,
               }}
             >
-              {state.characterName || '未创建角色'}
+              {state.character.characterName || '未创建角色'}
             </div>
             <div
               style={{
@@ -199,7 +197,7 @@ export function HomePage() {
                 <span>{positionConfig()?.name}</span>
                 <span>·</span>
               </Show>
-              <span>行政线 L{state.currentLevel}</span>
+              <span>{LEADERSHIP_RANK_LABELS[state.career.appointment.leadershipRank]}</span>
             </div>
           </div>
         </div>
@@ -211,7 +209,11 @@ export function HomePage() {
             <div
               style={{ 'font-size': '11px', color: 'rgba(255,255,255,0.55)', 'margin-top': '2px' }}
             >
-              任职第 {state.yearsInCurrentPosition} 年 · 累计 {state.totalDaysPlayed} 天
+              任职第{' '}
+              {Math.floor(
+                (state.time.totalDaysPlayed - state.career.appointment.startedAtDay) / 360,
+              ) + 1}{' '}
+              年 · 累计 {state.time.totalDaysPlayed} 天
             </div>
           </div>
           <button
@@ -341,7 +343,7 @@ export function HomePage() {
                 <For each={occupants}>
                   {(occupant: SlotOccupant | null) => {
                     if (occupant) {
-                      const elapsed = state.totalDaysPlayed - occupant.startedAtDay;
+                      const elapsed = state.time.totalDaysPlayed - occupant.startedAtDay;
                       const total = occupant.durationDays;
                       const pct = Math.min((elapsed / total) * 100, 100);
                       const remain = Math.max(total - elapsed, 0);

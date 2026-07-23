@@ -225,6 +225,8 @@ export interface GameConfig {
   defaultStartingAge: number;
   /** 角色初始属性默认值 */
   initialAttributes: Record<string, number>;
+  /** 初始职位 ID（新建游戏时的起始职位） */
+  initialPositionId: string;
   /** KPI 等次对应的 UI 颜色 */
   kpiTierColors: Record<string, string>;
   /** 进度条颜色阈值 */

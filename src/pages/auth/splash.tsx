@@ -20,7 +20,7 @@ export function SplashPage() {
   const { state } = useGameStore();
   const saveResult = getStartupSaveResult();
   // 可继续状态从 Store 派生：有角色名和职位即可继续
-  const hasSave = Boolean(state.characterName && state.currentPositionId);
+  const hasSave = Boolean(state.character.characterName && state.career.appointment.positionId);
   const hasError =
     !hasSave &&
     (saveResult.status === 'legacy' ||
@@ -131,7 +131,8 @@ export function SplashPage() {
                 >
                   <div class="eyebrow">LOCAL ARCHIVE</div>
                   <strong style={{ display: 'block', 'margin-top': '0.35rem' }}>
-                    {state.characterName || '未命名角色'} · L{state.currentLevel}
+                    {state.character.characterName || '未命名角色'} ·{' '}
+                    {state.career.appointment.leadershipRank}
                   </strong>
                   <span style={{ color: 'var(--text-secondary)', 'font-size': '0.76rem' }}>
                     {formatDate(state.time.year, state.time.month, state.time.day)}

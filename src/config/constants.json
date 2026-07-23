@@ -1,17 +1,37 @@
 {
   "slotTiers": {
-    "primary": { "label": "主要", "count": 3, "description": "核心工作槽位" },
-    "secondary": { "label": "次要", "count": 2, "description": "常规工作槽位" },
-    "reserve": { "label": "备用", "count": 1, "description": "加班槽位，消耗健康" }
+    "primary": {
+      "label": "主要",
+      "count": 3,
+      "description": "核心工作槽位"
+    },
+    "secondary": {
+      "label": "次要",
+      "count": 2,
+      "description": "常规工作槽位"
+    },
+    "reserve": {
+      "label": "备用",
+      "count": 1,
+      "description": "加班槽位，消耗健康"
+    }
   },
-  "reservePenalty": { "vigor": -5, "ambition": -3 },
+  "reservePenalty": {
+    "vigor": -5,
+    "ambition": -3
+  },
   "daysPerMonth": 30,
   "monthsPerYear": 12,
   "retirementAge": 65,
   "startYear": 2012,
   "congressCycleYears": 5,
   "budgetByLevel": [0, 1000, 2000, 3000, 5000, 8000, 12000, 18000, 25000, 35000, 50000, 70000],
-  "budgetMultiplierByLine": { "admin": 1.0, "party": 0.8, "discipline": 1.0, "mass": 0.8 },
+  "budgetMultiplierByLine": {
+    "admin": 1,
+    "party": 0.8,
+    "discipline": 1,
+    "mass": 0.8
+  },
   "initialTransferCount": 5,
   "lineLockLevel": 7,
   "transferWindowLevels": [
@@ -34,7 +54,11 @@
     "ambition": [0, 100],
     "vigor": [0, 100]
   },
-  "kpiTierThresholds": { "excellent": 90, "competent": 75, "basic": 60 },
+  "kpiTierThresholds": {
+    "excellent": 90,
+    "competent": 75,
+    "basic": 60
+  },
   "completionRateCap": 1.5,
   "sentimentMinLevel": 4,
   "incompetentFrozenPeriods": 1,
@@ -60,12 +84,31 @@
     "基本称职": "#FF9800",
     "不称职": "#C44D4D"
   },
-  "completionBarThresholds": { "excellent": 1, "good": 0.6 },
+  "completionBarThresholds": {
+    "excellent": 1,
+    "good": 0.6
+  },
   "fiveDimMapping": {
-    "virtue": { "integrity": 0.4, "stability": 0.3, "ambition": 0.3 },
-    "capacity": { "competence": 0.5, "charisma": 0.2, "network": 0.2, "stability": 0.1 },
-    "diligenceScore": { "diligence": 0.5, "vigor": 0.3, "ambition": 0.2 },
-    "honesty": { "integrity": 0.6, "stability": 0.4 }
+    "virtue": {
+      "integrity": 0.4,
+      "stability": 0.3,
+      "ambition": 0.3
+    },
+    "capacity": {
+      "competence": 0.5,
+      "charisma": 0.2,
+      "network": 0.2,
+      "stability": 0.1
+    },
+    "diligenceScore": {
+      "diligence": 0.5,
+      "vigor": 0.3,
+      "ambition": 0.2
+    },
+    "honesty": {
+      "integrity": 0.6,
+      "stability": 0.4
+    }
   },
   "comprehensiveScoreWeights": {
     "virtue": 0.15,
@@ -108,5 +151,6 @@
       "ambitionOnRejected": 8,
       "politicalCapitalBonusOnSuccess": 10
     }
-  }
+  },
+  "initialPositionId": "admin_l1_0"
 }

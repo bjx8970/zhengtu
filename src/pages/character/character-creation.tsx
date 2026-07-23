@@ -46,7 +46,7 @@ const INITIAL_DATA: CharacterData = {
 export function CharacterCreation() {
   const { state, dispatch } = useGameStore();
 
-  if (state.characterName && !consumeForceNewGame()) {
+  if (state.character.characterName && !consumeForceNewGame()) {
     navigate('/main');
     return null;
   }
@@ -85,8 +85,7 @@ export function CharacterCreation() {
 
   function handleComplete() {
     const cfg = loader.getGameConfig();
-    const startLine = data().careerLine;
-    const startPos = loader.getPosition(startLine, 1, 0);
+    const startPos = loader.getPositionById(cfg.initialPositionId);
     const startYear = cfg.startYear + (data().isPreparatory ? 1 : 0);
 
     dispatch({
