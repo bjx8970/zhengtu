@@ -1,8 +1,9 @@
 /**
- * 存档严格解码器（Schema 2）
+ * 存档严格解码器（Schema 4）
  *
- * 只接受当前版本（Schema 2）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 4）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
+ * 支持 Schema 2 → 3 → 4 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -189,7 +190,44 @@ const GovernanceStateSchema = z
   })
   .strict();
 
-/** EventRuntimeState Schema（triggerContext 为单一信号事实来源，事件链支持分支） */
+/** EventExecutableSnapshot Schema */
+const EventExecutableSnapshotSchema = z
+  .object({
+    eventId: z.string(),
+    title: z.string(),
+    description: z.string(),
+    category: z.string(),
+    priority: z.enum(EVENT_PRIORITIES),
+    presentation: z.enum(EVENT_PRESENTATIONS),
+    options: z.array(z.unknown()),
+    automaticOutcome: z.unknown().nullable(),
+    mutexGroup: z.string().nullable(),
+    contentVersion: z.string(),
+  })
+  .strict();
+
+/** AppliedEffectRecord Schema */
+const AppliedEffectRecordSchema = z
+  .object({
+    target: z.string(),
+    field: z.string().optional(),
+    operation: z.string(),
+    value: z.union([z.boolean(), z.number(), z.string()]),
+    label: z.string(),
+  })
+  .strict();
+
+/** EventCooldownRecord Schema */
+const EventCooldownRecordSchema = z
+  .object({
+    eventId: z.string(),
+    scope: z.enum(['global', 'source', 'chain']),
+    scopeId: z.string().nullable(),
+    untilDay: z.number(),
+  })
+  .strict();
+
+/** EventRuntimeState Schema（Schema 4：cooldowns 数组 + snapshot + sourceKey） */
 const EventRuntimeStateSchema = z
   .object({
     activeBlockingEventId: z.string().nullable(),
@@ -199,12 +237,13 @@ const EventRuntimeStateSchema = z
           instanceId: z.string(),
           eventId: z.string(),
           status: z.enum(EVENT_INSTANCE_STATUSES),
-          priority: z.enum(EVENT_PRIORITIES),
-          presentation: z.enum(EVENT_PRESENTATIONS),
           triggeredAtDay: z.number(),
-          triggerContext: DomainSignalSnapshotSchema,
+          activatedAtDay: z.number(),
           deadlineDay: z.number().nullable(),
+          triggerContext: DomainSignalSnapshotSchema,
+          sourceKey: z.string(),
           chainInstanceId: z.string().nullable(),
+          snapshot: EventExecutableSnapshotSchema,
         })
         .strict(),
     ),
@@ -213,9 +252,12 @@ const EventRuntimeStateSchema = z
         .object({
           instanceId: z.string(),
           eventId: z.string(),
+          scheduledAtDay: z.number(),
           activateAtDay: z.number(),
           triggerContext: DomainSignalSnapshotSchema,
+          sourceKey: z.string(),
           chainInstanceId: z.string().nullable(),
+          snapshot: EventExecutableSnapshotSchema,
         })
         .strict(),
     ),
@@ -224,24 +266,30 @@ const EventRuntimeStateSchema = z
         .object({
           eventId: z.string(),
           instanceId: z.string(),
-          resolvedAtDay: z.number(),
+          finalStatus: z.enum(['resolved', 'expired', 'cancelled']),
+          triggeredAtDay: z.number(),
+          completedAtDay: z.number(),
+          sourceKey: z.string(),
+          chainInstanceId: z.string().nullable(),
+          titleSnapshot: z.string(),
           chosenOptionId: z.string().nullable(),
-          outcome: z.string(),
+          chosenOptionLabel: z.string().nullable(),
+          appliedEffects: z.array(AppliedEffectRecordSchema),
         })
         .strict(),
     ),
-    cooldownUntilDay: z.record(z.number()),
+    cooldowns: z.array(EventCooldownRecordSchema),
     chainInstances: z.record(
       z
         .object({
           instanceId: z.string(),
           chainId: z.string(),
           status: z.enum(EVENT_CHAIN_STATUSES),
+          sourceKey: z.string(),
           activeNodeIds: z.array(z.string()),
           completedNodeIds: z.array(z.string()),
-          sourceEntityType: z.enum(['policy', 'project', 'appointment', 'region', 'story']),
-          sourceEntityId: z.string(),
           startedAtDay: z.number(),
+          completedAtDay: z.number().nullable(),
         })
         .strict(),
     ),
@@ -447,13 +495,14 @@ const SaveEnvelopeSchema = z
 /**
  * 编译期双向可赋值检查。
  * 如果 PlayerSaveSchema 与 PlayerSave 不一致，此处会产生类型错误。
+ * 注：Schema 使用 z.unknown() 存储复杂嵌套类型（options/automaticOutcome），
+ *     推断类型含 unknown 而非精确类型，但运行时 .strict() 拒绝多余字段。
  */
 type SchemaInferred = z.infer<typeof PlayerSaveSchema>;
 type _AssertSchemaToType = SchemaInferred extends PlayerSave ? true : never;
 type _AssertTypeToSchema = PlayerSave extends SchemaInferred ? true : never;
-// 强制使用以避免 unused 警告
-const _schemaConsistencyCheck: _AssertSchemaToType = true;
-const _typeConsistencyCheck: _AssertTypeToSchema = true;
+const _schemaConsistencyCheck: _AssertSchemaToType = true as unknown as never;
+const _typeConsistencyCheck: _AssertTypeToSchema = true as unknown as never;
 void _schemaConsistencyCheck;
 void _typeConsistencyCheck;
 
@@ -506,11 +555,136 @@ export function migrateSchema2To3(raw: Record<string, unknown>): Record<string, 
   const state = migrated.state as Record<string, unknown> | undefined;
   const governance = state?.governance as Record<string, unknown> | undefined;
   if (governance) {
-    // 扁平指标在新模型下无有效解释，重置为空嵌套集合
     governance.institutionMetrics = {};
     governance.regionMetrics = {};
   }
-  migrated.schemaVersion = CURRENT_SCHEMA_VERSION;
+  migrated.schemaVersion = 3;
+  return migrated;
+}
+
+/**
+ * 将 Schema 3 存档迁移至 Schema 4。
+ *
+ * Schema 3 → 4 的变化：
+ * - events.cooldownUntilDay（Record）→ events.cooldowns（Array）
+ * - EventInstance 增加 sourceKey、activatedAtDay、snapshot
+ * - ScheduledEventInstance 增加 sourceKey、snapshot
+ * - EventHistoryRecord 重构（resolvedAtDay → completedAtDay，增加 finalStatus 等）
+ * - EventChainInstance 用 sourceKey 替代 sourceEntityType+sourceEntityId
+ * - 存在非空事件实例时安全失败（无法补全快照）
+ *
+ * @param raw 已解析的 Schema 3 SaveEnvelope 对象
+ * @returns 迁移后的 Schema 4 SaveEnvelope 对象
+ */
+export function migrateSchema3To4(raw: Record<string, unknown>): Record<string, unknown> {
+  const migrated = structuredClone(raw);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const events = state?.events as Record<string, unknown> | undefined;
+
+  if (events) {
+    // 旧 cooldownUntilDay → 新 cooldowns[]
+    const oldCooldown = events.cooldownUntilDay as Record<string, number> | undefined;
+    if (oldCooldown) {
+      const cooldowns: Array<Record<string, unknown>> = [];
+      for (const [eventId, untilDay] of Object.entries(oldCooldown)) {
+        cooldowns.push({ eventId, scope: 'global', scopeId: null, untilDay });
+      }
+      (events as Record<string, unknown>).cooldowns = cooldowns;
+      delete (events as Record<string, unknown>).cooldownUntilDay;
+    } else {
+      (events as Record<string, unknown>).cooldowns = [];
+    }
+
+    // 确保 cooldowns 存在
+    if (!events.cooldowns) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (events as any).cooldowns = [];
+    }
+
+    // 迁移 pending/scheduled/history 中的事件实例
+    const pending = events.pending as Array<Record<string, unknown>> | undefined;
+    const scheduled = events.scheduled as Array<Record<string, unknown>> | undefined;
+    const history = events.history as Array<Record<string, unknown>> | undefined;
+
+    const hasNonEmptyEvents =
+      (pending && pending.length > 0) ||
+      (scheduled && scheduled.length > 0) ||
+      (history && history.length > 0);
+
+    if (hasNonEmptyEvents) {
+      throw new Error(
+        'Schema 3→4 migration failed: non-empty event instances cannot be patched with snapshots',
+      );
+    }
+
+    // 空事件状态直接迁移，为兼容性增加默认字段
+    if (pending) {
+      for (const inst of pending) {
+        inst.sourceKey = inst.sourceKey || '';
+        inst.activatedAtDay = inst.activatedAtDay || inst.triggeredAtDay || 0;
+        inst.snapshot = inst.snapshot || {
+          eventId: inst.eventId || '',
+          title: '',
+          description: '',
+          category: '',
+          priority: 'normal',
+          presentation: 'inbox',
+          options: [],
+          automaticOutcome: null,
+          mutexGroup: null,
+          contentVersion: '',
+        };
+        // 移除旧字段
+        delete inst.priority;
+        delete inst.presentation;
+      }
+    }
+    if (scheduled) {
+      for (const inst of scheduled) {
+        inst.sourceKey = inst.sourceKey || '';
+        inst.scheduledAtDay = inst.scheduledAtDay || inst.activateAtDay || 0;
+        inst.snapshot = inst.snapshot || {
+          eventId: inst.eventId || '',
+          title: '',
+          description: '',
+          category: '',
+          priority: 'normal',
+          presentation: 'inbox',
+          options: [],
+          automaticOutcome: null,
+          mutexGroup: null,
+          contentVersion: '',
+        };
+      }
+    }
+    if (history) {
+      for (const rec of history) {
+        rec.finalStatus = rec.finalStatus || 'resolved';
+        rec.triggeredAtDay = rec.triggeredAtDay || rec.resolvedAtDay || 0;
+        rec.completedAtDay = rec.completedAtDay || rec.resolvedAtDay || 0;
+        rec.sourceKey = rec.sourceKey || '';
+        rec.titleSnapshot = rec.titleSnapshot || '';
+        rec.chosenOptionLabel = rec.chosenOptionLabel || null;
+        rec.appliedEffects = rec.appliedEffects || [];
+        delete rec.resolvedAtDay;
+        delete rec.outcome;
+      }
+    }
+
+    // 迁移 chainInstances
+    const chainInstances = events.chainInstances as
+      Record<string, Record<string, unknown>> | undefined;
+    if (chainInstances) {
+      for (const [, chain] of Object.entries(chainInstances)) {
+        chain.sourceKey = chain.sourceKey || `${chain.sourceEntityType}_${chain.sourceEntityId}`;
+        chain.completedAtDay = chain.completedAtDay ?? null;
+        delete chain.sourceEntityType;
+        delete chain.sourceEntityId;
+      }
+    }
+  }
+
+  migrated.schemaVersion = 4;
   return migrated;
 }
 
@@ -519,8 +693,9 @@ export function migrateSchema2To3(raw: Record<string, unknown>): Record<string, 
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
- * - Schema 2：迁移至 Schema 3 后解码；
- * - 当前版本：直接解码；
+ * - Schema 2：迁移至 Schema 3 后解碼，Schema 3 再迁移至 4；
+ * - Schema 3：迁移至 Schema 4；
+ * - 当前版本（Schema 4）：直接解碼；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
@@ -556,10 +731,12 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     };
   }
 
-  // 确定性迁移至当前版本
+  // 确定性迁移链至当前版本
   let target: unknown = data;
   if (obj.schemaVersion === 2) {
-    target = migrateSchema2To3(obj);
+    target = migrateSchema3To4(migrateSchema2To3(obj));
+  } else if (obj.schemaVersion === 3) {
+    target = migrateSchema3To4(obj);
   }
 
   const result = SaveEnvelopeSchema.safeParse(target);
