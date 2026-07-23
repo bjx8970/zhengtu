@@ -91,55 +91,6 @@ export interface PlayerEffectChange {
   delta: number;
 }
 
-/** 随机事件的触发条件 */
-export interface EventCondition {
-  minLevel?: number;
-  maxLevel?: number;
-  careerLines?: string[];
-  // P3 新增预留字段
-  /** 地区限定 */
-  regions?: string[];
-  /** 时间窗口（月份范围） */
-  timeWindow?: { startMonth: number; endMonth: number };
-  /** 前置事件链（已完成事件 ID） */
-  prerequisiteEvents?: string[];
-  /** 专属职位 ID 列表 */
-  positionIds?: string[];
-  /** 隐藏状态条件（后续扩展民众满意度等） */
-  hiddenStateConditions?: {
-    key: string;
-    operator: 'gt' | 'lt' | 'eq' | 'gte' | 'lte';
-    value: number;
-  }[];
-}
-
-/** 事件类型：通用 / 专属 */
-export type EventType = 'generic' | 'exclusive';
-
-/** 事件分类 */
-export type EventCategory = 'resident' | 'political' | 'economic' | 'emergency' | 'story';
-
-/** 随机事件的可选应对选项 */
-export interface EventOption {
-  label: string;
-  description: string;
-  effects: { target: string; value: number }[];
-  risk?: { type: string; probability: number };
-}
-
-/** 随机事件定义 */
-export interface GameEvent {
-  id: string;
-  title: string;
-  description: string;
-  /** 事件类型：通用 / 专属（P3 预留） */
-  eventType?: EventType;
-  /** 事件分类（P3 预留） */
-  eventCategory?: EventCategory;
-  triggerCondition: EventCondition;
-  options: EventOption[];
-}
-
 /** 待处理的公文/文件 */
 export interface PendingDocument {
   id: string;
@@ -167,13 +118,6 @@ export interface Sentiment {
   heatIndex: number;
   remainingDays: number;
   resolved: boolean;
-}
-
-/** 事件选项选择后的结算结果 */
-export interface EventResolveResult {
-  effects: Record<string, number>;
-  riskTriggered: boolean;
-  detail: string;
 }
 
 /** 晋升目标候选职位 */

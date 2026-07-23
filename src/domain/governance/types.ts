@@ -56,6 +56,29 @@ export type DomainSignal = (typeof DOMAIN_SIGNALS)[number];
 /** 领域信号 Zod Schema */
 export const DomainSignalSchema = z.enum(DOMAIN_SIGNALS);
 
+/**
+ * 每种信号类型的载荷字段映射（从 DomainSignalSnapshot 派生）。
+ *
+ * 用于事件配置来源兼容性验证：条件/效果引用的 signal 字段必须在
+ * 可触发来源的载荷中有定义，否则事件永久不可达。
+ */
+export const SIGNAL_TYPE_PAYLOAD_FIELDS: Record<DomainSignal, readonly string[]> = {
+  'action.completed': ['actionInstanceId', 'actionId', 'deptId', 'regionId', 'institutionId'],
+  'policy.approved': ['policyInstanceId', 'policyId', 'regionId'],
+  'policy.phase_changed': ['policyInstanceId', 'policyId', 'phaseId'],
+  'policy.metric_changed': ['policyInstanceId', 'policyId', 'metricId', 'value'],
+  'appointment.changed': [
+    'experienceId',
+    'positionId',
+    'institutionId',
+    'regionId',
+    'previousPositionId',
+  ],
+  'assessment.completed': ['year', 'score', 'tier'],
+  'world.metric_changed': ['metricId', 'value'],
+  'event.resolved': ['eventInstanceId', 'eventId', 'optionId'],
+};
+
 /** 领域信号快照（按信号类型判别联合，各类型有固定载荷 + 实例身份） */
 export type DomainSignalSnapshot =
   | {

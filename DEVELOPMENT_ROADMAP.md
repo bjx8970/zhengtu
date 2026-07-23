@@ -32,7 +32,7 @@ PR #88 完成以下基础工程整理：
 - 启动页存档错误分类提示
 - 相关单元测试和集成测试
 
-## 当前：Phase 1.5 项目基线校准
+## 已完成：Phase 1.5 项目基线校准
 
 - 正式版本体系（`0.1.0-alpha.1`）
 - 软件版本、Schema 版本、内容版本分离
@@ -43,27 +43,43 @@ PR #88 完成以下基础工程整理：
 - 历史设计文档标记
 - Issue 清理和 Phase 2 追踪创建
 
-## 下一阶段：Phase 2 职业领域模型
+## 已完成：Phase 2 第一实施批次（PR #99）
 
-目标：建立支撑完整职业生涯的数据模型基础。
+- 职业/治理/事件领域契约（机构层级、岗位领域、领导职务、公务员职级）
+- Career/Governance/Event/World 持久化状态骨架
+- 统一条件/效果模型（`ConditionExpression` / `EffectDefinition`）
+- 八类 `DomainSignalSnapshot`
+- Schema 2 与 Schema 1 安全拒绝
+- 36 个职位 + 18 个机构原生配置迁移
+- ConfigLoader 稳定 ID 查询
 
-1. 定义机构层级（乡镇→县区→地级市→省级→中央）
-2. 定义岗位领域（替代固定职业线）
-3. 定义领导职务层次（乡科级副职→国家级正职）
-4. 建立公务员职级数据模型（二级科员→巡视员）
-5. 建立当前任职状态（具体职位 + 层次 + 职级 + 机构层级）
-6. 建立职业履历记录
-7. 保留 `contentTier` 兼容层（减少配置一次性重写）
-8. 升级存档 Schema（schemaVersion 1 → 2）
-9. 实现职级晋升最小闭环
-10. 实现岗位机会驱动的领导职务选拔入口
+## 当前：Phase 2 第二实施批次 — 事件定义、条件解释与效果执行基础
+
+目标：替换旧事件定义，建立可执行的新版事件配置、条件解释器和统一效果执行器。
+
+1. 删除旧 `GameEvent`/`EventCondition`/`EventOption`/`evaluateEventTrigger`/`filterAvailableEvents`
+2. 新版 `EventDefinition` 格式与严格 Zod Schema
+3. 统一条件解释器 `evaluateCondition`（纯函数）
+4. 统一效果执行器 `applyEffects`（原子事务，效果地址判别联合）
+5. ConfigLoader 事件加载与信号索引
+6. 事件配置引用与零延迟循环验证
+7. 迁移示例事件 `flood_emergency`
+8. 治理指标修正为 `MetricCollection`，Schema 2 → 3 迁移
 
 完成标准：
 
-- 领导职务和公务员职级可以独立变化
-- 玩家不能随时主动触发领导岗位晋升
-- 岗位领域可以通过交流改变
-- 旧行政线 L1-L11 配置通过适配层继续可用
+- 旧事件类型和筛选器已删除，`main` 可编译
+- 配置 Schema、TypeScript 类型、运行时解释器保持一致
+- 条件/效果结算为纯函数或可预测事务
+- 非法效果不会部分结算
+- 完整 CI 通过
+
+## 下一步：领域信号驱动的事件编排器
+
+- `processDomainSignal` 编排、事件实例生成
+- 冷却、互斥、重复控制、延迟调度
+- 选项原子结算（`CHOOSE_EVENT_OPTION`）
+- 事件 UI 与可中断时间轴
 
 ## 后续阶段
 

@@ -1,10 +1,54 @@
-# Changelog
+# 更新日志
 
 本文件记录政途人生的用户可见变化、重要开发者契约变化和兼容性变化。
 
-格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/)，版本号遵循语义化版本。
+格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/)，版本号遵循语义化版本。分类：Added / Changed / Fixed / Deprecated / Removed / Save compatibility。
 
-## [Unreleased]
+## [Unreleased] — Phase 2 第二实施批次（事件定义与效果运行时基础）
+
+### Added
+
+- 新版事件定义 `EventDefinition`（`src/domain/events/definition.ts`）：触发器、重复策略、激活定义、选项，附严格 Zod Schema。
+- 统一条件解释器 `evaluateCondition`（`src/engine/events/condition-interpreter.ts`）：纯函数，支持逻辑组合、信号字段、职业状态、世界指标、事件历史、政策状态、履历、世界事实。
+- 统一效果执行器 `applyEffects`（`src/engine/events/effect-executor.ts`）：原子事务，先验证全部目标再应用。
+- 事件配置验证 `validateEventDefinitions`（`src/domain/events/validation.ts`）：引用完整性 + 零延迟循环检测，由 `validate:config` 复用。
+- ConfigLoader 事件加载与信号索引：`getEventDefinition` / `getAllEventDefinitions` / `getEventDefinitionsBySignal`。
+- 迁移示例事件 `flood_emergency` 为新版配置。
+- ADR-002：事件定义与效果运行时基础。
+
+### Changed
+
+- `EffectDefinition` 重设计为按 `target` 判别的联合：机构/地区/政策指标通过 `institutionRef`/`regionRef`/`policyRef`（current_appointment / signal / fixed）明确来源，不再共用含义模糊的 `subjectId`。
+- `PolicyStateCondition` 的 `metric_gte`/`metric_lte` 新增 `metricId` 字段。
+- `GovernanceState.institutionMetrics`/`regionMetrics` 由扁平 `Record<string, number>` 修正为嵌套 `MetricCollection = Record<string, Record<string, number>>`。
+- `events.json` 由旧对象格式重写为 `EventDefinition[]` 数组格式。
+
+### Removed
+
+- 旧事件原型：`GameEvent`、`EventCondition`、`EventOption`、`EventResolveResult`、`EventType`、旧 `EventCategory`。
+- 旧事件引擎：`evaluateEventTrigger()`、`filterAvailableEvents()`、`EventContext`（`src/engine/core/event.ts`）。
+- 旧事件测试与旧 `events.json` 格式（`minLevel`/`maxLevel`/`careerLines`/`prerequisiteEvents`/`hiddenStateConditions`）。
+
+### Save compatibility
+
+- 存档 Schema 由 2 提升至 3（治理指标字段类型变化）。
+- 提供确定性 `migrateSchema2To3` 迁移：Schema 2 存档加载时自动迁移，扁平治理指标重置为空嵌套集合（Schema 2 阶段治理未投产，指标恒为空，不丢失真实数据）。
+- 低于 Schema 2 的存档拒绝并保留只读备份；高于 Schema 3 的存档拒绝。
+
+## [Unreleased] — Phase 2 第一实施批次（PR #99，尚未单独发版）
+
+### Added
+
+- 职业/治理/事件领域契约：机构层级、岗位领域、领导职务层次、公务员职级。
+- Career/Governance/Event/World 持久化状态骨架。
+- 统一条件/效果模型（`ConditionExpression` / `EffectDefinition`）与八类 `DomainSignalSnapshot`。
+- 36 个职位 + 18 个机构原生配置迁移，ConfigLoader 稳定 ID 查询。
+- ADR-001：统一条件/效果模型与 Schema 2 契约。
+
+### Save compatibility
+
+- **当前 Schema 版本：2**（由 1 提升）。
+- Schema 1 存档拒绝并保留只读备份（不实现自动迁移）。
 
 ## [0.1.0-alpha.1] - 2026-07-21
 

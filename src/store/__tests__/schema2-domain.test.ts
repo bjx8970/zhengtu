@@ -25,7 +25,7 @@ import {
 } from '../../domain/career/types';
 import { POLICY_STATUSES, DOMAIN_SIGNALS } from '../../domain/governance/types';
 import { EVENT_PRIORITIES, EVENT_PRESENTATIONS } from '../../domain/events/types';
-import { EFFECT_TARGETS } from '../../domain/conditions';
+import { EFFECT_TARGET_DISCRIMINANTS } from '../../domain/conditions';
 
 describe('Schema 2 存档', () => {
   beforeEach(() => {
@@ -78,6 +78,34 @@ describe('Schema 2 存档', () => {
     expect(result.error).toBe('future_version');
   });
 
+  it('Schema 2 存档确定性迁移至 Schema 3', () => {
+    // 构造一个 Schema 2 存档（治理指标为扁平结构）
+    const state = createInitialState();
+    state.character.characterName = '迁移测试';
+    const schema2Envelope = {
+      schemaVersion: 2,
+      contentVersion: '2026.07.1',
+      revision: 3,
+      savedAt: Date.now(),
+      state: {
+        ...state,
+        governance: {
+          ...state.governance,
+          // Schema 2 扁平指标（旧结构）
+          institutionMetrics: { legacy_flat_metric: 42 },
+          regionMetrics: {},
+        },
+      },
+    };
+    const result = decodeCurrentSave(JSON.stringify(schema2Envelope));
+    // 迁移成功
+    expect(result.success).toBe(true);
+    expect(result.state?.character.characterName).toBe('迁移测试');
+    // 治理指标被重置为空嵌套集合（扁平结构无有效解释）
+    expect(result.state?.governance.institutionMetrics).toEqual({});
+    expect(result.state?.governance.regionMetrics).toEqual({});
+  });
+
   it('旧职业字段被 .strict() 拒绝', () => {
     const state = createInitialState();
     // 注入旧字段
@@ -107,7 +135,7 @@ describe('领域契约完整性', () => {
       DOMAIN_SIGNALS,
       EVENT_PRIORITIES,
       EVENT_PRESENTATIONS,
-      EFFECT_TARGETS,
+      EFFECT_TARGET_DISCRIMINANTS,
     ];
     for (const enumArr of allEnums) {
       const set = new Set(enumArr);

@@ -102,24 +102,70 @@ describe('ConditionExpression 负向测试', () => {
     expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('拒绝 policyState status_is + number', () => {
-    const invalid = { policyState: 'pol_1', check: 'status_is', value: 42 };
+  it('拒绝 policyRef status_is + number', () => {
+    const invalid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'status_is',
+      value: 42,
+    };
     expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it('拒绝 policyState status_is + 非法状态字符串', () => {
-    const invalid = { policyState: 'pol_1', check: 'status_is', value: 'unknown_status' };
+  it('拒绝 policyRef status_is + 非法状态字符串', () => {
+    const invalid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'status_is',
+      value: 'unknown_status',
+    };
     expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it('接受 policyState status_is + 合法状态', () => {
-    const valid = { policyState: 'pol_1', check: 'status_is', value: 'implementing' };
+  it('接受 policyRef status_is + 合法状态', () => {
+    const valid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'status_is',
+      value: 'implementing',
+    };
     expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('拒绝 policyState metric_gte + string', () => {
-    const invalid = { policyState: 'pol_1', check: 'metric_gte', value: 'high' };
+  it('接受 policyRef signal 引用', () => {
+    const valid = { policyRef: { source: 'signal' }, check: 'status_is', value: 'implementing' };
+    expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('拒绝 policyRef fixed 缺失 policyInstanceId', () => {
+    const invalid = { policyRef: { source: 'fixed' }, check: 'status_is', value: 'implementing' };
     expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝 policyRef metric_gte + string', () => {
+    const invalid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'metric_gte',
+      metricId: 'm1',
+      value: 'high',
+    };
+    expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝 policyRef metric_gte 缺失 metricId', () => {
+    const invalid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'metric_gte',
+      value: 5,
+    };
+    expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('接受 policyRef metric_gte + metricId + number', () => {
+    const valid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'metric_gte',
+      metricId: 'coverage',
+      value: 5,
+    };
+    expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
   });
 
   it('拒绝 eventHistory count_gte 缺失 value', () => {
@@ -164,58 +210,140 @@ describe('ConditionExpression 负向测试', () => {
 });
 
 describe('EffectDefinition 负向测试', () => {
-  it('拒绝 character.vigor + append', () => {
-    const invalid = { target: 'character.vigor', operation: 'append', value: 'x', subjectId: 'y' };
-    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
-  });
-
-  it('拒绝 world.fact + multiply', () => {
-    const invalid = { target: 'world.fact', operation: 'multiply', value: 2 };
-    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
-  });
-
-  it('拒绝 world.fact + set 缺失 subjectId', () => {
-    const invalid = { target: 'world.fact', operation: 'set', value: true };
-    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
-  });
-
-  it('接受 world.fact + set + subjectId', () => {
-    const valid = { target: 'world.fact', operation: 'set', value: true, subjectId: 'is_corrupt' };
+  it('接受角色属性 add', () => {
+    const valid = { target: 'character', field: 'vigor', operation: 'add', value: 5 };
     expect(EffectDefinitionSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('拒绝具名指标缺失 subjectId', () => {
-    const invalid = { target: 'career.specialty', operation: 'add', value: 5 };
+  it('拒绝角色属性未知 field', () => {
+    const invalid = { target: 'character', field: 'unknown_field', operation: 'add', value: 5 };
     expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it('接受具名指标 + subjectId', () => {
+  it('拒绝角色属性 string value', () => {
+    const invalid = { target: 'character', field: 'vigor', operation: 'add', value: 'ten' };
+    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝角色属性缺失 field', () => {
+    const invalid = { target: 'character', operation: 'add', value: 5 };
+    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('接受机构指标 + current_appointment 引用', () => {
     const valid = {
-      target: 'career.specialty',
+      target: 'institution_metric',
+      institutionRef: { source: 'current_appointment' },
+      metricId: 'efficiency',
       operation: 'add',
-      value: 5,
-      subjectId: 'economics',
+      value: 10,
     };
     expect(EffectDefinitionSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('拒绝 assessment.score + set', () => {
-    const invalid = { target: 'assessment.score', operation: 'set', value: 100 };
-    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
-  });
-
-  it('接受 assessment.score + add', () => {
-    const valid = { target: 'assessment.score', operation: 'add', value: 3 };
+  it('接受机构指标 + signal 引用', () => {
+    const valid = {
+      target: 'institution_metric',
+      institutionRef: { source: 'signal', field: 'institutionId' },
+      metricId: 'efficiency',
+      operation: 'set',
+      value: 80,
+    };
     expect(EffectDefinitionSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('拒绝 character.vigor + string value', () => {
-    const invalid = { target: 'character.vigor', operation: 'add', value: 'ten' };
+  it('拒绝机构指标缺失 institutionRef', () => {
+    const invalid = {
+      target: 'institution_metric',
+      metricId: 'efficiency',
+      operation: 'add',
+      value: 10,
+    };
+    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝机构指标 signal 引用错误字段', () => {
+    const invalid = {
+      target: 'institution_metric',
+      institutionRef: { source: 'signal', field: 'regionId' },
+      metricId: 'efficiency',
+      operation: 'add',
+      value: 10,
+    };
+    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝机构指标 fixed 引用缺失 institutionId', () => {
+    const invalid = {
+      target: 'institution_metric',
+      institutionRef: { source: 'fixed' },
+      metricId: 'efficiency',
+      operation: 'add',
+      value: 10,
+    };
+    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('接受政策指标 + fixed 引用', () => {
+    const valid = {
+      target: 'policy_metric',
+      policyRef: { source: 'fixed', policyInstanceId: 'pol_1' },
+      metricId: 'coverage',
+      operation: 'add',
+      value: 5,
+    };
+    expect(EffectDefinitionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('拒绝政策指标 current_appointment 引用（政策无当前任职来源）', () => {
+    const invalid = {
+      target: 'policy_metric',
+      policyRef: { source: 'current_appointment' },
+      metricId: 'coverage',
+      operation: 'add',
+      value: 5,
+    };
+    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('接受世界事实 set', () => {
+    const valid = { target: 'world_fact', factId: 'is_corrupt', operation: 'set', value: true };
+    expect(EffectDefinitionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('拒绝世界事实 multiply', () => {
+    const invalid = { target: 'world_fact', factId: 'is_corrupt', operation: 'multiply', value: 2 };
+    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝世界事实缺失 factId', () => {
+    const invalid = { target: 'world_fact', operation: 'set', value: true };
+    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('接受考核分数 add', () => {
+    const valid = { target: 'assessment_score', operation: 'add', value: 3 };
+    expect(EffectDefinitionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('拒绝考核分数 set', () => {
+    const invalid = { target: 'assessment_score', operation: 'set', value: 100 };
     expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
   });
 
   it('拒绝未知 target', () => {
-    const invalid = { target: 'unknown.target', operation: 'add', value: 1 };
+    const invalid = { target: 'unknown_target', operation: 'add', value: 1 };
+    expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('拒绝额外未知字段（.strict）', () => {
+    const invalid = {
+      target: 'world_metric',
+      metricId: 'gdp',
+      operation: 'add',
+      value: 1,
+      subjectId: 'should_not_exist',
+    };
     expect(EffectDefinitionSchema.safeParse(invalid).success).toBe(false);
   });
 });

@@ -56,8 +56,10 @@ src/
 │   │   ├── action.ts            # 行动校验与效果解析
 │   │   ├── effect.ts            # 效果应用
 │   │   ├── time.ts              # 时间推进基础
-│   │   ├── timeline.ts          # 统一时间轴引擎
-│   │   └── event.ts             # 事件处理
+│   │   └── timeline.ts          # 统一时间轴引擎
+│   ├── events/
+│   │   ├── condition-interpreter.ts  # 统一条件解释器（纯函数）
+│   │   └── effect-executor.ts        # 统一效果执行器（原子事务）
 │   ├── governance/              # assessment/budget/kpi/dimensions
 │   ├── career/                  # promotion/deviation-penalty/spectrum 等
 │   └── index.ts                 # 引擎聚合导出
@@ -191,6 +193,19 @@ interface ActionRuntimeSnapshot {
 - 理念偏离倍率和冲突状态绑定到具体行动实例（`SlotOccupant.runtimeSnapshot`）
 - 不再使用玩家级临时倍率
 - 配置在行动执行期间变化不会影响已启动行动的快照
+
+## 事件系统（定义与执行基础层）
+
+旧事件原型（`GameEvent`/`EventCondition`/`EventOption`/`evaluateEventTrigger`/`filterAvailableEvents`）已删除。新事件系统建立在领域信号驱动之上：
+
+- **事件定义**：`src/domain/events/definition.ts` 的 `EventDefinition`（触发器/重复策略/激活定义/选项）。
+- **统一条件解释器**：`src/engine/events/condition-interpreter.ts` 的 `evaluateCondition`（纯函数）。
+- **统一效果执行器**：`src/engine/events/effect-executor.ts` 的 `applyEffects`（原子事务，先验证全部目标再应用）。
+- **配置验证**：`src/domain/events/validation.ts` 的 `validateEventDefinitions`（引用完整性 + 零延迟循环检测），由 `validate:config` 复用。
+- **ConfigLoader 事件索引**：`getEventDefinition` / `getAllEventDefinitions` / `getEventDefinitionsBySignal`（返回深拷贝，不污染全局）。
+- **效果地址**：`EffectDefinition` 为按 `target` 判别的联合，机构/地区/政策指标通过 `institutionRef`/`regionRef`/`policyRef`（current_appointment / signal / fixed）明确来源，不拼接路径字符串。
+
+**仍未实现（后续事件编排器 PR）**：`processDomainSignal` 编排、概率加权选择、冷却/互斥运行时、事件链实例推进、`CHOOSE_EVENT_OPTION` Store action、事件 UI、可中断时间轴、行动/考核自动发信号。
 
 ## 配置模型
 

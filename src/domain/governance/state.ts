@@ -8,6 +8,14 @@
 
 import type { PolicyStatus } from './types';
 
+/**
+ * 指标集合：实体 ID → 指标字典。
+ *
+ * 外层键为机构 ID 或地区 ID，内层键为指标 ID。
+ * 例如：`{ inst_001: { efficiency: 80, satisfaction: 65 } }`。
+ */
+export type MetricCollection = Record<string, Record<string, number>>;
+
 /** 政策实例 */
 export interface PolicyInstance {
   /** 唯一实例 ID */
@@ -57,7 +65,7 @@ export interface GovernanceState {
   /** 治理项目实例列表 */
   projects: GovernanceProjectInstance[];
   /** 机构指标（机构 ID → 指标字典） */
-  institutionMetrics: Record<string, number>;
+  institutionMetrics: MetricCollection;
   /** 地区指标（地区 ID → 指标字典） */
-  regionMetrics: Record<string, number>;
+  regionMetrics: MetricCollection;
 }

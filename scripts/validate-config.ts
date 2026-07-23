@@ -27,6 +27,9 @@ import backgroundData from '../src/config/templates/backgrounds.json' with { typ
 import leadershipStyles from '../src/config/templates/leadership-styles.json' with { type: 'json' };
 import positionsData from '../src/config/positions/positions.json' with { type: 'json' };
 import institutionsData from '../src/config/institutions/institutions.json' with { type: 'json' };
+import { EventDefinitionArraySchema } from '../src/domain/events/definition';
+import type { EventDefinition } from '../src/domain/events/definition';
+import { validateEventDefinitions } from '../src/domain/events/validation';
 
 const departments = { ...deptCore, ...deptExtra };
 const departmentsLookup = departments as Record<string, unknown>;
@@ -99,62 +102,6 @@ const DepartmentTemplateSchema = z.object({
   kpiTemplateIds: z.array(z.string()).min(1).max(3),
 });
 
-const EventOptionSchema = z.object({
-  label: z.string().min(1),
-  description: z.string(),
-  effects: z.array(
-    z.object({
-      target: z.string().min(1),
-      value: z.number(),
-    }),
-  ),
-  risk: z
-    .object({
-      type: z.string(),
-      probability: z.number().min(0).max(1),
-    })
-    .optional(),
-});
-
-const EventSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  description: z.string(),
-  /** 事件类型：通用 / 专属（P3 预留） */
-  eventType: z.enum(['generic', 'exclusive']).optional(),
-  /** 事件分类（P3 预留） */
-  eventCategory: z.enum(['resident', 'political', 'economic', 'emergency', 'story']).optional(),
-  triggerCondition: z.object({
-    minLevel: z.number().optional(),
-    maxLevel: z.number().optional(),
-    careerLines: z.array(z.string()).optional(),
-    minScore: z.number().optional(),
-    requiredFlag: z.string().optional(),
-    // P3 新增预留字段
-    /** 地区限定 */
-    regions: z.array(z.string()).optional(),
-    /** 时间窗口（月份范围） */
-    timeWindow: z
-      .object({ startMonth: z.number().min(1).max(12), endMonth: z.number().min(1).max(12) })
-      .optional(),
-    /** 前置事件链（已完成事件 ID） */
-    prerequisiteEvents: z.array(z.string()).optional(),
-    /** 专属职位 ID 列表 */
-    positionIds: z.array(z.string()).optional(),
-    /** 隐藏状态条件（后续扩展民众满意度等） */
-    hiddenStateConditions: z
-      .array(
-        z.object({
-          key: z.string().min(1),
-          operator: z.enum(['gt', 'lt', 'eq', 'gte', 'lte']),
-          value: z.number(),
-        }),
-      )
-      .optional(),
-  }),
-  options: z.array(EventOptionSchema).length(3),
-});
-
 const PositionRawSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -204,7 +151,21 @@ console.log('\n=== 配置数据格式校验 ===\n');
 
 validateRecord('部门模板', DepartmentTemplateSchema, departments);
 validateRecord('KPI 模板', KPISchema, kpis);
-validateRecord('事件模板', EventSchema, events);
+
+// 事件配置为数组格式，使用正式 EventDefinitionArraySchema 解析
+const parsedEventsResult = EventDefinitionArraySchema.safeParse(events);
+if (!parsedEventsResult.success) {
+  console.error('❌ 事件配置格式校验失败:');
+  for (const issue of parsedEventsResult.error.issues) {
+    console.error(`   [${issue.path.join('.')}] ${issue.message}`);
+  }
+  errors++;
+} else {
+  console.log(
+    `   事件模板: ${parsedEventsResult.data.length}/${parsedEventsResult.data.length} passed`,
+  );
+}
+const parsedEvents: EventDefinition[] = parsedEventsResult.success ? parsedEventsResult.data : [];
 
 // 全部职业线格式校验
 for (const line of ALL_CAREER_LINES) {
@@ -331,19 +292,21 @@ for (const line of ALL_CAREER_LINES) {
 
 console.log('\n--- 事件引用完整性 ---\n');
 
-for (const [eventId, event] of Object.entries(events) as [string, z.infer<typeof EventSchema>][]) {
-  if (event.triggerCondition.careerLines) {
-    const validLines = ['admin', 'party', 'discipline', 'mass'];
-    for (const line of event.triggerCondition.careerLines) {
-      if (!validLines.includes(line)) {
-        console.error(`❌ 事件 ${eventId}: 无效的职业线 "${line}"`);
-        errors++;
-      }
-    }
-  }
-  if (event.options.length !== 3) {
-    console.error(`❌ 事件 ${eventId}: 选项数 ${event.options.length} 不为 3`);
+{
+  // 构建已知机构/地区 ID 集合（用于校验 fixed 引用）
+  const instValues = Object.values(institutionsData) as { id: string; regionId: string }[];
+  const posValues = positionsData as { regionId: string }[];
+  const knownIds = {
+    institutionIds: new Set(instValues.map((i) => i.id)),
+    regionIds: new Set([...instValues.map((i) => i.regionId), ...posValues.map((p) => p.regionId)]),
+  };
+  const eventErrors = validateEventDefinitions(parsedEvents, knownIds);
+  for (const msg of eventErrors) {
+    console.error(`❌ ${msg}`);
     errors++;
+  }
+  if (parsedEvents.length > 0 && eventErrors.length === 0) {
+    console.log(`   事件引用完整性: ${parsedEvents.length} 个事件已校验`);
   }
 }
 

@@ -1,100 +1,58 @@
-{
-  "flood_emergency": {
+[
+  {
     "id": "flood_emergency",
+    "chainId": null,
+    "nodeId": null,
     "title": "防汛抗洪",
     "description": "暴雨导致辖区发生严重内涝，群众生命财产受到威胁，需要立即组织抢险救灾。",
-    "triggerCondition": { "minLevel": 1, "maxLevel": 6 },
+    "category": "emergency",
+    "priority": "urgent",
+    "presentation": "blocking",
+    "trigger": {
+      "sources": ["world.metric_changed"],
+      "condition": {
+        "worldMetric": "flood_risk",
+        "op": "gte",
+        "value": 80
+      },
+      "probability": 1
+    },
+    "repeatPolicy": {
+      "mode": "repeatable",
+      "cooldownDays": 30
+    },
+    "activation": {
+      "deadlineDays": 3
+    },
     "options": [
       {
+        "id": "frontline_command",
         "label": "亲临一线指挥",
         "description": "亲自到受灾现场指挥抢险，调动所有可用资源。",
         "effects": [
-          { "target": "player.performance", "value": 8 },
-          { "target": "player.charisma", "value": 3 }
-        ]
+          { "target": "character", "field": "performance", "operation": "add", "value": 8 },
+          { "target": "character", "field": "charisma", "operation": "add", "value": 3 }
+        ],
+        "setFacts": [{ "factId": "flood_handled_personally", "value": true }]
       },
       {
+        "id": "coordinate_rescue",
         "label": "组织协调救援",
         "description": "在指挥部统筹协调各部门，保障救援有序进行。",
         "effects": [
-          { "target": "player.performance", "value": 5 },
-          { "target": "player.competence", "value": 2 }
+          { "target": "character", "field": "performance", "operation": "add", "value": 5 },
+          { "target": "character", "field": "competence", "operation": "add", "value": 2 }
         ]
       },
       {
+        "id": "request_support",
         "label": "请求上级支援",
         "description": "立即向上级报告请求支援，等待上级派员指挥。",
         "effects": [
-          { "target": "player.performance", "value": 2 },
-          { "target": "player.network", "value": -3 }
-        ]
-      }
-    ]
-  },
-  "corruption_tip": {
-    "id": "corruption_tip",
-    "title": "匿名举报",
-    "description": "收到一封匿名举报信，举报某下属部门负责人在工程招投标中存在违规操作。",
-    "triggerCondition": { "minLevel": 3 },
-    "options": [
-      {
-        "label": "立即查处",
-        "description": "成立调查组进行核实，绝不姑息。",
-        "effects": [
-          { "target": "player.integrity", "value": 5 },
-          { "target": "player.stability", "value": -2 }
-        ],
-        "risk": { "type": "政治风险", "probability": 0.2 }
-      },
-      {
-        "label": "私下谈话",
-        "description": "私下找当事人谈话警告，不公开处理。",
-        "effects": [
-          { "target": "player.integrity", "value": -3 },
-          { "target": "player.corruptionRisk", "value": 5 },
-          { "target": "player.network", "value": 2 }
-        ]
-      },
-      {
-        "label": "搁置不理",
-        "description": "以「查无实据」为由不予处理。",
-        "effects": [
-          { "target": "player.integrity", "value": -8 },
-          { "target": "player.corruptionRisk", "value": 10 }
-        ]
-      }
-    ]
-  },
-  "economic_opportunity": {
-    "id": "economic_opportunity",
-    "title": "招商引资",
-    "description": "一家大型企业有意在辖区投资建设新厂，但需要政府提供税收优惠和土地支持。",
-    "triggerCondition": { "minLevel": 3 },
-    "options": [
-      {
-        "label": "全力支持引进",
-        "description": "提供最优政策和土地，力争项目落户。",
-        "effects": [
-          { "target": "player.performance", "value": 10 },
-          { "target": "player.stability", "value": 3 }
-        ]
-      },
-      {
-        "label": "有条件支持",
-        "description": "要求企业满足环保和就业指标后才给予优惠。",
-        "effects": [
-          { "target": "player.performance", "value": 6 },
-          { "target": "player.competence", "value": 3 }
-        ]
-      },
-      {
-        "label": "婉拒投资",
-        "description": "认为条件过于苛刻，决定不引进。",
-        "effects": [
-          { "target": "player.performance", "value": -2 },
-          { "target": "player.integrity", "value": 2 }
+          { "target": "character", "field": "performance", "operation": "add", "value": 2 },
+          { "target": "character", "field": "network", "operation": "add", "value": -3 }
         ]
       }
     ]
   }
-}
+]
