@@ -205,4 +205,134 @@ describe('validateEventDefinitions 引用完整性', () => {
     const errors = validateEventDefinitions([a, b]);
     expect(errors.some((e) => e.includes('循环'))).toBe(false);
   });
+
+  it('automatic 事件缺失 automaticOutcome 被拒绝', () => {
+    const event = makeEvent({ presentation: 'automatic', options: [] });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('automaticOutcome'))).toBe(true);
+  });
+
+  it('automatic 事件携带 automaticOutcome 通过', () => {
+    const event = makeEvent({
+      presentation: 'automatic',
+      options: [],
+      automaticOutcome: {
+        effects: [{ target: 'character', field: 'vigor', operation: 'add', value: 5 }],
+      },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors).toEqual([]);
+  });
+
+  it('blocking 事件携带 automaticOutcome 被拒绝', () => {
+    const event = makeEvent({
+      presentation: 'blocking',
+      automaticOutcome: { effects: [] },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('不得有 automaticOutcome'))).toBe(true);
+  });
+
+  it('trigger.sources 与条件 signal 字段不兼容被拒绝', () => {
+    // world.metric_changed 载荷无 institutionId，条件却读取 institutionId
+    const event = makeEvent({
+      trigger: {
+        sources: ['world.metric_changed'],
+        condition: { signalField: 'institutionId', op: 'eq', value: 'x' },
+      },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('institutionId') && e.includes('不可达'))).toBe(true);
+  });
+
+  it('trigger.sources 与条件 signal 字段兼容通过', () => {
+    // appointment.changed 载荷含 institutionId
+    const event = makeEvent({
+      trigger: {
+        sources: ['appointment.changed'],
+        condition: { signalField: 'institutionId', op: 'eq', value: 'x' },
+      },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('不可达'))).toBe(false);
+  });
+
+  it('效果 signal 来源引用不兼容字段被拒绝', () => {
+    // world.metric_changed 无 institutionId，机构指标 signal 引用不可达
+    const event = makeEvent({
+      trigger: { sources: ['world.metric_changed'] },
+      options: [
+        {
+          id: 'o',
+          label: 'a',
+          description: '',
+          effects: [
+            {
+              target: 'institution_metric',
+              institutionRef: { source: 'signal', field: 'institutionId' },
+              metricId: 'm',
+              operation: 'add',
+              value: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('institutionId') && e.includes('不可达'))).toBe(true);
+  });
+
+  it('fixed 机构引用未知 ID 被拒绝', () => {
+    const event = makeEvent({
+      options: [
+        {
+          id: 'o',
+          label: 'a',
+          description: '',
+          effects: [
+            {
+              target: 'institution_metric',
+              institutionRef: { source: 'fixed', institutionId: 'ghost_inst' },
+              metricId: 'm',
+              operation: 'add',
+              value: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const knownIds = {
+      institutionIds: new Set(['real_inst']),
+      regionIds: new Set(['real_region']),
+    };
+    const errors = validateEventDefinitions([event], knownIds);
+    expect(errors.some((e) => e.includes('ghost_inst'))).toBe(true);
+  });
+
+  it('fixed 机构引用已知 ID 通过', () => {
+    const event = makeEvent({
+      options: [
+        {
+          id: 'o',
+          label: 'a',
+          description: '',
+          effects: [
+            {
+              target: 'institution_metric',
+              institutionRef: { source: 'fixed', institutionId: 'real_inst' },
+              metricId: 'm',
+              operation: 'add',
+              value: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const knownIds = {
+      institutionIds: new Set(['real_inst']),
+      regionIds: new Set(['real_region']),
+    };
+    const errors = validateEventDefinitions([event], knownIds);
+    expect(errors.some((e) => e.includes('real_inst'))).toBe(false);
+  });
 });

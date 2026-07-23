@@ -93,12 +93,26 @@ export type EventHistoryCondition =
   | { eventHistory: string; check: 'occurred' | 'not_occurred' }
   | { eventHistory: string; check: 'count_gte' | 'count_lte'; value: number };
 
-/** 政策状态条件（按 check 类型判别，status_is 复用 PolicyStatus） */
+/**
+ * 政策实例引用（条件用，隔离具体政策实例）。
+ *
+ * - signal：使用触发信号的 policyInstanceId（隔离触发实例）
+ * - fixed：指定政策实例 ID
+ * 不再使用 policyId 模糊匹配首个实例。
+ */
+export type PolicyConditionRef =
+  { source: 'signal' } | { source: 'fixed'; policyInstanceId: string };
+
+/** 政策状态条件（按 check 类型判别，status_is 复用 PolicyStatus，policyRef 隔离实例） */
 export type PolicyStateCondition =
-  | { policyState: string; check: 'status_is'; value: import('./governance/types').PolicyStatus }
-  | { policyState: string; check: 'phase_is'; value: string }
   | {
-      policyState: string;
+      policyRef: PolicyConditionRef;
+      check: 'status_is';
+      value: import('./governance/types').PolicyStatus;
+    }
+  | { policyRef: PolicyConditionRef; check: 'phase_is'; value: string }
+  | {
+      policyRef: PolicyConditionRef;
       check: 'metric_gte' | 'metric_lte';
       metricId: string;
       value: number;
@@ -238,25 +252,31 @@ const EventHistoryConditionSchema = z.union([
     .strict(),
 ]);
 
-/** 政策状态条件 Schema（按 check 判别，status_is 复用 PolicyStatusSchema） */
+/** 政策实例引用 Schema（条件用） */
+const PolicyConditionRefSchema = z.union([
+  z.object({ source: z.literal('signal') }).strict(),
+  z.object({ source: z.literal('fixed'), policyInstanceId: z.string().min(1) }).strict(),
+]);
+
+/** 政策状态条件 Schema（按 check 判别，status_is 复用 PolicyStatusSchema，policyRef 隔离实例） */
 const PolicyStateConditionSchema = z.union([
   z
     .object({
-      policyState: z.string().min(1),
+      policyRef: PolicyConditionRefSchema,
       check: z.literal('status_is'),
       value: PolicyStatusSchema,
     })
     .strict(),
   z
     .object({
-      policyState: z.string().min(1),
+      policyRef: PolicyConditionRefSchema,
       check: z.literal('phase_is'),
       value: z.string().min(1),
     })
     .strict(),
   z
     .object({
-      policyState: z.string().min(1),
+      policyRef: PolicyConditionRefSchema,
       check: z.enum(['metric_gte', 'metric_lte']),
       metricId: z.string().min(1),
       value: z.number(),

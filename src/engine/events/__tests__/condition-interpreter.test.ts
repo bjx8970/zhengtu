@@ -30,6 +30,7 @@ function makeContext(
     signal: makeSignal(),
     state,
     currentDay: 1000,
+    daysPerYear: 360,
   };
   if (mutate) mutate(ctx);
   return ctx;
@@ -258,10 +259,26 @@ describe('条件解释器 - 政策状态', () => {
         },
       ];
     });
-    expect(evalCond({ policyState: 'pol_1', check: 'status_is', value: 'implementing' }, ctx)).toBe(
-      true,
-    );
-    expect(evalCond({ policyState: 'pol_1', check: 'phase_is', value: 'phase_2' }, ctx)).toBe(true);
+    expect(
+      evalCond(
+        {
+          policyRef: { source: 'fixed', policyInstanceId: 'pol_inst_1' },
+          check: 'status_is',
+          value: 'implementing',
+        },
+        ctx,
+      ),
+    ).toBe(true);
+    expect(
+      evalCond(
+        {
+          policyRef: { source: 'fixed', policyInstanceId: 'pol_inst_1' },
+          check: 'phase_is',
+          value: 'phase_2',
+        },
+        ctx,
+      ),
+    ).toBe(true);
   });
 
   it('metric_gte/metric_lte', () => {
@@ -282,17 +299,84 @@ describe('条件解释器 - 政策状态', () => {
       ];
     });
     expect(
-      evalCond({ policyState: 'pol_1', check: 'metric_gte', metricId: 'coverage', value: 50 }, ctx),
+      evalCond(
+        {
+          policyRef: { source: 'fixed', policyInstanceId: 'pol_inst_1' },
+          check: 'metric_gte',
+          metricId: 'coverage',
+          value: 50,
+        },
+        ctx,
+      ),
     ).toBe(true);
     expect(
-      evalCond({ policyState: 'pol_1', check: 'metric_lte', metricId: 'coverage', value: 50 }, ctx),
+      evalCond(
+        {
+          policyRef: { source: 'fixed', policyInstanceId: 'pol_inst_1' },
+          check: 'metric_lte',
+          metricId: 'coverage',
+          value: 50,
+        },
+        ctx,
+      ),
+    ).toBe(false);
+  });
+
+  it('policyRef signal 引用隔离触发实例', () => {
+    const ctx = makeContext((c) => {
+      // 两个同 policyId 的实例，信号指向第二个
+      c.state.governance.policies = [
+        {
+          instanceId: 'inst_A',
+          policyId: 'pol_1',
+          status: 'proposed',
+          proposedAtDay: 0,
+          approvedAtDay: null,
+          effectiveAtDay: null,
+          regionId: 'r1',
+          responsibleInstitutionId: 'i1',
+          currentPhaseId: 'p1',
+          metrics: {},
+        },
+        {
+          instanceId: 'inst_B',
+          policyId: 'pol_1',
+          status: 'implementing',
+          proposedAtDay: 0,
+          approvedAtDay: 5,
+          effectiveAtDay: 10,
+          regionId: 'r2',
+          responsibleInstitutionId: 'i2',
+          currentPhaseId: 'p2',
+          metrics: {},
+        },
+      ];
+      c.signal = {
+        signalType: 'policy.approved',
+        occurredAtDay: 100,
+        data: { policyInstanceId: 'inst_B', policyId: 'pol_1', regionId: 'r2' },
+      } as DomainSignalSnapshot;
+    });
+    // signal 引用应隔离出 inst_B（implementing），而非首个 inst_A（proposed）
+    expect(
+      evalCond({ policyRef: { source: 'signal' }, check: 'status_is', value: 'implementing' }, ctx),
+    ).toBe(true);
+    expect(
+      evalCond({ policyRef: { source: 'signal' }, check: 'status_is', value: 'proposed' }, ctx),
     ).toBe(false);
   });
 
   it('政策实例未找到返回 false', () => {
     const ctx = makeContext();
     expect(
-      evalCond({ policyState: 'nonexistent', check: 'status_is', value: 'implementing' }, ctx),
+      evalCond(
+        {
+          policyRef: { source: 'fixed', policyInstanceId: 'nonexistent' },
+          check: 'status_is',
+          value: 'implementing',
+        },
+        ctx,
+      ),
     ).toBe(false);
   });
 });

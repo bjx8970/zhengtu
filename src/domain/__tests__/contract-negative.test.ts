@@ -102,33 +102,69 @@ describe('ConditionExpression 负向测试', () => {
     expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('拒绝 policyState status_is + number', () => {
-    const invalid = { policyState: 'pol_1', check: 'status_is', value: 42 };
+  it('拒绝 policyRef status_is + number', () => {
+    const invalid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'status_is',
+      value: 42,
+    };
     expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it('拒绝 policyState status_is + 非法状态字符串', () => {
-    const invalid = { policyState: 'pol_1', check: 'status_is', value: 'unknown_status' };
+  it('拒绝 policyRef status_is + 非法状态字符串', () => {
+    const invalid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'status_is',
+      value: 'unknown_status',
+    };
     expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it('接受 policyState status_is + 合法状态', () => {
-    const valid = { policyState: 'pol_1', check: 'status_is', value: 'implementing' };
+  it('接受 policyRef status_is + 合法状态', () => {
+    const valid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'status_is',
+      value: 'implementing',
+    };
     expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('拒绝 policyState metric_gte + string', () => {
-    const invalid = { policyState: 'pol_1', check: 'metric_gte', metricId: 'm1', value: 'high' };
+  it('接受 policyRef signal 引用', () => {
+    const valid = { policyRef: { source: 'signal' }, check: 'status_is', value: 'implementing' };
+    expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('拒绝 policyRef fixed 缺失 policyInstanceId', () => {
+    const invalid = { policyRef: { source: 'fixed' }, check: 'status_is', value: 'implementing' };
     expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it('拒绝 policyState metric_gte 缺失 metricId', () => {
-    const invalid = { policyState: 'pol_1', check: 'metric_gte', value: 5 };
+  it('拒绝 policyRef metric_gte + string', () => {
+    const invalid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'metric_gte',
+      metricId: 'm1',
+      value: 'high',
+    };
     expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it('接受 policyState metric_gte + metricId + number', () => {
-    const valid = { policyState: 'pol_1', check: 'metric_gte', metricId: 'coverage', value: 5 };
+  it('拒绝 policyRef metric_gte 缺失 metricId', () => {
+    const invalid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'metric_gte',
+      value: 5,
+    };
+    expect(ConditionExpressionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('接受 policyRef metric_gte + metricId + number', () => {
+    const valid = {
+      policyRef: { source: 'fixed', policyInstanceId: 'pi1' },
+      check: 'metric_gte',
+      metricId: 'coverage',
+      value: 5,
+    };
     expect(ConditionExpressionSchema.safeParse(valid).success).toBe(true);
   });
 

@@ -293,7 +293,14 @@ for (const line of ALL_CAREER_LINES) {
 console.log('\n--- 事件引用完整性 ---\n');
 
 {
-  const eventErrors = validateEventDefinitions(parsedEvents);
+  // 构建已知机构/地区 ID 集合（用于校验 fixed 引用）
+  const instValues = Object.values(institutionsData) as { id: string; regionId: string }[];
+  const posValues = positionsData as { regionId: string }[];
+  const knownIds = {
+    institutionIds: new Set(instValues.map((i) => i.id)),
+    regionIds: new Set([...instValues.map((i) => i.regionId), ...posValues.map((p) => p.regionId)]),
+  };
+  const eventErrors = validateEventDefinitions(parsedEvents, knownIds);
   for (const msg of eventErrors) {
     console.error(`❌ ${msg}`);
     errors++;

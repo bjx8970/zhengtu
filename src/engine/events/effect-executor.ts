@@ -30,6 +30,10 @@ export interface EffectExecutionContext {
   currentDay: number;
   /** 角色属性边界表（用于 clampAttr） */
   attributeBounds: Record<string, [number, number]>;
+  /** 已知机构 ID 集合（校验 fixed 机构引用，避免幽灵机构） */
+  knownInstitutionIds: ReadonlySet<string>;
+  /** 已知地区 ID 集合（校验 fixed 地区引用，避免幽灵地区） */
+  knownRegionIds: ReadonlySet<string>;
 }
 
 /** 单条效果应用记录 */
@@ -119,6 +123,10 @@ function resolveInstitutionRef(
     case 'signal':
       return resolveSignalStringField(ctx.signal, ref.field);
     case 'fixed':
+      // 校验 fixed 机构引用存在，避免静默创建幽灵机构
+      if (!ctx.knownInstitutionIds.has(ref.institutionId)) {
+        throw new Error(`Unknown institution "${ref.institutionId}" in fixed institutionRef`);
+      }
       return ref.institutionId;
   }
 }
@@ -138,6 +146,10 @@ function resolveRegionRef(ref: RegionRef, draft: PlayerSave, ctx: EffectExecutio
     case 'signal':
       return resolveSignalStringField(ctx.signal, ref.field);
     case 'fixed':
+      // 校验 fixed 地区引用存在，避免静默创建幽灵地区
+      if (!ctx.knownRegionIds.has(ref.regionId)) {
+        throw new Error(`Unknown region "${ref.regionId}" in fixed regionRef`);
+      }
       return ref.regionId;
   }
 }

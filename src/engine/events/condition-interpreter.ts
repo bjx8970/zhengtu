@@ -28,10 +28,9 @@ export interface ConditionEvaluationContext {
   state: Readonly<PlayerSave>;
   /** 当前绝对游戏日 */
   currentDay: number;
+  /** 每年游戏日数（由调用方从配置 daysPerMonth × monthsPerYear 提供，项目为 360） */
+  daysPerYear: number;
 }
-
-/** 每年游戏日数（用于任职年限计算） */
-const DAYS_PER_YEAR = 365;
 
 /**
  * 比较两个序数（用于有序枚举）。
@@ -146,7 +145,7 @@ function evaluateCareer(
       return compareOrdinal(actual, target, cond.op ?? 'eq');
     }
     case 'years_in_position': {
-      const years = (ctx.currentDay - appt.startedAtDay) / DAYS_PER_YEAR;
+      const years = (ctx.currentDay - appt.startedAtDay) / ctx.daysPerYear;
       return compareNumber(years, cond.value, cond.op);
     }
     case 'has_experience': {
@@ -194,10 +193,24 @@ function evaluateEventHistory(
  * @returns 是否满足
  */
 function evaluatePolicyState(
-  cond: Extract<ConditionExpression, { policyState: string }>,
+  cond: Extract<ConditionExpression, { policyRef: unknown }>,
   ctx: ConditionEvaluationContext,
 ): boolean {
-  const policy = ctx.state.governance.policies.find((p) => p.policyId === cond.policyState);
+  // 通过 policyRef 隔离具体政策实例（不再按 policyId 模糊匹配首个）
+  const ref = cond.policyRef as
+    { source: 'signal' } | { source: 'fixed'; policyInstanceId: string };
+  let instanceId: string | undefined;
+  if (ref.source === 'signal') {
+    const data = ctx.signal.data as Record<string, unknown>;
+    instanceId =
+      typeof data['policyInstanceId'] === 'string'
+        ? (data['policyInstanceId'] as string)
+        : undefined;
+  } else {
+    instanceId = ref.policyInstanceId;
+  }
+  if (!instanceId) return false;
+  const policy = ctx.state.governance.policies.find((p) => p.instanceId === instanceId);
   // 未找到政策实例明确返回 false
   if (!policy) return false;
   switch (cond.check) {
@@ -327,7 +340,7 @@ export function evaluateCondition(
     return evaluateEventHistory(condition, context);
   }
   // 政策状态
-  if ('policyState' in condition) {
+  if ('policyRef' in condition) {
     return evaluatePolicyState(condition, context);
   }
   // 履历

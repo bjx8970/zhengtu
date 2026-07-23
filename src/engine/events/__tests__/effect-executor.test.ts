@@ -30,6 +30,9 @@ function makeContext(signal?: DomainSignalSnapshot): EffectExecutionContext {
       } as DomainSignalSnapshot),
     currentDay: 1000,
     attributeBounds: getConfigLoader().getGameConfig().attributeBounds,
+    // 已知机构/地区集合（含测试中使用的 fixed 引用 ID）
+    knownInstitutionIds: new Set(['inst_fixed', 'inst_signal', 'township_govt_01']),
+    knownRegionIds: new Set(['region_fixed', 'region_signal', 'region_qingyun_town']),
   };
 }
 
@@ -274,5 +277,46 @@ describe('效果执行器 - 原子性', () => {
     );
     expect(result.applied).toHaveLength(2);
     expect(state.world.metrics['m']).toBe(42);
+  });
+
+  it('fixed 机构引用未知 ID 抛错（避免幽灵机构）', () => {
+    const state = createInitialState();
+    expect(() =>
+      applyEffects(
+        state,
+        [
+          {
+            target: 'institution_metric',
+            institutionRef: { source: 'fixed', institutionId: 'ghost_institution' },
+            metricId: 'm',
+            operation: 'add',
+            value: 5,
+          },
+        ],
+        makeContext(),
+      ),
+    ).toThrow(/ghost_institution/);
+    // 不应创建幽灵机构条目
+    expect(state.governance.institutionMetrics['ghost_institution']).toBeUndefined();
+  });
+
+  it('fixed 地区引用未知 ID 抛错（避免幽灵地区）', () => {
+    const state = createInitialState();
+    expect(() =>
+      applyEffects(
+        state,
+        [
+          {
+            target: 'region_metric',
+            regionRef: { source: 'fixed', regionId: 'ghost_region' },
+            metricId: 'm',
+            operation: 'add',
+            value: 5,
+          },
+        ],
+        makeContext(),
+      ),
+    ).toThrow(/ghost_region/);
+    expect(state.governance.regionMetrics['ghost_region']).toBeUndefined();
   });
 });

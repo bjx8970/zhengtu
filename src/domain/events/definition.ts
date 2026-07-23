@@ -5,10 +5,14 @@
  * - 触发器（信号来源 + 统一条件 + 概率/权重/互斥）
  * - 重复策略（once/once_per_chain/once_per_source/repeatable）
  * - 激活定义（延迟/截止）
- * - 选项（统一效果 + 信号发出 + 后续调度 + 事实变更）
+ * - 选项（统一效果 + 后续调度 + 事实变更）
+ * - 自动事件载荷（automaticOutcome，无需玩家选项的可执行结果）
  *
  * TypeScript 类型与 Zod Schema 保持一致，配置不得执行任意脚本。
  * 本文件只定义与验证，运行时编排留给事件编排器。
+ *
+ * 注：信号发出（emitSignals）能力尚不可执行（需按 signalType 构造合法载荷），
+ * 在本阶段移除，留给事件编排器 PR 重新设计。
  */
 
 import { z } from 'zod';
@@ -35,13 +39,7 @@ export type EventCategory = (typeof EVENT_CATEGORIES)[number];
 /** 事件分类 Zod Schema */
 export const EventCategorySchema = z.enum(EVENT_CATEGORIES);
 
-// ===== 信号发出与事实变更 =====
-
-/** 信号发出定义：选项解决时发出一个领域信号 */
-export interface SignalEmissionDefinition {
-  /** 要发出的信号类型 */
-  signalType: import('../governance/types').DomainSignal;
-}
+// ===== 事实变更 =====
 
 /** 事实变更定义：设置一个世界事实 */
 export interface FactMutationDefinition {
@@ -157,8 +155,25 @@ export interface EventOptionDefinition {
   description: string;
   /** 效果列表 */
   effects: import('../conditions').EffectDefinition[];
-  /** 解决时发出的信号（可选） */
-  emitSignals?: SignalEmissionDefinition[];
+  /** 调度的后续事件（可选） */
+  schedule?: ScheduledFollowupDefinition[];
+  /** 取消的计划事件 ID 列表（可选） */
+  cancelScheduledEvents?: string[];
+  /** 设置的世界事实（可选） */
+  setFacts?: FactMutationDefinition[];
+}
+
+// ===== 自动事件载荷 =====
+
+/**
+ * 自动事件可执行载荷。
+ *
+ * automatic 事件没有玩家选项，其效果/调度/事实变更直接定义在事件级，
+ * 由编排器在事件触发时自动结算。
+ */
+export interface EventOutcomePayload {
+  /** 效果列表 */
+  effects: import('../conditions').EffectDefinition[];
   /** 调度的后续事件（可选） */
   schedule?: ScheduledFollowupDefinition[];
   /** 取消的计划事件 ID 列表（可选） */
@@ -173,8 +188,8 @@ export interface EventOptionDefinition {
  * 新版事件定义。
  *
  * - chainId/nodeId：事件链归属（独立事件为 null）
- * - presentation 为 automatic 时不得有玩家选项（由配置验证保证）
- * - presentation 为 blocking/inbox 时至少一个选项（由配置验证保证）
+ * - presentation 为 automatic 时不得有玩家选项，须携带 automaticOutcome（由配置验证保证）
+ * - presentation 为 blocking/inbox 时至少一个选项且不得有 automaticOutcome（由配置验证保证）
  */
 export interface EventDefinition {
   /** 稳定事件 ID（全局唯一） */
@@ -199,14 +214,13 @@ export interface EventDefinition {
   repeatPolicy: EventRepeatPolicy;
   /** 激活定义 */
   activation: EventActivationDefinition;
-  /** 选项列表 */
+  /** 选项列表（blocking/inbox 事件） */
   options: EventOptionDefinition[];
+  /** 自动事件载荷（仅 automatic 事件，可选但验证要求存在） */
+  automaticOutcome?: EventOutcomePayload;
 }
 
 // ===== Zod Schema =====
-
-/** 信号发出定义 Schema */
-const SignalEmissionDefinitionSchema = z.object({ signalType: DomainSignalSchema }).strict();
 
 /** 事实变更定义 Schema */
 const FactMutationDefinitionSchema = z
@@ -274,7 +288,16 @@ const EventOptionDefinitionSchema = z
     label: z.string().min(1),
     description: z.string(),
     effects: z.array(EffectDefinitionSchema),
-    emitSignals: z.array(SignalEmissionDefinitionSchema).optional(),
+    schedule: z.array(ScheduledFollowupDefinitionSchema).optional(),
+    cancelScheduledEvents: z.array(z.string().min(1)).optional(),
+    setFacts: z.array(FactMutationDefinitionSchema).optional(),
+  })
+  .strict();
+
+/** 自动事件载荷 Schema */
+const EventOutcomePayloadSchema = z
+  .object({
+    effects: z.array(EffectDefinitionSchema),
     schedule: z.array(ScheduledFollowupDefinitionSchema).optional(),
     cancelScheduledEvents: z.array(z.string().min(1)).optional(),
     setFacts: z.array(FactMutationDefinitionSchema).optional(),
@@ -296,6 +319,7 @@ export const EventDefinitionSchema = z
     repeatPolicy: EventRepeatPolicySchema,
     activation: EventActivationDefinitionSchema,
     options: z.array(EventOptionDefinitionSchema),
+    automaticOutcome: EventOutcomePayloadSchema.optional(),
   })
   .strict();
 
