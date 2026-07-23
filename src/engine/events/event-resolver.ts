@@ -24,6 +24,7 @@ import type {
   ScheduledFollowupDefinition,
 } from '../../domain/events/definition';
 import { createEventSnapshot } from './event-orchestrator';
+import { evaluateCondition } from './condition-interpreter';
 
 /** 选项结算输入 */
 export interface ResolveEventOptionInput {
@@ -58,6 +59,18 @@ export type ResolveEventOptionResult =
  *
  * 使用真实 EventDefinition 创建快照，不再创建伪定义。
  * event.resolved 信号仅在事件实际激活时由调度器发出，此处不提前发射。
+ *
+ * @param schedules 调度定义列表
+ * @param sourceKey 来源键
+ * @param chainInstanceId 当前链实例 ID
+ * @param parentChainId 父事件所属链 ID
+ * @param currentDay 当前游戏日
+ * @param rng 随机数生成器
+ * @param idFactory ID 工厂
+ * @param definitions 事件定义列表
+ * @param state 游戏状态（条件评估用）
+ * @param signal 触发信号上下文（条件评估用）
+ * @param evalCurrentDay 条件评估用的当前日
  */
 function resolveSchedule(
   schedules: readonly ScheduledFollowupDefinition[] | undefined,
@@ -68,6 +81,9 @@ function resolveSchedule(
   rng: () => number,
   idFactory: () => string,
   definitions: readonly EventDefinition[],
+  state: Readonly<PlayerSave>,
+  signal: DomainSignalSnapshot,
+  evalCurrentDay: number,
 ): ScheduledEventInstance[] {
   const scheduled: ScheduledEventInstance[] = [];
 
@@ -78,6 +94,16 @@ function resolveSchedule(
 
     const def = definitions.find((d) => d.id === sched.eventId);
     if (!def) continue;
+
+    // 评估调度条件（如配置了 condition）
+    if (sched.condition) {
+      const ctx = { signal, state, currentDay: evalCurrentDay, daysPerYear: 360 };
+      try {
+        if (!evaluateCondition(sched.condition, ctx)) continue;
+      } catch {
+        continue;
+      }
+    }
 
     // 仅当后续事件属于同一链时继承链实例 ID；不同链的事件需要独立链实例
     const inheritsChain = def.chainId != null && def.chainId === parentChainId;
@@ -161,14 +187,16 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
     label: eff.target,
   }));
 
-  // 冷却计算
+  // 冷却计算：优先使用选项级冷却，回退到事件级 repeatPolicy.cooldownDays
   let cooldownUpdate: EventCooldownRecord | null = null;
-  if (option.cooldownDays && option.cooldownDays > 0) {
+  const eventDef = definitions.find((d) => d.id === instance.eventId);
+  const effectiveCooldownDays = option.cooldownDays ?? eventDef?.repeatPolicy.cooldownDays;
+  if (effectiveCooldownDays && effectiveCooldownDays > 0) {
     cooldownUpdate = {
       eventId: instance.eventId,
       scope: 'global',
       scopeId: null,
-      untilDay: currentDay + option.cooldownDays,
+      untilDay: currentDay + effectiveCooldownDays,
     };
   }
 
@@ -182,6 +210,9 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
     rng,
     idFactory,
     definitions,
+    state,
+    instance.triggerContext,
+    currentDay,
   );
 
   // 取消规范

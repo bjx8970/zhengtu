@@ -239,7 +239,33 @@ function selectMutexGroupWinner(
 }
 
 /**
- * 查找或创建事件链实例。
+ * 在已有状态和事务映射中查找链实例（只读，不创建新链）。
+ *
+ * 用于资格检查阶段——避免在候选事件被条件/冷却/概率淘汰时残留 ghost chain。
+ *
+ * @param state 游戏状态
+ * @param chainId 链定义 ID
+ * @param sourceKey 来源键
+ * @param allChains 当前事务中已创建的链实例映射
+ * @returns 事件链实例（如果存在）；null 表示尚未创建
+ */
+function findExistingChainInstance(
+  state: Readonly<PlayerSave>,
+  chainId: string,
+  sourceKey: string,
+  allChains: Map<string, EventChainInstance>,
+): EventChainInstance | null {
+  for (const ci of allChains.values()) {
+    if (ci.chainId === chainId && ci.sourceKey === sourceKey) return ci;
+  }
+  const existing = Object.values(state.events.chainInstances).find(
+    (ci) => ci.chainId === chainId && ci.sourceKey === sourceKey,
+  );
+  return existing ?? null;
+}
+
+/**
+ * 查找或创建事件链实例（资格通过后才调用）。
  *
  * 先查事务级 allChains，再查持久化 state，避免重复创建链实例。
  *
@@ -328,6 +354,9 @@ function isSignalProcessed(
  * @param defs 事件定义列表
  * @param rng 随机数生成器
  * @param idFactory ID 工厂
+ * @param state 游戏状态（条件评估用）
+ * @param parentSignal 父触发信号（条件评估用）
+ * @param evalCurrentDay 条件评估用的当前日
  * @returns 计划事件实例
  */
 export function processScheduledFollowups(
@@ -338,6 +367,9 @@ export function processScheduledFollowups(
   defs: readonly EventDefinition[],
   rng: () => number,
   idFactory: () => string,
+  state: Readonly<PlayerSave>,
+  parentSignal: DomainSignalSnapshot,
+  evalCurrentDay: number,
 ): ScheduledEventInstance[] {
   const scheduled: ScheduledEventInstance[] = [];
 
@@ -346,6 +378,16 @@ export function processScheduledFollowups(
 
     const def: EventDefinition | undefined = defs.find((d) => d.id === sched.eventId);
     if (!def) continue;
+
+    // 评估调度条件
+    if (sched.condition) {
+      const ctx = { signal: parentSignal, state, currentDay: evalCurrentDay, daysPerYear: 360 };
+      try {
+        if (!evaluateCondition(sched.condition, ctx)) continue;
+      } catch {
+        continue;
+      }
+    }
 
     const activateAtDay = currentDay + sched.delayDays;
     const snapshot = createEventSnapshot(def);
@@ -435,7 +477,7 @@ function resolveSingleSignal(
 
   for (const def of candidates) {
     const chainInstance = def.chainId
-      ? findOrCreateChainInstance(state, def.chainId, sourceKey, currentDay, idFactory, allChains)
+      ? findExistingChainInstance(state, def.chainId, sourceKey, allChains)
       : null;
 
     if (checkEventRepeatability(state, def, sourceKey, allNewInstances, chainInstance)) {
@@ -503,7 +545,8 @@ function resolveSingleSignal(
   }
 
   // 每个信号最多一个 blocking 事件标记为 active，其余标记为 pending
-  let hasBlockingActive = false;
+  // 如果持久化状态中已有活跃阻塞事件，本次 signal 触发的 blocking 事件亦标记为 pending
+  let hasBlockingActive = state.events.activeBlockingEventId !== null;
 
   for (const def of selectedDefs) {
     const instanceId = idFactory();

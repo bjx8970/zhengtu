@@ -22,6 +22,9 @@ import {
 import type { EventOrchestrationResult } from '../../engine/events/event-orchestrator';
 import { getConfigLoader } from '../../config/loader';
 
+/** 模块级 ID 计数器，确保跨 dispatch 调用的 ID 唯一性 */
+let nextAutoId = 0;
+
 /** CHOOSE_EVENT_OPTION 载荷 */
 export interface ChooseEventOptionPayload {
   eventInstanceId: string;
@@ -47,8 +50,7 @@ export function reduceChooseEventOption(
 ): EventHistoryRecord | null {
   const definitions = getConfigLoader().getAllEventDefinitions();
   const rng = payload._rng ?? Math.random;
-  let idCounter = 0;
-  const idFactory = payload._idFactory ?? (() => `auto_id_${idCounter++}`);
+  const idFactory = payload._idFactory ?? (() => `auto_id_${nextAutoId++}`);
 
   const loader = getConfigLoader();
   const cfg = loader.getGameConfig();
@@ -225,6 +227,9 @@ export function handleAutoEventInstance(
       definitions,
       rng,
       idFactory,
+      draft as Readonly<PlayerSave>,
+      instance.triggerContext,
+      currentDay,
     );
     for (const sched of schedResult) {
       draft.events.scheduled.push(sched);
