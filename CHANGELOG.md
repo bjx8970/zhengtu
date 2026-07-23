@@ -4,7 +4,46 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/)，版本号遵循语义化版本。分类：Added / Changed / Fixed / Deprecated / Removed / Save compatibility。
 
-## [Unreleased] — Phase 2 第二实施批次（事件定义与效果运行时基础）
+## [Unreleased] — Phase 2 第三实施批次（事件编排与实例生命周期）
+
+### Added
+
+- 信号身份系统：`signalId` 为 `DomainSignalSnapshot` 新增稳定唯一标识，用于去重、来源追踪和诊断。
+- 来源键派生函数 `deriveEventSourceKey`（`src/engine/events/source-key.ts`）：根据信号类型统一派生 `sourceKey`，支持 once_per_source 判定、冷却隔离和链实例隔离。
+- 核心事件编排器 `processDomainSignal`（`src/engine/events/event-orchestrator.ts`）：纯函数，接收领域信号后执行资格评估（重复/冷却/互斥/条件/概率）、互斥组加权选择、事件实例创建、自动事件结算、递归信号处理和诊断信息记录。
+- 事件可执行快照 `EventExecutableSnapshot`：事件实例保存触发时完整定义副本（标题、描述、选项、效果），玩家选择时从快照读取，不重读配置。
+- 事件实例增强：`EventInstance` / `ScheduledEventInstance` 增加 `sourceKey`、`activatedAtDay`、`snapshot` 字段。
+- 重复控制：`once` / `once_per_source` / `once_per_chain` / `repeatable`（含 `maxActivations`），所有状态（pending/scheduled/history）均参与判定。
+- 冷却模型升级：从简单 `Record<string, number>` 升级为 `EventCooldownRecord[]`，支持 `global` / `source` / `chain` 三种作用域。
+- 互斥组运行时：同一 `mutexGroup` 内每次信号最多选中一个，按 `weight`（默认 1）加权选择，非互斥事件全部创建。
+- 概率与权重分离：`probability` 独立于 `weight`，RNG 注入确保可测试。
+- 自动事件即时结算：`presentation: automatic` 的事件在创建时立即应用效果、调度后续、取消计划、记录历史、发出 `event.resolved` 信号。
+- 玩家选项原子结算：`resolveEventOption` 纯函数 + `reduceChooseEventOption` Store reducer（`CHOOSE_EVENT_OPTION` action），从快照验证选项并原子应用效果。
+- 事件链实例增强：`EventChainInstance` 使用统一 `sourceKey` 替代 `sourceEntityType/sourceEntityId`，增加 `completedAtDay`，支持分支（多个 `activeNodeIds`）。
+- 计划事件管理：`activateScheduledEvents` 到期激活 + `expireEventInstances` 过期处理（纯函数）。
+- 计划事件取消语义：从简单 `string[]` 升级为 `ScheduledEventCancellation`（`same_chain` / `same_source` / `all`）。
+- 信号去重与递归保护：广度优先信号队列，最大深度 16，最多 100 信号/事务。
+- 编排诊断信息 `EventOrchestrationDiagnostic`：条件失败/重复阻止/冷却阻止/概率失败/互斥未选中/重复信号/实例创建等可观察诊断。
+- 事件历史记录增强：`EventHistoryRecord` 增加 `finalStatus`（resolved/expired/cancelled）、`triggeredAtDay`、`completedAtDay`、`sourceKey`、`chainInstanceId`、`titleSnapshot`、`chosenOptionLabel`、`appliedEffects`。
+- 测试配置 fixture：`events.json` 增加 `investigation_start` 事件链（6 个事件，覆盖线性/分支/延迟/自动路径）。
+- ADR-003：事件编排与运行时快照。
+
+### Changed
+
+- `setFacts` 从 `flood_emergency` 事件配置迁移为标准 `world_fact` effect；`setFacts` 标记为 deprecated。
+- 内容版本由 `2026.07.1` 提升为 `2026.07.2`。
+
+### Save compatibility
+
+- 存档 Schema 由 3 提升至 4（事件状态结构变化：事件实例增加快照、冷却改为结构化记录、链实例统一 sourceKey）。
+- 提供确定性 `migrateSchema3To4` 迁移：空事件状态直接迁移；非空事件实例拒绝迁移（无法补全快照）并保留原始备份。
+- Schema 2 存档通过链式迁移（2→3→4）仍可加载。低于 Schema 2 的存档拒绝。
+
+### 未实现
+
+- 政策生命周期与可中断时间轴（留给 #96）。
+- 事件 UI（留给后续 UI PR）。
+- 行动/考核完成后自动接入事件编排器（留给 #96）。
 
 ### Added
 
