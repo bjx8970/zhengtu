@@ -163,38 +163,79 @@ function computeApplicableSources(
 }
 
 /**
- * 收集被 not 取反引用的信号字段。
+ * 递归校验被 not 取反引用的信号字段安全性。
  *
- * 被取反的字段若在某个来源缺失，会因 not(false)=true 错误触发，
- * 因此这些字段须在所有触发来源中都存在。
+ * 被取反字段若在某个“该条件实际可达”的来源中缺失，会因 not(false)=true 错误触发。
+ * 关键在于 all 节点的兄弟条件会限定可达来源：若某兄弟在来源 S 不可适用，
+ * 则 all 在 S 为假，当前 not 子树不会在 S 被评估为真，故不构成错误触发。
  *
  * @param cond 条件表达式
+ * @param contextSources 当前节点被评估的来源索引集合
  * @param negated 是否处于奇数层 not 下
- * @param out 输出集合
+ * @param sourceFieldSets 每个触发来源的载荷字段集合
+ * @param eventId 事件 ID（错误信息用）
+ * @param errors 错误输出列表
  */
-function collectNegatedSignalFields(
+function validateNegatedSafety(
   cond: ConditionExpression,
+  contextSources: Set<number>,
   negated: boolean,
-  out: Set<string>,
+  sourceFieldSets: Set<string>[],
+  eventId: string,
+  errors: string[],
 ): void {
+  const fieldMissingInSomeContext = (field: string): boolean => {
+    for (const s of contextSources) {
+      const fieldSet = sourceFieldSets[s];
+      if (fieldSet && !fieldSet.has(field)) return true;
+    }
+    return false;
+  };
+
   if ('all' in cond) {
-    cond.all.forEach((c) => collectNegatedSignalFields(c, negated, out));
+    // 每个子节点的上下文 = 当前上下文 ∩ 其他兄弟节点适用来源交集
+    // （兄弟在来源 S 不可适用时 all 为假，当前子树不会在 S 触发）
+    const childApplicable = cond.all.map((c) => computeApplicableSources(c, sourceFieldSets));
+    cond.all.forEach((child, i) => {
+      const childContext = new Set(contextSources);
+      cond.all.forEach((_, j) => {
+        if (j !== i) {
+          const siblingApplicable = childApplicable[j];
+          if (siblingApplicable) {
+            for (const s of [...childContext]) {
+              if (!siblingApplicable.has(s)) childContext.delete(s);
+            }
+          }
+        }
+      });
+      validateNegatedSafety(child, childContext, negated, sourceFieldSets, eventId, errors);
+    });
     return;
   }
   if ('any' in cond) {
-    cond.any.forEach((c) => collectNegatedSignalFields(c, negated, out));
+    cond.any.forEach((child) =>
+      validateNegatedSafety(child, contextSources, negated, sourceFieldSets, eventId, errors),
+    );
     return;
   }
   if ('not' in cond) {
-    collectNegatedSignalFields(cond.not, !negated, out);
+    validateNegatedSafety(cond.not, contextSources, !negated, sourceFieldSets, eventId, errors);
     return;
   }
   if ('signalField' in cond) {
-    if (negated) out.add(cond.signalField);
+    if (negated && fieldMissingInSomeContext(cond.signalField)) {
+      errors.push(
+        `事件 ${eventId}: 条件中 not 取反引用信号字段 "${cond.signalField}" 在可达来源中缺失，将因 not(false) 错误触发`,
+      );
+    }
     return;
   }
   if ('policyRef' in cond && cond.policyRef.source === 'signal') {
-    if (negated) out.add('policyInstanceId');
+    if (negated && fieldMissingInSomeContext('policyInstanceId')) {
+      errors.push(
+        `事件 ${eventId}: 条件中 not 取反引用信号字段 "policyInstanceId" 在可达来源中缺失，将因 not(false) 错误触发`,
+      );
+    }
   }
 }
 
@@ -305,23 +346,11 @@ export function validateEventDefinitions(
     for (const fieldSet of sourceFieldSets) {
       for (const field of fieldSet) conditionAvailableFields.add(field);
     }
-    // 所有声明来源的载荷字段交集：not 安全性须对每个声明来源保证
-    // （not(缺失=false)=true 可对任意声明来源触发，不受触发条件限定）
-    const allSourcesIntersection = new Set<string>();
-    const firstSourceSet = sourceFieldSets[0];
-    if (firstSourceSet) {
-      for (const field of firstSourceSet) allSourcesIntersection.add(field);
-      for (const fieldSet of sourceFieldSets) {
-        for (const field of [...allSourcesIntersection]) {
-          if (!fieldSet.has(field)) allSourcesIntersection.delete(field);
-        }
-      }
-    }
+    // 所有声明来源索引（not 安全递归校验的初始上下文）
+    const allSourceIndices = new Set<number>(sourceFieldSets.map((_, i) => i));
 
     // 条件引用的信号字段（含触发条件与后续调度条件）
     const conditionSignalFields = new Set<string>();
-    // 被 not 取反引用的信号字段（须在所有来源存在）
-    const negatedSignalFields = new Set<string>();
     // 条件适用来源（递归计算，用于可达性判断）
     let conditionApplicableSources = new Set<number>(sourceFieldSets.map((_, i) => i));
     // 效果引用的信号字段
@@ -331,10 +360,18 @@ export function validateEventDefinitions(
 
     if (event.trigger.condition) {
       collectConditionSignalFields(event.trigger.condition, conditionSignalFields);
-      collectNegatedSignalFields(event.trigger.condition, false, negatedSignalFields);
       conditionApplicableSources = computeApplicableSources(
         event.trigger.condition,
         sourceFieldSets,
+      );
+      // not 安全性：按触发条件树递归校验，上下文为所有声明来源
+      validateNegatedSafety(
+        event.trigger.condition,
+        allSourceIndices,
+        false,
+        sourceFieldSets,
+        event.id,
+        errors,
       );
     }
 
@@ -368,10 +405,10 @@ export function validateEventDefinitions(
         }
         // 后续调度条件使用父事件的触发信号上下文。
         // 不同选项/同一选项的多个 followup 是独立分支，不累计相交，
-        // 每个后续条件独立验证：其适用来源与触发条件适用来源的交集须非空。
+        // 每个后续条件独立验证：其适用来源与触发条件适用来源的交集须非空，
+        // not 安全性亦按该后续条件树独立校验（上下文为触发条件适用来源）。
         if (followup.condition) {
           collectConditionSignalFields(followup.condition, conditionSignalFields);
-          collectNegatedSignalFields(followup.condition, false, negatedSignalFields);
           const followupSources = computeApplicableSources(followup.condition, sourceFieldSets);
           const reachable = [...conditionApplicableSources].some((i) => followupSources.has(i));
           if (!reachable) {
@@ -379,6 +416,15 @@ export function validateEventDefinitions(
               `事件 ${event.id} ${scopeLabel}: 后续事件 "${followup.eventId}" 的条件引用的信号字段在可触发来源中不可达`,
             );
           }
+          // not 安全性按该后续条件树独立校验，上下文为其自身适用来源
+          validateNegatedSafety(
+            followup.condition,
+            followupSources,
+            false,
+            sourceFieldSets,
+            event.id,
+            errors,
+          );
         }
         if (followup.delayDays === 0) {
           const edges = zeroDelayGraph.get(event.id) ?? [];
@@ -424,16 +470,6 @@ export function validateEventDefinitions(
       errors.push(
         `事件 ${event.id}: 条件引用的信号字段组合不存在于任何单一触发来源，事件将永久不可达`,
       );
-    }
-
-    // not 安全性：被取反的字段须在每个声明来源中都存在
-    // （not(缺失=false)=true 可对任意声明来源触发，不受触发条件限定）
-    for (const field of negatedSignalFields) {
-      if (!allSourcesIntersection.has(field)) {
-        errors.push(
-          `事件 ${event.id}: 条件中 not 取反引用信号字段 "${field}" 并非在所有触发来源 [${event.trigger.sources.join(', ')}] 中都存在，缺失来源将因 not(false) 错误触发`,
-        );
-      }
     }
 
     // 效果引用来源兼容性：字段须在每个可触发来源载荷中都可解析

@@ -604,6 +604,67 @@ describe('validateEventDefinitions 引用完整性', () => {
     const errors = validateEventDefinitions([event]);
     expect(errors.some((e) => e.includes('not') && e.includes('regionId'))).toBe(false);
   });
+
+  it('all 兄弟条件限定来源后 not 字段只需对可达来源存在', () => {
+    // all(experienceId == x, not(regionId == forbidden))
+    // experienceId 仅在 appointment.changed → all 将可达来源限定为 appointment.changed
+    // regionId 在 appointment.changed 存在 → not 安全 → 应通过
+    // （旧逻辑按全部声明来源校验，world.metric_changed 无 regionId 会误拒）
+    const event = makeEvent({
+      trigger: {
+        sources: ['world.metric_changed', 'appointment.changed'],
+        condition: {
+          all: [
+            { signalField: 'experienceId', op: 'eq', value: 'x' },
+            { not: { signalField: 'regionId', op: 'eq', value: 'forbidden' } },
+          ],
+        },
+      },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('not') && e.includes('regionId'))).toBe(false);
+  });
+
+  it('两个独立 followup 的 not 条件不累计误拒', () => {
+    // 选项1 followup not(actionId)：actionId 在 action.completed 存在
+    // 选项2 followup not(score)：score 在 assessment.completed 存在
+    // 二者独立分支，不应累计或按全部来源误拒
+    const event = makeEvent({
+      trigger: { sources: ['action.completed', 'assessment.completed'] },
+      options: [
+        {
+          id: 'o1',
+          label: 'a',
+          description: '',
+          effects: [],
+          schedule: [
+            {
+              eventId: 'f1',
+              delayDays: 5,
+              condition: { not: { signalField: 'actionId', op: 'eq', value: 'x' } },
+            },
+          ],
+        },
+        {
+          id: 'o2',
+          label: 'b',
+          description: '',
+          effects: [],
+          schedule: [
+            {
+              eventId: 'f2',
+              delayDays: 5,
+              condition: { not: { signalField: 'score', op: 'gte', value: 80 } },
+            },
+          ],
+        },
+      ],
+    });
+    const f1 = makeEvent({ id: 'f1' });
+    const f2 = makeEvent({ id: 'f2' });
+    const errors = validateEventDefinitions([event, f1, f2]);
+    expect(errors.some((e) => e.includes('not') && e.includes('not(false)'))).toBe(false);
+  });
 });
 
 describe('SIGNAL_TYPE_PAYLOAD_FIELDS 一致性', () => {
