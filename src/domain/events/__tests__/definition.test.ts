@@ -417,6 +417,69 @@ describe('validateEventDefinitions 引用完整性', () => {
     const errors = validateEventDefinitions([event, followup]);
     expect(errors.some((e) => e.includes('institutionId') && e.includes('不可达'))).toBe(true);
   });
+
+  it('all 引用分属不同来源的字段被拒绝（永久不可达）', () => {
+    // actionId 仅在 action.completed，score 仅在 assessment.completed，无来源同时含有两者
+    const event = makeEvent({
+      trigger: {
+        sources: ['action.completed', 'assessment.completed'],
+        condition: {
+          all: [
+            { signalField: 'actionId', op: 'eq', value: 'x' },
+            { signalField: 'score', op: 'gte', value: 80 },
+          ],
+        },
+      },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('all') && e.includes('不可达'))).toBe(true);
+  });
+
+  it('all 引用共存于同一来源的字段通过', () => {
+    // actionId 和 deptId 都在 action.completed
+    const event = makeEvent({
+      trigger: {
+        sources: ['action.completed', 'assessment.completed'],
+        condition: {
+          all: [
+            { signalField: 'actionId', op: 'eq', value: 'x' },
+            { signalField: 'deptId', op: 'eq', value: 'y' },
+          ],
+        },
+      },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('all') && e.includes('不可达'))).toBe(false);
+  });
+
+  it('not(signalField) 在部分来源缺失字段被拒绝（避免 not(false) 错误触发）', () => {
+    // institutionId 仅在 appointment.changed，world.metric_changed 缺失
+    // not(institutionId eq x) 在 world.metric_changed 触发时会因 not(false)=true 错误触发
+    const event = makeEvent({
+      trigger: {
+        sources: ['world.metric_changed', 'appointment.changed'],
+        condition: {
+          not: { signalField: 'institutionId', op: 'eq', value: 'x' },
+        },
+      },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('not') && e.includes('institutionId'))).toBe(true);
+  });
+
+  it('not(signalField) 在所有来源都有字段通过', () => {
+    // regionId 在 action.completed 和 appointment.changed 都存在
+    const event = makeEvent({
+      trigger: {
+        sources: ['action.completed', 'appointment.changed'],
+        condition: {
+          not: { signalField: 'regionId', op: 'eq', value: 'x' },
+        },
+      },
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('not') && e.includes('regionId'))).toBe(false);
+  });
 });
 
 describe('SIGNAL_TYPE_PAYLOAD_FIELDS 一致性', () => {
