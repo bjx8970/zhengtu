@@ -56,12 +56,15 @@ export function activateScheduledEvents(
   });
 
   const activated: EventInstance[] = [];
+  let hasActiveBlocking = state.events.activeBlockingEventId !== null;
 
   for (const sched of due) {
     const isBlocking = sched.snapshot.presentation === 'blocking';
-    // 如果已有活跃阻塞事件，新阻塞事件设为 pending 而非 active
-    const status: 'active' | 'pending' =
-      isBlocking && state.events.activeBlockingEventId === null ? 'active' : 'pending';
+    // 首个 blocking 且没有现有活跃阻塞事件时标记为 active，其余为 pending
+    const status: 'active' | 'pending' = isBlocking && !hasActiveBlocking ? 'active' : 'pending';
+    if (isBlocking) {
+      hasActiveBlocking = true;
+    }
 
     const deadlineDay =
       sched.snapshot.deadlineDays != null
@@ -134,7 +137,9 @@ export function expireEventInstances(
       if (ci) {
         chainsToUpdate.push({
           ...ci,
-          activeNodeIds: ci.activeNodeIds.filter((n) => n !== inst.eventId),
+          activeNodeIds: ci.activeNodeIds.filter(
+            (n) => n !== (inst.snapshot.nodeId ?? inst.eventId),
+          ),
         });
       }
     }

@@ -214,12 +214,11 @@ export function handleAutoEventInstance(
     }
   }
 
-  // 处理 schedule（不级联，仅收集信号）
+  // 处理 schedule（仅创建计划事件，不发出级联信号）
   const cascadeSignals: DomainSignalSnapshot[] = [];
   if (outcome?.schedule) {
     const schedResult = processScheduledFollowups(
       outcome.schedule,
-      instance.triggerContext,
       instance.sourceKey,
       instance.chainInstanceId,
       currentDay,
@@ -227,10 +226,9 @@ export function handleAutoEventInstance(
       rng,
       idFactory,
     );
-    for (const sched of schedResult.scheduled) {
+    for (const sched of schedResult) {
       draft.events.scheduled.push(sched);
     }
-    cascadeSignals.push(...schedResult.signals);
   }
 
   // 历史记录

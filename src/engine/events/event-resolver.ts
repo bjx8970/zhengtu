@@ -63,6 +63,7 @@ function resolveSchedule(
   schedules: readonly ScheduledFollowupDefinition[] | undefined,
   sourceKey: string,
   chainInstanceId: string | null,
+  parentChainId: string | null,
   currentDay: number,
   rng: () => number,
   idFactory: () => string,
@@ -77,6 +78,10 @@ function resolveSchedule(
 
     const def = definitions.find((d) => d.id === sched.eventId);
     if (!def) continue;
+
+    // 仅当后续事件属于同一链时继承链实例 ID；不同链的事件需要独立链实例
+    const inheritsChain = def.chainId != null && def.chainId === parentChainId;
+    const resolvedChainInstanceId = inheritsChain ? chainInstanceId : null;
 
     const signalId = idFactory();
     const activateAtDay = currentDay + sched.delayDays;
@@ -98,7 +103,7 @@ function resolveSchedule(
         },
       },
       sourceKey,
-      chainInstanceId,
+      chainInstanceId: resolvedChainInstanceId,
       snapshot: createEventSnapshot(def),
     });
   }
@@ -172,6 +177,7 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
     option.schedule,
     instance.sourceKey,
     instance.chainInstanceId,
+    instance.snapshot.chainId,
     currentDay,
     rng,
     idFactory,

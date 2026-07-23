@@ -602,4 +602,76 @@ describe('event-reducer: cascade signals and scheduling', () => {
       'node_a',
     );
   });
+
+  it('end-to-end cascade: option → event.resolved → cascade processing', () => {
+    // Event A resolves, emitting event.resolved signal → cascade triggers
+    // processDomainSignal. This verifies the full reducer cascade path.
+    const e2eSnapshot = createEventSnapshot({
+      id: 'evt_e2e_source',
+      chainId: null,
+      nodeId: null,
+      title: 'E2E Cascade Source',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: { deadlineDays: 30 },
+      options: [
+        {
+          id: 'opt_e2e',
+          label: '触发级联',
+          description: '',
+          effects: [
+            { target: 'character', field: 'diligence', operation: 'add', value: 10 },
+            { target: 'world_fact', factId: 'e2e_test_resolved', operation: 'set', value: true },
+          ],
+        },
+      ],
+    });
+
+    const e2eInst: EventInstance = {
+      instanceId: 'inst_e2e_001',
+      eventId: 'evt_e2e_source',
+      status: 'pending',
+      triggeredAtDay: 50,
+      activatedAtDay: 50,
+      deadlineDay: null,
+      triggerContext: { ...makeSignal(), signalId: 'sig_e2e' },
+      sourceKey: 'src_e2e',
+      chainInstanceId: null,
+      snapshot: e2eSnapshot,
+    };
+
+    const baseState = createStateWithPending();
+    baseState.events.pending = [e2eInst];
+
+    const store = createTestStore(baseState);
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_e2e_001',
+      optionId: 'opt_e2e',
+    });
+
+    const state = store.getRawState();
+    // Event resolved and removed from pending
+    expect(state.events.pending.find((p) => p.instanceId === 'inst_e2e_001')).toBeUndefined();
+
+    // History records created: at minimum the resolved event itself
+    const e2eHistory = state.events.history.find((h) => h.instanceId === 'inst_e2e_001');
+    expect(e2eHistory).toBeDefined();
+    expect(e2eHistory!.finalStatus).toBe('resolved');
+    expect(e2eHistory!.chosenOptionId).toBe('opt_e2e');
+    expect(e2eHistory!.appliedEffects.length).toBeGreaterThanOrEqual(2);
+
+    // World fact applied via effect pipeline
+    expect(state.world.facts['e2e_test_resolved']).toBe(true);
+
+    // event.resolved signal processed through cascade
+    // If any auto event matched, its history would also appear.
+    // Even if none matched, processedSignalIds should have grown.
+    const processedCount = state.events.processedSignalIds.length;
+    expect(processedCount).toBeGreaterThan(0);
+  });
 });

@@ -264,11 +264,19 @@ function findOrCreateChainInstance(
     if (ci.chainId === chainId && ci.sourceKey === sourceKey) return ci;
   }
 
-  // 再查持久化状态
+  // 再查持久化状态；必须浅克隆以避免调用方直接修改持久化引用
   const existing = Object.values(state.events.chainInstances).find(
     (ci) => ci.chainId === chainId && ci.sourceKey === sourceKey,
   );
-  if (existing) return existing;
+  if (existing) {
+    const clone: EventChainInstance = {
+      ...existing,
+      activeNodeIds: [...existing.activeNodeIds],
+      completedNodeIds: [...existing.completedNodeIds],
+    };
+    allChains.set(clone.instanceId, clone);
+    return clone;
+  }
 
   const newChain: EventChainInstance = {
     instanceId: idFactory(),
@@ -308,33 +316,30 @@ function isSignalProcessed(
 }
 
 /**
- * 处理调度的后续事件，创建 ScheduledEventInstance 和级联信号。
+ * 处理调度的后续事件，创建 ScheduledEventInstance。
+ *
+ * 注意：不在此处发出 event.resolved 级联信号——后续事件尚未激活，
+ * event.resolved 信号应在计划事件实际激活时（activateScheduledEvents）才发出。
  *
  * @param schedules 调度定义列表
- * @param sourceSignal 来源信号
  * @param sourceKey 来源键
  * @param chainInstanceId 链实例 ID
  * @param currentDay 当前游戏日
  * @param defs 事件定义列表
  * @param rng 随机数生成器
  * @param idFactory ID 工厂
- * @returns 计划事件和发出的信号
+ * @returns 计划事件实例
  */
 export function processScheduledFollowups(
   schedules: readonly ScheduledFollowupDefinition[],
-  _sourceSignal: DomainSignalSnapshot,
   sourceKey: string,
   chainInstanceId: string | null,
   currentDay: number,
   defs: readonly EventDefinition[],
   rng: () => number,
   idFactory: () => string,
-): {
-  scheduled: ScheduledEventInstance[];
-  signals: DomainSignalSnapshot[];
-} {
+): ScheduledEventInstance[] {
   const scheduled: ScheduledEventInstance[] = [];
-  const signals: DomainSignalSnapshot[] = [];
 
   for (const sched of schedules) {
     if (sched.probability != null && rng() >= sched.probability) continue;
@@ -346,7 +351,8 @@ export function processScheduledFollowups(
     const snapshot = createEventSnapshot(def);
 
     const signalId = idFactory();
-    const followSignal: DomainSignalSnapshot = {
+    // 创建触发上下文供计划事件激活时使用
+    const triggerContext: DomainSignalSnapshot = {
       signalId,
       signalType: 'event.resolved',
       occurredAtDay: currentDay,
@@ -363,16 +369,14 @@ export function processScheduledFollowups(
       eventId: sched.eventId,
       scheduledAtDay: currentDay,
       activateAtDay,
-      triggerContext: followSignal,
+      triggerContext,
       sourceKey,
       chainInstanceId,
       snapshot: snapshot,
     });
-
-    signals.push(followSignal);
   }
 
-  return { scheduled, signals };
+  return scheduled;
 }
 
 /**
