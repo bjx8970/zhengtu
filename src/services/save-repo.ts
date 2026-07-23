@@ -13,6 +13,8 @@ import type { LocalSaveLoadResult } from './startup-save-state';
 import { getSupabase } from './supabase';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../store/save-codec';
 import { getConfigLoader } from '../config/loader';
+import { INSTITUTION_LEVELS } from '../domain/career/types';
+import type { PositionConfigV2 } from '../types/position-v2';
 
 const TABLE_NAME = 'game_saves';
 const SLOT_NAME = 'main';
@@ -109,11 +111,50 @@ export async function fetchRemoteSave(userId: string): Promise<PlayerSave | null
 }
 
 /**
+ * 构建远程存档的结构化索引列（兼容投影）。
+ *
+ * 历史背景：`current_level` / `current_career_line` 是旧 Schema 的索引列，
+ * 原义分别为“职业等级（1-11）”与“职业线”。Schema 2 已移除这两个概念，
+ * 但数据库列仍存在且被存档列表/筛选使用。这里建立明确的兼容投影：
+ * - `current_level` ← 当前职位的机构层级序数（1=乡镇 … 5=中央，职业事实）
+ * - `current_career_line` ← 当前职位的岗位领域（positionDomain）
+ *
+ * 该投影仅为列表展示提供近似值，不代表精确职业语义；
+ * 后续云存档阶段应迁移列为 content_tier / position_domain。
+ *
+ * @param position 当前职位配置
+ * @returns 索引列投影值
+ */
+export function buildRemoteIndexColumns(position: PositionConfigV2): {
+  current_level: number;
+  current_career_line: string;
+} {
+  // 机构层级序数（1-based）：INSTITUTION_LEVELS 已按从低到高排序
+  const levelOrdinal = INSTITUTION_LEVELS.indexOf(position.institutionLevel) + 1;
+  return {
+    current_level: levelOrdinal,
+    current_career_line: position.positionDomain,
+  };
+}
+
+/**
+ * 校验 revision 为非负有限整数，非法值返回 null。
+ *
+ * @param value 待校验值
+ * @returns 合法的 revision 或 null
+ */
+export function normalizeRevision(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+/**
  * 保存存档：远程写入成功后同步本地备份。
  * Supabase 不可用时降级为纯本地存储。
  *
- * revision 递增：先读取现有远程 envelope 的 revision，再 +1。
- * 索引列从当前职位配置生成有意义值（contentTier 与岗位领域）。
+ * revision 语义（最佳努力，非原子）：读取现有远程 envelope 的 revision 并 +1。
+ * 该值为单调递增计数器，不承担并发仲裁职责（仲裁使用 updatedAt）；
+ * 读改写非原子，并发保存可能产生相同 revision，不保证严格递增。
+ * 读取失败时明确失败（不猜测 revision），避免远端 revision 倒退。
  */
 export async function upsertSave(save: PlayerSave): Promise<boolean> {
   const supabase = getSupabase();
@@ -125,31 +166,47 @@ export async function upsertSave(save: PlayerSave): Promise<boolean> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
 
-  // 读取现有远程 envelope 的 revision，用于递增
-  let existingRevision = 0;
-  const { data: existing } = await sb
+  // 读取现有远程 envelope 的 revision，用于递增。
+  // 严格区分“无记录”（revision=0）与“读取失败”（明确失败，不猜测）。
+  const { data: existing, error: readError } = await sb
     .from(TABLE_NAME)
     .select('save_data')
     .eq('user_id', save.character.userId)
     .eq('slot_name', SLOT_NAME)
     .maybeSingle();
-  if (existing?.save_data && typeof existing.save_data.revision === 'number') {
-    existingRevision = existing.save_data.revision;
+  if (readError) {
+    console.error('Failed to read existing remote save revision:', readError.message);
+    // 读取失败时不猜测 revision，避免以低 revision 覆盖远端。
+    // 降级：保留本地备份，远程保存视为失败。
+    writeLocalSave(save);
+    return false;
   }
+
+  // 无记录时 revision 从 0 开始；有记录时校验后递增。
+  const rawRevision = existing?.save_data?.revision;
+  const existingRevision = existing ? (normalizeRevision(rawRevision) ?? 0) : 0;
 
   // 使用 SaveEnvelope 封装（revision 递增）
   const envelope = wrapSaveEnvelope(save, existingRevision);
 
-  // 从当前职位配置生成索引列的有意义值
+  // 从当前职位配置生成索引列投影。职位查不到时明确失败，不静默写 0。
   const position = getConfigLoader().getPositionById(save.career.appointment.positionId);
+  if (!position) {
+    console.error(
+      `Cannot build remote index columns: position "${save.career.appointment.positionId}" not found in config`,
+    );
+    writeLocalSave(save);
+    return false;
+  }
+  const indexColumns = buildRemoteIndexColumns(position);
 
   const { error } = await sb.from(TABLE_NAME).upsert(
     {
       user_id: save.character.userId,
       slot_name: SLOT_NAME,
       save_data: envelope,
-      current_level: position?.contentTier ?? 0,
-      current_career_line: save.career.appointment.positionDomain,
+      current_level: indexColumns.current_level,
+      current_career_line: indexColumns.current_career_line,
       current_position_id: save.career.appointment.positionId,
       game_year: save.time.year,
       game_month: save.time.month,

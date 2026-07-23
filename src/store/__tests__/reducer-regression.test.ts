@@ -13,7 +13,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createTestStore, createInitialState, dispatch } from '../game-store';
 import { wrapSaveEnvelope } from '../save-codec';
 import { getConfigLoader } from '../../config/loader';
+import { upsertSave, buildRemoteIndexColumns, normalizeRevision } from '../../services/save-repo';
+import { getSupabase } from '../../services/supabase';
 import type { PlayerSave, SlotOccupant } from '../../types/player';
+
+vi.mock('../../services/supabase', () => ({
+  getSupabase: vi.fn(),
+}));
 
 // 可控的 resolveActionEffects mock（用于测试结算语义）
 let mockEffects: {
@@ -456,5 +462,138 @@ describe('行动效果结算语义', () => {
         'approve_project'
       ],
     ).toBe(23);
+  });
+});
+
+describe('远程保存路径（Supabase mock）', () => {
+  const mockedGetSupabase = vi.mocked(getSupabase);
+
+  function makeMockClient(opts: {
+    existingRevision?: number | null;
+    readError?: { message: string } | null;
+    upsertError?: { message: string } | null;
+  }) {
+    const upserted: Record<string, unknown>[] = [];
+    const client = {
+      from: () => ({
+        select: () => ({
+          eq: function eq(this: unknown) {
+            return this;
+          },
+          maybeSingle: async () => ({
+            data:
+              opts.existingRevision != null
+                ? { save_data: { revision: opts.existingRevision } }
+                : null,
+            error: opts.readError ?? null,
+          }),
+        }),
+        upsert: async (row: Record<string, unknown>) => {
+          upserted.push(row);
+          return { error: opts.upsertError ?? null };
+        },
+      }),
+    };
+    return { client, upserted };
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    mockedGetSupabase.mockReset();
+  });
+
+  it('已有 revision=5 保存为 6', async () => {
+    const { client, upserted } = makeMockClient({ existingRevision: 5 });
+    mockedGetSupabase.mockReturnValue(client as never);
+
+    const ok = await upsertSave(createInitialState());
+    expect(ok).toBe(true);
+    expect(upserted).toHaveLength(1);
+    const envelope = upserted[0]!.save_data as { revision: number };
+    expect(envelope.revision).toBe(6);
+  });
+
+  it('无记录时 revision 为 1', async () => {
+    const { client, upserted } = makeMockClient({ existingRevision: null });
+    mockedGetSupabase.mockReturnValue(client as never);
+
+    const ok = await upsertSave(createInitialState());
+    expect(ok).toBe(true);
+    const envelope = upserted[0]!.save_data as { revision: number };
+    expect(envelope.revision).toBe(1);
+  });
+
+  it('读取错误不会把远端 revision 重置为 1（明确失败）', async () => {
+    const { client, upserted } = makeMockClient({
+      existingRevision: 9,
+      readError: { message: 'network error' },
+    });
+    mockedGetSupabase.mockReturnValue(client as never);
+
+    const ok = await upsertSave(createInitialState());
+    // 读取失败时明确失败，不写入（避免以低 revision 覆盖远端）
+    expect(ok).toBe(false);
+    expect(upserted).toHaveLength(0);
+  });
+
+  it('非法 revision 被归一化为 0 后递增', async () => {
+    const { client, upserted } = makeMockClient({ existingRevision: -3 });
+    mockedGetSupabase.mockReturnValue(client as never);
+
+    const ok = await upsertSave(createInitialState());
+    expect(ok).toBe(true);
+    const envelope = upserted[0]!.save_data as { revision: number };
+    // -3 非法 → 归一化为 0 → 递增为 1
+    expect(envelope.revision).toBe(1);
+  });
+
+  it('索引列遵循兼容投影契约', async () => {
+    const { client, upserted } = makeMockClient({ existingRevision: null });
+    mockedGetSupabase.mockReturnValue(client as never);
+
+    const state = createInitialState();
+    const position = getConfigLoader().getPositionById(state.career.appointment.positionId);
+    expect(position).not.toBeNull();
+
+    await upsertSave(state);
+    const expected = buildRemoteIndexColumns(position!);
+    const row = upserted[0]!;
+    expect(row.current_level).toBe(expected.current_level);
+    expect(row.current_career_line).toBe(expected.current_career_line);
+    expect(row.current_level).toBeGreaterThan(0);
+    expect(row.current_career_line).not.toBe('');
+  });
+
+  it('职位引用缺失时明确失败', async () => {
+    const { client, upserted } = makeMockClient({ existingRevision: null });
+    mockedGetSupabase.mockReturnValue(client as never);
+
+    const state = createInitialState();
+    state.career.appointment.positionId = 'nonexistent_position';
+
+    const ok = await upsertSave(state);
+    expect(ok).toBe(false);
+    expect(upserted).toHaveLength(0);
+  });
+});
+
+describe('normalizeRevision / buildRemoteIndexColumns', () => {
+  it('normalizeRevision 拒绝非法值', () => {
+    expect(normalizeRevision(5)).toBe(5);
+    expect(normalizeRevision(0)).toBe(0);
+    expect(normalizeRevision(-1)).toBeNull();
+    expect(normalizeRevision(1.5)).toBeNull();
+    expect(normalizeRevision('5')).toBeNull();
+    expect(normalizeRevision(NaN)).toBeNull();
+    expect(normalizeRevision(undefined)).toBeNull();
+  });
+
+  it('buildRemoteIndexColumns 从职位配置投影', () => {
+    const position = getConfigLoader().getPositionById('admin_l1_0');
+    expect(position).not.toBeNull();
+    const cols = buildRemoteIndexColumns(position!);
+    // admin_l1_0 为乡镇级（INSTITUTION_LEVELS[0]）→ 序数 1
+    expect(cols.current_level).toBe(1);
+    expect(cols.current_career_line).toBe(position!.positionDomain);
   });
 });
