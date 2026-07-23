@@ -296,7 +296,7 @@ const ScheduledFollowupDefinitionSchema: z.ZodType<ScheduledFollowupDefinition> 
 );
 
 /** 事件选项 Schema */
-const EventOptionDefinitionSchema = z
+export const EventOptionDefinitionSchema = z
   .object({
     id: z.string().min(1),
     label: z.string().min(1),
@@ -311,7 +311,7 @@ const EventOptionDefinitionSchema = z
   .strict();
 
 /** 自动事件载荷 Schema */
-const EventOutcomePayloadSchema = z
+export const EventOutcomePayloadSchema = z
   .object({
     effects: z.array(EffectDefinitionSchema),
     schedule: z.array(ScheduledFollowupDefinitionSchema).optional(),

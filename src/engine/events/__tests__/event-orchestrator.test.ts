@@ -522,9 +522,9 @@ describe('processDomainSignal - 重复控制', () => {
 });
 
 describe('processDomainSignal - 冷却', () => {
-  it('trigger with cooldown → instance created, cooldown record added for automatic events', () => {
-    // Cooldown records are only auto-added for automatic events in the orchestrator;
-    // non-automatic events get cooldown records when resolved via the reducer.
+  it('automatic event instance goes to createdInstances for reducer handling', () => {
+    // Auto events no longer auto-resolve in the orchestrator;
+    // they are now handled by the reducer via handleAutoEventInstance.
     const def = makeEventDef({
       id: 'evt_cd_auto',
       presentation: 'automatic',
@@ -534,11 +534,10 @@ describe('processDomainSignal - 冷却', () => {
     });
     const input = makeInput({ definitions: [def], signal: makeSignal('sig_cd_auto_1') });
     const result = processDomainSignal(input);
-    expect(result.autoResolvedHistory).toHaveLength(1);
-    expect(result.updatedCooldowns).toHaveLength(1);
-    expect(result.updatedCooldowns[0]!.eventId).toBe('evt_cd_auto');
-    expect(result.updatedCooldowns[0]!.untilDay).toBe(110);
-    expect(result.updatedCooldowns[0]!.scope).toBe('global');
+    // Auto events now appear in createdInstances, not autoResolvedHistory
+    expect(result.createdInstances).toHaveLength(1);
+    expect(result.createdInstances[0]!.eventId).toBe('evt_cd_auto');
+    // Cooldowns are handled by the reducer for auto events
   });
 
   it('trigger during cooldown → cooldown_blocked diagnostic', () => {
@@ -778,7 +777,7 @@ describe('processDomainSignal - 实例创建', () => {
 });
 
 describe('processDomainSignal - 自动事件', () => {
-  it('presentation: automatic → goes to autoResolvedHistory', () => {
+  it('presentation: automatic → goes to createdInstances for reducer handling', () => {
     const def = makeEventDef({
       id: 'evt_auto',
       presentation: 'automatic',
@@ -787,15 +786,13 @@ describe('processDomainSignal - 自动事件', () => {
     });
     const input = makeInput({ definitions: [def], signal: makeSignal('sig_auto') });
     const result = processDomainSignal(input);
-    expect(result.autoResolvedHistory).toHaveLength(1);
-    expect(result.autoResolvedHistory[0]!.eventId).toBe('evt_auto');
-    expect(result.autoResolvedHistory[0]!.finalStatus).toBe('resolved');
-    expect(result.createdInstances).toHaveLength(0);
+    // Auto events now appear in createdInstances; reducer handles them
+    expect(result.createdInstances).toHaveLength(1);
+    expect(result.createdInstances[0]!.eventId).toBe('evt_auto');
+    expect(result.createdInstances[0]!.status).toBe('pending');
   });
 
-  it('automatic event generates event.resolved signal (consumed recursively)', () => {
-    // The event.resolved signal is generated and consumed internally
-    // through the recursive queue — it is not emitted back.
+  it('automatic event instance created with correct metadata', () => {
     const def = makeEventDef({
       id: 'evt_auto_sig',
       presentation: 'automatic',
@@ -804,13 +801,13 @@ describe('processDomainSignal - 自动事件', () => {
     });
     const input = makeInput({ definitions: [def], signal: makeSignal('sig_auto_2') });
     const result = processDomainSignal(input);
-    // Automatic events create history records, not user-facing instances
-    expect(result.autoResolvedHistory).toHaveLength(1);
-    expect(result.autoResolvedHistory[0]!.eventId).toBe('evt_auto_sig');
-    expect(result.createdInstances).toHaveLength(0);
+    // Automatic events create instances with snapshot containing automaticOutcome
+    expect(result.createdInstances).toHaveLength(1);
+    expect(result.createdInstances[0]!.eventId).toBe('evt_auto_sig');
+    expect(result.createdInstances[0]!.snapshot.presentation).toBe('automatic');
   });
 
-  it('automaticOutcome effects recorded in history', () => {
+  it('automaticOutcome effects available in instance snapshot', () => {
     const def = makeEventDef({
       id: 'evt_auto_eff',
       presentation: 'automatic',
@@ -821,13 +818,17 @@ describe('processDomainSignal - 自动事件', () => {
     });
     const input = makeInput({ definitions: [def], signal: makeSignal('sig_auto_eff') });
     const result = processDomainSignal(input);
-    expect(result.autoResolvedHistory).toHaveLength(1);
-    const history = result.autoResolvedHistory[0]!;
-    expect(history.appliedEffects).toHaveLength(1);
-    expect(history.appliedEffects[0]!.target).toBe('character');
+    expect(result.createdInstances).toHaveLength(1);
+    const instance = result.createdInstances[0]!;
+    expect(instance.snapshot.automaticOutcome).toBeDefined();
+    expect(instance.snapshot.automaticOutcome!.effects).toHaveLength(1);
+    expect(instance.snapshot.automaticOutcome!.effects[0]).toMatchObject({
+      target: 'character',
+      field: 'vigor',
+    });
   });
 
-  it('automatic event with schedule creates scheduled instances', () => {
+  it('automatic event with schedule is created as instance for reducer handling', () => {
     const defA = makeEventDef({
       id: 'evt_auto_sched',
       presentation: 'automatic',
@@ -846,10 +847,11 @@ describe('processDomainSignal - 自动事件', () => {
       signal: makeSignal('sig_auto_sched'),
     });
     const result = processDomainSignal(input);
-    // Should have at least 1 scheduled instance for the follow-up
-    expect(result.scheduledInstances.length).toBeGreaterThanOrEqual(1);
-    const followSched = result.scheduledInstances.find((s) => s.eventId === 'evt_follow');
-    expect(followSched).toBeDefined();
+    // Auto events go to createdInstances; reducer handles scheduling
+    expect(result.createdInstances).toHaveLength(1);
+    expect(result.createdInstances[0]!.eventId).toBe('evt_auto_sched');
+    expect(result.createdInstances[0]!.snapshot.automaticOutcome).toBeDefined();
+    expect(result.createdInstances[0]!.snapshot.automaticOutcome!.schedule).toHaveLength(1);
   });
 });
 
@@ -915,9 +917,9 @@ describe('processDomainSignal - 级联信号', () => {
     });
     // Should not hang; should produce some results
     const result = processDomainSignal(input);
-    expect(result.autoResolvedHistory.length).toBeGreaterThan(0);
+    expect(result.createdInstances.length).toBeGreaterThan(0);
     // Depth limit is MAX_SIGNAL_DEPTH=16 (0..16 = 17 iterations)
     // but MAX_SIGNALS_PER_TRANSACTION=100 bounds the total
-    expect(result.autoResolvedHistory.length).toBeLessThanOrEqual(100);
+    expect(result.createdInstances.length).toBeLessThanOrEqual(100);
   });
 });

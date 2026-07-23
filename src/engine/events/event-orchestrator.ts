@@ -17,7 +17,6 @@ import type { EventDefinition, ScheduledFollowupDefinition } from '../../domain/
 import type {
   EventInstance,
   ScheduledEventInstance,
-  EventHistoryRecord,
   EventChainInstance,
   EventExecutableSnapshot,
 } from '../../domain/events/state';
@@ -44,7 +43,7 @@ export interface EventOrchestrationInput {
 export interface EventOrchestrationResult {
   createdInstances: EventInstance[];
   scheduledInstances: ScheduledEventInstance[];
-  autoResolvedHistory: EventHistoryRecord[];
+  newProcessedSignalIds: string[];
   emittedSignals: DomainSignalSnapshot[];
   updatedCooldowns: EventCooldownRecord[];
   updatedChainInstances: EventChainInstance[];
@@ -69,6 +68,7 @@ export function createEventSnapshot(def: EventDefinition): EventExecutableSnapsh
     automaticOutcome: def.automaticOutcome ? structuredClone(def.automaticOutcome) : null,
     mutexGroup: def.mutexGroup ?? def.trigger.mutexGroup ?? null,
     contentVersion: def.contentVersion ?? CURRENT_CONTENT_VERSION,
+    deadlineDays: def.activation.deadlineDays ?? null,
   };
 }
 
@@ -239,12 +239,15 @@ function selectMutexGroupWinner(
 /**
  * 查找或创建事件链实例。
  *
+ * 先查事务级 allChains，再查持久化 state，避免重复创建链实例。
+ *
  * @param state 游戏状态
  * @param chainId 事件链 ID
  * @param sourceKey 来源键
  * @param currentDay 当前游戏日
  * @param idFactory ID 工厂
- * @returns 事件链实例
+ * @param allChains 当前事务中已创建的链实例映射
+ * @returns 事件链实例（新创建的为克隆副本，避免调用方直接修改共享引用）
  */
 function findOrCreateChainInstance(
   state: Readonly<PlayerSave>,
@@ -252,13 +255,20 @@ function findOrCreateChainInstance(
   sourceKey: string,
   currentDay: number,
   idFactory: () => string,
+  allChains: Map<string, EventChainInstance>,
 ): EventChainInstance {
+  // 先查事务级映射
+  for (const ci of allChains.values()) {
+    if (ci.chainId === chainId && ci.sourceKey === sourceKey) return ci;
+  }
+
+  // 再查持久化状态
   const existing = Object.values(state.events.chainInstances).find(
     (ci) => ci.chainId === chainId && ci.sourceKey === sourceKey,
   );
   if (existing) return existing;
 
-  return {
+  const newChain: EventChainInstance = {
     instanceId: idFactory(),
     chainId,
     status: 'active',
@@ -268,6 +278,8 @@ function findOrCreateChainInstance(
     startedAtDay: currentDay,
     completedAtDay: null,
   };
+  allChains.set(newChain.instanceId, newChain);
+  return newChain;
 }
 
 /**
@@ -276,70 +288,21 @@ function findOrCreateChainInstance(
  * @param state 游戏状态
  * @param signalId 信号唯一 ID
  * @param allNewInstances 当前事务已创建的实例
+ * @param processedIds 当前事务中已处理的信号 ID 集合
  * @returns 已处理返回 true
  */
 function isSignalProcessed(
   state: Readonly<PlayerSave>,
   signalId: string,
   allNewInstances: EventInstance[],
+  processedIds: ReadonlySet<string>,
 ): boolean {
+  if (processedIds.has(signalId)) return true;
+  if (state.events.processedSignalIds.includes(signalId)) return true;
   const inPending = state.events.pending.some((p) => p.triggerContext.signalId === signalId);
   const inScheduled = state.events.scheduled.some((s) => s.triggerContext.signalId === signalId);
   const inNew = allNewInstances.some((i) => i.triggerContext.signalId === signalId);
   return inPending || inScheduled || inNew;
-}
-
-/**
- * 构建 AppliedEffectRecord 的简易版本（仅记录，不执行）。
- * 实际效果执行由 applyEffects 在 reducer 中完成。
- */
-function buildEffectRecords(
-  effects: {
-    target: string;
-    operation: string;
-    value: boolean | number | string;
-    label?: string;
-    field?: string;
-    factId?: string;
-    metricId?: string;
-    specialtyId?: string;
-  }[],
-): {
-  target: string;
-  field?: string;
-  operation: string;
-  value: boolean | number | string;
-  label: string;
-}[] {
-  const result: {
-    target: string;
-    field?: string;
-    operation: string;
-    value: boolean | number | string;
-    label: string;
-  }[] = [];
-  if (!effects) return result;
-  for (const eff of effects as unknown as Array<{
-    target: string;
-    operation: string;
-    value: number;
-    label?: string;
-    field?: string;
-    factId?: string;
-    metricId?: string;
-    specialtyId?: string;
-  }>) {
-    const label =
-      eff.label ?? eff.field ?? eff.factId ?? eff.metricId ?? eff.specialtyId ?? eff.target;
-    result.push({
-      target: eff.target,
-      field: eff.field,
-      operation: eff.operation,
-      value: eff.value,
-      label,
-    });
-  }
-  return result;
 }
 
 /**
@@ -355,7 +318,7 @@ function buildEffectRecords(
  * @param idFactory ID 工厂
  * @returns 计划事件和发出的信号
  */
-function processScheduledFollowups(
+export function processScheduledFollowups(
   schedules: readonly ScheduledFollowupDefinition[],
   _sourceSignal: DomainSignalSnapshot,
   sourceKey: string,
@@ -421,11 +384,11 @@ function processScheduledFollowups(
  * @param idFactory ID 工厂
  * @param allNewInstances 当前事务中已创建实例（可变累加）
  * @param allScheduled 当前事务中已计划事件（可变累加）
- * @param allHistory 当前事务中已记录历史（可变累加）
  * @param allEmittedSignals 已发出的级联信号（可变累加）
  * @param allCooldowns 冷却记录（可变累加）
  * @param allChains 链实例（可变累加）
  * @param allDiagnostics 诊断信息（可变累加）
+ * @param processedIds 当前事务中已处理的信号 ID 集合（可变累加）
  * @returns 本轮新发出的信号（需在下一深度处理）
  */
 function resolveSingleSignal(
@@ -437,19 +400,22 @@ function resolveSingleSignal(
   idFactory: () => string,
   allNewInstances: EventInstance[],
   allScheduled: ScheduledEventInstance[],
-  allHistory: EventHistoryRecord[],
   _allEmittedSignals: DomainSignalSnapshot[],
   allCooldowns: EventCooldownRecord[],
   allChains: Map<string, EventChainInstance>,
   allDiagnostics: EventOrchestrationDiagnostic[],
+  processedIds: Set<string>,
 ): DomainSignalSnapshot[] {
   const nextSignals: DomainSignalSnapshot[] = [];
 
   // 信号去重
-  if (isSignalProcessed(state, sig.signalId, allNewInstances)) {
+  if (isSignalProcessed(state, sig.signalId, allNewInstances, processedIds)) {
     allDiagnostics.push({ type: 'duplicate_signal', signalId: sig.signalId });
     return nextSignals;
   }
+
+  // 记录此信号为已处理
+  processedIds.add(sig.signalId);
 
   const sourceKey = deriveEventSourceKey(sig);
 
@@ -463,12 +429,8 @@ function resolveSingleSignal(
 
   for (const def of candidates) {
     const chainInstance = def.chainId
-      ? findOrCreateChainInstance(state, def.chainId, sourceKey, currentDay, idFactory)
+      ? findOrCreateChainInstance(state, def.chainId, sourceKey, currentDay, idFactory, allChains)
       : null;
-
-    if (chainInstance) {
-      allChains.set(chainInstance.instanceId, chainInstance);
-    }
 
     if (checkEventRepeatability(state, def, sourceKey, allNewInstances, chainInstance)) {
       allDiagnostics.push({ type: 'repeat_blocked', eventId: def.id });
@@ -544,12 +506,19 @@ function resolveSingleSignal(
 
     let chainInstanceId: string | null = null;
     if (def.chainId) {
-      const ci = findOrCreateChainInstance(state, def.chainId, sourceKey, currentDay, idFactory);
+      const ci = findOrCreateChainInstance(
+        state,
+        def.chainId,
+        sourceKey,
+        currentDay,
+        idFactory,
+        allChains,
+      );
       chainInstanceId = ci.instanceId;
       if (!ci.activeNodeIds.includes(def.nodeId ?? def.id)) {
-        ci.activeNodeIds.push(def.nodeId ?? def.id);
+        // 创建新数组避免修改共享引用
+        ci.activeNodeIds = [...ci.activeNodeIds, def.nodeId ?? def.id];
       }
-      allChains.set(ci.instanceId, ci);
     }
 
     const delay = def.activation.delayDays ?? 0;
@@ -582,78 +551,9 @@ function resolveSingleSignal(
         snapshot,
       };
 
-      if (def.presentation === 'automatic') {
-        // 自动事件立即解析
-        const outcome = def.automaticOutcome;
-
-        const effectRecords = outcome
-          ? buildEffectRecords(outcome.effects as unknown as never)
-          : [];
-
-        let resolvedScheduled: ScheduledEventInstance[] = [];
-        const resolvedSignals: DomainSignalSnapshot[] = [];
-
-        if (outcome?.schedule) {
-          const schedResult = processScheduledFollowups(
-            outcome.schedule,
-            sig,
-            sourceKey,
-            chainInstanceId,
-            currentDay,
-            defs,
-            rng,
-            idFactory,
-          );
-          resolvedScheduled = schedResult.scheduled;
-          allScheduled.push(...resolvedScheduled);
-          nextSignals.push(...schedResult.signals);
-        }
-
-        // 生成 event.resolved 信号
-        const resolvedSignal: DomainSignalSnapshot = {
-          signalId: idFactory(),
-          signalType: 'event.resolved',
-          occurredAtDay: currentDay,
-          data: {
-            eventInstanceId: instanceId,
-            eventId: def.id,
-            optionId: null,
-            occurredAtDay: currentDay,
-          },
-        };
-        resolvedSignals.push(resolvedSignal);
-        nextSignals.push(resolvedSignal);
-
-        allHistory.push({
-          eventId: def.id,
-          instanceId,
-          finalStatus: 'resolved',
-          triggeredAtDay: sig.occurredAtDay,
-          completedAtDay: currentDay,
-          sourceKey,
-          chainInstanceId,
-          titleSnapshot: snapshot.title,
-          chosenOptionId: null,
-          chosenOptionLabel: null,
-          appliedEffects: effectRecords,
-        });
-
-        // 冷却记录
-        const cooldownDays = def.repeatPolicy.cooldownDays;
-        if (cooldownDays && cooldownDays > 0) {
-          let scope: 'global' | 'source' | 'chain' = 'global';
-          if (def.repeatPolicy.mode === 'once_per_source') scope = 'source';
-          else if (def.repeatPolicy.mode === 'once_per_chain') scope = 'chain';
-          allCooldowns.push({
-            eventId: def.id,
-            scope,
-            scopeId: scope === 'source' ? sourceKey : scope === 'chain' ? chainInstanceId : null,
-            untilDay: currentDay + cooldownDays,
-          });
-        }
-      } else {
-        allNewInstances.push(inst);
-      }
+      // All events (including automatic) go into createdInstances;
+      // automatic events are handled by the reducer via handleAutoEventInstance.
+      allNewInstances.push(inst);
 
       allDiagnostics.push({ type: 'instance_created', eventId: def.id, instanceId });
     }
@@ -679,11 +579,11 @@ export function processDomainSignal(input: EventOrchestrationInput): EventOrches
 
   const allNewInstances: EventInstance[] = [];
   const allScheduled: ScheduledEventInstance[] = [];
-  const allHistory: EventHistoryRecord[] = [];
   const allEmittedSignals: DomainSignalSnapshot[] = [];
   const allCooldowns: EventCooldownRecord[] = [];
   const allChains = new Map<string, EventChainInstance>();
   const allDiagnostics: EventOrchestrationDiagnostic[] = [];
+  const processedIds = new Set<string>();
 
   let queue: DomainSignalSnapshot[] = [signal];
   let totalProcessed = 0;
@@ -707,11 +607,11 @@ export function processDomainSignal(input: EventOrchestrationInput): EventOrches
         idFactory,
         allNewInstances,
         allScheduled,
-        allHistory,
         allEmittedSignals,
         allCooldowns,
         allChains,
         allDiagnostics,
+        processedIds,
       );
       nextQueue.push(...cascaded);
     }
@@ -721,13 +621,13 @@ export function processDomainSignal(input: EventOrchestrationInput): EventOrches
 
   // 收集未消费的级联信号
   allEmittedSignals.push(
-    ...queue.filter((s) => !isSignalProcessed(state, s.signalId, allNewInstances)),
+    ...queue.filter((s) => !isSignalProcessed(state, s.signalId, allNewInstances, processedIds)),
   );
 
   return {
     createdInstances: allNewInstances,
     scheduledInstances: allScheduled,
-    autoResolvedHistory: allHistory,
+    newProcessedSignalIds: Array.from(processedIds),
     emittedSignals: allEmittedSignals,
     updatedCooldowns: allCooldowns,
     updatedChainInstances: Array.from(allChains.values()),

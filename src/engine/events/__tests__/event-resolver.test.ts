@@ -100,6 +100,7 @@ describe('resolveEventOption - 成功路径', () => {
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_resolve_001',
       optionId: 'opt_a',
       currentDay: 60,
@@ -137,6 +138,7 @@ describe('resolveEventOption - 成功路径', () => {
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_resolve_001',
       optionId: 'opt_cd',
       currentDay: 60,
@@ -168,8 +170,10 @@ describe('resolveEventOption - 成功路径', () => {
     const instance = makeInstance(snapshot);
     const state = makeStateWithPending(instance);
 
+    const followDef = makeEventDef({ id: 'evt_follow' });
     const result = resolveEventOption({
       state,
+      definitions: [def, followDef],
       eventInstanceId: 'inst_resolve_001',
       optionId: 'opt_sched',
       currentDay: 60,
@@ -192,6 +196,7 @@ describe('resolveEventOption - 成功路径', () => {
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_resolve_001',
       optionId: 'opt_a',
       currentDay: 60,
@@ -219,6 +224,7 @@ describe('resolveEventOption - 成功路径', () => {
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_resolve_001',
       optionId: 'opt_a',
       currentDay: 60,
@@ -246,6 +252,7 @@ describe('resolveEventOption - 失败路径', () => {
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_resolve_001',
       optionId: 'opt_nonexistent',
       currentDay: 60,
@@ -261,9 +268,11 @@ describe('resolveEventOption - 失败路径', () => {
 
   it('event not found → event_not_found', () => {
     const state = createInitialState();
+    const def = makeEventDef();
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_nonexistent',
       optionId: 'opt_a',
       currentDay: 60,
@@ -286,6 +295,7 @@ describe('resolveEventOption - 失败路径', () => {
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_resolve_001',
       optionId: 'opt_a',
       currentDay: 60,
@@ -307,6 +317,7 @@ describe('resolveEventOption - 失败路径', () => {
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_resolve_001',
       optionId: 'opt_a',
       currentDay: 60, // past deadline of 50
@@ -328,6 +339,7 @@ describe('resolveEventOption - 失败路径', () => {
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_resolve_001',
       optionId: 'opt_a',
       currentDay: 100,
@@ -346,6 +358,7 @@ describe('resolveEventOption - 失败路径', () => {
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_resolve_001',
       optionId: 'opt_a',
       currentDay: 60, // exactly at deadline
@@ -392,6 +405,7 @@ describe('resolveEventOption - 链实例更新', () => {
 
     const result = resolveEventOption({
       state,
+      definitions: [def],
       eventInstanceId: 'inst_chain_001',
       optionId: 'opt_a',
       currentDay: 60,

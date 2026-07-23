@@ -2,7 +2,7 @@
  * 事件选项结算器
  *
  * 纯函数 resolveEventOption：验证事件实例、解析选项效果、
- * 记录历史、生成调度信号和冷却记录。
+ * 记录历史、生成调度计划和冷却记录。
  *
  * 效果的实际执行由 applyEffects 在 reducer 中完成，
  * 本函数仅返回待执行的 effect 列表和元数据。
@@ -20,6 +20,7 @@ import type {
 import type { EventCooldownRecord, ScheduledEventCancellation } from '../../domain/events/types';
 import type {
   EventOptionDefinition,
+  EventDefinition,
   ScheduledFollowupDefinition,
 } from '../../domain/events/definition';
 import { createEventSnapshot } from './event-orchestrator';
@@ -32,6 +33,7 @@ export interface ResolveEventOptionInput {
   currentDay: number;
   rng: () => number;
   idFactory: () => string;
+  definitions: readonly EventDefinition[];
 }
 
 /** 选项结算结果 */
@@ -53,23 +55,28 @@ export type ResolveEventOptionResult =
 
 /**
  * 处理调度定义，创建 ScheduledEventInstance 列表。
+ *
+ * 使用真实 EventDefinition 创建快照，不再创建伪定义。
+ * event.resolved 信号仅在事件实际激活时由调度器发出，此处不提前发射。
  */
 function resolveSchedule(
   schedules: readonly ScheduledFollowupDefinition[] | undefined,
-  _sourceSignal: DomainSignalSnapshot,
   sourceKey: string,
   chainInstanceId: string | null,
   currentDay: number,
   rng: () => number,
   idFactory: () => string,
-): { scheduled: ScheduledEventInstance[]; signals: DomainSignalSnapshot[] } {
+  definitions: readonly EventDefinition[],
+): ScheduledEventInstance[] {
   const scheduled: ScheduledEventInstance[] = [];
-  const signals: DomainSignalSnapshot[] = [];
 
-  if (!schedules) return { scheduled, signals };
+  if (!schedules) return scheduled;
 
   for (const sched of schedules) {
     if (sched.probability != null && rng() >= sched.probability) continue;
+
+    const def = definitions.find((d) => d.id === sched.eventId);
+    if (!def) continue;
 
     const signalId = idFactory();
     const activateAtDay = currentDay + sched.delayDays;
@@ -92,36 +99,11 @@ function resolveSchedule(
       },
       sourceKey,
       chainInstanceId,
-      snapshot: createEventSnapshot({
-        id: sched.eventId,
-        chainId: null,
-        nodeId: null,
-        title: '',
-        description: '',
-        category: 'governance',
-        priority: 'normal',
-        presentation: 'inbox',
-        trigger: { sources: ['event.resolved'], probability: 1 },
-        repeatPolicy: { mode: 'once' },
-        activation: {},
-        options: [],
-      }),
-    });
-
-    signals.push({
-      signalId,
-      signalType: 'event.resolved',
-      occurredAtDay: currentDay,
-      data: {
-        eventInstanceId: `scheduled_${sched.eventId}`,
-        eventId: sched.eventId,
-        optionId: null,
-        occurredAtDay: currentDay,
-      },
+      snapshot: createEventSnapshot(def),
     });
   }
 
-  return { scheduled, signals };
+  return scheduled;
 }
 
 /**
@@ -134,7 +116,7 @@ function resolveSchedule(
  * @returns 结算结果
  */
 export function resolveEventOption(input: ResolveEventOptionInput): ResolveEventOptionResult {
-  const { state, eventInstanceId, optionId, currentDay, rng, idFactory } = input;
+  const { state, eventInstanceId, optionId, currentDay, rng, idFactory, definitions } = input;
 
   // 查找事件实例
   const pendingIndex = state.events.pending.findIndex((p) => p.instanceId === eventInstanceId);
@@ -185,15 +167,15 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
     };
   }
 
-  // 调度后续事件
-  const { scheduled, signals: scheduledSignals } = resolveSchedule(
+  // 调度后续事件（使用真实定义，不提前发射 event.resolved）
+  const scheduled = resolveSchedule(
     option.schedule,
-    instance.triggerContext,
     instance.sourceKey,
     instance.chainInstanceId,
     currentDay,
     rng,
     idFactory,
+    definitions,
   );
 
   // 取消规范
@@ -219,7 +201,7 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
     }
   }
 
-  // 生成 event.resolved 信号
+  // 生成 event.resolved 信号（仅在当前事件结算时发出，用于级联）
   const resolvedSignal: DomainSignalSnapshot = {
     signalId: idFactory(),
     signalType: 'event.resolved',
@@ -251,7 +233,7 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
     success: true,
     history,
     scheduled,
-    emittedSignals: [resolvedSignal, ...scheduledSignals],
+    emittedSignals: [resolvedSignal],
     cooldownUpdate,
     chainUpdate,
     effectsToApply,

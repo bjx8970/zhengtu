@@ -58,13 +58,23 @@ export function activateScheduledEvents(
   const activated: EventInstance[] = [];
 
   for (const sched of due) {
+    const isBlocking = sched.snapshot.presentation === 'blocking';
+    // 如果已有活跃阻塞事件，新阻塞事件设为 pending 而非 active
+    const status: 'active' | 'pending' =
+      isBlocking && state.events.activeBlockingEventId === null ? 'active' : 'pending';
+
+    const deadlineDay =
+      sched.snapshot.deadlineDays != null
+        ? sched.activateAtDay + sched.snapshot.deadlineDays
+        : null;
+
     const inst: EventInstance = {
       instanceId: sched.instanceId,
       eventId: sched.eventId,
-      status: sched.snapshot.presentation === 'blocking' ? 'active' : 'pending',
+      status,
       triggeredAtDay: sched.scheduledAtDay,
       activatedAtDay: sched.activateAtDay,
-      deadlineDay: null, // 计划事件无截止（从定义中复制缺失）
+      deadlineDay,
       triggerContext: sched.triggerContext,
       sourceKey: sched.sourceKey,
       chainInstanceId: sched.chainInstanceId,
@@ -73,7 +83,7 @@ export function activateScheduledEvents(
     activated.push(inst);
   }
 
-  // 首个 blocking 事件设为 activeBlockingEventId
+  // 首个 blocking 且状态为 active 的事件设为 activeBlockingEventId
   const blocking = activated.find(
     (i) => i.snapshot.presentation === 'blocking' && i.status === 'active',
   );

@@ -33,6 +33,8 @@ export interface EventExecutableSnapshot {
   automaticOutcome: EventOutcomePayload | null;
   mutexGroup: string | null;
   contentVersion: string;
+  /** 截止天数（从激活日开始计算，null 表示无截止） */
+  deadlineDays: number | null;
 }
 
 /** 事件实例 */
@@ -105,4 +107,6 @@ export interface EventRuntimeState {
   history: EventHistoryRecord[];
   cooldowns: EventCooldownRecord[];
   chainInstances: Record<string, EventChainInstance>;
+  /** 已处理信号 ID 集合（防重入），SignalId → completedAtDay */
+  processedSignalIds: string[];
 }
