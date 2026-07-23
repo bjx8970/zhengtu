@@ -90,14 +90,15 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     });
 
     const state = store.getRawState();
-    // Instance removed from pending
-    expect(state.events.pending).toHaveLength(0);
-    // History record created
-    expect(state.events.history).toHaveLength(1);
-    expect(state.events.history[0]!.eventId).toBe('evt_reducer_test');
-    expect(state.events.history[0]!.finalStatus).toBe('resolved');
-    expect(state.events.history[0]!.chosenOptionId).toBe('opt_heal');
-    expect(state.events.history[0]!.chosenOptionLabel).toBe('恢复精力');
+    // Instance removed from pending (cascade may add other events)
+    expect(state.events.pending.find((p) => p.instanceId === 'inst_reducer_001')).toBeUndefined();
+    // History record created (cascade may add auto-event history)
+    const ourHistory = state.events.history.find((h) => h.instanceId === 'inst_reducer_001');
+    expect(ourHistory).toBeDefined();
+    expect(ourHistory!.eventId).toBe('evt_reducer_test');
+    expect(ourHistory!.finalStatus).toBe('resolved');
+    expect(ourHistory!.chosenOptionId).toBe('opt_heal');
+    expect(ourHistory!.chosenOptionLabel).toBe('恢复精力');
   });
 
   it('effects applied atomically to PlayerSave', () => {
@@ -139,11 +140,11 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     });
 
     const state = store.getRawState();
-    expect(state.events.history).toHaveLength(1);
-    const record = state.events.history[0]!;
-    expect(record.appliedEffects).toHaveLength(1);
-    expect(record.appliedEffects[0]!.target).toBe('character');
-    expect(record.appliedEffects[0]!.label).toContain('diligence');
+    const record = state.events.history.find((h) => h.instanceId === 'inst_reducer_001');
+    expect(record).toBeDefined();
+    expect(record!.appliedEffects).toHaveLength(1);
+    expect(record!.appliedEffects[0]!.target).toBe('character');
+    expect(record!.appliedEffects[0]!.label).toContain('diligence');
   });
 
   it('instance removed from pending after resolution', () => {
@@ -156,7 +157,8 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
       optionId: 'opt_heal',
     });
 
-    expect(store.getRawState().events.pending).toHaveLength(0);
+    const state = store.getRawState();
+    expect(state.events.pending.find((p) => p.instanceId === 'inst_reducer_001')).toBeUndefined();
   });
 
   it('blocking pointer advanced correctly', () => {
@@ -211,7 +213,8 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     const after = store.getRawState();
     // After resolving the only blocking event, pointer should be null
     expect(after.events.activeBlockingEventId).toBeNull();
-    expect(after.events.pending).toHaveLength(0);
+    // Resolved instance should be removed
+    expect(after.events.pending.find((p) => p.instanceId === 'inst_block_reducer')).toBeUndefined();
   });
 
   it('blocking pointer advances to next blocking if available', () => {
@@ -292,8 +295,9 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
 
     const after = store.getRawState();
     expect(after.events.activeBlockingEventId).toBe('inst_block_2');
-    expect(after.events.pending).toHaveLength(1);
-    expect(after.events.pending[0]!.instanceId).toBe('inst_block_2');
+    // inst_block_1 should be removed, inst_block_2 still present
+    expect(after.events.pending.find((p) => p.instanceId === 'inst_block_1')).toBeUndefined();
+    expect(after.events.pending.find((p) => p.instanceId === 'inst_block_2')).toBeDefined();
   });
 
   it('invalid option returns null (no state changes)', () => {
@@ -354,9 +358,9 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     });
 
     const state = store.getRawState();
-    expect(state.events.cooldowns).toHaveLength(1);
-    expect(state.events.cooldowns[0]!.eventId).toBe('evt_reducer_test');
-    expect(state.events.cooldowns[0]!.scope).toBe('global');
+    const ourCd = state.events.cooldowns.find((c) => c.eventId === 'evt_reducer_test');
+    expect(ourCd).toBeDefined();
+    expect(ourCd!.scope).toBe('global');
   });
 
   it('history record includes sourceKey and titleSnapshot', () => {
@@ -368,8 +372,9 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     });
 
     const state = store.getRawState();
-    expect(state.events.history).toHaveLength(1);
-    expect(state.events.history[0]!.sourceKey).toBe('src_reducer');
-    expect(state.events.history[0]!.titleSnapshot).toBe('Reducer Test Event');
+    const record = state.events.history.find((h) => h.instanceId === 'inst_reducer_001');
+    expect(record).toBeDefined();
+    expect(record!.sourceKey).toBe('src_reducer');
+    expect(record!.titleSnapshot).toBe('Reducer Test Event');
   });
 });

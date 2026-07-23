@@ -64,6 +64,7 @@ function createDefaultEventRuntimeState(): EventRuntimeState {
     history: [],
     cooldowns: [],
     chainInstances: {},
+    processedSignalIds: [],
   };
 }
 
@@ -236,7 +237,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
       return true;
     }
     case 'CHOOSE_EVENT_OPTION': {
-      const currentDay = draft.time.year * 360 + (draft.time.month - 1) * 30 + draft.time.day;
+      const currentDay = draft.time.totalDaysPlayed;
       const result = reduceChooseEventOption(
         draft,
         {
