@@ -10,7 +10,11 @@
 import { z } from 'zod';
 import type { PlayerSave } from '../../types/player';
 import type { SaveEnvelope, SaveDecodeResult } from '../../types/save';
-import { CURRENT_SCHEMA_VERSION, CURRENT_CONTENT_VERSION } from '../../types/save';
+import {
+  CURRENT_SCHEMA_VERSION,
+  CURRENT_CONTENT_VERSION,
+  MIN_MIGRATABLE_SCHEMA_VERSION,
+} from '../../types/save';
 import {
   INSTITUTION_LEVELS,
   POSITION_DOMAINS,
@@ -180,8 +184,8 @@ const GovernanceStateSchema = z
         })
         .strict(),
     ),
-    institutionMetrics: z.record(z.number()),
-    regionMetrics: z.record(z.number()),
+    institutionMetrics: z.record(z.record(z.number())),
+    regionMetrics: z.record(z.record(z.number())),
   })
   .strict();
 
@@ -487,7 +491,37 @@ export function wrapSaveEnvelope(state: PlayerSave, existingRevision = 0): SaveE
 }
 
 /**
+ * 将 Schema 2 存档迁移至 Schema 3。
+ *
+ * Schema 2 → 3 的唯一变化：治理指标从扁平 `Record<string, number>`
+ * 改为嵌套 `MetricCollection = Record<string, Record<string, number>>`。
+ * 旧扁平结构在新模型下无有效解释，且 Schema 2 阶段治理子系统未投产、
+ * 指标恒为空对象，故迁移确定性地重置为空集合（不丢失任何真实数据）。
+ *
+ * @param raw 已解析的 Schema 2 SaveEnvelope 对象
+ * @returns 迁移后的 Schema 3 SaveEnvelope 对象
+ */
+export function migrateSchema2To3(raw: Record<string, unknown>): Record<string, unknown> {
+  const migrated = structuredClone(raw);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const governance = state?.governance as Record<string, unknown> | undefined;
+  if (governance) {
+    // 扁平指标在新模型下无有效解释，重置为空嵌套集合
+    governance.institutionMetrics = {};
+    governance.regionMetrics = {};
+  }
+  migrated.schemaVersion = CURRENT_SCHEMA_VERSION;
+  return migrated;
+}
+
+/**
  * 严格解码存档数据（已解析的对象）。
+ *
+ * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
+ * - 低于可迁移版本：拒绝为 legacy；
+ * - Schema 2：迁移至 Schema 3 后解码；
+ * - 当前版本：直接解码；
+ * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
  * @returns 解码结果
@@ -507,11 +541,11 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     };
   }
 
-  if (obj.schemaVersion < CURRENT_SCHEMA_VERSION) {
+  if (obj.schemaVersion < MIN_MIGRATABLE_SCHEMA_VERSION) {
     return {
       success: false,
       error: 'legacy_save_unsupported',
-      detail: `Schema ${obj.schemaVersion} < current ${CURRENT_SCHEMA_VERSION}`,
+      detail: `Schema ${obj.schemaVersion} < min migratable ${MIN_MIGRATABLE_SCHEMA_VERSION}`,
     };
   }
   if (obj.schemaVersion > CURRENT_SCHEMA_VERSION) {
@@ -522,7 +556,13 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     };
   }
 
-  const result = SaveEnvelopeSchema.safeParse(data);
+  // 确定性迁移至当前版本
+  let target: unknown = data;
+  if (obj.schemaVersion === 2) {
+    target = migrateSchema2To3(obj);
+  }
+
+  const result = SaveEnvelopeSchema.safeParse(target);
   if (!result.success) {
     return { success: false, error: 'invalid_envelope', detail: result.error.message };
   }

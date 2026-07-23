@@ -15,6 +15,7 @@ export * from './governance/state';
 // 事件领域
 export * from './events/types';
 export * from './events/state';
+export * from './events/definition';
 
 // 世界状态
 export * from './world-state';
