@@ -284,9 +284,7 @@ describe('validateEventDefinitions 引用完整性', () => {
       ],
     });
     const errors = validateEventDefinitions([event]);
-    expect(errors.some((e) => e.includes('institutionId') && e.includes('所有触发来源'))).toBe(
-      true,
-    );
+    expect(errors.some((e) => e.includes('institutionId') && e.includes('可触发来源'))).toBe(true);
   });
 
   it('fixed 机构引用未知 ID 被拒绝', () => {
@@ -365,7 +363,7 @@ describe('validateEventDefinitions 引用完整性', () => {
       ],
     });
     const errors = validateEventDefinitions([event]);
-    expect(errors.some((e) => e.includes('regionId') && e.includes('所有触发来源'))).toBe(true);
+    expect(errors.some((e) => e.includes('regionId') && e.includes('可触发来源'))).toBe(true);
   });
 
   it('多来源效果 signal 引用字段在所有来源存在通过', () => {
@@ -416,6 +414,79 @@ describe('validateEventDefinitions 引用完整性', () => {
     const followup = makeEvent({ id: 'followup_event' });
     const errors = validateEventDefinitions([event, followup]);
     expect(errors.some((e) => e.includes('institutionId') && e.includes('不可达'))).toBe(true);
+  });
+
+  it('不同选项的多个后续条件为独立分支不累计相交', () => {
+    // 选项1 后续条件读 actionId（仅 action.completed）
+    // 选项2 后续条件读 score（仅 assessment.completed）
+    // 二者是独立分支，不应被要求同时在同一来源可评估
+    const event = makeEvent({
+      trigger: { sources: ['action.completed', 'assessment.completed'] },
+      options: [
+        {
+          id: 'o1',
+          label: 'a',
+          description: '',
+          effects: [],
+          schedule: [
+            {
+              eventId: 'f1',
+              delayDays: 5,
+              condition: { signalField: 'actionId', op: 'eq', value: 'x' },
+            },
+          ],
+        },
+        {
+          id: 'o2',
+          label: 'b',
+          description: '',
+          effects: [],
+          schedule: [
+            {
+              eventId: 'f2',
+              delayDays: 5,
+              condition: { signalField: 'score', op: 'gte', value: 80 },
+            },
+          ],
+        },
+      ],
+    });
+    const f1 = makeEvent({ id: 'f1' });
+    const f2 = makeEvent({ id: 'f2' });
+    const errors = validateEventDefinitions([event, f1, f2]);
+    expect(errors.some((e) => e.includes('不可达'))).toBe(false);
+  });
+
+  it('触发条件限定来源后效果字段只需对可触发来源可解析', () => {
+    // 来源 [world.metric_changed, appointment.changed]
+    // 触发条件要求 actionId（仅在……都不在？改用 appointment.changed 独有字段 experienceId）
+    // experienceId 仅在 appointment.changed → 条件将可触发来源限定为 appointment.changed
+    // 效果 regionRef signal regionId：appointment.changed 含 regionId → 合法
+    // （若按全部声明来源交集，world.metric_changed 无 regionId 会被误拒）
+    const event = makeEvent({
+      trigger: {
+        sources: ['world.metric_changed', 'appointment.changed'],
+        condition: { signalField: 'experienceId', op: 'eq', value: 'x' },
+      },
+      options: [
+        {
+          id: 'o',
+          label: 'a',
+          description: '',
+          effects: [
+            {
+              target: 'region_metric',
+              regionRef: { source: 'signal', field: 'regionId' },
+              metricId: 'm',
+              operation: 'add',
+              value: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('regionId') && e.includes('可触发来源'))).toBe(false);
   });
 
   it('all 引用分属不同来源的字段被拒绝（永久不可达）', () => {

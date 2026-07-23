@@ -297,9 +297,7 @@ export function validateEventDefinitions(
       errors.push(`事件 ${event.id}: once_per_chain 模式必须携带 chainId`);
     }
 
-    // 来源兼容性：trigger.sources 的载荷字段并集与交集
-    // - 条件引用用并集：某来源缺字段只会使该来源不满足条件，不会报错
-    // - 效果引用用交集：效果会在任一来源触发后结算，必须对每个来源都可解析
+    // 来源兼容性：trigger.sources 的载荷字段并集（条件基本可达性）
     const sourceFieldSets = event.trigger.sources.map(
       (source) => new Set<string>(SIGNAL_TYPE_PAYLOAD_FIELDS[source] ?? []),
     );
@@ -307,13 +305,15 @@ export function validateEventDefinitions(
     for (const fieldSet of sourceFieldSets) {
       for (const field of fieldSet) conditionAvailableFields.add(field);
     }
-    const effectAvailableFields = new Set<string>();
-    const firstFieldSet = sourceFieldSets[0];
-    if (firstFieldSet) {
-      for (const field of firstFieldSet) effectAvailableFields.add(field);
+    // 所有声明来源的载荷字段交集：not 安全性须对每个声明来源保证
+    // （not(缺失=false)=true 可对任意声明来源触发，不受触发条件限定）
+    const allSourcesIntersection = new Set<string>();
+    const firstSourceSet = sourceFieldSets[0];
+    if (firstSourceSet) {
+      for (const field of firstSourceSet) allSourcesIntersection.add(field);
       for (const fieldSet of sourceFieldSets) {
-        for (const field of [...effectAvailableFields]) {
-          if (!fieldSet.has(field)) effectAvailableFields.delete(field);
+        for (const field of [...allSourcesIntersection]) {
+          if (!fieldSet.has(field)) allSourcesIntersection.delete(field);
         }
       }
     }
@@ -338,6 +338,22 @@ export function validateEventDefinitions(
       );
     }
 
+    // 触发条件适用来源的载荷字段交集：
+    // 触发条件可能将实际触发来源限定到子集，效果与 not 安全性只需对这些来源保证。
+    const applicableSourceFields = new Set<string>();
+    const applicableFieldSets = [...conditionApplicableSources]
+      .map((i) => sourceFieldSets[i])
+      .filter((fs): fs is Set<string> => fs !== undefined);
+    const firstApplicableSet = applicableFieldSets[0];
+    if (firstApplicableSet) {
+      for (const field of firstApplicableSet) applicableSourceFields.add(field);
+      for (const fieldSet of applicableFieldSets) {
+        for (const field of [...applicableSourceFields]) {
+          if (!fieldSet.has(field)) applicableSourceFields.delete(field);
+        }
+      }
+    }
+
     // 校验载荷（选项或 automaticOutcome）中的效果引用与后续/取消引用
     const validatePayload = (
       effects: readonly EffectDefinition[],
@@ -350,15 +366,19 @@ export function validateEventDefinitions(
         if (!eventIds.has(followup.eventId)) {
           errors.push(`事件 ${event.id} ${scopeLabel}: 后续事件 "${followup.eventId}" 不存在`);
         }
-        // 后续调度条件使用父事件的触发信号上下文，纳入相同的来源字段兼容性校验
+        // 后续调度条件使用父事件的触发信号上下文。
+        // 不同选项/同一选项的多个 followup 是独立分支，不累计相交，
+        // 每个后续条件独立验证：其适用来源与触发条件适用来源的交集须非空。
         if (followup.condition) {
           collectConditionSignalFields(followup.condition, conditionSignalFields);
           collectNegatedSignalFields(followup.condition, false, negatedSignalFields);
-          // 后续条件适用来源与触发条件取交集
           const followupSources = computeApplicableSources(followup.condition, sourceFieldSets);
-          conditionApplicableSources = new Set(
-            [...conditionApplicableSources].filter((i) => followupSources.has(i)),
-          );
+          const reachable = [...conditionApplicableSources].some((i) => followupSources.has(i));
+          if (!reachable) {
+            errors.push(
+              `事件 ${event.id} ${scopeLabel}: 后续事件 "${followup.eventId}" 的条件引用的信号字段在可触发来源中不可达`,
+            );
+          }
         }
         if (followup.delayDays === 0) {
           const edges = zeroDelayGraph.get(event.id) ?? [];
@@ -406,20 +426,22 @@ export function validateEventDefinitions(
       );
     }
 
-    // not 安全性：被取反的字段须在每个触发来源中都存在（否则 not(缺失=false)=true 错误触发）
+    // not 安全性：被取反的字段须在每个声明来源中都存在
+    // （not(缺失=false)=true 可对任意声明来源触发，不受触发条件限定）
     for (const field of negatedSignalFields) {
-      if (!effectAvailableFields.has(field)) {
+      if (!allSourcesIntersection.has(field)) {
         errors.push(
           `事件 ${event.id}: 条件中 not 取反引用信号字段 "${field}" 并非在所有触发来源 [${event.trigger.sources.join(', ')}] 中都存在，缺失来源将因 not(false) 错误触发`,
         );
       }
     }
 
-    // 效果引用来源兼容性：字段须在每个触发来源载荷中都可解析（交集）
+    // 效果引用来源兼容性：字段须在每个可触发来源载荷中都可解析
+    // （触发条件可能已将实际来源限定到子集，只需对该子集保证）
     for (const field of effectSignalFields) {
-      if (!effectAvailableFields.has(field)) {
+      if (!applicableSourceFields.has(field)) {
         errors.push(
-          `事件 ${event.id}: 效果引用信号字段 "${field}" 并非在所有触发来源 [${event.trigger.sources.join(', ')}] 的载荷中都存在，部分来源触发时结算将失败`,
+          `事件 ${event.id}: 效果引用信号字段 "${field}" 并非在所有可触发来源的载荷中都存在，部分来源触发时结算将失败`,
         );
       }
     }
