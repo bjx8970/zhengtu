@@ -9,6 +9,11 @@ import { describe, it, expect } from 'vitest';
 import { EventDefinitionSchema } from '../definition';
 import type { EventDefinition } from '../definition';
 import { validateEventDefinitions } from '../validation';
+import {
+  DOMAIN_SIGNALS,
+  DomainSignalSnapshotSchema,
+  SIGNAL_TYPE_PAYLOAD_FIELDS,
+} from '../../governance/types';
 
 /** 构造一个合法的事件定义 */
 function makeEvent(override?: Partial<EventDefinition>): EventDefinition {
@@ -279,7 +284,9 @@ describe('validateEventDefinitions 引用完整性', () => {
       ],
     });
     const errors = validateEventDefinitions([event]);
-    expect(errors.some((e) => e.includes('institutionId') && e.includes('不可达'))).toBe(true);
+    expect(errors.some((e) => e.includes('institutionId') && e.includes('所有触发来源'))).toBe(
+      true,
+    );
   });
 
   it('fixed 机构引用未知 ID 被拒绝', () => {
@@ -334,5 +341,100 @@ describe('validateEventDefinitions 引用完整性', () => {
     };
     const errors = validateEventDefinitions([event], knownIds);
     expect(errors.some((e) => e.includes('real_inst'))).toBe(false);
+  });
+
+  it('多来源效果 signal 引用字段不在所有来源被拒绝', () => {
+    // world.metric_changed 无 regionId，appointment.changed 有；效果 regionRef signal 在部分来源结算会失败
+    const event = makeEvent({
+      trigger: { sources: ['world.metric_changed', 'appointment.changed'] },
+      options: [
+        {
+          id: 'o',
+          label: 'a',
+          description: '',
+          effects: [
+            {
+              target: 'region_metric',
+              regionRef: { source: 'signal', field: 'regionId' },
+              metricId: 'm',
+              operation: 'add',
+              value: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('regionId') && e.includes('所有触发来源'))).toBe(true);
+  });
+
+  it('多来源效果 signal 引用字段在所有来源存在通过', () => {
+    // action.completed 与 appointment.changed 都含 regionId
+    const event = makeEvent({
+      trigger: { sources: ['action.completed', 'appointment.changed'] },
+      options: [
+        {
+          id: 'o',
+          label: 'a',
+          description: '',
+          effects: [
+            {
+              target: 'region_metric',
+              regionRef: { source: 'signal', field: 'regionId' },
+              metricId: 'm',
+              operation: 'add',
+              value: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const errors = validateEventDefinitions([event]);
+    expect(errors.some((e) => e.includes('所有触发来源'))).toBe(false);
+  });
+
+  it('后续调度条件引用不兼容信号字段被拒绝', () => {
+    // world.metric_changed 无 institutionId，后续条件却读取 institutionId
+    const event = makeEvent({
+      trigger: { sources: ['world.metric_changed'] },
+      options: [
+        {
+          id: 'o',
+          label: 'a',
+          description: '',
+          effects: [],
+          schedule: [
+            {
+              eventId: 'followup_event',
+              delayDays: 5,
+              condition: { signalField: 'institutionId', op: 'eq', value: 'x' },
+            },
+          ],
+        },
+      ],
+    });
+    const followup = makeEvent({ id: 'followup_event' });
+    const errors = validateEventDefinitions([event, followup]);
+    expect(errors.some((e) => e.includes('institutionId') && e.includes('不可达'))).toBe(true);
+  });
+});
+
+describe('SIGNAL_TYPE_PAYLOAD_FIELDS 一致性', () => {
+  it('信号字段映射覆盖所有领域信号且与 Schema 一致', () => {
+    // 映射的键须与 DOMAIN_SIGNALS 完全一致
+    const mappedSignals = Object.keys(SIGNAL_TYPE_PAYLOAD_FIELDS).sort();
+    const domainSignals = [...DOMAIN_SIGNALS].sort();
+    expect(mappedSignals).toEqual(domainSignals);
+
+    // 每个信号类型的字段须与 DomainSignalSnapshotSchema 的 data 形状一致
+    for (const signalType of DOMAIN_SIGNALS) {
+      const branch = DomainSignalSnapshotSchema.options.find(
+        (o) => o.shape.signalType.value === signalType,
+      );
+      expect(branch, `signal ${signalType} branch`).toBeDefined();
+      const schemaFields = Object.keys(branch!.shape.data.shape).sort();
+      const mappedFields = [...SIGNAL_TYPE_PAYLOAD_FIELDS[signalType]].sort();
+      expect(mappedFields, `signal ${signalType} fields`).toEqual(schemaFields);
+    }
   });
 });

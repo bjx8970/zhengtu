@@ -203,21 +203,36 @@ export function validateEventDefinitions(
       errors.push(`事件 ${event.id}: once_per_chain 模式必须携带 chainId`);
     }
 
-    // 来源兼容性：trigger.sources 的载荷字段并集
-    const availableFields = new Set<string>();
-    for (const source of event.trigger.sources) {
-      for (const field of SIGNAL_TYPE_PAYLOAD_FIELDS[source] ?? []) {
-        availableFields.add(field);
+    // 来源兼容性：trigger.sources 的载荷字段并集与交集
+    // - 条件引用用并集：某来源缺字段只会使该来源不满足条件，不会报错
+    // - 效果引用用交集：效果会在任一来源触发后结算，必须对每个来源都可解析
+    const sourceFieldSets = event.trigger.sources.map(
+      (source) => new Set<string>(SIGNAL_TYPE_PAYLOAD_FIELDS[source] ?? []),
+    );
+    const conditionAvailableFields = new Set<string>();
+    for (const fieldSet of sourceFieldSets) {
+      for (const field of fieldSet) conditionAvailableFields.add(field);
+    }
+    const effectAvailableFields = new Set<string>();
+    const firstFieldSet = sourceFieldSets[0];
+    if (firstFieldSet) {
+      for (const field of firstFieldSet) effectAvailableFields.add(field);
+      for (const fieldSet of sourceFieldSets) {
+        for (const field of [...effectAvailableFields]) {
+          if (!fieldSet.has(field)) effectAvailableFields.delete(field);
+        }
       }
     }
 
-    // 收集本事件引用的信号字段与 fixed 引用
-    const referencedSignalFields = new Set<string>();
+    // 条件引用的信号字段（含触发条件与后续调度条件）
+    const conditionSignalFields = new Set<string>();
+    // 效果引用的信号字段
+    const effectSignalFields = new Set<string>();
     const fixedInstitutions = new Set<string>();
     const fixedRegions = new Set<string>();
 
     if (event.trigger.condition) {
-      collectConditionSignalFields(event.trigger.condition, referencedSignalFields);
+      collectConditionSignalFields(event.trigger.condition, conditionSignalFields);
     }
 
     // 校验载荷（选项或 automaticOutcome）中的效果引用与后续/取消引用
@@ -227,10 +242,14 @@ export function validateEventDefinitions(
       cancelScheduledEvents: EventOutcomePayload['cancelScheduledEvents'],
       scopeLabel: string,
     ): void => {
-      collectEffectRefs(effects, referencedSignalFields, fixedInstitutions, fixedRegions);
+      collectEffectRefs(effects, effectSignalFields, fixedInstitutions, fixedRegions);
       for (const followup of schedule ?? []) {
         if (!eventIds.has(followup.eventId)) {
           errors.push(`事件 ${event.id} ${scopeLabel}: 后续事件 "${followup.eventId}" 不存在`);
+        }
+        // 后续调度条件使用父事件的触发信号上下文，纳入相同的来源字段兼容性校验
+        if (followup.condition) {
+          collectConditionSignalFields(followup.condition, conditionSignalFields);
         }
         if (followup.delayDays === 0) {
           const edges = zeroDelayGraph.get(event.id) ?? [];
@@ -262,11 +281,20 @@ export function validateEventDefinitions(
       );
     }
 
-    // 来源兼容性验证：引用的信号字段必须在可触发来源载荷中有定义
-    for (const field of referencedSignalFields) {
-      if (!availableFields.has(field)) {
+    // 条件引用来源兼容性：字段须在任一触发来源载荷中有定义（并集）
+    for (const field of conditionSignalFields) {
+      if (!conditionAvailableFields.has(field)) {
         errors.push(
-          `事件 ${event.id}: 引用信号字段 "${field}" 不在触发来源 [${event.trigger.sources.join(', ')}] 的载荷中，事件将不可达`,
+          `事件 ${event.id}: 条件引用信号字段 "${field}" 不在任何触发来源 [${event.trigger.sources.join(', ')}] 的载荷中，事件将不可达`,
+        );
+      }
+    }
+
+    // 效果引用来源兼容性：字段须在每个触发来源载荷中都可解析（交集）
+    for (const field of effectSignalFields) {
+      if (!effectAvailableFields.has(field)) {
+        errors.push(
+          `事件 ${event.id}: 效果引用信号字段 "${field}" 并非在所有触发来源 [${event.trigger.sources.join(', ')}] 的载荷中都存在，部分来源触发时结算将失败`,
         );
       }
     }
