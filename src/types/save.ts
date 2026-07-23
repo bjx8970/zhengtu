@@ -41,7 +41,11 @@ export interface SaveEnvelope {
 
 /** 存档解码错误类型 */
 export type SaveDecodeError =
-  'invalid_json' | 'legacy_save_unsupported' | 'future_version' | 'invalid_envelope';
+  | 'invalid_json'
+  | 'legacy_save_unsupported'
+  | 'future_version'
+  | 'invalid_envelope'
+  | 'migration_failed';
 
 /** 存档解码结果 */
 export interface SaveDecodeResult {

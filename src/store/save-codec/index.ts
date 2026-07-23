@@ -33,6 +33,10 @@ import {
   EVENT_INSTANCE_STATUSES,
   EVENT_CHAIN_STATUSES,
 } from '../../domain/events/types';
+import {
+  EventOptionDefinitionSchema,
+  EventOutcomePayloadSchema,
+} from '../../domain/events/definition';
 
 /** 不兼容存档备份的 localStorage key 前缀 */
 const BACKUP_KEY_PREFIX = 'zhengtu_incompatible_save';
@@ -199,10 +203,11 @@ const EventExecutableSnapshotSchema = z
     category: z.string(),
     priority: z.enum(EVENT_PRIORITIES),
     presentation: z.enum(EVENT_PRESENTATIONS),
-    options: z.array(z.unknown()),
-    automaticOutcome: z.unknown().nullable(),
+    options: z.array(EventOptionDefinitionSchema),
+    automaticOutcome: EventOutcomePayloadSchema.nullable(),
     mutexGroup: z.string().nullable(),
     contentVersion: z.string(),
+    deadlineDays: z.number().nullable(),
   })
   .strict();
 
@@ -293,6 +298,7 @@ const EventRuntimeStateSchema = z
         })
         .strict(),
     ),
+    processedSignalIds: z.array(z.string()),
   })
   .strict();
 
@@ -495,8 +501,6 @@ const SaveEnvelopeSchema = z
 /**
  * 编译期双向可赋值检查。
  * 如果 PlayerSaveSchema 与 PlayerSave 不一致，此处会产生类型错误。
- * 注：Schema 使用 z.unknown() 存储复杂嵌套类型（options/automaticOutcome），
- *     推断类型含 unknown 而非精确类型，但运行时 .strict() 拒绝多余字段。
  */
 type SchemaInferred = z.infer<typeof PlayerSaveSchema>;
 type _AssertSchemaToType = SchemaInferred extends PlayerSave ? true : never;
@@ -601,6 +605,11 @@ export function migrateSchema3To4(raw: Record<string, unknown>): Record<string, 
       (events as any).cooldowns = [];
     }
 
+    // Schema 4 新增字段：已处理信号 ID
+    if (!events.processedSignalIds) {
+      (events as Record<string, unknown>).processedSignalIds = [];
+    }
+
     // 迁移 pending/scheduled/history 中的事件实例
     const pending = events.pending as Array<Record<string, unknown>> | undefined;
     const scheduled = events.scheduled as Array<Record<string, unknown>> | undefined;
@@ -633,6 +642,7 @@ export function migrateSchema3To4(raw: Record<string, unknown>): Record<string, 
           automaticOutcome: null,
           mutexGroup: null,
           contentVersion: '',
+          deadlineDays: null,
         };
         // 移除旧字段
         delete inst.priority;
@@ -654,6 +664,7 @@ export function migrateSchema3To4(raw: Record<string, unknown>): Record<string, 
           automaticOutcome: null,
           mutexGroup: null,
           contentVersion: '',
+          deadlineDays: null,
         };
       }
     }
@@ -733,10 +744,18 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
 
   // 确定性迁移链至当前版本
   let target: unknown = data;
-  if (obj.schemaVersion === 2) {
-    target = migrateSchema3To4(migrateSchema2To3(obj));
-  } else if (obj.schemaVersion === 3) {
-    target = migrateSchema3To4(obj);
+  try {
+    if (obj.schemaVersion === 2) {
+      target = migrateSchema3To4(migrateSchema2To3(obj));
+    } else if (obj.schemaVersion === 3) {
+      target = migrateSchema3To4(obj);
+    }
+  } catch (e) {
+    return {
+      success: false,
+      error: 'migration_failed',
+      detail: e instanceof Error ? e.message : 'Unknown migration error',
+    };
   }
 
   const result = SaveEnvelopeSchema.safeParse(target);
