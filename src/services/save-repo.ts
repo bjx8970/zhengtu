@@ -12,6 +12,7 @@ import type { SaveEnvelope, SaveDecodeResult } from '../types/save';
 import type { LocalSaveLoadResult } from './startup-save-state';
 import { getSupabase } from './supabase';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../store/save-codec';
+import { getConfigLoader } from '../config/loader';
 
 const TABLE_NAME = 'game_saves';
 const SLOT_NAME = 'main';
@@ -110,6 +111,9 @@ export async function fetchRemoteSave(userId: string): Promise<PlayerSave | null
 /**
  * 保存存档：远程写入成功后同步本地备份。
  * Supabase 不可用时降级为纯本地存储。
+ *
+ * revision 递增：先读取现有远程 envelope 的 revision，再 +1。
+ * 索引列从当前职位配置生成有意义值（contentTier 与岗位领域）。
  */
 export async function upsertSave(save: PlayerSave): Promise<boolean> {
   const supabase = getSupabase();
@@ -118,18 +122,34 @@ export async function upsertSave(save: PlayerSave): Promise<boolean> {
     return true;
   }
 
-  // 使用 SaveEnvelope 封装
-  const envelope = wrapSaveEnvelope(save);
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
+
+  // 读取现有远程 envelope 的 revision，用于递增
+  let existingRevision = 0;
+  const { data: existing } = await sb
+    .from(TABLE_NAME)
+    .select('save_data')
+    .eq('user_id', save.character.userId)
+    .eq('slot_name', SLOT_NAME)
+    .maybeSingle();
+  if (existing?.save_data && typeof existing.save_data.revision === 'number') {
+    existingRevision = existing.save_data.revision;
+  }
+
+  // 使用 SaveEnvelope 封装（revision 递增）
+  const envelope = wrapSaveEnvelope(save, existingRevision);
+
+  // 从当前职位配置生成索引列的有意义值
+  const position = getConfigLoader().getPositionById(save.career.appointment.positionId);
+
   const { error } = await sb.from(TABLE_NAME).upsert(
     {
       user_id: save.character.userId,
       slot_name: SLOT_NAME,
       save_data: envelope,
-      current_level: 0,
-      current_career_line: '',
+      current_level: position?.contentTier ?? 0,
+      current_career_line: save.career.appointment.positionDomain,
       current_position_id: save.career.appointment.positionId,
       game_year: save.time.year,
       game_month: save.time.month,

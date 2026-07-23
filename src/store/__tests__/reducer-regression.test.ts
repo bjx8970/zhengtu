@@ -372,6 +372,66 @@ describe('行动效果结算语义', () => {
     }
   });
 
+  it('角色属性 multiply 不应用 devMult 倍率', () => {
+    mockEffects = {
+      kpiChanges: [],
+      playerChanges: [{ attr: 'competence', operation: 'multiply', delta: 2 }],
+      styleDeltas: {},
+    };
+
+    try {
+      const initial = createInitialState();
+      const store = createTestStore({
+        character: { ...initial.character, competence: 50 },
+        actions: makeSlotsWithAction({
+          startedAtDay: 0,
+          durationDays: 3,
+          runtimeSnapshot: { effectivenessMultiplier: 0.5, styleConflictTriggered: false },
+        }),
+      });
+
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+      const state = store.getRawState();
+      // multiply 不应用 devMult: 50 * 2 = 100（而非 50 * 2 * 0.5）
+      expect(state.character.competence).toBe(100);
+    } finally {
+      mockEffects = null;
+    }
+  });
+
+  it('角色属性 set 不应用 devMult 倍率', () => {
+    mockEffects = {
+      kpiChanges: [],
+      playerChanges: [{ attr: 'competence', operation: 'set', delta: 88 }],
+      styleDeltas: {},
+    };
+
+    try {
+      const initial = createInitialState();
+      const store = createTestStore({
+        character: { ...initial.character, competence: 50 },
+        actions: makeSlotsWithAction({
+          startedAtDay: 0,
+          durationDays: 3,
+          runtimeSnapshot: { effectivenessMultiplier: 0.5, styleConflictTriggered: false },
+        }),
+      });
+
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+      const state = store.getRawState();
+      // set 直接设置: 88（不应用 devMult）
+      expect(state.character.competence).toBe(88);
+    } finally {
+      mockEffects = null;
+    }
+  });
+
   it('冷却使用 SlotOccupant.cooldownDays 快照', () => {
     const store = createTestStore({
       actions: makeSlotsWithAction({
