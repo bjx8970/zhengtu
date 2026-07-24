@@ -149,10 +149,12 @@ function checkEventRepeatability(
       return exists;
     }
     case 'once_per_chain': {
-      // 无链实例时（如跨链调度尚未创建子链），回退为检查 scheduled 中同 eventId+sourceKey 实例
+      // 无链实例时（如跨链调度尚未创建子链），回退为检查同 eventId+sourceKey 的所有实例
       if (!def.chainId || !chainInstance) {
-        return state.events.scheduled.some(
-          (s) => s.eventId === def.id && s.sourceKey === sourceKey,
+        return (
+          state.events.history.some((h) => h.eventId === def.id && h.sourceKey === sourceKey) ||
+          state.events.pending.some((p) => p.eventId === def.id && p.sourceKey === sourceKey) ||
+          state.events.scheduled.some((s) => s.eventId === def.id && s.sourceKey === sourceKey)
         );
       }
       if (chainInstance.completedNodeIds.includes(def.nodeId ?? def.id)) return true;

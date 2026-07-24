@@ -388,7 +388,7 @@ export function applyEventOrchestrationPlan(
  * @param idFactory ID 工厂
  * @param definitions 事件定义列表
  */
-function processCascadeSignals(
+export function processCascadeSignals(
   draft: PlayerSave,
   signals: DomainSignalSnapshot[],
   currentDay: number,

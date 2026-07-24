@@ -23,6 +23,9 @@ import { annualAssessment as runAnnualAssessment } from '../../engine/governance
 import { decayStyleScores } from '../../engine/career/style-decay';
 import { getConfigLoader } from '../../config/loader';
 import { clampAttr } from '../../utils/math';
+import { activateScheduledEvents, expireEventInstances } from '../../engine/events/event-scheduler';
+import { processCascadeSignals } from './event-reducer';
+import { handleAutoEventInstance } from './event-reducer';
 
 /**
  * 处理行动完成时间轴事件。
@@ -265,6 +268,87 @@ export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload
   draft.time.day = result.newTime.day;
   draft.time.granularity = payload.granularity;
   draft.time.totalDaysPlayed += days;
+
+  const currentDay = draft.time.totalDaysPlayed;
+
+  // 激活到期的计划事件
+  const definitions = getConfigLoader().getAllEventDefinitions();
+  const activationResult = activateScheduledEvents(
+    draft as Readonly<PlayerSave>,
+    currentDay,
+    rng,
+    () => `sched_act_${currentDay}_${Date.now()}`,
+  );
+
+  // 清理已激活的计划事件
+  const activatedIds = new Set(activationResult.activatedInstances.map((i) => i.instanceId));
+  draft.events.scheduled = draft.events.scheduled.filter((s) => !activatedIds.has(s.instanceId));
+
+  for (const inst of activationResult.activatedInstances) {
+    // 跨链调度：snapshot 有 chainId 但实例无 chainInstanceId，为子链创建链实例
+    if (inst.snapshot.chainId && !inst.chainInstanceId) {
+      const existingChain = Object.values(draft.events.chainInstances).find(
+        (c) => c.chainId === inst.snapshot.chainId && c.sourceKey === inst.sourceKey,
+      );
+      if (existingChain) {
+        inst.chainInstanceId = existingChain.instanceId;
+      } else {
+        const newChain = {
+          instanceId: `chain_${inst.snapshot.chainId}_${inst.sourceKey}`,
+          chainId: inst.snapshot.chainId,
+          status: 'active' as const,
+          sourceKey: inst.sourceKey,
+          activeNodeIds: [] as string[],
+          completedNodeIds: [] as string[],
+          startedAtDay: currentDay,
+          completedAtDay: null,
+        };
+        draft.events.chainInstances[newChain.instanceId] = newChain;
+        inst.chainInstanceId = newChain.instanceId;
+      }
+    }
+
+    if (inst.snapshot.presentation === 'automatic') {
+      const { cascadeSignals } = handleAutoEventInstance(
+        draft,
+        inst,
+        currentDay,
+        rng,
+        () => `auto_${inst.instanceId}`,
+        definitions,
+      );
+      // 处理自动事件产生的级联信号
+      processCascadeSignals(
+        draft,
+        cascadeSignals,
+        currentDay,
+        rng,
+        () => `cascade_auto_${inst.instanceId}`,
+        definitions,
+      );
+    } else {
+      draft.events.pending.push(inst);
+      if (
+        inst.snapshot.presentation === 'blocking' &&
+        draft.events.activeBlockingEventId === null
+      ) {
+        draft.events.activeBlockingEventId = inst.instanceId;
+      }
+    }
+  }
+
+  // 过期事件处理
+  const expiryResult = expireEventInstances(draft as Readonly<PlayerSave>, currentDay);
+  for (const record of expiryResult.expiredRecords) {
+    draft.events.history.push(record);
+  }
+  for (const history of expiryResult.expiredRecords) {
+    const idx = draft.events.pending.findIndex((p) => p.instanceId === history.instanceId);
+    if (idx !== -1) draft.events.pending.splice(idx, 1);
+  }
+  for (const chain of expiryResult.chainsToUpdate) {
+    draft.events.chainInstances[chain.instanceId] = chain;
+  }
 
   // 更新最近完成行动通知
   if (notifications.length > 0) {

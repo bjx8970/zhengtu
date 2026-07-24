@@ -265,7 +265,7 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     const inst2: EventInstance = {
       instanceId: 'inst_block_2',
       eventId: 'evt_block_2',
-      status: 'active',
+      status: 'pending', // 从 pending 被 advanceBlockingPointer 提升为 active
       triggeredAtDay: 50,
       activatedAtDay: 50,
       deadlineDay: null,
@@ -295,6 +295,10 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
 
     const after = store.getRawState();
     expect(after.events.activeBlockingEventId).toBe('inst_block_2');
+    // advanceBlockingPointer 将 status 从 pending 提升为 active
+    const inst2After = after.events.pending.find((p) => p.instanceId === 'inst_block_2');
+    expect(inst2After).toBeDefined();
+    expect(inst2After!.status).toBe('active');
     // inst_block_1 should be removed, inst_block_2 still present
     expect(after.events.pending.find((p) => p.instanceId === 'inst_block_1')).toBeUndefined();
     expect(after.events.pending.find((p) => p.instanceId === 'inst_block_2')).toBeDefined();
