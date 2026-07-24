@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createTestStore, createInitialState } from '../game-store';
-import { createEventSnapshot } from '../../engine/events/event-orchestrator';
+import { createEventSnapshot, processDomainSignal } from '../../engine/events/event-orchestrator';
 import type { PlayerSave } from '../../types/player';
 import type { EventInstance } from '../../domain/events/state';
 import type { EventDefinition } from '../../domain/events/definition';
@@ -313,6 +313,84 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     expect(after.events.pending.find((p) => p.instanceId === 'inst_block_2')).toBeDefined();
   });
 
+  it('promotes the next blocker before deferring the resolved blocker follow-ups', () => {
+    const firstSnapshot = createEventSnapshot({
+      id: 'evt_first_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'First blocker',
+      description: '',
+      category: 'governance',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [
+        {
+          id: 'continue',
+          label: '继续',
+          description: '',
+          effects: [],
+          schedule: [{ eventId: 'formal_investigation', delayDays: 0 }],
+        },
+      ],
+    });
+    const secondSnapshot = createEventSnapshot({
+      id: 'evt_second_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Second blocker',
+      description: '',
+      category: 'governance',
+      priority: 'high',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'resolve', label: '处理', description: '', effects: [] }],
+    });
+    const state = createStateWithPending({
+      eventId: firstSnapshot.eventId,
+      status: 'active',
+      snapshot: firstSnapshot,
+    });
+    state.events.activeBlockingEventId = 'inst_reducer_001';
+    state.events.pending.push({
+      instanceId: 'inst_second_blocker',
+      eventId: secondSnapshot.eventId,
+      status: 'pending',
+      triggeredAtDay: 100,
+      activatedAtDay: 100,
+      deadlineDay: null,
+      triggerContext: makeSignal(),
+      sourceKey: 'src_second_blocker',
+      chainInstanceId: null,
+      snapshot: secondSnapshot,
+    });
+
+    const store = createTestStore(state);
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_reducer_001',
+      optionId: 'continue',
+    });
+
+    const after = store.getRawState();
+    expect(after.events.activeBlockingEventId).toBe('inst_second_blocker');
+    expect(after.events.history.some((item) => item.eventId === 'formal_investigation')).toBe(
+      false,
+    );
+    expect(after.events.scheduled.some((item) => item.eventId === 'formal_investigation')).toBe(
+      true,
+    );
+    expect(
+      after.events.deferredSignals.some(
+        (item) => item.signalType === 'event.resolved' && item.data.eventId === 'evt_first_blocker',
+      ),
+    ).toBe(true);
+  });
+
   it('invalid option returns null (no state changes)', () => {
     const store = createTestStore(createStateWithPending());
     store.dispatch({
@@ -457,6 +535,54 @@ describe('event-reducer: cascade signals and scheduling', () => {
     expect(scheduledItem).toBeDefined();
     expect(scheduledItem!.sourceKey).toBe('src_schedule');
     expect(scheduledItem!.activateAtDay).toBe(110); // currentDay 100 + delayDays 10
+  });
+
+  it('cancellation observes the newly planned chain node and leaves it abandoned', () => {
+    const snapshot = createEventSnapshot({
+      id: 'evt_plan_then_cancel',
+      chainId: null,
+      nodeId: null,
+      title: 'Plan and cancel',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [
+        {
+          id: 'cancel_child',
+          label: '取消后续',
+          description: '',
+          effects: [],
+          schedule: [{ eventId: 'formal_investigation', delayDays: 2 }],
+          cancelScheduled: [{ eventId: 'formal_investigation', scope: 'all' }],
+        },
+      ],
+    });
+    const state = createStateWithPending({
+      eventId: snapshot.eventId,
+      snapshot,
+    });
+    const store = createTestStore(state);
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_reducer_001',
+      optionId: 'cancel_child',
+    });
+
+    const after = store.getRawState();
+    expect(after.events.scheduled.some((item) => item.eventId === 'formal_investigation')).toBe(
+      false,
+    );
+    expect(after.events.history.some((item) => item.eventId === 'formal_investigation')).toBe(true);
+    const chain = Object.values(after.events.chainInstances).find(
+      (item) => item.chainId === 'investigation_chain',
+    );
+    expect(chain?.activeNodeIds).toEqual([]);
+    expect(chain?.status).toBe('abandoned');
   });
 
   it('option with cancelScheduledEvents removes matching scheduled events', () => {
@@ -735,6 +861,74 @@ describe('event-reducer: cascade signals and scheduling', () => {
     expect(state.world.facts['should_not_apply']).toBeUndefined();
     expect(state.events.scheduled.map((instance) => instance.instanceId)).toEqual(['batch_1']);
     expect(state.events.scheduled[0]?.activateAtDay).toBe(1);
+  });
+
+  it('prioritizes a signal-created blocker over an alphabetically earlier automatic instance', () => {
+    const state = createInitialState();
+    const automatic: EventDefinition = {
+      id: 'a_automatic',
+      chainId: null,
+      nodeId: null,
+      title: 'Automatic',
+      description: '',
+      category: 'story',
+      priority: 'urgent',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [
+          {
+            target: 'world_fact',
+            factId: 'automatic_ran_before_blocker',
+            operation: 'set',
+            value: true,
+          },
+        ],
+      },
+    };
+    const blocker: EventDefinition = {
+      id: 'z_urgent_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Blocker',
+      description: '',
+      category: 'story',
+      priority: 'low',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'resolve', label: '处理', description: '', effects: [] }],
+    };
+    let id = 0;
+    const plan = processDomainSignal({
+      state,
+      signal: makeSignal(),
+      currentDay: 1,
+      definitions: [automatic, blocker],
+      rng: () => 0,
+      idFactory: () => `signal_order_${id++}`,
+    });
+
+    expect(plan.createdInstances.map((item) => item.eventId)).toEqual([
+      'z_urgent_blocker',
+      'a_automatic',
+    ]);
+    applyEventInstances(
+      state,
+      plan.createdInstances,
+      1,
+      () => 0,
+      () => 'generated',
+      [],
+    );
+
+    expect(state.events.activeBlockingEventId).toBe('signal_order_0');
+    expect(state.world.facts['automatic_ran_before_blocker']).toBeUndefined();
+    expect(state.events.scheduled.map((item) => item.eventId)).toContain('a_automatic');
   });
 
   it('processes zero-delay children before later siblings and pauses cascade signals at a blocker', () => {

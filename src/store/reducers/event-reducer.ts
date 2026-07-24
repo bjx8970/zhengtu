@@ -137,7 +137,15 @@ function reduceChooseEventOptionInternal(
     draft.events.cooldowns.push(plan.cooldownUpdate);
   }
 
-  // 4. 按作用域取消计划事件
+  // 4. 先落地完整 follow-up 计划，再执行取消。取消需要观察本次刚创建的
+  // 链节点和计划实例；反过来会被基于结算前状态生成的 chainUpdates 覆盖。
+  for (const chain of plan.chainUpdates) {
+    draft.events.chainInstances[chain.instanceId] = chain;
+  }
+  for (const sched of plan.scheduledInstances) {
+    draft.events.scheduled.push(sched);
+  }
+
   for (const cancellation of plan.cancellations) {
     cancelScheduledByScope(
       draft,
@@ -148,15 +156,7 @@ function reduceChooseEventOptionInternal(
     );
   }
 
-  // 5. 原子应用目标链更新，再添加调度事件
-  for (const chain of plan.chainUpdates) {
-    draft.events.chainInstances[chain.instanceId] = chain;
-  }
-  for (const sched of plan.scheduledInstances) {
-    draft.events.scheduled.push(sched);
-  }
-
-  // 6. 从 pending 移除
+  // 5. 从 pending 移除
   const pendingIndex = draft.events.pending.findIndex(
     (p) => p.instanceId === payload.eventInstanceId,
   );
@@ -164,25 +164,34 @@ function reduceChooseEventOptionInternal(
     draft.events.pending.splice(pendingIndex, 1);
   }
 
-  // 7. 构建并写入历史
+  // 6. 构建并写入历史
   const history: EventHistoryRecord = {
     ...plan.history,
     appliedEffects,
   };
   draft.events.history.push(history);
 
-  // 8. 零延迟后续在当前有界事务内直接激活/结算
-  const immediateResult = applyEventInstances(
-    draft,
-    plan.immediateInstances,
-    currentDay,
-    rng,
-    idFactory,
-    definitions,
-  );
-
-  // 9. 处理父事件和即时自动事件的级联信号
+  // 7. 移除当前 blocker 后立即提升下一项。若队列中仍有 blocker，当前
+  // 结算产生的即时后续和 resolved 信号都必须延后，不能绕过新的事务边界。
   advanceBlockingPointer(draft);
+  const nextBlockerActive = draft.events.activeBlockingEventId !== null;
+  let immediateResult: { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] };
+  if (nextBlockerActive) {
+    deferImmediateInstances(draft, plan.immediateInstances, currentDay);
+    immediateResult = { histories: [], cascadeSignals: [] };
+  } else {
+    immediateResult = applyEventInstances(
+      draft,
+      plan.immediateInstances,
+      currentDay,
+      rng,
+      idFactory,
+      definitions,
+    );
+  }
+
+  // 8. 处理父事件和即时自动事件的级联信号；processCascadeSignals 会在
+  // nextBlockerActive 时持久化该信号，等待 blocker 解除后恢复。
   processCascadeSignals(draft, plan.emittedSignals, currentDay, rng, idFactory, definitions);
   processCascadeSignals(
     draft,
