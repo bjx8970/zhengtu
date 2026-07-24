@@ -120,11 +120,7 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
   const scheduledInstances: ScheduledEventInstance[] = [];
   const chains = new Map<string, EventChainInstance>();
 
-  for (const schedule of input.schedules ?? []) {
-    if (schedule.probability != null && input.rng() >= schedule.probability) continue;
-    const definition = input.definitions.find((item) => item.id === schedule.eventId);
-    if (!definition) continue;
-
+  const eligibleSchedules = (input.schedules ?? []).filter((schedule) => {
     if (schedule.condition) {
       try {
         const matches = evaluateCondition(schedule.condition, {
@@ -133,11 +129,42 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
           currentDay: input.currentDay,
           daysPerYear: 360,
         });
-        if (!matches) continue;
+        if (!matches) return false;
       } catch {
-        continue;
+        return false;
       }
     }
+    return true;
+  });
+
+  const selectedSchedules: ScheduledFollowupDefinition[] = [];
+  const mutexGroups = new Map<string, ScheduledFollowupDefinition[]>();
+  for (const schedule of eligibleSchedules) {
+    if (!schedule.mutexGroup) {
+      if (schedule.probability == null || input.rng() < schedule.probability) {
+        selectedSchedules.push(schedule);
+      }
+      continue;
+    }
+    const group = mutexGroups.get(schedule.mutexGroup) ?? [];
+    group.push(schedule);
+    mutexGroups.set(schedule.mutexGroup, group);
+  }
+  for (const group of mutexGroups.values()) {
+    const totalWeight = group.reduce((sum, schedule) => sum + (schedule.probability ?? 1), 0);
+    let roll = input.rng() * totalWeight;
+    for (const schedule of group) {
+      roll -= schedule.probability ?? 1;
+      if (roll <= 0) {
+        selectedSchedules.push(schedule);
+        break;
+      }
+    }
+  }
+
+  for (const schedule of selectedSchedules) {
+    const definition = input.definitions.find((item) => item.id === schedule.eventId);
+    if (!definition) continue;
 
     const chain = definition.chainId
       ? findOrCreateTargetChain(input, definition.chainId, chains)

@@ -793,16 +793,11 @@ describe('event-reducer: cascade signals and scheduling', () => {
     );
   });
 
-  it('end-to-end cascade: investigation_start → event.resolved → cascade produces downstream', () => {
+  it('end-to-end cascade: cooperate only schedules its explicit investigation branch', () => {
     // Uses real config: investigation_start resolves with "cooperate" →
     // resolveSchedule creates scheduled formal_investigation →
-    // event.resolved cascade triggers processDomainSignal →
-    // suppress_investigation (trigger: event.resolved, no condition) is created as pending
-    // formal_investigation is blocked by once_per_chain (already scheduled with chain)
-    // investigation_cleared (auto) is created and auto-resolves → event.resolved → cascade round 2
-    //
-    // This verifies the full lifecycle: option → resolveSchedule → cascade →
-    // orchestrator → once_per_chain dedup → auto-event auto-resolve → secondary cascade
+    // event.resolved is still emitted for external content, but scheduled-only
+    // investigation nodes must not leak across to the suppress branch.
     const invSnapshot = createEventSnapshot({
       id: 'investigation_start',
       chainId: 'investigation_chain',
@@ -872,26 +867,22 @@ describe('event-reducer: cascade signals and scheduling', () => {
     expect(schedFormal).toBeDefined();
     expect(schedFormal!.activateAtDay).toBe(103); // currentDay=100 + delayDays=3
 
-    // 4. Cascade: event.resolved triggers suppress_investigation in orchestrator
-    // (suppress_investigation has trigger.sources=['event.resolved'], no condition)
+    // 4. Cascade does not enter the incompatible suppress branch.
     const suppressPending = after.events.pending.find(
       (p) => p.eventId === 'suppress_investigation',
     );
-    expect(suppressPending).toBeDefined();
-    expect(suppressPending!.triggerContext.signalType).toBe('event.resolved');
+    expect(suppressPending).toBeUndefined();
 
     // 5. Cascade dedup: formal_investigation is NOT in pending (scheduled exists,
     // once_per_chain with chain blocks duplicate creation)
     const formalPending = after.events.pending.filter((p) => p.eventId === 'formal_investigation');
     expect(formalPending).toHaveLength(0);
 
-    // 6. Auto-event cascade: investigation_cleared (auto, trigger: event.resolved)
-    // is created by cascade and auto-resolves, producing history
+    // 6. The other outcome is not created before formal_investigation is actually resolved.
     const clearedHistory = after.events.history.find(
       (h) => h.eventId === 'investigation_cleared' && h.instanceId !== 'inst_inv_start',
     );
-    expect(clearedHistory).toBeDefined();
-    expect(clearedHistory!.finalStatus).toBe('resolved');
+    expect(clearedHistory).toBeUndefined();
 
     // 7. processedSignalIds grows (cascade signals recorded)
     expect(after.events.processedSignalIds.length).toBeGreaterThan(0);
@@ -901,7 +892,7 @@ describe('event-reducer: cascade signals and scheduling', () => {
     const invChain = chainEntries.find((c) => c.chainId === 'investigation_chain');
     expect(invChain).toBeDefined();
     // noUncheckedIndexedAccess: verified invChain is defined above
-    // Chain has active nodes (auto-event "cleared" or "investigation") from cascade
+    // Chain has the explicitly scheduled investigation node, not unrelated descendants.
     const totalTrackedNodes = invChain!.activeNodeIds.length + invChain!.completedNodeIds.length;
     expect(totalTrackedNodes).toBeGreaterThanOrEqual(1);
   });

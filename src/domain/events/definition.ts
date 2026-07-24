@@ -64,6 +64,8 @@ export interface EventTriggerDefinition {
   weight?: number;
   /** 互斥组 ID（可选，非空） */
   mutexGroup?: string;
+  /** 仅由父事件显式 schedule 创建，不参与领域信号的通用匹配 */
+  scheduledOnly?: boolean;
 }
 
 // ===== 重复策略 =====
@@ -129,6 +131,8 @@ export interface ScheduledFollowupDefinition {
   probability?: number;
   /** 触发条件（可选） */
   condition?: import('../conditions').ConditionExpression;
+  /** 同组后续以 probability 为相对权重，只选择一个 */
+  mutexGroup?: string;
 }
 
 // ===== 事件选项 =====
@@ -230,6 +234,7 @@ const EventTriggerDefinitionSchema = z
     probability: z.number().min(0).max(1).optional(),
     weight: z.number().positive().optional(),
     mutexGroup: z.string().min(1).optional(),
+    scheduledOnly: z.boolean().optional(),
   })
   .strict();
 
@@ -269,6 +274,7 @@ const ScheduledFollowupDefinitionSchema: z.ZodType<ScheduledFollowupDefinition> 
       delayDays: z.number().int().nonnegative(),
       probability: z.number().min(0).max(1).optional(),
       condition: ConditionExpressionSchema.optional(),
+      mutexGroup: z.string().min(1).optional(),
     })
     .strict(),
 );

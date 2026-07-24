@@ -124,7 +124,8 @@
     "presentation": "automatic",
     "trigger": {
       "sources": ["event.resolved"],
-      "probability": 1
+      "probability": 1,
+      "scheduledOnly": true
     },
     "repeatPolicy": {
       "mode": "once_per_chain"
@@ -144,8 +145,18 @@
         { "target": "character", "field": "stability", "operation": "add", "value": -8 }
       ],
       "schedule": [
-        { "eventId": "investigation_confirmed", "delayDays": 2, "probability": 0.7 },
-        { "eventId": "investigation_cleared", "delayDays": 2, "probability": 0.3 }
+        {
+          "eventId": "investigation_confirmed",
+          "delayDays": 2,
+          "probability": 0.7,
+          "mutexGroup": "investigation_outcome"
+        },
+        {
+          "eventId": "investigation_cleared",
+          "delayDays": 2,
+          "probability": 0.3,
+          "mutexGroup": "investigation_outcome"
+        }
       ]
     }
   },
@@ -160,7 +171,8 @@
     "presentation": "inbox",
     "trigger": {
       "sources": ["event.resolved"],
-      "probability": 1
+      "probability": 1,
+      "scheduledOnly": true
     },
     "repeatPolicy": {
       "mode": "once_per_chain"
@@ -206,7 +218,8 @@
     "presentation": "automatic",
     "trigger": {
       "sources": ["event.resolved"],
-      "probability": 1
+      "probability": 1,
+      "scheduledOnly": true
     },
     "repeatPolicy": {
       "mode": "once_per_chain"
@@ -237,7 +250,8 @@
     "presentation": "inbox",
     "trigger": {
       "sources": ["event.resolved"],
-      "probability": 1
+      "probability": 1,
+      "scheduledOnly": true
     },
     "repeatPolicy": {
       "mode": "once_per_chain"
@@ -277,7 +291,8 @@
     "presentation": "automatic",
     "trigger": {
       "sources": ["event.resolved"],
-      "probability": 1
+      "probability": 1,
+      "scheduledOnly": true
     },
     "repeatPolicy": {
       "mode": "once_per_chain"

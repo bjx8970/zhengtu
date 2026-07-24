@@ -124,6 +124,75 @@ describe('event timeline integration', () => {
     expect(after.assessments.annualAssessments).toHaveLength(0);
   });
 
+  it('keeps later same-day scheduled events untouched after an urgent blocker', () => {
+    const state = createInitialState();
+    const blocker = createEventSnapshot({
+      id: 'same_day_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Blocker',
+      description: '',
+      category: 'emergency',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'ack', label: '处理', description: '', effects: [] }],
+    });
+    const automatic = createEventSnapshot({
+      id: 'same_day_automatic',
+      chainId: null,
+      nodeId: null,
+      title: 'Automatic',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [{ target: 'character', field: 'vigor', operation: 'add', value: 10 }],
+      },
+    });
+    state.events.scheduled.push(
+      {
+        instanceId: 'same_day_blocker_instance',
+        eventId: blocker.eventId,
+        scheduledAtDay: 0,
+        activateAtDay: 1,
+        triggerContext: makeSignal('same_day_blocker'),
+        sourceKey: 'same_day',
+        chainInstanceId: null,
+        snapshot: blocker,
+      },
+      {
+        instanceId: 'same_day_automatic_instance',
+        eventId: automatic.eventId,
+        scheduledAtDay: 0,
+        activateAtDay: 1,
+        triggerContext: makeSignal('same_day_automatic'),
+        sourceKey: 'same_day',
+        chainInstanceId: null,
+        snapshot: automatic,
+      },
+    );
+    const originalVigor = state.character.vigor;
+    const store = createTestStore(state);
+
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+    const after = store.getRawState();
+    expect(after.events.activeBlockingEventId).toBe('same_day_blocker_instance');
+    expect(after.events.scheduled.map((item) => item.instanceId)).toContain(
+      'same_day_automatic_instance',
+    );
+    expect(after.events.history.some((item) => item.eventId === 'same_day_automatic')).toBe(false);
+    expect(after.character.vigor).toBe(originalVigor);
+  });
+
   it('shares one monotonic ID factory across automatic follow-ups and secondary cascades', () => {
     const definition = getConfigLoader().getEventDefinition('formal_investigation')!;
     const state = createInitialState();
@@ -162,10 +231,14 @@ describe('event timeline integration', () => {
       (item) => item.instanceId === 'scheduled_automatic',
     );
     expect(formalHistory?.completedAtDay).toBe(5);
+    // Mutually exclusive conclusions are scheduled only after the real formal event resolves.
     expect(after.events.history.some((item) => item.eventId === 'investigation_cleared')).toBe(
+      false,
+    );
+    expect(after.events.pending.some((item) => item.eventId === 'investigation_confirmed')).toBe(
       true,
     );
-    expect(after.events.processedSignalIds.length).toBeGreaterThanOrEqual(2);
+    expect(after.events.processedSignalIds.length).toBeGreaterThanOrEqual(1);
 
     const generatedIds = [
       ...after.events.pending.map((item) => item.instanceId),

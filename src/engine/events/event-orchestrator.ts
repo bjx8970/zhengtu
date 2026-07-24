@@ -392,7 +392,7 @@ function resolveSingleSignal(
 
   // 按稳定 ID 排序候选
   const candidates = defs
-    .filter((d) => d.trigger.sources.includes(sig.signalType))
+    .filter((d) => !d.trigger.scheduledOnly && d.trigger.sources.includes(sig.signalType))
     .sort((a, b) => a.id.localeCompare(b.id));
 
   const mutexGroupCandidates = new Map<string, EventDefinition[]>();
@@ -493,6 +493,9 @@ function resolveSingleSignal(
       if (!ci.activeNodeIds.includes(def.nodeId ?? def.id)) {
         // 创建新数组避免修改共享引用
         ci.activeNodeIds = [...ci.activeNodeIds, def.nodeId ?? def.id];
+        // 终态链被后续信号重新推进时，必须恢复为活跃状态。
+        ci.status = 'active';
+        ci.completedAtDay = null;
       }
     }
 

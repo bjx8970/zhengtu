@@ -655,4 +655,45 @@ describe('resolveEventOption - 结算后后续语义', () => {
       expect(source?.status).toBe('completed');
     }
   });
+
+  it('selects exactly one weighted mutex follow-up at both RNG boundaries', () => {
+    const parent = makeEventDef({
+      id: 'evt_mutex_parent',
+      options: [
+        {
+          id: 'resolve',
+          label: '结算',
+          description: '',
+          effects: [],
+          schedule: [
+            { eventId: 'evt_confirmed', delayDays: 2, probability: 0.7, mutexGroup: 'outcome' },
+            { eventId: 'evt_cleared', delayDays: 2, probability: 0.3, mutexGroup: 'outcome' },
+          ],
+        },
+      ],
+    });
+    const confirmed = makeEventDef({ id: 'evt_confirmed' });
+    const cleared = makeEventDef({ id: 'evt_cleared' });
+    const resolveWith = (rng: () => number) => {
+      const instance = makeInstance(createEventSnapshot(parent), { eventId: parent.id });
+      return resolveEventOption({
+        state: makeStateWithPending(instance),
+        definitions: [parent, confirmed, cleared],
+        eventInstanceId: instance.instanceId,
+        optionId: 'resolve',
+        currentDay: 60,
+        rng,
+        idFactory: () => 'mutex_child',
+      });
+    };
+
+    const low = resolveWith(() => 0);
+    const high = resolveWith(() => 0.999);
+    expectSuccess(low);
+    expectSuccess(high);
+    if (low.success && high.success) {
+      expect(low.scheduledInstances.map((item) => item.eventId)).toEqual(['evt_confirmed']);
+      expect(high.scheduledInstances.map((item) => item.eventId)).toEqual(['evt_cleared']);
+    }
+  });
 });

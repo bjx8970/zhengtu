@@ -253,13 +253,21 @@ function activateEventsAtDay(
     rng,
     idFactory,
   );
-  const activatedIds = new Set(activation.activatedInstances.map((item) => item.instanceId));
+  // 同一批到期事件依序处理；首个新 blocking 事件暂停当天其余工作。
+  const blockerIndex = activation.activatedInstances.findIndex(
+    (item) => item.snapshot.presentation === 'blocking' && item.status === 'active',
+  );
+  const activatedInstances =
+    blockerIndex === -1
+      ? activation.activatedInstances
+      : activation.activatedInstances.slice(0, blockerIndex + 1);
+  const activatedIds = new Set(activatedInstances.map((item) => item.instanceId));
   draft.events.scheduled = draft.events.scheduled.filter(
     (item) => !activatedIds.has(item.instanceId),
   );
 
   // 防御旧存档：新版调度在创建时已物化目标链，旧数据在激活时补齐。
-  for (const instance of activation.activatedInstances) {
+  for (const instance of activatedInstances) {
     if (!instance.snapshot.chainId || instance.chainInstanceId) continue;
     const existing = Object.values(draft.events.chainInstances).find(
       (chain) =>
@@ -283,7 +291,7 @@ function activateEventsAtDay(
 
   const applied = applyEventInstances(
     draft,
-    activation.activatedInstances,
+    activatedInstances,
     currentDay,
     rng,
     idFactory,

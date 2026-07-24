@@ -967,9 +967,94 @@ describe('processDomainSignal - 链作用域隔离', () => {
     expect(result.createdInstances).toHaveLength(1);
     expect(result.updatedChainInstances[0]!.sourceKey).toBe('source_b');
   });
+
+  it('reopens a terminal chain when a direct signal registers a new node', () => {
+    const definition = makeEventDef({
+      id: 'evt_reopened_child',
+      chainId: 'chain_reopen',
+      nodeId: 'new_node',
+      trigger: { sources: ['event.resolved'] },
+      repeatPolicy: { mode: 'once_per_chain' },
+    });
+    const state = createInitialState();
+    state.events.chainInstances['terminal_chain'] = {
+      instanceId: 'terminal_chain',
+      chainId: 'chain_reopen',
+      status: 'failed',
+      sourceKey: 'source_reopen',
+      activeNodeIds: [],
+      completedNodeIds: ['old_node'],
+      startedAtDay: 1,
+      completedAtDay: 2,
+    };
+    state.events.history.push({
+      eventId: 'parent_reopen',
+      instanceId: 'parent_reopen_instance',
+      finalStatus: 'resolved',
+      triggeredAtDay: 10,
+      completedAtDay: 10,
+      sourceKey: 'source_reopen',
+      chainInstanceId: null,
+      titleSnapshot: 'parent',
+      chosenOptionId: null,
+      chosenOptionLabel: null,
+      appliedEffects: [],
+    });
+
+    const result = processDomainSignal({
+      state,
+      signal: {
+        signalId: 'signal_reopen',
+        signalType: 'event.resolved',
+        occurredAtDay: 10,
+        data: {
+          eventInstanceId: 'parent_reopen_instance',
+          eventId: 'parent_reopen',
+          optionId: null,
+          occurredAtDay: 10,
+        },
+      },
+      currentDay: 10,
+      definitions: [definition],
+      rng: () => 0,
+      idFactory: () => 'unused',
+    });
+
+    expect(result.createdInstances).toHaveLength(1);
+    expect(result.updatedChainInstances[0]).toMatchObject({
+      instanceId: 'terminal_chain',
+      status: 'active',
+      completedAtDay: null,
+      activeNodeIds: ['new_node'],
+    });
+  });
 });
 
 describe('processDomainSignal - 级联信号', () => {
+  it('ignores scheduled-only definitions during generic event.resolved dispatch', () => {
+    const definition = makeEventDef({
+      id: 'evt_scheduled_only',
+      trigger: { sources: ['event.resolved'], scheduledOnly: true },
+    });
+    const result = processDomainSignal(
+      makeInput({
+        definitions: [definition],
+        signal: {
+          signalId: 'scheduled_only_signal',
+          signalType: 'event.resolved',
+          occurredAtDay: 100,
+          data: {
+            eventInstanceId: 'parent',
+            eventId: 'parent_event',
+            optionId: 'cooperate',
+            occurredAtDay: 100,
+          },
+        },
+      }),
+    );
+    expect(result.createdInstances).toHaveLength(0);
+  });
+
   it('signal depth limit prevents infinite loops', () => {
     // Create a definition that triggers on event.resolved and itself produces an event.resolved
     // With an automatic event this could cascade
