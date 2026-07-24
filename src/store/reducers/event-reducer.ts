@@ -80,8 +80,8 @@ export function reduceChooseEventOption(
     signal,
     currentDay,
     attributeBounds: cfg.attributeBounds,
-    knownInstitutionIds: new Set<string>(),
-    knownRegionIds: new Set<string>(),
+    knownInstitutionIds: new Set(loader.getAllInstitutions().map((i) => i.id)),
+    knownRegionIds: new Set(loader.getRegions().provinces.map((p) => p.name)),
   };
 
   const result = applyEffects(draft, plan.effectsToApply, effectCtx);
@@ -176,8 +176,8 @@ export function handleAutoEventInstance(
     signal: instance.triggerContext,
     currentDay,
     attributeBounds: cfg.attributeBounds,
-    knownInstitutionIds: new Set<string>(),
-    knownRegionIds: new Set<string>(),
+    knownInstitutionIds: new Set(loader.getAllInstitutions().map((i) => i.id)),
+    knownRegionIds: new Set(loader.getRegions().provinces.map((p) => p.name)),
   };
 
   const result = applyEffects(draft, effects, effectCtx);
@@ -444,6 +444,10 @@ function processCascadeSignals(
 function advanceBlockingPointer(draft: PlayerSave): void {
   const nextBlocking = draft.events.pending.find((p) => p.snapshot.presentation === 'blocking');
   draft.events.activeBlockingEventId = nextBlocking?.instanceId ?? null;
+  // 将指针指向的 blocking 实例 status 提升为 active，维持"指针指向 = active"的不变量
+  if (nextBlocking && nextBlocking.status !== 'active') {
+    nextBlocking.status = 'active';
+  }
 }
 
 /**
