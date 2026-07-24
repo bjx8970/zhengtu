@@ -674,6 +674,246 @@ describe('event-reducer: cascade signals and scheduling', () => {
     expect(state.events.pending).toHaveLength(0);
   });
 
+  it('defers unconsumed immediate siblings when a blocker is activated', () => {
+    const state = createInitialState();
+    const blocking = createEventSnapshot({
+      id: 'evt_batch_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Batch blocker',
+      description: '',
+      category: 'story',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'resolve', label: '处理', description: '', effects: [] }],
+    });
+    const automatic = createEventSnapshot({
+      id: 'evt_batch_automatic',
+      chainId: null,
+      nodeId: null,
+      title: 'Batch automatic',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [
+          { target: 'world_fact', factId: 'should_not_apply', operation: 'set', value: true },
+        ],
+      },
+    });
+    const instances = [blocking, automatic].map((snapshot, index): EventInstance => ({
+      instanceId: `batch_${index}`,
+      eventId: snapshot.eventId,
+      status: 'pending',
+      triggeredAtDay: 1,
+      activatedAtDay: 1,
+      deadlineDay: null,
+      triggerContext: { ...makeSignal(), signalId: `batch_signal_${index}` },
+      sourceKey: 'batch_source',
+      chainInstanceId: null,
+      snapshot,
+    }));
+
+    applyEventInstances(
+      state,
+      instances,
+      1,
+      () => 0,
+      () => 'generated',
+      [],
+    );
+
+    expect(state.events.activeBlockingEventId).toBe('batch_0');
+    expect(state.world.facts['should_not_apply']).toBeUndefined();
+    expect(state.events.scheduled.map((instance) => instance.instanceId)).toEqual(['batch_1']);
+    expect(state.events.scheduled[0]?.activateAtDay).toBe(1);
+  });
+
+  it('processes zero-delay children before later siblings and pauses cascade signals at a blocker', () => {
+    const state = createInitialState();
+    const automaticParent = createEventSnapshot({
+      id: 'evt_auto_parent',
+      chainId: null,
+      nodeId: null,
+      title: 'Auto parent',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: { effects: [], schedule: [{ eventId: 'evt_child_blocker', delayDays: 0 }] },
+    });
+    const siblingAutomatic = createEventSnapshot({
+      id: 'evt_late_sibling',
+      chainId: null,
+      nodeId: null,
+      title: 'Late sibling',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [
+          { target: 'world_fact', factId: 'late_sibling_ran', operation: 'set', value: true },
+        ],
+      },
+    });
+    const childDefinition: EventDefinition = {
+      id: 'evt_child_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Child blocker',
+      description: '',
+      category: 'story',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: { sources: ['event.resolved'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'resolve', label: '处理', description: '', effects: [] }],
+    };
+    const instances = [automaticParent, siblingAutomatic].map((snapshot, index): EventInstance => ({
+      instanceId: `causal_${index}`,
+      eventId: snapshot.eventId,
+      status: 'pending',
+      triggeredAtDay: 1,
+      activatedAtDay: 1,
+      deadlineDay: null,
+      triggerContext: { ...makeSignal(), signalId: `causal_signal_${index}` },
+      sourceKey: 'causal_source',
+      chainInstanceId: null,
+      snapshot,
+    }));
+
+    const result = applyEventInstances(
+      state,
+      instances,
+      1,
+      () => 0,
+      (() => {
+        let index = 0;
+        return () => `causal_generated_${index++}`;
+      })(),
+      [childDefinition],
+    );
+    processCascadeSignals(
+      state,
+      result.cascadeSignals,
+      1,
+      () => 0,
+      () => 'cascade',
+      [],
+    );
+
+    expect(state.events.activeBlockingEventId).toBe('causal_generated_1');
+    expect(state.world.facts['late_sibling_ran']).toBeUndefined();
+    expect(state.events.scheduled.map((instance) => instance.instanceId)).toContain('causal_1');
+    expect(state.events.deferredSignals.map((signal) => signal.signalId)).toContain(
+      'causal_generated_0',
+    );
+  });
+
+  it('defers later cascade signals after an earlier signal activates a blocker', () => {
+    const state = createInitialState();
+    const blocker: EventDefinition = {
+      id: 'evt_cascade_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Cascade blocker',
+      description: '',
+      category: 'story',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: {
+        sources: ['world.metric_changed'],
+        condition: { signalField: 'metricId', op: 'eq', value: 'block' },
+      },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'resolve', label: '处理', description: '', effects: [] }],
+    };
+    const automatic: EventDefinition = {
+      id: 'evt_cascade_automatic',
+      chainId: null,
+      nodeId: null,
+      title: 'Cascade automatic',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: {
+        sources: ['world.metric_changed'],
+        condition: { signalField: 'metricId', op: 'eq', value: 'after_block' },
+      },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [
+          { target: 'world_fact', factId: 'cascade_after_block', operation: 'set', value: true },
+        ],
+      },
+    };
+    const signals: DomainSignalSnapshot[] = [
+      {
+        signalId: 'cascade_block_signal',
+        signalType: 'world.metric_changed',
+        occurredAtDay: 1,
+        data: { metricId: 'block', value: 1 },
+      },
+      {
+        signalId: 'cascade_after_signal',
+        signalType: 'world.metric_changed',
+        occurredAtDay: 1,
+        data: { metricId: 'after_block', value: 1 },
+      },
+    ];
+
+    processCascadeSignals(
+      state,
+      signals,
+      1,
+      () => 0,
+      () => 'cascade_id',
+      [blocker, automatic],
+    );
+
+    expect(state.events.activeBlockingEventId).toBe('cascade_id');
+    expect(state.world.facts['cascade_after_block']).toBeUndefined();
+    expect(state.events.deferredSignals.map((signal) => signal.signalId)).toEqual([
+      'cascade_after_signal',
+    ]);
+
+    state.events.pending = [];
+    state.events.activeBlockingEventId = null;
+    processCascadeSignals(
+      state,
+      [],
+      1,
+      () => 0,
+      () => 'resumed_id',
+      [blocker, automatic],
+    );
+
+    expect(state.events.deferredSignals).toHaveLength(0);
+    expect(state.world.facts['cascade_after_block']).toBe(true);
+  });
+
   it('cascade-depth budget fails atomically instead of dropping remaining signals', () => {
     const state = createInitialState();
     const endlessAutomatic: EventDefinition = {

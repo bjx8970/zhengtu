@@ -115,4 +115,6 @@ export interface EventRuntimeState {
   chainInstances: Record<string, EventChainInstance>;
   /** 已处理信号 ID 集合（防重入），SignalId → completedAtDay */
   processedSignalIds: string[];
+  /** 因 blocking 事件暂停而尚未处理的级联信号，解除阻塞后按原顺序恢复。 */
+  deferredSignals: DomainSignalSnapshot[];
 }

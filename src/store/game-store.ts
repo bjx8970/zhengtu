@@ -70,6 +70,7 @@ function createDefaultEventRuntimeState(): EventRuntimeState {
     cooldowns: [],
     chainInstances: {},
     processedSignalIds: [],
+    deferredSignals: [],
   };
 }
 

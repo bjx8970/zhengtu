@@ -319,6 +319,7 @@ function reduceAdvanceTimeInternal(draft: PlayerSave, payload: AdvanceTimePayloa
   const notifications: CompletedActionNotification[] = [];
   const rng = payload._rng ?? Math.random;
   const idFactory = payload._idFactory ?? createRuntimeIdFactory('timeline-event');
+  const definitions = getConfigLoader().getAllEventDefinitions();
 
   // 已有 blocker 时不得借由第二次推进激活同日剩余计划事件。先处理
   // 当前日的合法过期收尾，若 blocker 仍存在则原地返回。
@@ -326,6 +327,15 @@ function reduceAdvanceTimeInternal(draft: PlayerSave, payload: AdvanceTimePayloa
   if (draft.events.activeBlockingEventId !== null) {
     draft.time.granularity = payload.granularity;
     return;
+  }
+
+  // 上一次事件事务可能因 blocker 留下未消费的级联信号；在处理新的计划事件前先恢复原队列。
+  if (draft.events.deferredSignals.length > 0) {
+    processCascadeSignals(draft, [], draft.time.totalDaysPlayed, rng, idFactory, definitions);
+    if (draft.events.activeBlockingEventId !== null) {
+      draft.time.granularity = payload.granularity;
+      return;
+    }
   }
 
   // 先处理当前日已经到期的计划/过期事件；新 blocker 同样会暂停时间。

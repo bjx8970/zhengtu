@@ -303,6 +303,8 @@ const EventRuntimeStateSchema = z
         .strict(),
     ),
     processedSignalIds: z.array(z.string()),
+    // 此字段在 Schema 4 已存在的存档中缺失时安全默认为空；其余未知字段仍由 strict() 拒绝。
+    deferredSignals: z.array(DomainSignalSnapshotSchema).default([]),
   })
   .strict();
 
@@ -612,6 +614,10 @@ export function migrateSchema3To4(raw: Record<string, unknown>): Record<string, 
     // Schema 4 新增字段：已处理信号 ID
     if (!events.processedSignalIds) {
       (events as Record<string, unknown>).processedSignalIds = [];
+    }
+
+    if (!events.deferredSignals) {
+      (events as Record<string, unknown>).deferredSignals = [];
     }
 
     // 迁移 pending/scheduled/history 中的事件实例

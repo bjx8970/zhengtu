@@ -383,14 +383,50 @@ function applyEventInstancesInternal(
       );
       histories.push(settled.history);
       cascadeSignals.push(...settled.cascadeSignals);
-      queue.push(...settled.immediateInstances);
+      // 先处理自动事件的零延迟后续，才能保证它产生的 blocker 会中断尚未消费的兄弟实例。
+      queue.splice(index + 1, 0, ...settled.immediateInstances);
     } else {
       draft.events.pending.push(instance);
+      if (instance.snapshot.presentation === 'blocking') {
+        advanceBlockingPointer(draft);
+        deferImmediateInstances(draft, queue.slice(index + 1), currentDay);
+        break;
+      }
     }
   }
 
   advanceBlockingPointer(draft);
   return { histories, cascadeSignals };
+}
+
+/**
+ * 将因 blocker 暂停的即时实例转为当前日计划项，保留完整快照与来源，等待解除阻塞后恢复。
+ *
+ * @param draft 游戏状态草稿
+ * @param instances 尚未消费的实例
+ * @param currentDay 当前绝对游戏日
+ * @returns void
+ */
+function deferImmediateInstances(
+  draft: PlayerSave,
+  instances: readonly EventInstance[],
+  currentDay: number,
+): void {
+  for (const instance of instances) {
+    if (draft.events.scheduled.some((scheduled) => scheduled.instanceId === instance.instanceId)) {
+      continue;
+    }
+    draft.events.scheduled.push({
+      instanceId: instance.instanceId,
+      eventId: instance.eventId,
+      scheduledAtDay: currentDay,
+      activateAtDay: currentDay,
+      triggerContext: instance.triggerContext,
+      sourceKey: instance.sourceKey,
+      chainInstanceId: instance.chainInstanceId,
+      snapshot: instance.snapshot,
+    });
+  }
 }
 
 /**
@@ -492,12 +528,37 @@ function processCascadeSignalsInternal(
   definitions: readonly EventDefinition[],
 ): void {
   const maxCascadeIterations = 16;
-  let queue = signals;
+  const pendingSignalIds = new Set(draft.events.deferredSignals.map((signal) => signal.signalId));
+  const queue = [
+    ...draft.events.deferredSignals,
+    ...signals.filter((signal) => !pendingSignalIds.has(signal.signalId)),
+  ];
+  draft.events.deferredSignals = [];
 
-  for (let i = 0; i < maxCascadeIterations && queue.length > 0; i++) {
+  const deferSignals = (remaining: readonly DomainSignalSnapshot[]): void => {
+    const known = new Set(draft.events.deferredSignals.map((signal) => signal.signalId));
+    for (const signal of remaining) {
+      if (
+        !draft.events.processedSignalIds.includes(signal.signalId) &&
+        !known.has(signal.signalId)
+      ) {
+        draft.events.deferredSignals.push(signal);
+        known.add(signal.signalId);
+      }
+    }
+  };
+
+  if (draft.events.activeBlockingEventId !== null) {
+    deferSignals(queue);
+    return;
+  }
+
+  let currentQueue = queue;
+  for (let i = 0; i < maxCascadeIterations && currentQueue.length > 0; i++) {
     const nextSignals: DomainSignalSnapshot[] = [];
 
-    for (const sig of queue) {
+    for (let index = 0; index < currentQueue.length; index++) {
+      const sig = currentQueue[index]!;
       if (draft.events.processedSignalIds.includes(sig.signalId)) {
         continue;
       }
@@ -520,12 +581,16 @@ function processCascadeSignalsInternal(
         definitions,
       );
       nextSignals.push(...cascadeSignals);
+      if (draft.events.activeBlockingEventId !== null) {
+        deferSignals([...nextSignals, ...currentQueue.slice(index + 1)]);
+        return;
+      }
     }
 
-    queue = nextSignals;
+    currentQueue = nextSignals;
   }
 
-  if (queue.length > 0) {
+  if (currentQueue.length > 0) {
     throw new Error(
       `Cascade depth exceeded (${maxCascadeIterations}); transaction was not committed`,
     );

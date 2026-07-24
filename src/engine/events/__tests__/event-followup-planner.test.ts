@@ -66,6 +66,7 @@ function plan(
   target = definition({}),
   schedules: ScheduledFollowupDefinition[] = [{ eventId: 'target', delayDays: 1 }],
   definitions: readonly EventDefinition[] = [target],
+  rng: () => number = () => 0,
 ) {
   let nextId = 0;
   return planEventFollowups({
@@ -75,7 +76,7 @@ function plan(
     state,
     currentDay: 10,
     definitions,
-    rng: () => 0,
+    rng,
     idFactory: () => `generated_${nextId++}`,
   });
 }
@@ -176,5 +177,30 @@ describe('planEventFollowups', () => {
 
     expect(result.immediateInstances.map((item) => item.eventId)).toEqual(['positive']);
     expect(allZero.immediateInstances).toHaveLength(0);
+  });
+
+  it('selects an eligible mutex schedule when the higher-weight sibling is cooling down', () => {
+    const state = createInitialState();
+    state.events.cooldowns.push({
+      eventId: 'cooling_down',
+      scope: 'global',
+      scopeId: null,
+      untilDay: 20,
+    });
+    const coolingDown = definition({ id: 'cooling_down' });
+    const eligible = definition({ id: 'eligible' });
+
+    const result = plan(
+      state,
+      coolingDown,
+      [
+        { eventId: 'cooling_down', delayDays: 0, probability: 0.9, mutexGroup: 'outcome' },
+        { eventId: 'eligible', delayDays: 0, probability: 0.1, mutexGroup: 'outcome' },
+      ],
+      [coolingDown, eligible],
+      () => 0,
+    );
+
+    expect(result.immediateInstances.map((instance) => instance.eventId)).toEqual(['eligible']);
   });
 });

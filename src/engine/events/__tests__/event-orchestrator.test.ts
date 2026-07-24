@@ -1053,6 +1053,8 @@ describe('processDomainSignal - 链作用域隔离', () => {
       status: 'active',
       completedAtDay: null,
       activeNodeIds: ['new_node'],
+      // 重新激活不是创建新链；保留已完成节点才能继续履行 once_per_chain。
+      completedNodeIds: ['old_node'],
     });
   });
 });

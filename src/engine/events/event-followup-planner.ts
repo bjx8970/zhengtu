@@ -155,7 +155,31 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
         return false;
       }
     }
-    return true;
+    const definition = input.definitions.find((item) => item.id === schedule.eventId);
+    if (!definition) return false;
+    const existingChain = definition.chainId
+      ? findExistingTargetChain(input, definition.chainId, chains)
+      : null;
+    if (
+      isEventRepeatBlocked(
+        input.state,
+        definition,
+        input.parentInstance.sourceKey,
+        [],
+        existingChain,
+      )
+    ) {
+      return false;
+    }
+    return (
+      findEventCooldownEndDay(
+        input.state.events.cooldowns,
+        definition,
+        input.parentInstance.sourceKey,
+        existingChain?.instanceId ?? null,
+        input.currentDay,
+      ) === null
+    );
   });
 
   const selectedSchedules: ScheduledFollowupDefinition[] = [];
