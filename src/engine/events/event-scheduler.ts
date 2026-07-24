@@ -139,12 +139,13 @@ export function expireEventInstances(
         const activeNodeIds = ci.activeNodeIds.filter(
           (nodeId) => nodeId !== (inst.snapshot.nodeId ?? inst.eventId),
         );
-        const completed = activeNodeIds.length === 0;
+        // expired 是失败终态，不能把未处理节点误报为成功完成。
+        const terminal = activeNodeIds.length === 0;
         chains.set(ci.instanceId, {
           ...ci,
           activeNodeIds,
-          status: completed ? 'completed' : 'active',
-          completedAtDay: completed ? currentDay : null,
+          status: terminal ? 'failed' : 'active',
+          completedAtDay: terminal ? currentDay : null,
         });
       }
     }

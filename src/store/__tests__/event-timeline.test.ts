@@ -64,6 +64,66 @@ describe('event timeline integration', () => {
     ).toBe('active');
   });
 
+  it('activates a year-end blocker before monthly settlement and annual assessment', () => {
+    const loader = getConfigLoader();
+    const config = loader.getGameConfig();
+    const state = createInitialState();
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.baseConsumption * item.consumptionCoefficient > 0);
+    expect(department).toBeDefined();
+    if (!department) return;
+
+    state.time = {
+      year: config.startYear,
+      month: config.monthsPerYear,
+      day: config.daysPerMonth,
+      granularity: 'day',
+      totalDaysPlayed: config.monthsPerYear * config.daysPerMonth - 1,
+    };
+    state.remainingBudget = 10_000;
+    state.actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+    const snapshot = createEventSnapshot({
+      id: 'year_end_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Year-end blocker',
+      description: '',
+      category: 'emergency',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'ack', label: '处理', description: '', effects: [] }],
+    });
+    state.events.scheduled.push({
+      instanceId: 'year_end_blocker_instance',
+      eventId: snapshot.eventId,
+      scheduledAtDay: state.time.totalDaysPlayed - 1,
+      activateAtDay: state.time.totalDaysPlayed + 1,
+      triggerContext: makeSignal('year_end_blocker_signal'),
+      sourceKey: 'year_end_source',
+      chainInstanceId: null,
+      snapshot,
+    });
+    const store = createTestStore(state);
+
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+    const after = store.getRawState();
+    expect(after.events.activeBlockingEventId).toBe('year_end_blocker_instance');
+    expect(after.remainingBudget).toBe(10_000);
+    expect(after.assessments.annualAssessments).toHaveLength(0);
+  });
+
   it('shares one monotonic ID factory across automatic follow-ups and secondary cascades', () => {
     const definition = getConfigLoader().getEventDefinition('formal_investigation')!;
     const state = createInitialState();

@@ -10,7 +10,11 @@
 
 import type { PlayerSave } from '../../types/player';
 import { unwrap } from 'solid-js/store';
-import type { EventInstance, EventHistoryRecord } from '../../domain/events/state';
+import type {
+  EventChainInstance,
+  EventInstance,
+  EventHistoryRecord,
+} from '../../domain/events/state';
 import type { ScheduledEventCancellation } from '../../domain/events/types';
 import type { EventDefinition } from '../../domain/events/definition';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
@@ -54,6 +58,18 @@ function createEffectContext(signal: DomainSignalSnapshot, currentDay: number) {
  * @returns 历史记录（null 表示失败）
  */
 export function reduceChooseEventOption(
+  draft: PlayerSave,
+  payload: ChooseEventOptionPayload,
+  currentDay: number,
+): EventHistoryRecord | null {
+  // 级联预算失败时不能留下半个已结算事件：整次选择在副本上规划并提交。
+  const transaction = structuredClone(unwrap(draft));
+  const history = reduceChooseEventOptionInternal(transaction, payload, currentDay);
+  if (history) Object.assign(draft, transaction);
+  return history;
+}
+
+function reduceChooseEventOptionInternal(
   draft: PlayerSave,
   payload: ChooseEventOptionPayload,
   currentDay: number,
@@ -322,12 +338,39 @@ export function applyEventInstances(
   idFactory: () => string,
   definitions: readonly EventDefinition[],
 ): { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] } {
+  // 即时自动链超过预算时，调用方必须能回滚整个批次，而不能丢弃尾部实例。
+  const transaction = structuredClone(unwrap(draft));
+  const result = applyEventInstancesInternal(
+    transaction,
+    instances,
+    currentDay,
+    rng,
+    idFactory,
+    definitions,
+  );
+  Object.assign(draft, transaction);
+  return result;
+}
+
+function applyEventInstancesInternal(
+  draft: PlayerSave,
+  instances: readonly EventInstance[],
+  currentDay: number,
+  rng: () => number,
+  idFactory: () => string,
+  definitions: readonly EventDefinition[],
+): { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] } {
   const histories: EventHistoryRecord[] = [];
   const cascadeSignals: DomainSignalSnapshot[] = [];
   const queue = [...instances];
   const maxImmediateInstances = 100;
 
-  for (let index = 0; index < queue.length && index < maxImmediateInstances; index++) {
+  for (let index = 0; index < queue.length; index++) {
+    if (index >= maxImmediateInstances) {
+      throw new Error(
+        `Immediate event budget exceeded (${maxImmediateInstances}); transaction was not committed`,
+      );
+    }
     const instance = queue[index]!;
     if (instance.snapshot.presentation === 'automatic') {
       const settled = handleAutoEventInstance(
@@ -434,10 +477,24 @@ export function processCascadeSignals(
   idFactory: () => string,
   definitions: readonly EventDefinition[],
 ): void {
-  const MAX_CASCADE_ITERATIONS = 5;
+  // 让超限的级联保持原子性；成功时才替换调用方草稿。
+  const transaction = structuredClone(unwrap(draft));
+  processCascadeSignalsInternal(transaction, signals, currentDay, rng, idFactory, definitions);
+  Object.assign(draft, transaction);
+}
+
+function processCascadeSignalsInternal(
+  draft: PlayerSave,
+  signals: DomainSignalSnapshot[],
+  currentDay: number,
+  rng: () => number,
+  idFactory: () => string,
+  definitions: readonly EventDefinition[],
+): void {
+  const maxCascadeIterations = 16;
   let queue = signals;
 
-  for (let i = 0; i < MAX_CASCADE_ITERATIONS && queue.length > 0; i++) {
+  for (let i = 0; i < maxCascadeIterations && queue.length > 0; i++) {
     const nextSignals: DomainSignalSnapshot[] = [];
 
     for (const sig of queue) {
@@ -466,6 +523,12 @@ export function processCascadeSignals(
     }
 
     queue = nextSignals;
+  }
+
+  if (queue.length > 0) {
+    throw new Error(
+      `Cascade depth exceeded (${maxCascadeIterations}); transaction was not committed`,
+    );
   }
 }
 
@@ -497,29 +560,66 @@ export function advanceBlockingPointer(draft: PlayerSave): void {
  * @param cancellation 取消规范
  * @param sourceKey 当前事件实例的来源键
  * @param chainInstanceId 当前事件实例的链实例 ID
- * @param _currentDay 当前绝对游戏日（保留参数）
+ * @param currentDay 当前绝对游戏日
  */
 export function cancelScheduledByScope(
   draft: PlayerSave,
   cancellation: ScheduledEventCancellation,
   sourceKey: string,
   chainInstanceId: string | null,
-  _currentDay: number,
+  currentDay: number,
 ): void {
   const { eventId, scope } = cancellation;
-
-  draft.events.scheduled = draft.events.scheduled.filter((s) => {
-    if (s.eventId !== eventId) return true;
-
+  const matchesScope = (scheduled: (typeof draft.events.scheduled)[number]): boolean => {
+    if (scheduled.eventId !== eventId) return false;
     switch (scope) {
+      // 无链父事件没有可比较的“同链”范围，不能误伤全部无链计划事件。
       case 'same_chain':
-        return s.chainInstanceId !== chainInstanceId;
+        return chainInstanceId !== null && scheduled.chainInstanceId === chainInstanceId;
       case 'same_source':
-        return s.sourceKey !== sourceKey;
+        return scheduled.sourceKey === sourceKey;
       case 'all':
-        return false;
-      default:
         return true;
     }
-  });
+  };
+  const cancelled = draft.events.scheduled.filter(matchesScope);
+  if (cancelled.length === 0) return;
+  draft.events.scheduled = draft.events.scheduled.filter((scheduled) => !matchesScope(scheduled));
+
+  const chains = new Map<string, EventChainInstance>();
+  for (const scheduled of cancelled) {
+    draft.events.history.push({
+      eventId: scheduled.eventId,
+      instanceId: scheduled.instanceId,
+      finalStatus: 'cancelled',
+      triggeredAtDay: scheduled.scheduledAtDay,
+      completedAtDay: currentDay,
+      sourceKey: scheduled.sourceKey,
+      chainInstanceId: scheduled.chainInstanceId,
+      titleSnapshot: scheduled.snapshot.title,
+      chosenOptionId: null,
+      chosenOptionLabel: null,
+      appliedEffects: [],
+    });
+    if (!scheduled.chainInstanceId) continue;
+    const persisted =
+      chains.get(scheduled.chainInstanceId) ??
+      draft.events.chainInstances[scheduled.chainInstanceId];
+    if (!persisted) continue;
+    const chain = chains.get(persisted.instanceId) ?? {
+      ...persisted,
+      activeNodeIds: [...persisted.activeNodeIds],
+      completedNodeIds: [...persisted.completedNodeIds],
+    };
+    const nodeId = scheduled.snapshot.nodeId ?? scheduled.eventId;
+    chain.activeNodeIds = chain.activeNodeIds.filter((id) => id !== nodeId);
+    if (chain.activeNodeIds.length === 0) {
+      chain.status = 'abandoned';
+      chain.completedAtDay = currentDay;
+    }
+    chains.set(chain.instanceId, chain);
+  }
+  for (const chain of chains.values()) {
+    draft.events.chainInstances[chain.instanceId] = chain;
+  }
 }

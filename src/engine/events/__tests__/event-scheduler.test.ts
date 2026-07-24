@@ -438,6 +438,38 @@ describe('expireEventInstances', () => {
     expect(result.chainsToUpdate[0]!.activeNodeIds).toEqual(['other_node']);
   });
 
+  it('last expired chain node marks the chain failed rather than completed', () => {
+    const state: PlayerSave = {
+      ...createInitialState(),
+      events: {
+        ...createInitialState().events,
+        pending: [
+          makePendingInstance('p_chain_terminal', 'evt_chain_terminal', 50, {
+            chainInstanceId: 'ci_terminal',
+            eventId: 'evt_chain_terminal',
+          }),
+        ],
+        chainInstances: {
+          ci_terminal: {
+            instanceId: 'ci_terminal',
+            chainId: 'chain_terminal',
+            status: 'active',
+            sourceKey: 'test_key',
+            activeNodeIds: ['evt_chain_terminal'],
+            completedNodeIds: [],
+            startedAtDay: 30,
+            completedAtDay: null,
+          },
+        },
+      },
+    };
+
+    const result = expireEventInstances(state, 60);
+    expect(result.chainsToUpdate[0]?.status).toBe('failed');
+    expect(result.chainsToUpdate[0]?.completedAtDay).toBe(60);
+    expect(result.chainsToUpdate[0]?.completedNodeIds).toEqual([]);
+  });
+
   it('empty pending returns empty result', () => {
     const state = createInitialState();
     const result = expireEventInstances(state, 100);

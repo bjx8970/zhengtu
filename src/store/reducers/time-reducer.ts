@@ -8,6 +8,7 @@
  */
 
 import type { PlayerSave, CompletedActionNotification } from '../../types/player';
+import { unwrap } from 'solid-js/store';
 import type { ActionCompletionTimelineEvent } from '../../types/game';
 import type { AdvanceTimePayload } from '../../types/actions';
 import { getGranularityDays } from '../../engine/core/time';
@@ -298,6 +299,13 @@ function activateEventsAtDay(
  * @param payload 动作参数
  */
 export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload): void {
+  // 时间推进可触发多层自动事件；预算失败时保留推进前的完整状态。
+  const transaction = structuredClone(unwrap(draft));
+  reduceAdvanceTimeInternal(transaction, payload);
+  Object.assign(draft, transaction);
+}
+
+function reduceAdvanceTimeInternal(draft: PlayerSave, payload: AdvanceTimePayload): void {
   const cfg = getConfigLoader().getGameConfig();
   const days = getGranularityDays(payload.granularity, cfg);
   const notifications: CompletedActionNotification[] = [];
@@ -318,7 +326,21 @@ export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload
       cfg,
     );
 
+    // 先落到当天的时间坐标，计划事件与同日 timeline 节点使用同一个绝对日。
+    draft.time.year = daily.newTime.year;
+    draft.time.month = daily.newTime.month;
+    draft.time.day = daily.newTime.day;
+    draft.time.totalDaysPlayed = daily.newAbsoluteDay;
+
+    let scheduledProcessed = false;
     for (const event of daily.events) {
+      // 行动完成仍保持最高优先级；计划事件是正式同日节点，必须早于月结/年考。
+      if (!scheduledProcessed && event.type !== 'action_completion') {
+        activateEventsAtDay(draft, daily.newAbsoluteDay, rng, idFactory);
+        expireEventsAtDay(draft, daily.newAbsoluteDay);
+        scheduledProcessed = true;
+        if (draft.events.activeBlockingEventId !== null) break;
+      }
       switch (event.type) {
         case 'action_completion':
           processActionCompletion(draft, event, rng, notifications);
@@ -332,15 +354,14 @@ export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload
         default:
           break;
       }
+      if (draft.events.activeBlockingEventId !== null) break;
     }
 
-    draft.time.year = daily.newTime.year;
-    draft.time.month = daily.newTime.month;
-    draft.time.day = daily.newTime.day;
-    draft.time.totalDaysPlayed = daily.newAbsoluteDay;
-
-    activateEventsAtDay(draft, daily.newAbsoluteDay, rng, idFactory);
-    expireEventsAtDay(draft, daily.newAbsoluteDay);
+    // 没有周期节点的普通日也需要激活到期事件。
+    if (!scheduledProcessed && draft.events.activeBlockingEventId === null) {
+      activateEventsAtDay(draft, daily.newAbsoluteDay, rng, idFactory);
+      expireEventsAtDay(draft, daily.newAbsoluteDay);
+    }
   }
   draft.time.granularity = payload.granularity;
 

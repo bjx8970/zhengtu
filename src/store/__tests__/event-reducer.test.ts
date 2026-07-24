@@ -9,7 +9,14 @@ import { createTestStore, createInitialState } from '../game-store';
 import { createEventSnapshot } from '../../engine/events/event-orchestrator';
 import type { PlayerSave } from '../../types/player';
 import type { EventInstance } from '../../domain/events/state';
+import type { EventDefinition } from '../../domain/events/definition';
+import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import { getConfigLoader } from '../../config/loader';
+import {
+  applyEventInstances,
+  cancelScheduledByScope,
+  processCascadeSignals,
+} from '../reducers/event-reducer';
 
 function makeSignal() {
   return {
@@ -528,6 +535,183 @@ describe('event-reducer: cascade signals and scheduling', () => {
     const state = store.getRawState();
     // The scheduled flood_emergency with same sourceKey should be removed
     expect(state.events.scheduled.find((s) => s.instanceId === 'sched_to_cancel')).toBeUndefined();
+    expect(state.events.history.find((h) => h.instanceId === 'sched_to_cancel')?.finalStatus).toBe(
+      'cancelled',
+    );
+  });
+
+  it('cancelling a scheduled chain node closes it as abandoned', () => {
+    const state = createInitialState();
+    const snapshot = createEventSnapshot({
+      id: 'evt_cancelled_node',
+      chainId: 'cancel_chain',
+      nodeId: 'cancelled_node',
+      title: 'Cancelled node',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once_per_chain' },
+      activation: {},
+      options: [{ id: 'ack', label: '确认', description: '', effects: [] }],
+    });
+    state.events.scheduled.push({
+      instanceId: 'scheduled_cancelled_node',
+      eventId: snapshot.eventId,
+      scheduledAtDay: 10,
+      activateAtDay: 20,
+      triggerContext: makeSignal(),
+      sourceKey: 'cancel_source',
+      chainInstanceId: 'cancel_chain_instance',
+      snapshot,
+    });
+    state.events.chainInstances['cancel_chain_instance'] = {
+      instanceId: 'cancel_chain_instance',
+      chainId: 'cancel_chain',
+      status: 'active',
+      sourceKey: 'cancel_source',
+      activeNodeIds: ['cancelled_node'],
+      completedNodeIds: [],
+      startedAtDay: 10,
+      completedAtDay: null,
+    };
+
+    cancelScheduledByScope(
+      state,
+      { eventId: 'evt_cancelled_node', scope: 'same_chain' },
+      'cancel_source',
+      'cancel_chain_instance',
+      15,
+    );
+
+    expect(state.events.scheduled).toHaveLength(0);
+    expect(
+      state.events.history.find((h) => h.instanceId === 'scheduled_cancelled_node')?.finalStatus,
+    ).toBe('cancelled');
+    expect(state.events.chainInstances['cancel_chain_instance']?.status).toBe('abandoned');
+    expect(state.events.chainInstances['cancel_chain_instance']?.completedAtDay).toBe(15);
+  });
+
+  it('same_chain cancellation without a chain scope leaves unchained events intact', () => {
+    const state = createInitialState();
+    const snapshot = createEventSnapshot({
+      id: 'evt_unchained_cancel',
+      chainId: null,
+      nodeId: null,
+      title: 'Unchained',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'ack', label: '确认', description: '', effects: [] }],
+    });
+    state.events.scheduled.push({
+      instanceId: 'scheduled_unchained',
+      eventId: snapshot.eventId,
+      scheduledAtDay: 10,
+      activateAtDay: 20,
+      triggerContext: makeSignal(),
+      sourceKey: 'cancel_source',
+      chainInstanceId: null,
+      snapshot,
+    });
+
+    cancelScheduledByScope(
+      state,
+      { eventId: 'evt_unchained_cancel', scope: 'same_chain' },
+      'cancel_source',
+      null,
+      15,
+    );
+
+    expect(state.events.scheduled.map((item) => item.instanceId)).toEqual(['scheduled_unchained']);
+    expect(state.events.history).toHaveLength(0);
+  });
+
+  it('immediate-event budget fails atomically instead of silently dropping the tail', () => {
+    const state = createInitialState();
+    const snapshot = createEventSnapshot({
+      id: 'evt_immediate_budget',
+      chainId: null,
+      nodeId: null,
+      title: 'Immediate budget',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'repeatable' },
+      activation: {},
+      options: [{ id: 'ack', label: '确认', description: '', effects: [] }],
+    });
+    const instances = Array.from({ length: 101 }, (_, index): EventInstance => ({
+      instanceId: `immediate_${index}`,
+      eventId: snapshot.eventId,
+      status: 'pending',
+      triggeredAtDay: 1,
+      activatedAtDay: 1,
+      deadlineDay: null,
+      triggerContext: { ...makeSignal(), signalId: `immediate_signal_${index}` },
+      sourceKey: 'immediate_source',
+      chainInstanceId: null,
+      snapshot,
+    }));
+
+    expect(() =>
+      applyEventInstances(
+        state,
+        instances,
+        1,
+        () => 0,
+        () => 'generated',
+        [],
+      ),
+    ).toThrow('Immediate event budget exceeded');
+    expect(state.events.pending).toHaveLength(0);
+  });
+
+  it('cascade-depth budget fails atomically instead of dropping remaining signals', () => {
+    const state = createInitialState();
+    const endlessAutomatic: EventDefinition = {
+      id: 'evt_endless_automatic',
+      chainId: null,
+      nodeId: null,
+      title: 'Endless automatic',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['event.resolved'] },
+      repeatPolicy: { mode: 'repeatable' },
+      activation: {},
+      options: [],
+      automaticOutcome: { effects: [] },
+    };
+    const signal: DomainSignalSnapshot = {
+      signalId: 'cascade_seed',
+      signalType: 'event.resolved',
+      occurredAtDay: 1,
+      data: { eventInstanceId: 'seed', eventId: 'seed_event', optionId: null, occurredAtDay: 1 },
+    };
+    let sequence = 0;
+
+    expect(() =>
+      processCascadeSignals(
+        state,
+        [signal],
+        1,
+        () => 0,
+        () => `cascade_${sequence++}`,
+        [endlessAutomatic],
+      ),
+    ).toThrow('Cascade depth exceeded');
+    expect(state.events.history).toHaveLength(0);
+    expect(state.events.pending).toHaveLength(0);
+    expect(state.events.processedSignalIds).toHaveLength(0);
   });
 
   it('event.resolved signal updates processedSignalIds', () => {
