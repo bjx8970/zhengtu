@@ -26,9 +26,10 @@ import { clampAttr } from '../../utils/math';
 import { activateScheduledEvents, expireEventInstances } from '../../engine/events/event-scheduler';
 import {
   processCascadeSignals,
-  handleAutoEventInstance,
+  applyEventInstances,
   advanceBlockingPointer,
 } from './event-reducer';
+import { createRuntimeIdFactory } from '../runtime-id';
 
 /**
  * 处理行动完成时间轴事件。
@@ -225,6 +226,71 @@ function processAnnualAssessment(
   }
 }
 
+function expireEventsAtDay(draft: PlayerSave, currentDay: number): void {
+  const expiryResult = expireEventInstances(draft as Readonly<PlayerSave>, currentDay);
+  draft.events.history.push(...expiryResult.expiredRecords);
+  const expiredIds = new Set(expiryResult.expiredRecords.map((record) => record.instanceId));
+  draft.events.pending = draft.events.pending.filter(
+    (instance) => !expiredIds.has(instance.instanceId),
+  );
+  for (const chain of expiryResult.chainsToUpdate) {
+    draft.events.chainInstances[chain.instanceId] = chain;
+  }
+  advanceBlockingPointer(draft);
+}
+
+function activateEventsAtDay(
+  draft: PlayerSave,
+  currentDay: number,
+  rng: () => number,
+  idFactory: () => string,
+): void {
+  const definitions = getConfigLoader().getAllEventDefinitions();
+  const activation = activateScheduledEvents(
+    draft as Readonly<PlayerSave>,
+    currentDay,
+    rng,
+    idFactory,
+  );
+  const activatedIds = new Set(activation.activatedInstances.map((item) => item.instanceId));
+  draft.events.scheduled = draft.events.scheduled.filter(
+    (item) => !activatedIds.has(item.instanceId),
+  );
+
+  // 防御旧存档：新版调度在创建时已物化目标链，旧数据在激活时补齐。
+  for (const instance of activation.activatedInstances) {
+    if (!instance.snapshot.chainId || instance.chainInstanceId) continue;
+    const existing = Object.values(draft.events.chainInstances).find(
+      (chain) =>
+        chain.chainId === instance.snapshot.chainId && chain.sourceKey === instance.sourceKey,
+    );
+    const chain = existing ?? {
+      instanceId: idFactory(),
+      chainId: instance.snapshot.chainId,
+      status: 'active' as const,
+      sourceKey: instance.sourceKey,
+      activeNodeIds: [],
+      completedNodeIds: [],
+      startedAtDay: currentDay,
+      completedAtDay: null,
+    };
+    const nodeId = instance.snapshot.nodeId ?? instance.eventId;
+    if (!chain.activeNodeIds.includes(nodeId)) chain.activeNodeIds.push(nodeId);
+    draft.events.chainInstances[chain.instanceId] = chain;
+    instance.chainInstanceId = chain.instanceId;
+  }
+
+  const applied = applyEventInstances(
+    draft,
+    activation.activatedInstances,
+    currentDay,
+    rng,
+    idFactory,
+    definitions,
+  );
+  processCascadeSignals(draft, applied.cascadeSignals, currentDay, rng, idFactory, definitions);
+}
+
 /**
  * 处理 ADVANCE_TIME 动作。
  *
@@ -234,127 +300,49 @@ function processAnnualAssessment(
 export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload): void {
   const cfg = getConfigLoader().getGameConfig();
   const days = getGranularityDays(payload.granularity, cfg);
-
-  // 统一时间推进
-  const result = advanceTimeline(
-    draft.time,
-    days,
-    draft.time.totalDaysPlayed,
-    draft.actions.slots,
-    draft.character.birthYear,
-    cfg,
-  );
-
   const notifications: CompletedActionNotification[] = [];
   const rng = payload._rng ?? Math.random;
+  const idFactory = payload._idFactory ?? createRuntimeIdFactory('timeline-event');
 
-  // 按时间顺序处理事件
-  for (const event of result.events) {
-    switch (event.type) {
-      case 'action_completion':
-        processActionCompletion(draft, event, rng, notifications);
-        break;
-      case 'monthly_settlement':
-        processMonthlySettlement(draft);
-        break;
-      case 'annual_assessment':
-        processAnnualAssessment(draft, event.year, event.absoluteDay);
-        break;
-      default:
-        break;
+  // 先处理当前日已经到期的计划/过期事件；未解决 blocker 会暂停时间。
+  activateEventsAtDay(draft, draft.time.totalDaysPlayed, rng, idFactory);
+  expireEventsAtDay(draft, draft.time.totalDaysPlayed);
+
+  for (let elapsed = 0; elapsed < days && draft.events.activeBlockingEventId === null; elapsed++) {
+    const daily = advanceTimeline(
+      draft.time,
+      1,
+      draft.time.totalDaysPlayed,
+      draft.actions.slots,
+      draft.character.birthYear,
+      cfg,
+    );
+
+    for (const event of daily.events) {
+      switch (event.type) {
+        case 'action_completion':
+          processActionCompletion(draft, event, rng, notifications);
+          break;
+        case 'monthly_settlement':
+          processMonthlySettlement(draft);
+          break;
+        case 'annual_assessment':
+          processAnnualAssessment(draft, event.year, event.absoluteDay);
+          break;
+        default:
+          break;
+      }
     }
-  }
 
-  // 更新时间和总天数
-  draft.time.year = result.newTime.year;
-  draft.time.month = result.newTime.month;
-  draft.time.day = result.newTime.day;
+    draft.time.year = daily.newTime.year;
+    draft.time.month = daily.newTime.month;
+    draft.time.day = daily.newTime.day;
+    draft.time.totalDaysPlayed = daily.newAbsoluteDay;
+
+    activateEventsAtDay(draft, daily.newAbsoluteDay, rng, idFactory);
+    expireEventsAtDay(draft, daily.newAbsoluteDay);
+  }
   draft.time.granularity = payload.granularity;
-  draft.time.totalDaysPlayed += days;
-
-  const currentDay = draft.time.totalDaysPlayed;
-
-  // 激活到期的计划事件
-  const definitions = getConfigLoader().getAllEventDefinitions();
-  const activationResult = activateScheduledEvents(
-    draft as Readonly<PlayerSave>,
-    currentDay,
-    rng,
-    () => `sched_act_${currentDay}_${Date.now()}`,
-  );
-
-  // 清理已激活的计划事件
-  const activatedIds = new Set(activationResult.activatedInstances.map((i) => i.instanceId));
-  draft.events.scheduled = draft.events.scheduled.filter((s) => !activatedIds.has(s.instanceId));
-
-  for (const inst of activationResult.activatedInstances) {
-    // 跨链调度：snapshot 有 chainId 但实例无 chainInstanceId，为子链创建链实例
-    if (inst.snapshot.chainId && !inst.chainInstanceId) {
-      const existingChain = Object.values(draft.events.chainInstances).find(
-        (c) => c.chainId === inst.snapshot.chainId && c.sourceKey === inst.sourceKey,
-      );
-      if (existingChain) {
-        inst.chainInstanceId = existingChain.instanceId;
-      } else {
-        const newChain = {
-          instanceId: `chain_${inst.snapshot.chainId}_${inst.sourceKey}`,
-          chainId: inst.snapshot.chainId,
-          status: 'active' as const,
-          sourceKey: inst.sourceKey,
-          activeNodeIds: [] as string[],
-          completedNodeIds: [] as string[],
-          startedAtDay: currentDay,
-          completedAtDay: null,
-        };
-        draft.events.chainInstances[newChain.instanceId] = newChain;
-        inst.chainInstanceId = newChain.instanceId;
-      }
-    }
-
-    if (inst.snapshot.presentation === 'automatic') {
-      const { cascadeSignals } = handleAutoEventInstance(
-        draft,
-        inst,
-        currentDay,
-        rng,
-        () => `auto_${inst.instanceId}`,
-        definitions,
-      );
-      // 处理自动事件产生的级联信号
-      processCascadeSignals(
-        draft,
-        cascadeSignals,
-        currentDay,
-        rng,
-        () => `cascade_auto_${inst.instanceId}`,
-        definitions,
-      );
-    } else {
-      draft.events.pending.push(inst);
-      if (
-        inst.snapshot.presentation === 'blocking' &&
-        draft.events.activeBlockingEventId === null
-      ) {
-        draft.events.activeBlockingEventId = inst.instanceId;
-      }
-    }
-  }
-
-  // 过期事件处理
-  const expiryResult = expireEventInstances(draft as Readonly<PlayerSave>, currentDay);
-  for (const record of expiryResult.expiredRecords) {
-    draft.events.history.push(record);
-  }
-  for (const history of expiryResult.expiredRecords) {
-    const idx = draft.events.pending.findIndex((p) => p.instanceId === history.instanceId);
-    if (idx !== -1) draft.events.pending.splice(idx, 1);
-  }
-  for (const chain of expiryResult.chainsToUpdate) {
-    draft.events.chainInstances[chain.instanceId] = chain;
-  }
-
-  // 过期事件可能包含当前 activeBlockingEventId，需推进指针避免悬空
-  advanceBlockingPointer(draft);
 
   // 更新最近完成行动通知
   if (notifications.length > 0) {

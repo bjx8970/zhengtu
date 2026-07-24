@@ -36,7 +36,12 @@ export type GameAction =
       actionId: string;
       tierKey: 'primary' | 'secondary' | 'reserve';
     }
-  | { type: 'ADVANCE_TIME'; granularity: 'day' | 'week' | 'month'; _rng?: () => number }
+  | {
+      type: 'ADVANCE_TIME';
+      granularity: 'day' | 'week' | 'month';
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
   | {
       type: 'CHOOSE_EVENT_OPTION';
       eventInstanceId: string;
@@ -225,6 +230,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
       reduceAdvanceTime(draft, {
         granularity: action.granularity,
         _rng: action._rng,
+        _idFactory: action._idFactory,
       });
       return true;
     }

@@ -183,8 +183,8 @@ describe('resolveEventOption - 成功路径', () => {
 
     expectSuccess(result);
     if (result.success) {
-      expect(result.scheduled).toHaveLength(1);
-      expect(result.scheduled[0]!.eventId).toBe('evt_follow');
+      expect(result.scheduledInstances).toHaveLength(1);
+      expect(result.scheduledInstances[0]!.eventId).toBe('evt_follow');
     }
   });
 
@@ -415,9 +415,244 @@ describe('resolveEventOption - 链实例更新', () => {
 
     expectSuccess(result);
     if (result.success) {
-      expect(result.chainUpdate).not.toBeNull();
-      expect(result.chainUpdate!.activeNodeIds).toEqual(['other_node']);
-      expect(result.chainUpdate!.completedNodeIds).toEqual(['evt_resolve_target']);
+      const chainUpdate = result.chainUpdates.find((chain) => chain.instanceId === 'ci_001');
+      expect(chainUpdate).toBeDefined();
+      expect(chainUpdate!.activeNodeIds).toEqual(['other_node']);
+      expect(chainUpdate!.completedNodeIds).toEqual(['evt_resolve_target']);
+    }
+  });
+});
+
+describe('resolveEventOption - 结算后后续语义', () => {
+  it('uses post-effect state and the real resolved option signal for follow-up conditions', () => {
+    const parent = makeEventDef({
+      id: 'evt_post_effect_parent',
+      options: [
+        {
+          id: 'unlock',
+          label: '解锁',
+          description: '',
+          effects: [
+            { target: 'world_fact', factId: 'followup_unlocked', operation: 'set', value: true },
+          ],
+          schedule: [
+            {
+              eventId: 'evt_post_effect_child',
+              delayDays: 1,
+              condition: {
+                all: [
+                  { fact: 'followup_unlocked', op: 'is_true' },
+                  { signalField: 'optionId', op: 'eq', value: 'unlock' },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const child = makeEventDef({ id: 'evt_post_effect_child' });
+    const instance = makeInstance(createEventSnapshot(parent));
+    const state = makeStateWithPending(instance);
+    const conditionState = structuredClone(state);
+    conditionState.world.facts['followup_unlocked'] = true;
+
+    const result = resolveEventOption({
+      state,
+      conditionState,
+      definitions: [parent, child],
+      eventInstanceId: instance.instanceId,
+      optionId: 'unlock',
+      currentDay: 60,
+      rng: () => 0,
+      idFactory: (() => {
+        let id = 0;
+        return () => `post_${id++}`;
+      })(),
+    });
+
+    expectSuccess(result);
+    if (result.success) {
+      expect(result.scheduledInstances).toHaveLength(1);
+      expect(result.scheduledInstances[0]!.triggerContext).toEqual(result.emittedSignals[0]);
+    }
+  });
+
+  it('returns zero-delay follow-ups as immediate instances', () => {
+    const parent = makeEventDef({
+      options: [
+        {
+          id: 'instant',
+          label: '立即',
+          description: '',
+          effects: [],
+          schedule: [{ eventId: 'evt_instant_child', delayDays: 0 }],
+        },
+      ],
+    });
+    const child = makeEventDef({ id: 'evt_instant_child' });
+    const instance = makeInstance(createEventSnapshot(parent));
+    const state = makeStateWithPending(instance);
+
+    const result = resolveEventOption({
+      state,
+      definitions: [parent, child],
+      eventInstanceId: instance.instanceId,
+      optionId: 'instant',
+      currentDay: 60,
+      rng: () => 0,
+      idFactory: () => 'instant_id',
+    });
+
+    expectSuccess(result);
+    if (result.success) {
+      expect(result.immediateInstances).toHaveLength(1);
+      expect(result.scheduledInstances).toHaveLength(0);
+      expect(result.immediateInstances[0]!.activatedAtDay).toBe(60);
+    }
+  });
+
+  it('uses the snapshotted repeat policy for scoped cooldowns', () => {
+    const definition = makeEventDef({
+      repeatPolicy: { mode: 'once_per_source', cooldownDays: 9 },
+    });
+    const instance = makeInstance(createEventSnapshot(definition));
+    const state = makeStateWithPending(instance);
+
+    const result = resolveEventOption({
+      state,
+      definitions: [makeEventDef({ id: definition.id, repeatPolicy: { mode: 'repeatable' } })],
+      eventInstanceId: instance.instanceId,
+      optionId: 'opt_a',
+      currentDay: 60,
+      rng: () => 0,
+      idFactory: () => 'cooldown_id',
+    });
+
+    expectSuccess(result);
+    if (result.success) {
+      expect(result.cooldownUpdate).toEqual({
+        eventId: definition.id,
+        scope: 'source',
+        scopeId: instance.sourceKey,
+        untilDay: 69,
+      });
+    }
+  });
+
+  it('registers same-chain children before completing the parent node', () => {
+    const parent = makeEventDef({
+      id: 'evt_parent',
+      chainId: 'chain_a',
+      nodeId: 'parent',
+      options: [
+        {
+          id: 'continue',
+          label: '继续',
+          description: '',
+          effects: [],
+          schedule: [{ eventId: 'evt_child', delayDays: 2 }],
+        },
+      ],
+    });
+    const child = makeEventDef({
+      id: 'evt_child',
+      chainId: 'chain_a',
+      nodeId: 'child',
+      repeatPolicy: { mode: 'once_per_chain' },
+    });
+    const instance = makeInstance(createEventSnapshot(parent), {
+      eventId: parent.id,
+      chainInstanceId: 'chain_instance',
+    });
+    const state = makeStateWithPending(instance);
+    state.events.chainInstances['chain_instance'] = {
+      instanceId: 'chain_instance',
+      chainId: 'chain_a',
+      status: 'active',
+      sourceKey: instance.sourceKey,
+      activeNodeIds: ['parent'],
+      completedNodeIds: [],
+      startedAtDay: 50,
+      completedAtDay: null,
+    };
+
+    const result = resolveEventOption({
+      state,
+      definitions: [parent, child],
+      eventInstanceId: instance.instanceId,
+      optionId: 'continue',
+      currentDay: 60,
+      rng: () => 0,
+      idFactory: () => 'child_instance',
+    });
+
+    expectSuccess(result);
+    if (result.success) {
+      const chain = result.chainUpdates.find((item) => item.instanceId === 'chain_instance');
+      expect(chain?.activeNodeIds).toEqual(['child']);
+      expect(chain?.completedNodeIds).toEqual(['parent']);
+      expect(chain?.status).toBe('active');
+      expect(chain?.completedAtDay).toBeNull();
+      expect(result.scheduledInstances[0]!.chainInstanceId).toBe('chain_instance');
+    }
+  });
+
+  it('creates a distinct target chain for cross-chain follow-ups', () => {
+    const parent = makeEventDef({
+      id: 'evt_cross_parent',
+      chainId: 'chain_parent',
+      nodeId: 'parent',
+      options: [
+        {
+          id: 'branch',
+          label: '分支',
+          description: '',
+          effects: [],
+          schedule: [{ eventId: 'evt_cross_child', delayDays: 1 }],
+        },
+      ],
+    });
+    const child = makeEventDef({
+      id: 'evt_cross_child',
+      chainId: 'chain_child',
+      nodeId: 'child',
+      repeatPolicy: { mode: 'once_per_chain' },
+    });
+    const instance = makeInstance(createEventSnapshot(parent), {
+      eventId: parent.id,
+      chainInstanceId: 'parent_instance',
+    });
+    const state = makeStateWithPending(instance);
+    state.events.chainInstances['parent_instance'] = {
+      instanceId: 'parent_instance',
+      chainId: 'chain_parent',
+      status: 'active',
+      sourceKey: instance.sourceKey,
+      activeNodeIds: ['parent'],
+      completedNodeIds: [],
+      startedAtDay: 50,
+      completedAtDay: null,
+    };
+    let sequence = 0;
+
+    const result = resolveEventOption({
+      state,
+      definitions: [parent, child],
+      eventInstanceId: instance.instanceId,
+      optionId: 'branch',
+      currentDay: 60,
+      rng: () => 0,
+      idFactory: () => `cross_${sequence++}`,
+    });
+
+    expectSuccess(result);
+    if (result.success) {
+      const target = result.chainUpdates.find((item) => item.chainId === 'chain_child');
+      const source = result.chainUpdates.find((item) => item.instanceId === 'parent_instance');
+      expect(target?.instanceId).not.toBe('parent_instance');
+      expect(target?.activeNodeIds).toEqual(['child']);
+      expect(result.scheduledInstances[0]!.chainInstanceId).toBe(target?.instanceId);
+      expect(source?.status).toBe('completed');
     }
   });
 });

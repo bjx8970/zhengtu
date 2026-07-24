@@ -9,6 +9,7 @@ import { createTestStore, createInitialState } from '../game-store';
 import { createEventSnapshot } from '../../engine/events/event-orchestrator';
 import type { PlayerSave } from '../../types/player';
 import type { EventInstance } from '../../domain/events/state';
+import { getConfigLoader } from '../../config/loader';
 
 function makeSignal() {
   return {
@@ -68,6 +69,7 @@ function createStateWithPending(overrides?: Partial<EventInstance>): PlayerSave 
     sourceKey: 'src_reducer',
     chainInstanceId: overrides?.chainInstanceId ?? null,
     snapshot: overrides?.snapshot ?? snapshot,
+    ...overrides,
   };
 
   return {
@@ -791,5 +793,201 @@ describe('event-reducer: cascade signals and scheduling', () => {
       after.events.scheduled.filter((s) => s.eventId === 'suppress_investigation').length +
       after.events.pending.filter((p) => p.eventId === 'suppress_investigation').length;
     expect(totalSuppress).toBe(1);
+  });
+});
+
+describe('event-reducer: lifecycle invariants', () => {
+  it('rejects a queued blocking event that is not the active pointer', () => {
+    const firstState = createStateWithPending({
+      instanceId: 'blocking_first',
+      status: 'active',
+      snapshot: createEventSnapshot({
+        id: 'blocking_first_event',
+        chainId: null,
+        nodeId: null,
+        title: 'First',
+        description: '',
+        category: 'governance',
+        priority: 'urgent',
+        presentation: 'blocking',
+        trigger: { sources: ['world.metric_changed'] },
+        repeatPolicy: { mode: 'once' },
+        activation: {},
+        options: [{ id: 'resolve', label: '处理', description: '', effects: [] }],
+      }),
+    });
+    const secondState = createStateWithPending({
+      instanceId: 'blocking_second',
+      status: 'pending',
+      snapshot: createEventSnapshot({
+        id: 'blocking_second_event',
+        chainId: null,
+        nodeId: null,
+        title: 'Second',
+        description: '',
+        category: 'governance',
+        priority: 'high',
+        presentation: 'blocking',
+        trigger: { sources: ['world.metric_changed'] },
+        repeatPolicy: { mode: 'once' },
+        activation: {},
+        options: [{ id: 'resolve', label: '处理', description: '', effects: [] }],
+      }),
+    });
+    const state = firstState;
+    state.events.pending = [firstState.events.pending[0]!, secondState.events.pending[0]!];
+    state.events.activeBlockingEventId = 'blocking_first';
+    const store = createTestStore(state);
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'blocking_second',
+      optionId: 'resolve',
+    });
+
+    expect(store.getRawState().events.history).toHaveLength(0);
+    expect(store.getRawState().events.pending.map((item) => item.instanceId)).toContain(
+      'blocking_second',
+    );
+  });
+
+  it('accepts stable fixed institution and region IDs from the institution registry', () => {
+    const institution = getConfigLoader().getAllInstitutions()[0]!;
+    const snapshot = createEventSnapshot({
+      id: 'fixed_reference_event',
+      chainId: null,
+      nodeId: null,
+      title: 'Fixed refs',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [
+        {
+          id: 'apply',
+          label: '应用',
+          description: '',
+          effects: [
+            {
+              target: 'institution_metric',
+              institutionRef: { source: 'fixed', institutionId: institution.id },
+              metricId: 'capacity',
+              operation: 'set',
+              value: 3,
+            },
+            {
+              target: 'region_metric',
+              regionRef: { source: 'fixed', regionId: institution.regionId },
+              metricId: 'confidence',
+              operation: 'set',
+              value: 4,
+            },
+          ],
+        },
+      ],
+    });
+    const state = createStateWithPending({ snapshot });
+    state.events.pending[0]!.eventId = snapshot.eventId;
+    const store = createTestStore(state);
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_reducer_001',
+      optionId: 'apply',
+    });
+
+    expect(store.getRawState().governance.institutionMetrics[institution.id]?.['capacity']).toBe(3);
+    expect(store.getRawState().governance.regionMetrics[institution.regionId]?.['confidence']).toBe(
+      4,
+    );
+  });
+
+  it('generates unique cascade IDs across consecutive dispatches', () => {
+    const first = createStateWithPending({ instanceId: 'dispatch_one' });
+    const second = createStateWithPending({ instanceId: 'dispatch_two' });
+    first.events.pending = [first.events.pending[0]!, second.events.pending[0]!];
+    const store = createTestStore(first);
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'dispatch_one',
+      optionId: 'opt_heal',
+    });
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'dispatch_two',
+      optionId: 'opt_heal',
+    });
+
+    const ids = store.getRawState().events.processedSignalIds;
+    expect(ids.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('evaluates zero-delay follow-ups after effects with the real selected option signal', () => {
+    const snapshot = createEventSnapshot({
+      id: 'post_effect_store_event',
+      chainId: null,
+      nodeId: null,
+      title: 'Post-effect event',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [
+        {
+          id: 'unlock',
+          label: '解锁',
+          description: '',
+          effects: [
+            {
+              target: 'world_fact',
+              factId: 'store_followup_unlocked',
+              operation: 'set',
+              value: true,
+            },
+          ],
+          schedule: [
+            {
+              eventId: 'flood_emergency',
+              delayDays: 0,
+              condition: {
+                all: [
+                  { fact: 'store_followup_unlocked', op: 'is_true' },
+                  { signalField: 'optionId', op: 'eq', value: 'unlock' },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const state = createStateWithPending({ snapshot });
+    state.events.pending[0]!.eventId = snapshot.eventId;
+    const store = createTestStore(state);
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_reducer_001',
+      optionId: 'unlock',
+      _rng: () => 0,
+      _idFactory: (() => {
+        let sequence = 0;
+        return () => `post_effect_${sequence++}`;
+      })(),
+    });
+
+    const after = store.getRawState();
+    expect(after.world.facts['store_followup_unlocked']).toBe(true);
+    const followup = after.events.pending.find((item) => item.eventId === 'flood_emergency');
+    expect(followup).toBeDefined();
+    expect(followup?.activatedAtDay).toBe(after.time.totalDaysPlayed);
+    expect(after.events.activeBlockingEventId).toBe(followup?.instanceId);
   });
 });

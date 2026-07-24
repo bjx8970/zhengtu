@@ -9,21 +9,19 @@
  */
 
 import type { PlayerSave } from '../../types/player';
+import { unwrap } from 'solid-js/store';
 import type { EventInstance, EventHistoryRecord } from '../../domain/events/state';
 import type { ScheduledEventCancellation } from '../../domain/events/types';
 import type { EventDefinition } from '../../domain/events/definition';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import { applyEffects } from '../../engine/events/effect-executor';
 import { resolveEventOption } from '../../engine/events/event-resolver';
-import {
-  processDomainSignal,
-  processScheduledFollowups,
-} from '../../engine/events/event-orchestrator';
+import { buildEventCooldownRecord } from '../../engine/events/event-cooldown';
+import { processDomainSignal } from '../../engine/events/event-orchestrator';
 import type { EventOrchestrationResult } from '../../engine/events/event-orchestrator';
+import { planEventFollowups } from '../../engine/events/event-followup-planner';
 import { getConfigLoader } from '../../config/loader';
-
-/** 模块级 ID 计数器，确保跨 dispatch 调用的 ID 唯一性 */
-let nextAutoId = 0;
+import { createRuntimeIdFactory } from '../runtime-id';
 
 /** CHOOSE_EVENT_OPTION 载荷 */
 export interface ChooseEventOptionPayload {
@@ -31,6 +29,18 @@ export interface ChooseEventOptionPayload {
   optionId: string;
   _rng?: () => number;
   _idFactory?: () => string;
+}
+
+function createEffectContext(signal: DomainSignalSnapshot, currentDay: number) {
+  const loader = getConfigLoader();
+  const institutions = loader.getAllInstitutions();
+  return {
+    signal,
+    currentDay,
+    attributeBounds: loader.getGameConfig().attributeBounds,
+    knownInstitutionIds: new Set(institutions.map((institution) => institution.id)),
+    knownRegionIds: new Set(institutions.map((institution) => institution.regionId)),
+  };
 }
 
 /**
@@ -50,10 +60,29 @@ export function reduceChooseEventOption(
 ): EventHistoryRecord | null {
   const definitions = getConfigLoader().getAllEventDefinitions();
   const rng = payload._rng ?? Math.random;
-  const idFactory = payload._idFactory ?? (() => `auto_id_${nextAutoId++}`);
+  const idFactory = payload._idFactory ?? createRuntimeIdFactory('event');
 
-  const loader = getConfigLoader();
-  const cfg = loader.getGameConfig();
+  const instance = draft.events.pending.find((item) => item.instanceId === payload.eventInstanceId);
+  const option = instance?.snapshot.options.find((item) => item.id === payload.optionId);
+  if (!instance || !option) return null;
+  const blockingAllowed =
+    instance.snapshot.presentation !== 'blocking' ||
+    (instance.status === 'active' && draft.events.activeBlockingEventId === instance.instanceId);
+  if (
+    !blockingAllowed ||
+    instance.snapshot.presentation === 'automatic' ||
+    (instance.deadlineDay != null && currentDay > instance.deadlineDay)
+  ) {
+    return null;
+  }
+
+  // 先在事务克隆上应用效果，让后续条件观察结算后状态；真实 draft 尚未改变。
+  const conditionState = structuredClone(unwrap(draft));
+  applyEffects(
+    conditionState,
+    option.effects,
+    createEffectContext(instance.triggerContext, currentDay),
+  );
 
   // 1. 调用 resolveEventOption 获取结算计划
   const plan = resolveEventOption({
@@ -64,6 +93,7 @@ export function reduceChooseEventOption(
     rng,
     idFactory,
     definitions,
+    conditionState,
   });
 
   if (!plan.success) {
@@ -71,20 +101,11 @@ export function reduceChooseEventOption(
   }
 
   // 2. 构建效果执行上下文并原子应用效果
-  const instance = draft.events.pending.find((p) => p.instanceId === payload.eventInstanceId);
-  if (!instance) return null;
-
-  const signal = instance.triggerContext;
-
-  const effectCtx = {
-    signal,
-    currentDay,
-    attributeBounds: cfg.attributeBounds,
-    knownInstitutionIds: new Set(loader.getAllInstitutions().map((i) => i.id)),
-    knownRegionIds: new Set(loader.getRegions().provinces.map((p) => p.name)),
-  };
-
-  const result = applyEffects(draft, plan.effectsToApply, effectCtx);
+  const result = applyEffects(
+    draft,
+    plan.effectsToApply,
+    createEffectContext(instance.triggerContext, currentDay),
+  );
 
   // 构建 appliedEffects 记录
   const appliedEffects = result.applied.map((rec) => ({
@@ -111,17 +132,15 @@ export function reduceChooseEventOption(
     );
   }
 
-  // 5. 添加调度事件
-  for (const sched of plan.scheduled) {
+  // 5. 原子应用目标链更新，再添加调度事件
+  for (const chain of plan.chainUpdates) {
+    draft.events.chainInstances[chain.instanceId] = chain;
+  }
+  for (const sched of plan.scheduledInstances) {
     draft.events.scheduled.push(sched);
   }
 
-  // 6. 应用链更新
-  if (plan.chainUpdate) {
-    draft.events.chainInstances[plan.chainUpdate.instanceId] = plan.chainUpdate;
-  }
-
-  // 7. 从 pending 移除
+  // 6. 从 pending 移除
   const pendingIndex = draft.events.pending.findIndex(
     (p) => p.instanceId === payload.eventInstanceId,
   );
@@ -129,18 +148,34 @@ export function reduceChooseEventOption(
     draft.events.pending.splice(pendingIndex, 1);
   }
 
-  // 8. 推进阻塞指针
-  advanceBlockingPointer(draft);
-
-  // 9. 构建并写入历史
+  // 7. 构建并写入历史
   const history: EventHistoryRecord = {
     ...plan.history,
     appliedEffects,
   };
   draft.events.history.push(history);
 
-  // 10. 处理级联信号（event.resolved → 新事件编排）并递归处理产生的自动事件
+  // 8. 零延迟后续在当前有界事务内直接激活/结算
+  const immediateResult = applyEventInstances(
+    draft,
+    plan.immediateInstances,
+    currentDay,
+    rng,
+    idFactory,
+    definitions,
+  );
+
+  // 9. 处理父事件和即时自动事件的级联信号
+  advanceBlockingPointer(draft);
   processCascadeSignals(draft, plan.emittedSignals, currentDay, rng, idFactory, definitions);
+  processCascadeSignals(
+    draft,
+    immediateResult.cascadeSignals,
+    currentDay,
+    rng,
+    idFactory,
+    definitions,
+  );
 
   return history;
 }
@@ -165,22 +200,20 @@ export function handleAutoEventInstance(
   rng: () => number,
   idFactory: () => string,
   definitions: readonly EventDefinition[],
-): { history: EventHistoryRecord; cascadeSignals: DomainSignalSnapshot[] } {
+): {
+  history: EventHistoryRecord;
+  cascadeSignals: DomainSignalSnapshot[];
+  immediateInstances: EventInstance[];
+} {
   const outcome = instance.snapshot.automaticOutcome;
-  const loader = getConfigLoader();
-  const cfg = loader.getGameConfig();
 
   // 应用效果
   const effects = outcome?.effects ?? [];
-  const effectCtx = {
-    signal: instance.triggerContext,
-    currentDay,
-    attributeBounds: cfg.attributeBounds,
-    knownInstitutionIds: new Set(loader.getAllInstitutions().map((i) => i.id)),
-    knownRegionIds: new Set(loader.getRegions().provinces.map((p) => p.name)),
-  };
-
-  const result = applyEffects(draft, effects, effectCtx);
+  const result = applyEffects(
+    draft,
+    effects,
+    createEffectContext(instance.triggerContext, currentDay),
+  );
 
   const appliedEffects = result.applied.map((rec) => ({
     target: rec.effect.target,
@@ -190,51 +223,38 @@ export function handleAutoEventInstance(
     label: rec.targetDescription,
   }));
 
-  // 冷却记录
-  const def = definitions.find((d) => d.id === instance.eventId);
-  if (def) {
-    const cooldownDays = def.repeatPolicy.cooldownDays;
-    if (cooldownDays && cooldownDays > 0) {
-      const scope: 'global' | 'source' | 'chain' =
-        def.repeatPolicy.mode === 'once_per_source'
-          ? 'source'
-          : def.repeatPolicy.mode === 'once_per_chain'
-            ? 'chain'
-            : 'global';
-      const scopeId =
-        scope === 'source'
-          ? instance.sourceKey
-          : scope === 'chain'
-            ? instance.chainInstanceId
-            : null;
-      draft.events.cooldowns.push({
-        eventId: instance.eventId,
-        scope,
-        scopeId,
-        untilDay: currentDay + cooldownDays,
-      });
-    }
+  const cooldown = buildEventCooldownRecord(instance, undefined, currentDay);
+  if (cooldown) {
+    draft.events.cooldowns.push(cooldown);
   }
 
-  // 处理 schedule（仅创建计划事件，不发出级联信号）
-  const cascadeSignals: DomainSignalSnapshot[] = [];
-  if (outcome?.schedule) {
-    const schedResult = processScheduledFollowups(
-      outcome.schedule,
-      instance.sourceKey,
-      instance.chainInstanceId,
-      currentDay,
-      definitions,
-      rng,
-      idFactory,
-      draft as Readonly<PlayerSave>,
-      instance.triggerContext,
-      currentDay,
-    );
-    for (const sched of schedResult) {
-      draft.events.scheduled.push(sched);
-    }
+  const resolvedSignal: DomainSignalSnapshot = {
+    signalId: idFactory(),
+    signalType: 'event.resolved',
+    occurredAtDay: currentDay,
+    data: {
+      eventInstanceId: instance.instanceId,
+      eventId: instance.eventId,
+      optionId: null,
+      occurredAtDay: currentDay,
+    },
+  };
+
+  // 效果成功后，使用真实 resolved 信号与结算后状态规划后续。
+  const followups = planEventFollowups({
+    schedules: outcome?.schedule,
+    parentInstance: instance,
+    resolvedSignal,
+    state: draft as Readonly<PlayerSave>,
+    currentDay,
+    definitions,
+    rng,
+    idFactory,
+  });
+  for (const chain of followups.chainUpdates) {
+    draft.events.chainInstances[chain.instanceId] = chain;
   }
+  draft.events.scheduled.push(...followups.scheduledInstances);
 
   // 历史记录
   const history: EventHistoryRecord = {
@@ -251,20 +271,6 @@ export function handleAutoEventInstance(
     appliedEffects,
   };
   draft.events.history.push(history);
-
-  // 发出 event.resolved 信号
-  const resolvedSignal: DomainSignalSnapshot = {
-    signalId: idFactory(),
-    signalType: 'event.resolved',
-    occurredAtDay: currentDay,
-    data: {
-      eventInstanceId: instance.instanceId,
-      eventId: instance.eventId,
-      optionId: null,
-      occurredAtDay: currentDay,
-    },
-  };
-  cascadeSignals.push(resolvedSignal);
 
   // 处理旧 cancelScheduledEvents 格式
   if (outcome?.cancelScheduledEvents) {
@@ -290,7 +296,58 @@ export function handleAutoEventInstance(
     );
   }
 
-  return { history, cascadeSignals };
+  return {
+    history,
+    cascadeSignals: [resolvedSignal],
+    immediateInstances: followups.immediateInstances,
+  };
+}
+
+/**
+ * 在同一事务中应用即时事件实例，自动事件会继续处理零延迟后续。
+ *
+ * @param draft 游戏状态草稿
+ * @param instances 待应用实例
+ * @param currentDay 当前绝对游戏日
+ * @param rng 随机数生成器
+ * @param idFactory 事务共享 ID 工厂
+ * @param definitions 事件定义
+ * @returns 自动结算历史与级联信号
+ */
+export function applyEventInstances(
+  draft: PlayerSave,
+  instances: readonly EventInstance[],
+  currentDay: number,
+  rng: () => number,
+  idFactory: () => string,
+  definitions: readonly EventDefinition[],
+): { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] } {
+  const histories: EventHistoryRecord[] = [];
+  const cascadeSignals: DomainSignalSnapshot[] = [];
+  const queue = [...instances];
+  const maxImmediateInstances = 100;
+
+  for (let index = 0; index < queue.length && index < maxImmediateInstances; index++) {
+    const instance = queue[index]!;
+    if (instance.snapshot.presentation === 'automatic') {
+      const settled = handleAutoEventInstance(
+        draft,
+        instance,
+        currentDay,
+        rng,
+        idFactory,
+        definitions,
+      );
+      histories.push(settled.history);
+      cascadeSignals.push(...settled.cascadeSignals);
+      queue.push(...settled.immediateInstances);
+    } else {
+      draft.events.pending.push(instance);
+    }
+  }
+
+  advanceBlockingPointer(draft);
+  return { histories, cascadeSignals };
 }
 
 /**
@@ -317,37 +374,6 @@ export function applyEventOrchestrationPlan(
   definitions: readonly EventDefinition[],
 ): { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] } {
   const histories: EventHistoryRecord[] = [];
-  const allCascadeSignals: DomainSignalSnapshot[] = [];
-
-  // 自动事件：立即结算（不级联）
-  for (const inst of plan.createdInstances) {
-    if (inst.snapshot.presentation === 'automatic') {
-      const { history, cascadeSignals } = handleAutoEventInstance(
-        draft,
-        inst,
-        currentDay,
-        rng,
-        idFactory,
-        definitions,
-      );
-      histories.push(history);
-      allCascadeSignals.push(...cascadeSignals);
-    } else {
-      draft.events.pending.push(inst);
-      // 更新阻塞指针
-      if (
-        inst.snapshot.presentation === 'blocking' &&
-        draft.events.activeBlockingEventId === null
-      ) {
-        draft.events.activeBlockingEventId = inst.instanceId;
-      }
-    }
-  }
-
-  // 调度事件
-  for (const sched of plan.scheduledInstances) {
-    draft.events.scheduled.push(sched);
-  }
 
   // 冷却记录（去重合并）
   for (const cd of plan.updatedCooldowns) {
@@ -367,6 +393,9 @@ export function applyEventOrchestrationPlan(
     draft.events.chainInstances[chain.instanceId] = chain;
   }
 
+  // 调度事件必须先落地，后续 resolved signal 才能按链精确去重。
+  draft.events.scheduled.push(...plan.scheduledInstances);
+
   // 已处理信号 ID（去重追加）
   for (const sid of plan.newProcessedSignalIds) {
     if (!draft.events.processedSignalIds.includes(sid)) {
@@ -374,7 +403,16 @@ export function applyEventOrchestrationPlan(
     }
   }
 
-  return { histories, cascadeSignals: allCascadeSignals };
+  const instanceResult = applyEventInstances(
+    draft,
+    plan.createdInstances,
+    currentDay,
+    rng,
+    idFactory,
+    definitions,
+  );
+  histories.push(...instanceResult.histories);
+  return { histories, cascadeSignals: instanceResult.cascadeSignals };
 }
 
 /**
@@ -403,12 +441,7 @@ export function processCascadeSignals(
     const nextSignals: DomainSignalSnapshot[] = [];
 
     for (const sig of queue) {
-      // 检查信号是否已被处理（通过 processedSignalIds + pending + scheduled）
-      if (
-        draft.events.processedSignalIds.includes(sig.signalId) ||
-        draft.events.pending.some((p) => p.triggerContext.signalId === sig.signalId) ||
-        draft.events.scheduled.some((s) => s.triggerContext.signalId === sig.signalId)
-      ) {
+      if (draft.events.processedSignalIds.includes(sig.signalId)) {
         continue;
       }
 
@@ -444,11 +477,16 @@ export function processCascadeSignals(
  * @param draft 游戏状态草稿
  */
 export function advanceBlockingPointer(draft: PlayerSave): void {
-  const nextBlocking = draft.events.pending.find((p) => p.snapshot.presentation === 'blocking');
+  const blockingInstances = draft.events.pending.filter(
+    (item) => item.snapshot.presentation === 'blocking',
+  );
+  const pointed = blockingInstances.find(
+    (item) => item.instanceId === draft.events.activeBlockingEventId,
+  );
+  const nextBlocking = pointed ?? blockingInstances[0];
   draft.events.activeBlockingEventId = nextBlocking?.instanceId ?? null;
-  // 将指针指向的 blocking 实例 status 提升为 active，维持"指针指向 = active"的不变量
-  if (nextBlocking && nextBlocking.status !== 'active') {
-    nextBlocking.status = 'active';
+  for (const instance of blockingInstances) {
+    instance.status = instance.instanceId === nextBlocking?.instanceId ? 'active' : 'pending';
   }
 }
 

@@ -43,16 +43,6 @@ export type EventCategory = (typeof EVENT_CATEGORIES)[number];
 /** 事件分类 Zod Schema */
 export const EventCategorySchema = z.enum(EVENT_CATEGORIES);
 
-// ===== 事实变更 =====
-
-/** 事实变更定义：设置一个世界事实 */
-export interface FactMutationDefinition {
-  /** 事实 ID */
-  factId: string;
-  /** 事实值 */
-  value: boolean | number | string;
-}
-
 // ===== 触发器 =====
 
 /**
@@ -167,8 +157,6 @@ export interface EventOptionDefinition {
   cooldownDays?: number;
   /** 计划事件取消规范（按作用域，可选） */
   cancelScheduled?: import('./types').ScheduledEventCancellation[];
-  /** 设置的世界事实（可选，已废弃，使用 world_fact effect 替代） */
-  setFacts?: FactMutationDefinition[];
 }
 
 // ===== 自动事件载荷 =====
@@ -188,8 +176,6 @@ export interface EventOutcomePayload {
   cancelScheduledEvents?: string[];
   /** 计划事件取消规范（按作用域，可选） */
   cancelScheduled?: import('./types').ScheduledEventCancellation[];
-  /** 设置的世界事实（可选，已废弃） */
-  setFacts?: FactMutationDefinition[];
 }
 
 // ===== 事件定义 =====
@@ -236,14 +222,6 @@ export interface EventDefinition {
 
 // ===== Zod Schema =====
 
-/** 事实变更定义 Schema */
-const FactMutationDefinitionSchema = z
-  .object({
-    factId: z.string().min(1),
-    value: z.union([z.boolean(), z.number(), z.string()]),
-  })
-  .strict();
-
 /** 触发定义 Schema */
 const EventTriggerDefinitionSchema = z
   .object({
@@ -256,7 +234,7 @@ const EventTriggerDefinitionSchema = z
   .strict();
 
 /** 重复策略 Schema */
-const EventRepeatPolicySchema = z
+export const EventRepeatPolicySchema = z
   .object({
     mode: z.enum(EVENT_REPEAT_MODES),
     cooldownDays: z.number().int().nonnegative().optional(),
@@ -306,7 +284,6 @@ export const EventOptionDefinitionSchema = z
     cancelScheduledEvents: z.array(z.string().min(1)).optional(),
     cooldownDays: z.number().int().nonnegative().optional(),
     cancelScheduled: z.array(ScheduledEventCancellationSchema).optional(),
-    setFacts: z.array(FactMutationDefinitionSchema).optional(),
   })
   .strict();
 
@@ -317,7 +294,6 @@ export const EventOutcomePayloadSchema = z
     schedule: z.array(ScheduledFollowupDefinitionSchema).optional(),
     cancelScheduledEvents: z.array(z.string().min(1)).optional(),
     cancelScheduled: z.array(ScheduledEventCancellationSchema).optional(),
-    setFacts: z.array(FactMutationDefinitionSchema).optional(),
   })
   .strict();
 

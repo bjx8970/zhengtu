@@ -140,6 +140,7 @@ describe('processDomainSignal - 信号去重', () => {
       events: {
         ...input.state.events,
         pending: [...result1.createdInstances],
+        processedSignalIds: result1.newProcessedSignalIds,
       },
     };
     const result2 = processDomainSignal({
@@ -892,6 +893,79 @@ describe('processDomainSignal - 延迟事件', () => {
     const result = processDomainSignal(input);
     expect(result.createdInstances).toHaveLength(1);
     expect(result.createdInstances[0]!.status).toBe('active');
+  });
+});
+
+describe('processDomainSignal - 链作用域隔离', () => {
+  it('once_per_chain does not fall back to a global eventId check', () => {
+    const definition = makeEventDef({
+      id: 'evt_chain_scoped',
+      chainId: 'chain_scoped',
+      nodeId: 'node',
+      trigger: { sources: ['event.resolved'] },
+      repeatPolicy: { mode: 'once_per_chain' },
+    });
+    const state = createInitialState();
+    state.events.chainInstances['old_chain'] = {
+      instanceId: 'old_chain',
+      chainId: 'chain_scoped',
+      status: 'completed',
+      sourceKey: 'source_a',
+      activeNodeIds: [],
+      completedNodeIds: ['node'],
+      startedAtDay: 1,
+      completedAtDay: 2,
+    };
+    state.events.history.push(
+      {
+        eventId: definition.id,
+        instanceId: 'old_child',
+        finalStatus: 'resolved',
+        triggeredAtDay: 1,
+        completedAtDay: 2,
+        sourceKey: 'source_a',
+        chainInstanceId: 'old_chain',
+        titleSnapshot: definition.title,
+        chosenOptionId: 'opt_a',
+        chosenOptionLabel: '选项A',
+        appliedEffects: [],
+      },
+      {
+        eventId: 'parent_b',
+        instanceId: 'parent_b_instance',
+        finalStatus: 'resolved',
+        triggeredAtDay: 10,
+        completedAtDay: 10,
+        sourceKey: 'source_b',
+        chainInstanceId: null,
+        titleSnapshot: 'Parent B',
+        chosenOptionId: null,
+        chosenOptionLabel: null,
+        appliedEffects: [],
+      },
+    );
+
+    const result = processDomainSignal({
+      state,
+      signal: {
+        signalId: 'signal_source_b',
+        signalType: 'event.resolved',
+        occurredAtDay: 10,
+        data: {
+          eventInstanceId: 'parent_b_instance',
+          eventId: 'parent_b',
+          optionId: null,
+          occurredAtDay: 10,
+        },
+      },
+      currentDay: 10,
+      definitions: [definition],
+      rng: () => 0,
+      idFactory: () => 'new_chain_id',
+    });
+
+    expect(result.createdInstances).toHaveLength(1);
+    expect(result.updatedChainInstances[0]!.sourceKey).toBe('source_b');
   });
 });
 

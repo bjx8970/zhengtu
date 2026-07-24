@@ -36,6 +36,7 @@ import {
 import {
   EventOptionDefinitionSchema,
   EventOutcomePayloadSchema,
+  EventRepeatPolicySchema,
 } from '../../domain/events/definition';
 
 /** 不兼容存档备份的 localStorage key 前缀 */
@@ -210,6 +211,7 @@ const EventExecutableSnapshotSchema = z
     deadlineDays: z.number().nullable(),
     chainId: z.string().nullable(),
     nodeId: z.string().nullable(),
+    repeatPolicy: EventRepeatPolicySchema,
   })
   .strict();
 

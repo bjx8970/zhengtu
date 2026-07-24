@@ -11,20 +11,11 @@
 import type { PlayerSave } from '../../types/player';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { EffectDefinition } from '../../domain/conditions';
-import type {
-  EventInstance,
-  ScheduledEventInstance,
-  EventHistoryRecord,
-  EventChainInstance,
-} from '../../domain/events/state';
+import type { EventInstance, EventHistoryRecord } from '../../domain/events/state';
 import type { EventCooldownRecord, ScheduledEventCancellation } from '../../domain/events/types';
-import type {
-  EventOptionDefinition,
-  EventDefinition,
-  ScheduledFollowupDefinition,
-} from '../../domain/events/definition';
-import { createEventSnapshot } from './event-orchestrator';
-import { evaluateCondition } from './condition-interpreter';
+import type { EventOptionDefinition, EventDefinition } from '../../domain/events/definition';
+import { planEventFollowups } from './event-followup-planner';
+import { buildEventCooldownRecord } from './event-cooldown';
 
 /** 选项结算输入 */
 export interface ResolveEventOptionInput {
@@ -35,6 +26,8 @@ export interface ResolveEventOptionInput {
   rng: () => number;
   idFactory: () => string;
   definitions: readonly EventDefinition[];
+  /** 已应用当前选项效果的只读状态，仅用于后续条件评估 */
+  conditionState?: Readonly<PlayerSave>;
 }
 
 /** 选项结算结果 */
@@ -42,10 +35,11 @@ export type ResolveEventOptionResult =
   | {
       success: true;
       history: EventHistoryRecord;
-      scheduled: ScheduledEventInstance[];
       emittedSignals: DomainSignalSnapshot[];
       cooldownUpdate: EventCooldownRecord | null;
-      chainUpdate: EventChainInstance | null;
+      immediateInstances: EventInstance[];
+      scheduledInstances: import('../../domain/events/state').ScheduledEventInstance[];
+      chainUpdates: import('../../domain/events/state').EventChainInstance[];
       effectsToApply: EffectDefinition[];
       cancellations: ScheduledEventCancellation[];
     }
@@ -53,89 +47,6 @@ export type ResolveEventOptionResult =
       success: false;
       reason: 'event_not_found' | 'event_not_active' | 'event_expired' | 'option_not_found';
     };
-
-/**
- * 处理调度定义，创建 ScheduledEventInstance 列表。
- *
- * 使用真实 EventDefinition 创建快照，不再创建伪定义。
- * event.resolved 信号仅在事件实际激活时由调度器发出，此处不提前发射。
- *
- * @param schedules 调度定义列表
- * @param sourceKey 来源键
- * @param chainInstanceId 当前链实例 ID
- * @param parentChainId 父事件所属链 ID
- * @param currentDay 当前游戏日
- * @param rng 随机数生成器
- * @param idFactory ID 工厂
- * @param definitions 事件定义列表
- * @param state 游戏状态（条件评估用）
- * @param signal 触发信号上下文（条件评估用）
- * @param evalCurrentDay 条件评估用的当前日
- */
-function resolveSchedule(
-  schedules: readonly ScheduledFollowupDefinition[] | undefined,
-  sourceKey: string,
-  chainInstanceId: string | null,
-  parentChainId: string | null,
-  currentDay: number,
-  rng: () => number,
-  idFactory: () => string,
-  definitions: readonly EventDefinition[],
-  state: Readonly<PlayerSave>,
-  signal: DomainSignalSnapshot,
-  evalCurrentDay: number,
-): ScheduledEventInstance[] {
-  const scheduled: ScheduledEventInstance[] = [];
-
-  if (!schedules) return scheduled;
-
-  for (const sched of schedules) {
-    if (sched.probability != null && rng() >= sched.probability) continue;
-
-    const def = definitions.find((d) => d.id === sched.eventId);
-    if (!def) continue;
-
-    // 评估调度条件（如配置了 condition）
-    if (sched.condition) {
-      const ctx = { signal, state, currentDay: evalCurrentDay, daysPerYear: 360 };
-      try {
-        if (!evaluateCondition(sched.condition, ctx)) continue;
-      } catch {
-        continue;
-      }
-    }
-
-    // 仅当后续事件属于同一链时继承链实例 ID；不同链的事件需要独立链实例
-    const inheritsChain = def.chainId != null && def.chainId === parentChainId;
-    const resolvedChainInstanceId = inheritsChain ? chainInstanceId : null;
-
-    const signalId = idFactory();
-    const activateAtDay = currentDay + sched.delayDays;
-
-    scheduled.push({
-      instanceId: idFactory(),
-      eventId: sched.eventId,
-      scheduledAtDay: currentDay,
-      activateAtDay,
-      triggerContext: {
-        signalId,
-        signalType: 'event.resolved',
-        occurredAtDay: currentDay,
-        data: {
-          eventInstanceId: `scheduled_${sched.eventId}`,
-          eventId: sched.eventId,
-          optionId: null,
-          occurredAtDay: currentDay,
-        },
-      },
-      sourceKey,
-      chainInstanceId: resolvedChainInstanceId,
-      snapshot: createEventSnapshot(def),
-    });
-  }
-
-  return scheduled;
-}
 
 /**
  * 结算玩家选择的事件选项。
@@ -147,7 +58,16 @@ function resolveSchedule(
  * @returns 结算结果
  */
 export function resolveEventOption(input: ResolveEventOptionInput): ResolveEventOptionResult {
-  const { state, eventInstanceId, optionId, currentDay, rng, idFactory, definitions } = input;
+  const {
+    state,
+    eventInstanceId,
+    optionId,
+    currentDay,
+    rng,
+    idFactory,
+    definitions,
+    conditionState,
+  } = input;
 
   // 查找事件实例
   const pendingIndex = state.events.pending.findIndex((p) => p.instanceId === eventInstanceId);
@@ -158,7 +78,12 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
   const instance: EventInstance = state.events.pending[pendingIndex]!;
 
   // 验证状态
-  if (instance.status !== 'active' && instance.status !== 'pending') {
+  const isBlocking = instance.snapshot.presentation === 'blocking';
+  const canResolve = isBlocking
+    ? instance.status === 'active' && state.events.activeBlockingEventId === instance.instanceId
+    : instance.snapshot.presentation === 'inbox' &&
+      (instance.status === 'active' || instance.status === 'pending');
+  if (!canResolve) {
     return { success: false, reason: 'event_not_active' };
   }
 
@@ -187,56 +112,12 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
     label: eff.target,
   }));
 
-  // 冷却计算：优先使用选项级冷却，回退到事件级 repeatPolicy.cooldownDays
-  let cooldownUpdate: EventCooldownRecord | null = null;
-  const eventDef = definitions.find((d) => d.id === instance.eventId);
-  const effectiveCooldownDays = option.cooldownDays ?? eventDef?.repeatPolicy.cooldownDays;
-  if (effectiveCooldownDays && effectiveCooldownDays > 0) {
-    cooldownUpdate = {
-      eventId: instance.eventId,
-      scope: 'global',
-      scopeId: null,
-      untilDay: currentDay + effectiveCooldownDays,
-    };
-  }
-
-  // 调度后续事件（使用真实定义，不提前发射 event.resolved）
-  const scheduled = resolveSchedule(
-    option.schedule,
-    instance.sourceKey,
-    instance.chainInstanceId,
-    instance.snapshot.chainId,
-    currentDay,
-    rng,
-    idFactory,
-    definitions,
-    state,
-    instance.triggerContext,
-    currentDay,
-  );
-
   // 取消规范
-  const cancellations: ScheduledEventCancellation[] = option.cancelScheduled ?? [];
+  const cancellations: ScheduledEventCancellation[] = [...(option.cancelScheduled ?? [])];
   // 兼容旧 cancelScheduledEvents 格式
   if (option.cancelScheduledEvents) {
     for (const eventId of option.cancelScheduledEvents) {
       cancellations.push({ eventId, scope: 'all' });
-    }
-  }
-
-  // 事件链更新
-  let chainUpdate: EventChainInstance | null = null;
-  if (instance.chainInstanceId) {
-    const ci = state.events.chainInstances[instance.chainInstanceId];
-    if (ci) {
-      // 解析节点标识符：优先使用快照中的 nodeId，回退到 eventId
-      const resolvedNodeId = instance.snapshot.nodeId ?? instance.eventId;
-      chainUpdate = {
-        ...ci,
-        activeNodeIds: ci.activeNodeIds.filter((n) => n !== resolvedNodeId),
-        completedNodeIds: [...ci.completedNodeIds, resolvedNodeId],
-        completedAtDay: ci.activeNodeIds.length <= 1 ? currentDay : ci.completedAtDay,
-      };
     }
   }
 
@@ -252,6 +133,17 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
       occurredAtDay: currentDay,
     },
   };
+
+  const followups = planEventFollowups({
+    schedules: option.schedule,
+    parentInstance: instance,
+    resolvedSignal,
+    state: conditionState ?? state,
+    currentDay,
+    definitions,
+    rng,
+    idFactory,
+  });
 
   // 历史记录
   const history: EventHistoryRecord = {
@@ -271,10 +163,11 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
   return {
     success: true,
     history,
-    scheduled,
     emittedSignals: [resolvedSignal],
-    cooldownUpdate,
-    chainUpdate,
+    cooldownUpdate: buildEventCooldownRecord(instance, option.cooldownDays, currentDay),
+    immediateInstances: followups.immediateInstances,
+    scheduledInstances: followups.scheduledInstances,
+    chainUpdates: followups.chainUpdates,
     effectsToApply,
     cancellations,
   };

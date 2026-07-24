@@ -19,7 +19,7 @@ import type {
   EventCooldownRecord,
 } from './types';
 import type { DomainSignalSnapshot } from '../governance/types';
-import type { EventOptionDefinition, EventOutcomePayload } from './definition';
+import type { EventOptionDefinition, EventOutcomePayload, EventRepeatPolicy } from './definition';
 
 /** 事件可执行快照 */
 export interface EventExecutableSnapshot {
@@ -39,6 +39,8 @@ export interface EventExecutableSnapshot {
   chainId: string | null;
   /** 链内节点 ID（null 表示非链节点） */
   nodeId: string | null;
+  /** 实例创建时冻结的重复与冷却策略 */
+  repeatPolicy: EventRepeatPolicy;
 }
 
 /** 事件实例 */

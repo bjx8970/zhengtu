@@ -111,7 +111,7 @@ export function expireEventInstances(
   currentDay: number,
 ): EventExpirationResult {
   const expiredRecords: EventHistoryRecord[] = [];
-  const chainsToUpdate: EventChainInstance[] = [];
+  const chains = new Map<string, EventChainInstance>();
 
   for (const inst of state.events.pending) {
     if (inst.deadlineDay == null || currentDay <= inst.deadlineDay) continue;
@@ -133,17 +133,22 @@ export function expireEventInstances(
 
     // 更新链实例
     if (inst.chainInstanceId) {
-      const ci = state.events.chainInstances[inst.chainInstanceId];
+      const ci =
+        chains.get(inst.chainInstanceId) ?? state.events.chainInstances[inst.chainInstanceId];
       if (ci) {
-        chainsToUpdate.push({
+        const activeNodeIds = ci.activeNodeIds.filter(
+          (nodeId) => nodeId !== (inst.snapshot.nodeId ?? inst.eventId),
+        );
+        const completed = activeNodeIds.length === 0;
+        chains.set(ci.instanceId, {
           ...ci,
-          activeNodeIds: ci.activeNodeIds.filter(
-            (n) => n !== (inst.snapshot.nodeId ?? inst.eventId),
-          ),
+          activeNodeIds,
+          status: completed ? 'completed' : 'active',
+          completedAtDay: completed ? currentDay : null,
         });
       }
     }
   }
 
-  return { expiredRecords, chainsToUpdate };
+  return { expiredRecords, chainsToUpdate: [...chains.values()] };
 }

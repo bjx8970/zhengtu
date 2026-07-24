@@ -13,7 +13,7 @@
 
 import type { PlayerSave } from '../../types/player';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
-import type { EventDefinition, ScheduledFollowupDefinition } from '../../domain/events/definition';
+import type { EventDefinition } from '../../domain/events/definition';
 import type {
   EventInstance,
   ScheduledEventInstance,
@@ -71,6 +71,7 @@ export function createEventSnapshot(def: EventDefinition): EventExecutableSnapsh
     deadlineDays: def.activation.deadlineDays ?? null,
     chainId: def.chainId ?? null,
     nodeId: def.nodeId ?? null,
+    repeatPolicy: structuredClone(def.repeatPolicy),
   };
 }
 
@@ -149,16 +150,9 @@ function checkEventRepeatability(
       return exists;
     }
     case 'once_per_chain': {
-      // 无链实例时（如跨链调度尚未创建子链），回退为检查同 eventId 的所有实例
-      // 注意：不按 sourceKey 匹配，因为级联信号的 sourceKey（eventInstanceId）
-      // 与 resolveSchedule 设置的 sourceKey（父实例 sourceKey）可能不同。
-      if (!def.chainId || !chainInstance) {
-        return (
-          state.events.history.some((h) => h.eventId === def.id) ||
-          state.events.pending.some((p) => p.eventId === def.id) ||
-          state.events.scheduled.some((s) => s.eventId === def.id)
-        );
-      }
+      // 尚未物化的目标链没有可比较的 chainInstanceId；入选后才创建链。
+      // 禁止退化为全局 eventId 检查，否则不同来源的独立链会互相阻塞。
+      if (!def.chainId || !chainInstance) return false;
       if (chainInstance.completedNodeIds.includes(def.nodeId ?? def.id)) return true;
       const exists =
         state.events.history.some(
@@ -339,95 +333,11 @@ function findOrCreateChainInstance(
 function isSignalProcessed(
   state: Readonly<PlayerSave>,
   signalId: string,
-  allNewInstances: EventInstance[],
+  _allNewInstances: EventInstance[],
   processedIds: ReadonlySet<string>,
 ): boolean {
   if (processedIds.has(signalId)) return true;
-  if (state.events.processedSignalIds.includes(signalId)) return true;
-  const inPending = state.events.pending.some((p) => p.triggerContext.signalId === signalId);
-  const inScheduled = state.events.scheduled.some((s) => s.triggerContext.signalId === signalId);
-  const inNew = allNewInstances.some((i) => i.triggerContext.signalId === signalId);
-  return inPending || inScheduled || inNew;
-}
-
-/**
- * 处理调度的后续事件，创建 ScheduledEventInstance。
- *
- * 注意：不在此处发出 event.resolved 级联信号——后续事件尚未激活，
- * event.resolved 信号应在计划事件实际激活时（activateScheduledEvents）才发出。
- *
- * @param schedules 调度定义列表
- * @param sourceKey 来源键
- * @param chainInstanceId 链实例 ID
- * @param currentDay 当前游戏日
- * @param defs 事件定义列表
- * @param rng 随机数生成器
- * @param idFactory ID 工厂
- * @param state 游戏状态（条件评估用）
- * @param parentSignal 父触发信号（条件评估用）
- * @param evalCurrentDay 条件评估用的当前日
- * @returns 计划事件实例
- */
-export function processScheduledFollowups(
-  schedules: readonly ScheduledFollowupDefinition[],
-  sourceKey: string,
-  chainInstanceId: string | null,
-  currentDay: number,
-  defs: readonly EventDefinition[],
-  rng: () => number,
-  idFactory: () => string,
-  state: Readonly<PlayerSave>,
-  parentSignal: DomainSignalSnapshot,
-  evalCurrentDay: number,
-): ScheduledEventInstance[] {
-  const scheduled: ScheduledEventInstance[] = [];
-
-  for (const sched of schedules) {
-    if (sched.probability != null && rng() >= sched.probability) continue;
-
-    const def: EventDefinition | undefined = defs.find((d) => d.id === sched.eventId);
-    if (!def) continue;
-
-    // 评估调度条件
-    if (sched.condition) {
-      const ctx = { signal: parentSignal, state, currentDay: evalCurrentDay, daysPerYear: 360 };
-      try {
-        if (!evaluateCondition(sched.condition, ctx)) continue;
-      } catch {
-        continue;
-      }
-    }
-
-    const activateAtDay = currentDay + sched.delayDays;
-    const snapshot = createEventSnapshot(def);
-
-    const signalId = idFactory();
-    // 创建触发上下文供计划事件激活时使用
-    const triggerContext: DomainSignalSnapshot = {
-      signalId,
-      signalType: 'event.resolved',
-      occurredAtDay: currentDay,
-      data: {
-        eventInstanceId: `scheduled_${sched.eventId}`,
-        eventId: sched.eventId,
-        optionId: null,
-        occurredAtDay: currentDay,
-      },
-    };
-
-    scheduled.push({
-      instanceId: idFactory(),
-      eventId: sched.eventId,
-      scheduledAtDay: currentDay,
-      activateAtDay,
-      triggerContext,
-      sourceKey,
-      chainInstanceId,
-      snapshot: snapshot,
-    });
-  }
-
-  return scheduled;
+  return state.events.processedSignalIds.includes(signalId);
 }
 
 /**
@@ -474,7 +384,11 @@ function resolveSingleSignal(
   // 记录此信号为已处理
   processedIds.add(sig.signalId);
 
-  const sourceKey = deriveEventSourceKey(sig);
+  const resolvedParent =
+    sig.signalType === 'event.resolved'
+      ? state.events.history.find((item) => item.instanceId === sig.data.eventInstanceId)
+      : null;
+  const sourceKey = resolvedParent?.sourceKey ?? deriveEventSourceKey(sig);
 
   // 按稳定 ID 排序候选
   const candidates = defs

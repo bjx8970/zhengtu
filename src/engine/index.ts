@@ -11,6 +11,8 @@ export * from './core/effect';
 export * from './core/timeline';
 export * from './events/condition-interpreter';
 export * from './events/effect-executor';
+export * from './events/event-cooldown';
+export * from './events/event-followup-planner';
 export * from './events/event-orchestrator';
 export * from './events/event-resolver';
 export * from './events/event-scheduler';
