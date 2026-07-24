@@ -14,6 +14,7 @@ import type {
 } from '../../domain/events/state';
 import { evaluateCondition } from './condition-interpreter';
 import { createEventSnapshot } from './event-orchestrator';
+import { findEventCooldownEndDay, isEventRepeatBlocked } from './event-eligibility';
 
 /** 后续事件规划结果 */
 export interface EventFollowupPlan {
@@ -80,6 +81,26 @@ function findOrCreateTargetChain(
   };
   chains.set(created.instanceId, created);
   return created;
+}
+
+function findExistingTargetChain(
+  input: PlanEventFollowupsInput,
+  chainId: string,
+  chains: ReadonlyMap<string, EventChainInstance>,
+): EventChainInstance | null {
+  const { parentInstance, state } = input;
+  if (parentInstance.snapshot.chainId === chainId && parentInstance.chainInstanceId) {
+    return (
+      chains.get(parentInstance.chainInstanceId) ??
+      state.events.chainInstances[parentInstance.chainInstanceId] ??
+      null
+    );
+  }
+  return (
+    [...chains.values(), ...Object.values(state.events.chainInstances)].find(
+      (chain) => chain.chainId === chainId && chain.sourceKey === parentInstance.sourceKey,
+    ) ?? null
+  );
 }
 
 function registerNode(chain: EventChainInstance, nodeId: string): void {
@@ -151,11 +172,16 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
     mutexGroups.set(schedule.mutexGroup, group);
   }
   for (const group of mutexGroups.values()) {
-    const totalWeight = group.reduce((sum, schedule) => sum + (schedule.probability ?? 1), 0);
+    const weightedSchedules = group.filter((schedule) => (schedule.probability ?? 1) > 0);
+    const totalWeight = weightedSchedules.reduce(
+      (sum, schedule) => sum + (schedule.probability ?? 1),
+      0,
+    );
+    if (totalWeight <= 0) continue;
     let roll = input.rng() * totalWeight;
-    for (const schedule of group) {
+    for (const schedule of weightedSchedules) {
       roll -= schedule.probability ?? 1;
-      if (roll <= 0) {
+      if (roll < 0) {
         selectedSchedules.push(schedule);
         break;
       }
@@ -165,6 +191,33 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
   for (const schedule of selectedSchedules) {
     const definition = input.definitions.find((item) => item.id === schedule.eventId);
     if (!definition) continue;
+
+    const existingChain = definition.chainId
+      ? findExistingTargetChain(input, definition.chainId, chains)
+      : null;
+    const transactionInstances = [...immediateInstances, ...scheduledInstances];
+    if (
+      isEventRepeatBlocked(
+        input.state,
+        definition,
+        input.parentInstance.sourceKey,
+        transactionInstances,
+        existingChain,
+      )
+    ) {
+      continue;
+    }
+    if (
+      findEventCooldownEndDay(
+        input.state.events.cooldowns,
+        definition,
+        input.parentInstance.sourceKey,
+        existingChain?.instanceId ?? null,
+        input.currentDay,
+      ) !== null
+    ) {
+      continue;
+    }
 
     const chain = definition.chainId
       ? findOrCreateTargetChain(input, definition.chainId, chains)

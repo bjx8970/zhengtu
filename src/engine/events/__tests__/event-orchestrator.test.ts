@@ -719,6 +719,33 @@ describe('processDomainSignal - 互斥组', () => {
     expect(result.createdInstances).toHaveLength(1);
     expect(result.createdInstances[0]!.eventId).toBe('evt_high_w');
   });
+
+  it('does not select a zero-weight mutex candidate when RNG is zero', () => {
+    const zeroWeight = makeEventDef({
+      id: 'evt_zero_weight',
+      mutexGroup: 'mg_zero_weight',
+      trigger: { sources: ['world.metric_changed'], weight: 0 },
+    });
+    const positiveWeight = makeEventDef({
+      id: 'evt_positive_weight',
+      mutexGroup: 'mg_zero_weight',
+      trigger: { sources: ['world.metric_changed'], weight: 1 },
+    });
+    const result = processDomainSignal(
+      makeInput({ definitions: [zeroWeight, positiveWeight], rng: () => 0 }),
+    );
+    expect(result.createdInstances.map((item) => item.eventId)).toEqual(['evt_positive_weight']);
+  });
+
+  it('does not select a mutex event when every candidate has zero weight', () => {
+    const zeroWeight = makeEventDef({
+      id: 'evt_all_zero_weight',
+      mutexGroup: 'mg_all_zero_weight',
+      trigger: { sources: ['world.metric_changed'], weight: 0 },
+    });
+    const result = processDomainSignal(makeInput({ definitions: [zeroWeight], rng: () => 0 }));
+    expect(result.createdInstances).toHaveLength(0);
+  });
 });
 
 describe('processDomainSignal - 实例创建', () => {

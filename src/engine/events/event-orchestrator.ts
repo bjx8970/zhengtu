@@ -20,11 +20,11 @@ import type {
   EventChainInstance,
   EventExecutableSnapshot,
 } from '../../domain/events/state';
-import type { EventCooldownRecord } from '../../domain/events/types';
-import type { EventOrchestrationDiagnostic } from '../../domain/events/types';
+import type { EventCooldownRecord, EventOrchestrationDiagnostic } from '../../domain/events/types';
 import { evaluateCondition } from './condition-interpreter';
 import { deriveEventSourceKey } from './source-key';
 import { CURRENT_CONTENT_VERSION } from '../../types/save';
+import { findEventCooldownEndDay, isEventRepeatBlocked } from './event-eligibility';
 
 const MAX_SIGNAL_DEPTH = 16;
 const MAX_SIGNALS_PER_TRANSACTION = 100;
@@ -114,107 +114,6 @@ function calculateActivateDay(
 }
 
 /**
- * 检查事件重复规则。
- *
- * @param state 游戏状态
- * @param def 事件定义
- * @param sourceKey 来源键
- * @param allNewInstances 当前事务已创建的实例
- * @param chainInstance 链实例
- * @returns 是否被重复规则阻止
- */
-function checkEventRepeatability(
-  state: Readonly<PlayerSave>,
-  def: EventDefinition,
-  sourceKey: string,
-  allNewInstances: EventInstance[],
-  chainInstance: EventChainInstance | null,
-): boolean {
-  const policy = def.repeatPolicy;
-
-  switch (policy.mode) {
-    case 'once': {
-      const exists =
-        state.events.history.some((h) => h.eventId === def.id) ||
-        state.events.pending.some((p) => p.eventId === def.id) ||
-        state.events.scheduled.some((s) => s.eventId === def.id) ||
-        allNewInstances.some((i) => i.eventId === def.id);
-      return exists;
-    }
-    case 'once_per_source': {
-      const exists =
-        state.events.history.some((h) => h.eventId === def.id && h.sourceKey === sourceKey) ||
-        state.events.pending.some((p) => p.eventId === def.id && p.sourceKey === sourceKey) ||
-        state.events.scheduled.some((s) => s.eventId === def.id && s.sourceKey === sourceKey) ||
-        allNewInstances.some((i) => i.eventId === def.id && i.sourceKey === sourceKey);
-      return exists;
-    }
-    case 'once_per_chain': {
-      // 尚未物化的目标链没有可比较的 chainInstanceId；入选后才创建链。
-      // 禁止退化为全局 eventId 检查，否则不同来源的独立链会互相阻塞。
-      if (!def.chainId || !chainInstance) return false;
-      if (chainInstance.completedNodeIds.includes(def.nodeId ?? def.id)) return true;
-      const exists =
-        state.events.history.some(
-          (h) => h.eventId === def.id && h.chainInstanceId === chainInstance.instanceId,
-        ) ||
-        state.events.pending.some(
-          (p) => p.eventId === def.id && p.chainInstanceId === chainInstance.instanceId,
-        ) ||
-        state.events.scheduled.some(
-          (s) => s.eventId === def.id && s.chainInstanceId === chainInstance.instanceId,
-        );
-      return exists;
-    }
-    case 'repeatable': {
-      if (policy.maxActivations == null) return false;
-      const total =
-        state.events.history.filter((h) => h.eventId === def.id).length +
-        state.events.pending.filter((p) => p.eventId === def.id).length +
-        state.events.scheduled.filter((s) => s.eventId === def.id).length +
-        allNewInstances.filter((i) => i.eventId === def.id).length;
-      return total >= policy.maxActivations;
-    }
-    default:
-      return false;
-  }
-}
-
-/**
- * 检查事件冷却。
- *
- * @param cooldowns 冷却记录数组
- * @param def 事件定义
- * @param sourceKey 来源键
- * @param chainInstanceId 链实例 ID
- * @param currentDay 当前绝对游戏日
- * @returns 如果被阻止，返回 untilDay；否则返回 null
- */
-function checkEventCooldown(
-  cooldowns: EventCooldownRecord[],
-  def: EventDefinition,
-  sourceKey: string,
-  chainInstanceId: string | null,
-  currentDay: number,
-): number | null {
-  for (const cd of cooldowns) {
-    if (cd.eventId !== def.id) continue;
-    if (cd.untilDay <= currentDay) continue;
-    switch (cd.scope) {
-      case 'global':
-        return cd.untilDay;
-      case 'source':
-        if (cd.scopeId === sourceKey) return cd.untilDay;
-        break;
-      case 'chain':
-        if (cd.scopeId === chainInstanceId) return cd.untilDay;
-        break;
-    }
-  }
-  return null;
-}
-
-/**
  * 加权随机选择互斥组优胜者。
  *
  * @param candidates 互斥组内候选事件
@@ -226,19 +125,20 @@ function selectMutexGroupWinner(
   rng: () => number,
 ): EventDefinition | null {
   if (candidates.length === 0) return null;
+  const weightedCandidates = candidates.filter((candidate) => (candidate.trigger.weight ?? 1) > 0);
+  if (weightedCandidates.length === 0) return null;
   // noUncheckedIndexedAccess: 已通过 length 检查保证索引有效
-  if (candidates.length === 1) return candidates[0]!;
-
-  const weights = candidates.map((d) => d.trigger.weight ?? 1);
-  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  if (weightedCandidates.length === 1) return weightedCandidates[0]!;
+  const weights = weightedCandidates.map((candidate) => candidate.trigger.weight ?? 1);
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
   if (totalWeight <= 0) return null;
 
   let r = rng() * totalWeight;
-  for (let i = 0; i < candidates.length; i++) {
+  for (let i = 0; i < weightedCandidates.length; i++) {
     r -= weights[i]!;
-    if (r <= 0) return candidates[i]!;
+    if (r < 0) return weightedCandidates[i]!;
   }
-  return candidates[candidates.length - 1]!;
+  return weightedCandidates[weightedCandidates.length - 1]!;
 }
 
 /**
@@ -403,13 +303,21 @@ function resolveSingleSignal(
       ? findExistingChainInstance(state, def.chainId, sourceKey, allChains)
       : null;
 
-    if (checkEventRepeatability(state, def, sourceKey, allNewInstances, chainInstance)) {
+    if (
+      isEventRepeatBlocked(
+        state,
+        def,
+        sourceKey,
+        [...allNewInstances, ...allScheduled],
+        chainInstance,
+      )
+    ) {
       allDiagnostics.push({ type: 'repeat_blocked', eventId: def.id });
       continue;
     }
 
     const allCd = [...state.events.cooldowns, ...allCooldowns];
-    const cdUntil = checkEventCooldown(
+    const cdUntil = findEventCooldownEndDay(
       allCd,
       def,
       sourceKey,

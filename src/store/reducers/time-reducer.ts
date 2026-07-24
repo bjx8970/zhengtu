@@ -320,7 +320,15 @@ function reduceAdvanceTimeInternal(draft: PlayerSave, payload: AdvanceTimePayloa
   const rng = payload._rng ?? Math.random;
   const idFactory = payload._idFactory ?? createRuntimeIdFactory('timeline-event');
 
-  // 先处理当前日已经到期的计划/过期事件；未解决 blocker 会暂停时间。
+  // 已有 blocker 时不得借由第二次推进激活同日剩余计划事件。先处理
+  // 当前日的合法过期收尾，若 blocker 仍存在则原地返回。
+  expireEventsAtDay(draft, draft.time.totalDaysPlayed);
+  if (draft.events.activeBlockingEventId !== null) {
+    draft.time.granularity = payload.granularity;
+    return;
+  }
+
+  // 先处理当前日已经到期的计划/过期事件；新 blocker 同样会暂停时间。
   activateEventsAtDay(draft, draft.time.totalDaysPlayed, rng, idFactory);
   expireEventsAtDay(draft, draft.time.totalDaysPlayed);
 

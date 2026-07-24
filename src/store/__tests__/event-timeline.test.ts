@@ -193,6 +193,77 @@ describe('event timeline integration', () => {
     expect(after.character.vigor).toBe(originalVigor);
   });
 
+  it('does not activate the remaining same-day events when an unresolved blocker advances again', () => {
+    const state = createInitialState();
+    const blocker = createEventSnapshot({
+      id: 'readvance_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Blocker',
+      description: '',
+      category: 'emergency',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'ack', label: '处理', description: '', effects: [] }],
+    });
+    const automatic = createEventSnapshot({
+      id: 'readvance_automatic',
+      chainId: null,
+      nodeId: null,
+      title: 'Automatic',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [{ target: 'character', field: 'vigor', operation: 'add', value: 10 }],
+      },
+    });
+    state.events.scheduled.push(
+      {
+        instanceId: 'readvance_blocker_instance',
+        eventId: blocker.eventId,
+        scheduledAtDay: 0,
+        activateAtDay: 1,
+        triggerContext: makeSignal('readvance_blocker'),
+        sourceKey: 'readvance',
+        chainInstanceId: null,
+        snapshot: blocker,
+      },
+      {
+        instanceId: 'readvance_automatic_instance',
+        eventId: automatic.eventId,
+        scheduledAtDay: 0,
+        activateAtDay: 1,
+        triggerContext: makeSignal('readvance_automatic'),
+        sourceKey: 'readvance',
+        chainInstanceId: null,
+        snapshot: automatic,
+      },
+    );
+    const originalVigor = state.character.vigor;
+    const store = createTestStore(state);
+
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'week' });
+
+    const after = store.getRawState();
+    expect(after.time.totalDaysPlayed).toBe(1);
+    expect(after.events.activeBlockingEventId).toBe('readvance_blocker_instance');
+    expect(after.events.scheduled.map((item) => item.instanceId)).toContain(
+      'readvance_automatic_instance',
+    );
+    expect(after.events.history.some((item) => item.eventId === 'readvance_automatic')).toBe(false);
+    expect(after.character.vigor).toBe(originalVigor);
+  });
+
   it('shares one monotonic ID factory across automatic follow-ups and secondary cascades', () => {
     const definition = getConfigLoader().getEventDefinition('formal_investigation')!;
     const state = createInitialState();
