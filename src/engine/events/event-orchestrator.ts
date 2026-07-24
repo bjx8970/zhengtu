@@ -149,12 +149,14 @@ function checkEventRepeatability(
       return exists;
     }
     case 'once_per_chain': {
-      // 无链实例时（如跨链调度尚未创建子链），回退为检查同 eventId+sourceKey 的所有实例
+      // 无链实例时（如跨链调度尚未创建子链），回退为检查同 eventId 的所有实例
+      // 注意：不按 sourceKey 匹配，因为级联信号的 sourceKey（eventInstanceId）
+      // 与 resolveSchedule 设置的 sourceKey（父实例 sourceKey）可能不同。
       if (!def.chainId || !chainInstance) {
         return (
-          state.events.history.some((h) => h.eventId === def.id && h.sourceKey === sourceKey) ||
-          state.events.pending.some((p) => p.eventId === def.id && p.sourceKey === sourceKey) ||
-          state.events.scheduled.some((s) => s.eventId === def.id && s.sourceKey === sourceKey)
+          state.events.history.some((h) => h.eventId === def.id) ||
+          state.events.pending.some((p) => p.eventId === def.id) ||
+          state.events.scheduled.some((s) => s.eventId === def.id)
         );
       }
       if (chainInstance.completedNodeIds.includes(def.nodeId ?? def.id)) return true;

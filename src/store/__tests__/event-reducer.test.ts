@@ -607,75 +607,189 @@ describe('event-reducer: cascade signals and scheduling', () => {
     );
   });
 
-  it('end-to-end cascade: option → event.resolved → cascade processing', () => {
-    // Event A resolves, emitting event.resolved signal → cascade triggers
-    // processDomainSignal. This verifies the full reducer cascade path.
-    const e2eSnapshot = createEventSnapshot({
-      id: 'evt_e2e_source',
-      chainId: null,
-      nodeId: null,
-      title: 'E2E Cascade Source',
-      description: '',
+  it('end-to-end cascade: investigation_start → event.resolved → cascade produces downstream', () => {
+    // Uses real config: investigation_start resolves with "cooperate" →
+    // resolveSchedule creates scheduled formal_investigation →
+    // event.resolved cascade triggers processDomainSignal →
+    // suppress_investigation (trigger: event.resolved, no condition) is created as pending
+    // formal_investigation is blocked by once_per_chain (already scheduled with chain)
+    // investigation_cleared (auto) is created and auto-resolves → event.resolved → cascade round 2
+    //
+    // This verifies the full lifecycle: option → resolveSchedule → cascade →
+    // orchestrator → once_per_chain dedup → auto-event auto-resolve → secondary cascade
+    const invSnapshot = createEventSnapshot({
+      id: 'investigation_start',
+      chainId: 'investigation_chain',
+      nodeId: 'start',
+      title: '腐败举报',
+      description: '有匿名举报称辖区存在严重腐败问题。',
       category: 'governance',
-      priority: 'normal',
+      priority: 'urgent',
       presentation: 'inbox',
       trigger: { sources: ['world.metric_changed'] },
-      repeatPolicy: { mode: 'once' },
-      activation: { deadlineDays: 30 },
+      repeatPolicy: { mode: 'once_per_source' },
+      activation: { deadlineDays: 7 },
       options: [
         {
-          id: 'opt_e2e',
-          label: '触发级联',
-          description: '',
-          effects: [
-            { target: 'character', field: 'diligence', operation: 'add', value: 10 },
-            { target: 'world_fact', factId: 'e2e_test_resolved', operation: 'set', value: true },
-          ],
+          id: 'cooperate',
+          label: '配合调查',
+          description: '全力配合纪委调查。',
+          effects: [{ target: 'character', field: 'integrity', operation: 'add', value: 5 }],
+          schedule: [{ eventId: 'formal_investigation', delayDays: 3, probability: 1 }],
+        },
+        {
+          id: 'suppress',
+          label: '压制举报',
+          description: '私下平息此事。',
+          effects: [],
+          schedule: [{ eventId: 'suppress_investigation', delayDays: 1, probability: 1 }],
         },
       ],
     });
 
-    const e2eInst: EventInstance = {
-      instanceId: 'inst_e2e_001',
-      eventId: 'evt_e2e_source',
+    const invInst: EventInstance = {
+      instanceId: 'inst_inv_start',
+      eventId: 'investigation_start',
       status: 'pending',
-      triggeredAtDay: 50,
-      activatedAtDay: 50,
+      triggeredAtDay: 100,
+      activatedAtDay: 100,
       deadlineDay: null,
-      triggerContext: { ...makeSignal(), signalId: 'sig_e2e' },
-      sourceKey: 'src_e2e',
+      triggerContext: { ...makeSignal(), signalId: 'sig_inv_start' },
+      sourceKey: 'src_inv_start',
       chainInstanceId: null,
-      snapshot: e2eSnapshot,
+      snapshot: invSnapshot,
     };
 
     const baseState = createStateWithPending();
-    baseState.events.pending = [e2eInst];
+    baseState.events.pending = [invInst];
 
     const store = createTestStore(baseState);
     store.dispatch({
       type: 'CHOOSE_EVENT_OPTION',
-      eventInstanceId: 'inst_e2e_001',
-      optionId: 'opt_e2e',
+      eventInstanceId: 'inst_inv_start',
+      optionId: 'cooperate',
     });
 
-    const state = store.getRawState();
-    // Event resolved and removed from pending
-    expect(state.events.pending.find((p) => p.instanceId === 'inst_e2e_001')).toBeUndefined();
+    const after = store.getRawState();
 
-    // History records created: at minimum the resolved event itself
-    const e2eHistory = state.events.history.find((h) => h.instanceId === 'inst_e2e_001');
-    expect(e2eHistory).toBeDefined();
-    expect(e2eHistory!.finalStatus).toBe('resolved');
-    expect(e2eHistory!.chosenOptionId).toBe('opt_e2e');
-    expect(e2eHistory!.appliedEffects.length).toBeGreaterThanOrEqual(2);
+    // 1. Source event resolved and removed from pending
+    expect(after.events.pending.find((p) => p.instanceId === 'inst_inv_start')).toBeUndefined();
 
-    // World fact applied via effect pipeline
-    expect(state.world.facts['e2e_test_resolved']).toBe(true);
+    // 2. History created
+    const srcHistory = after.events.history.find((h) => h.instanceId === 'inst_inv_start');
+    expect(srcHistory).toBeDefined();
+    expect(srcHistory!.finalStatus).toBe('resolved');
+    expect(srcHistory!.chosenOptionId).toBe('cooperate');
 
-    // event.resolved signal processed through cascade
-    // If any auto event matched, its history would also appear.
-    // Even if none matched, processedSignalIds should have grown.
-    const processedCount = state.events.processedSignalIds.length;
-    expect(processedCount).toBeGreaterThan(0);
+    // 3. resolveSchedule: formal_investigation scheduled (delay 3 days)
+    const schedFormal = after.events.scheduled.find((s) => s.eventId === 'formal_investigation');
+    expect(schedFormal).toBeDefined();
+    expect(schedFormal!.activateAtDay).toBe(103); // currentDay=100 + delayDays=3
+
+    // 4. Cascade: event.resolved triggers suppress_investigation in orchestrator
+    // (suppress_investigation has trigger.sources=['event.resolved'], no condition)
+    const suppressPending = after.events.pending.find(
+      (p) => p.eventId === 'suppress_investigation',
+    );
+    expect(suppressPending).toBeDefined();
+    expect(suppressPending!.triggerContext.signalType).toBe('event.resolved');
+
+    // 5. Cascade dedup: formal_investigation is NOT in pending (scheduled exists,
+    // once_per_chain with chain blocks duplicate creation)
+    const formalPending = after.events.pending.filter((p) => p.eventId === 'formal_investigation');
+    expect(formalPending).toHaveLength(0);
+
+    // 6. Auto-event cascade: investigation_cleared (auto, trigger: event.resolved)
+    // is created by cascade and auto-resolves, producing history
+    const clearedHistory = after.events.history.find(
+      (h) => h.eventId === 'investigation_cleared' && h.instanceId !== 'inst_inv_start',
+    );
+    expect(clearedHistory).toBeDefined();
+    expect(clearedHistory!.finalStatus).toBe('resolved');
+
+    // 7. processedSignalIds grows (cascade signals recorded)
+    expect(after.events.processedSignalIds.length).toBeGreaterThan(0);
+
+    // 8. investigation_chain created with nodes tracked
+    const chainEntries = Object.values(after.events.chainInstances);
+    const invChain = chainEntries.find((c) => c.chainId === 'investigation_chain');
+    expect(invChain).toBeDefined();
+    // noUncheckedIndexedAccess: verified invChain is defined above
+    // Chain has active nodes (auto-event "cleared" or "investigation") from cascade
+    const totalTrackedNodes = invChain!.activeNodeIds.length + invChain!.completedNodeIds.length;
+    expect(totalTrackedNodes).toBeGreaterThanOrEqual(1);
+  });
+
+  it('cross-chain cascade: suppress option does not duplicate suppress_investigation', () => {
+    // Regression test for once_per_chain fallback fix:
+    // investigation_start.suppress → resolveSchedule creates scheduled suppress_investigation
+    // → event.resolved cascade → orchestrator should NOT create a duplicate pending instance
+    // because once_per_chain fallback now checks by eventId (not eventId+sourceKey)
+    const invSnapshot = createEventSnapshot({
+      id: 'investigation_start',
+      chainId: 'investigation_chain',
+      nodeId: 'start',
+      title: '腐败举报',
+      description: '',
+      category: 'governance',
+      priority: 'urgent',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once_per_source' },
+      activation: { deadlineDays: 7 },
+      options: [
+        {
+          id: 'suppress',
+          label: '压制举报',
+          description: '',
+          effects: [],
+          schedule: [{ eventId: 'suppress_investigation', delayDays: 1, probability: 1 }],
+        },
+      ],
+    });
+
+    const invInst: EventInstance = {
+      instanceId: 'inst_inv_suppress',
+      eventId: 'investigation_start',
+      status: 'pending',
+      triggeredAtDay: 100,
+      activatedAtDay: 100,
+      deadlineDay: null,
+      triggerContext: { ...makeSignal(), signalId: 'sig_inv_suppress' },
+      sourceKey: 'src_suppress_test',
+      chainInstanceId: null,
+      snapshot: invSnapshot,
+    };
+
+    const baseState = createStateWithPending();
+    baseState.events.pending = [invInst];
+
+    const store = createTestStore(baseState);
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_inv_suppress',
+      optionId: 'suppress',
+    });
+
+    const after = store.getRawState();
+
+    // resolveSchedule creates exactly one scheduled suppress_investigation
+    const schedSuppress = after.events.scheduled.filter(
+      (s) => s.eventId === 'suppress_investigation',
+    );
+    expect(schedSuppress).toHaveLength(1);
+    expect(schedSuppress[0]!.activateAtDay).toBe(101); // currentDay=100 + delayDays=1
+
+    // Cascade should NOT create a pending suppress_investigation (duplicate)
+    const pendingSuppress = after.events.pending.filter(
+      (p) => p.eventId === 'suppress_investigation',
+    );
+    expect(pendingSuppress).toHaveLength(0);
+
+    // Only one suppress_investigation instance total (the scheduled one)
+    const totalSuppress =
+      after.events.scheduled.filter((s) => s.eventId === 'suppress_investigation').length +
+      after.events.pending.filter((p) => p.eventId === 'suppress_investigation').length;
+    expect(totalSuppress).toBe(1);
   });
 });

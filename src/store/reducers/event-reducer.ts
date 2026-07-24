@@ -439,9 +439,11 @@ export function processCascadeSignals(
 /**
  * 推进阻塞指针：从 pending 中找下一个 blocking 事件设为 activeBlockingEventId。
  *
+ * 供 time-reducer（过期事件移除后）复用。
+ *
  * @param draft 游戏状态草稿
  */
-function advanceBlockingPointer(draft: PlayerSave): void {
+export function advanceBlockingPointer(draft: PlayerSave): void {
   const nextBlocking = draft.events.pending.find((p) => p.snapshot.presentation === 'blocking');
   draft.events.activeBlockingEventId = nextBlocking?.instanceId ?? null;
   // 将指针指向的 blocking 实例 status 提升为 active，维持"指针指向 = active"的不变量

@@ -24,8 +24,11 @@ import { decayStyleScores } from '../../engine/career/style-decay';
 import { getConfigLoader } from '../../config/loader';
 import { clampAttr } from '../../utils/math';
 import { activateScheduledEvents, expireEventInstances } from '../../engine/events/event-scheduler';
-import { processCascadeSignals } from './event-reducer';
-import { handleAutoEventInstance } from './event-reducer';
+import {
+  processCascadeSignals,
+  handleAutoEventInstance,
+  advanceBlockingPointer,
+} from './event-reducer';
 
 /**
  * 处理行动完成时间轴事件。
@@ -349,6 +352,9 @@ export function reduceAdvanceTime(draft: PlayerSave, payload: AdvanceTimePayload
   for (const chain of expiryResult.chainsToUpdate) {
     draft.events.chainInstances[chain.instanceId] = chain;
   }
+
+  // 过期事件可能包含当前 activeBlockingEventId，需推进指针避免悬空
+  advanceBlockingPointer(draft);
 
   // 更新最近完成行动通知
   if (notifications.length > 0) {
