@@ -53,33 +53,38 @@ PR #88 完成以下基础工程整理：
 - 36 个职位 + 18 个机构原生配置迁移
 - ConfigLoader 稳定 ID 查询
 
-## 当前：Phase 2 第二实施批次 — 事件定义、条件解释与效果执行基础
+## 已完成：Phase 2 第二实施批次（PR #100）— 事件定义、条件解释与效果执行基础
 
-目标：替换旧事件定义，建立可执行的新版事件配置、条件解释器和统一效果执行器。
+- 删除旧 `GameEvent`/`EventCondition`/`EventOption`/`evaluateEventTrigger`/`filterAvailableEvents`
+- 新版 `EventDefinition` 格式与严格 Zod Schema
+- 统一条件解释器 `evaluateCondition`（纯函数）
+- 统一效果执行器 `applyEffects`（原子事务，效果地址判别联合）
+- ConfigLoader 事件加载与信号索引
+- 事件配置引用与零延迟循环验证
+- 迁移示例事件 `flood_emergency`
+- 治理指标修正为 `MetricCollection`，Schema 2 → 3 迁移
 
-1. 删除旧 `GameEvent`/`EventCondition`/`EventOption`/`evaluateEventTrigger`/`filterAvailableEvents`
-2. 新版 `EventDefinition` 格式与严格 Zod Schema
-3. 统一条件解释器 `evaluateCondition`（纯函数）
-4. 统一效果执行器 `applyEffects`（原子事务，效果地址判别联合）
-5. ConfigLoader 事件加载与信号索引
-6. 事件配置引用与零延迟循环验证
-7. 迁移示例事件 `flood_emergency`
-8. 治理指标修正为 `MetricCollection`，Schema 2 → 3 迁移
+## 已完成：Phase 2 第三实施批次 — 领域信号驱动的事件编排与事件实例生命周期
 
-完成标准：
+- 信号身份与来源作用域：`signalId` 稳定身份 + `deriveEventSourceKey` 统一来源键
+- 核心编排器 `processDomainSignal`（纯函数，广度优先信号队列）
+- 重复控制：`once` / `once_per_source` / `once_per_chain` / `repeatable` + `maxActivations`
+- 冷却模型：从 `Record<string, number>` 升级为 `EventCooldownRecord[]`（global/source/chain 三种作用域）
+- 互斥组：`mutexGroup` 加权选择，非互斥事件全部创建
+- 概率：独立于权重，注入 RNG，默认 1
+- 事件实例可执行快照：`EventExecutableSnapshot` 保存触发时完整定义，结算不重读配置
+- 自动事件即时结算：效果应用、调度后续、取消计划、记录历史、生成 `event.resolved`
+- 玩家选项原子结算：`resolveEventOption` + `CHOOSE_EVENT_OPTION` Store reducer
+- 事件链实例：`sourceKey` 替代 `sourceEntityType/sourceEntityId`，支持分支
+- 计划事件激活（`activateScheduledEvents`）与过期（`expireEventInstances`）
+- 信号去重与递归保护（最大深度 16，最多 100 信号/事务）
+- `setFacts` 迁移为标准 `world_fact` effect
+- Schema 3 → 4 迁移（2→3→4 链式可迁移）
+- 内容版本提升为 `2026.07.2`
 
-- 旧事件类型和筛选器已删除，`main` 可编译
-- 配置 Schema、TypeScript 类型、运行时解释器保持一致
-- 条件/效果结算为纯函数或可预测事务
-- 非法效果不会部分结算
-- 完整 CI 通过
+## 当前：Phase 2 第四实施批次 — 政策生命周期与可中断统一时间轴（#96）
 
-## 下一步：领域信号驱动的事件编排器
-
-- `processDomainSignal` 编排、事件实例生成
-- 冷却、互斥、重复控制、延迟调度
-- 选项原子结算（`CHOOSE_EVENT_OPTION`）
-- 事件 UI 与可中断时间轴
+目标：实现政策系统生命周期（proposed→approved→implementing→suspended→completed/failed/repealed）的完整阶段推进，并将计划事件激活、事件过期、政策阶段推进作为时间轴节点接入可中断统一时间轴。
 
 ## 后续阶段
 

@@ -24,6 +24,7 @@ import { writeLocalSave } from '../services/save-repo';
 import { reduceStartAction } from './reducers/action-reducer';
 import { reduceAdvanceTime } from './reducers/time-reducer';
 import { reduceNewGame, reduceLoadSave } from './reducers/character-reducer';
+import { reduceChooseEventOption } from './reducers/event-reducer';
 
 /** 游戏动作联合类型（Schema 2 精简版） */
 export type GameAction =
@@ -35,7 +36,19 @@ export type GameAction =
       actionId: string;
       tierKey: 'primary' | 'secondary' | 'reserve';
     }
-  | { type: 'ADVANCE_TIME'; granularity: 'day' | 'week' | 'month'; _rng?: () => number };
+  | {
+      type: 'ADVANCE_TIME';
+      granularity: 'day' | 'week' | 'month';
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'CHOOSE_EVENT_OPTION';
+      eventInstanceId: string;
+      optionId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    };
 
 /** 创建默认治理状态 */
 function createDefaultGovernanceState(): GovernanceState {
@@ -54,8 +67,10 @@ function createDefaultEventRuntimeState(): EventRuntimeState {
     pending: [],
     scheduled: [],
     history: [],
-    cooldownUntilDay: {},
+    cooldowns: [],
     chainInstances: {},
+    processedSignalIds: [],
+    deferredSignals: [],
   };
 }
 
@@ -216,6 +231,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
       reduceAdvanceTime(draft, {
         granularity: action.granularity,
         _rng: action._rng,
+        _idFactory: action._idFactory,
       });
       return true;
     }
@@ -226,6 +242,20 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
     case 'NEW_GAME': {
       reduceNewGame(draft, { data: action.data }, () => createInitialState());
       return true;
+    }
+    case 'CHOOSE_EVENT_OPTION': {
+      const currentDay = draft.time.totalDaysPlayed;
+      const result = reduceChooseEventOption(
+        draft,
+        {
+          eventInstanceId: action.eventInstanceId,
+          optionId: action.optionId,
+          _rng: action._rng,
+          _idFactory: action._idFactory,
+        },
+        currentDay,
+      );
+      return result !== null;
     }
     default:
       return false;

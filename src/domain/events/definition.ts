@@ -18,7 +18,11 @@
 import { z } from 'zod';
 import { DomainSignalSchema } from '../governance/types';
 import { ConditionExpressionSchema, EffectDefinitionSchema } from '../conditions';
-import { EventPrioritySchema, EventPresentationSchema } from './types';
+import {
+  EventPrioritySchema,
+  EventPresentationSchema,
+  ScheduledEventCancellationSchema,
+} from './types';
 
 // ===== 事件分类 =====
 
@@ -38,16 +42,6 @@ export type EventCategory = (typeof EVENT_CATEGORIES)[number];
 
 /** 事件分类 Zod Schema */
 export const EventCategorySchema = z.enum(EVENT_CATEGORIES);
-
-// ===== 事实变更 =====
-
-/** 事实变更定义：设置一个世界事实 */
-export interface FactMutationDefinition {
-  /** 事实 ID */
-  factId: string;
-  /** 事实值 */
-  value: boolean | number | string;
-}
 
 // ===== 触发器 =====
 
@@ -70,6 +64,8 @@ export interface EventTriggerDefinition {
   weight?: number;
   /** 互斥组 ID（可选，非空） */
   mutexGroup?: string;
+  /** 仅由父事件显式 schedule 创建，不参与领域信号的通用匹配 */
+  scheduledOnly?: boolean;
 }
 
 // ===== 重复策略 =====
@@ -135,6 +131,8 @@ export interface ScheduledFollowupDefinition {
   probability?: number;
   /** 触发条件（可选） */
   condition?: import('../conditions').ConditionExpression;
+  /** 同组后续以 probability 为相对权重，只选择一个 */
+  mutexGroup?: string;
 }
 
 // ===== 事件选项 =====
@@ -157,10 +155,12 @@ export interface EventOptionDefinition {
   effects: import('../conditions').EffectDefinition[];
   /** 调度的后续事件（可选） */
   schedule?: ScheduledFollowupDefinition[];
-  /** 取消的计划事件 ID 列表（可选） */
+  /** 取消的计划事件 ID 列表（可选，旧格式） */
   cancelScheduledEvents?: string[];
-  /** 设置的世界事实（可选） */
-  setFacts?: FactMutationDefinition[];
+  /** 选项冷却天数（可选） */
+  cooldownDays?: number;
+  /** 计划事件取消规范（按作用域，可选） */
+  cancelScheduled?: import('./types').ScheduledEventCancellation[];
 }
 
 // ===== 自动事件载荷 =====
@@ -176,10 +176,10 @@ export interface EventOutcomePayload {
   effects: import('../conditions').EffectDefinition[];
   /** 调度的后续事件（可选） */
   schedule?: ScheduledFollowupDefinition[];
-  /** 取消的计划事件 ID 列表（可选） */
+  /** 取消的计划事件 ID 列表（可选，旧格式） */
   cancelScheduledEvents?: string[];
-  /** 设置的世界事实（可选） */
-  setFacts?: FactMutationDefinition[];
+  /** 计划事件取消规范（按作用域，可选） */
+  cancelScheduled?: import('./types').ScheduledEventCancellation[];
 }
 
 // ===== 事件定义 =====
@@ -214,6 +214,10 @@ export interface EventDefinition {
   repeatPolicy: EventRepeatPolicy;
   /** 激活定义 */
   activation: EventActivationDefinition;
+  /** 互斥组 ID（可选，从 trigger.mutexGroup 复制） */
+  mutexGroup?: string;
+  /** 内容版本（用于快照标记） */
+  contentVersion?: string;
   /** 选项列表（blocking/inbox 事件） */
   options: EventOptionDefinition[];
   /** 自动事件载荷（仅 automatic 事件，可选但验证要求存在） */
@@ -221,14 +225,6 @@ export interface EventDefinition {
 }
 
 // ===== Zod Schema =====
-
-/** 事实变更定义 Schema */
-const FactMutationDefinitionSchema = z
-  .object({
-    factId: z.string().min(1),
-    value: z.union([z.boolean(), z.number(), z.string()]),
-  })
-  .strict();
 
 /** 触发定义 Schema */
 const EventTriggerDefinitionSchema = z
@@ -238,11 +234,12 @@ const EventTriggerDefinitionSchema = z
     probability: z.number().min(0).max(1).optional(),
     weight: z.number().positive().optional(),
     mutexGroup: z.string().min(1).optional(),
+    scheduledOnly: z.boolean().optional(),
   })
   .strict();
 
 /** 重复策略 Schema */
-const EventRepeatPolicySchema = z
+export const EventRepeatPolicySchema = z
   .object({
     mode: z.enum(EVENT_REPEAT_MODES),
     cooldownDays: z.number().int().nonnegative().optional(),
@@ -277,12 +274,13 @@ const ScheduledFollowupDefinitionSchema: z.ZodType<ScheduledFollowupDefinition> 
       delayDays: z.number().int().nonnegative(),
       probability: z.number().min(0).max(1).optional(),
       condition: ConditionExpressionSchema.optional(),
+      mutexGroup: z.string().min(1).optional(),
     })
     .strict(),
 );
 
 /** 事件选项 Schema */
-const EventOptionDefinitionSchema = z
+export const EventOptionDefinitionSchema = z
   .object({
     id: z.string().min(1),
     label: z.string().min(1),
@@ -290,17 +288,18 @@ const EventOptionDefinitionSchema = z
     effects: z.array(EffectDefinitionSchema),
     schedule: z.array(ScheduledFollowupDefinitionSchema).optional(),
     cancelScheduledEvents: z.array(z.string().min(1)).optional(),
-    setFacts: z.array(FactMutationDefinitionSchema).optional(),
+    cooldownDays: z.number().int().nonnegative().optional(),
+    cancelScheduled: z.array(ScheduledEventCancellationSchema).optional(),
   })
   .strict();
 
 /** 自动事件载荷 Schema */
-const EventOutcomePayloadSchema = z
+export const EventOutcomePayloadSchema = z
   .object({
     effects: z.array(EffectDefinitionSchema),
     schedule: z.array(ScheduledFollowupDefinitionSchema).optional(),
     cancelScheduledEvents: z.array(z.string().min(1)).optional(),
-    setFacts: z.array(FactMutationDefinitionSchema).optional(),
+    cancelScheduled: z.array(ScheduledEventCancellationSchema).optional(),
   })
   .strict();
 
@@ -318,6 +317,8 @@ export const EventDefinitionSchema = z
     trigger: EventTriggerDefinitionSchema,
     repeatPolicy: EventRepeatPolicySchema,
     activation: EventActivationDefinitionSchema,
+    mutexGroup: z.string().min(1).optional(),
+    contentVersion: z.string().optional(),
     options: z.array(EventOptionDefinitionSchema),
     automaticOutcome: EventOutcomePayloadSchema.optional(),
   })

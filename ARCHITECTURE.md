@@ -1,6 +1,6 @@
 # 政途人生 — 架构文档
 
-> 当前版本：0.1.0-alpha.1 | 存档 Schema：1 | 内容版本：2026.07.1
+> 当前版本：0.1.0-alpha.1 | 存档 Schema：4 | 内容版本：2026.07.2
 
 ## 当前范围
 
@@ -51,7 +51,7 @@ src/
 │   ├── templates/               # 部门、KPI 等复用模板
 │   ├── constants.json           # 时间、槽位、晋升等常量
 │   └── loader.ts                # ConfigLoader
-├── engine/
+  ├── engine/
 │   ├── core/
 │   │   ├── action.ts            # 行动校验与效果解析
 │   │   ├── effect.ts            # 效果应用
@@ -59,7 +59,11 @@ src/
 │   │   └── timeline.ts          # 统一时间轴引擎
 │   ├── events/
 │   │   ├── condition-interpreter.ts  # 统一条件解释器（纯函数）
-│   │   └── effect-executor.ts        # 统一效果执行器（原子事务）
+│   │   ├── effect-executor.ts        # 统一效果执行器（原子事务）
+│   │   ├── event-orchestrator.ts     # 领域信号驱动的事件编排器（纯函数）
+│   │   ├── event-resolver.ts         # 玩家选项结算（纯函数）
+│   │   ├── event-scheduler.ts        # 计划事件激活与过期（纯函数）
+│   │   └── source-key.ts             # 来源键派生函数
 │   ├── governance/              # assessment/budget/kpi/dimensions
 │   ├── career/                  # promotion/deviation-penalty/spectrum 等
 │   └── index.ts                 # 引擎聚合导出
@@ -70,9 +74,10 @@ src/
 │   │   ├── time-reducer.ts      # ADVANCE_TIME + 统一时间轴结算
 │   │   ├── career-reducer.ts    # 晋升流程
 │   │   ├── character-reducer.ts # NEW_GAME / LOAD_SAVE
+│   │   ├── event-reducer.ts     # CHOOSE_EVENT_OPTION + 原子效果应用
 │   │   └── shared.ts            # 共享辅助函数
 │   └── save-codec/
-│       └── index.ts             # 严格存档解码器（Zod Schema）
+│       └── index.ts             # 严格存档解码器（Zod Schema, Schema 4）
 └── services/
     ├── save-repo.ts             # 本地/远程存档读写
     ├── startup-save-state.ts    # 启动存档状态服务
@@ -105,13 +110,14 @@ UI（页面/组件） → Store（dispatch/reducer） → Engine（纯函数） 
 
 ### Reducer 分域
 
-| Reducer | 处理的 Action |
-| ------- | ------------- |
-| `action-reducer.ts` | START_ACTION（含 runtimeSnapshot 计算） |
-| `time-reducer.ts` | ADVANCE_TIME（使用统一时间轴） |
-| `career-reducer.ts` | START_PROMOTION / SELECT_TARGET / RESOLVE_STAGE / RESET |
-| `character-reducer.ts` | NEW_GAME / LOAD_SAVE |
-| `shared.ts` | applyPlayerAttr / initializeDepartmentStates 等 |
+| Reducer                | 处理的 Action                                           |
+| ---------------------- | ------------------------------------------------------- |
+| `action-reducer.ts`    | START_ACTION（含 runtimeSnapshot 计算）                 |
+| `time-reducer.ts`      | ADVANCE_TIME（使用统一时间轴）                          |
+| `career-reducer.ts`    | START_PROMOTION / SELECT_TARGET / RESOLVE_STAGE / RESET |
+| `character-reducer.ts` | NEW_GAME / LOAD_SAVE                                    |
+| `event-reducer.ts`     | CHOOSE_EVENT_OPTION（原子效果应用 + 事件结算）          |
+| `shared.ts`            | applyPlayerAttr / initializeDepartmentStates 等         |
 
 ### 测试 Store
 
@@ -123,22 +129,22 @@ UI（页面/组件） → Store（dispatch/reducer） → Engine（纯函数） 
 
 ```typescript
 interface SaveEnvelope {
-  schemaVersion: number;    // 存档结构版本（当前：1）
-  contentVersion: string;   // 内容配置版本（当前：2026.07.1）
-  revision: number;         // 同一存档的逻辑修订号
-  savedAt: number;          // 保存时间戳
-  state: PlayerSave;        // 实际游戏状态
+  schemaVersion: number; // 存档结构版本（当前：4）
+  contentVersion: string; // 内容配置版本（当前：2026.07.2）
+  revision: number; // 同一存档的逻辑修订号
+  savedAt: number; // 保存时间戳
+  state: PlayerSave; // 实际游戏状态
 }
 ```
 
 ### 严格解码行为
 
 - 只接受当前 `schemaVersion` 的完整 SaveEnvelope
-- 裸旧版 PlayerSave（无 Envelope 封装）→ 拒绝（`legacy_save_unsupported`）
-- `schemaVersion < CURRENT` → 拒绝
+- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → 4
+- `schemaVersion < 2` → 拒绝（`legacy_save_unsupported`）
 - `schemaVersion > CURRENT` → 拒绝（`future_version`）
 - 结构验证失败 → 拒绝（`invalid_envelope`）
-- **不支持自动迁移**
+- **非空事件实例的旧存档拒绝迁移**（无法补全快照），保留原始备份
 - 不兼容存档创建只读备份（最多 3 份轮转，相同内容不重复）
 - 启动页按错误类别显示提示
 
@@ -161,11 +167,11 @@ interface SaveEnvelope {
 
 ```typescript
 type TimelineEvent =
-  | ActionCompletionTimelineEvent   // 行动完成
-  | MonthlySettlementTimelineEvent  // 月度结算
-  | AnnualAssessmentTimelineEvent   // 年度考核
-  | PoliticalCycleTimelineEvent     // 政治周期（预留）
-  | RetirementCheckTimelineEvent;   // 退休检查（预留）
+  | ActionCompletionTimelineEvent // 行动完成
+  | MonthlySettlementTimelineEvent // 月度结算
+  | AnnualAssessmentTimelineEvent // 年度考核
+  | PoliticalCycleTimelineEvent // 政治周期（预留）
+  | RetirementCheckTimelineEvent; // 退休检查（预留）
 ```
 
 ### 同日事件排序
@@ -184,9 +190,9 @@ type TimelineEvent =
 
 ```typescript
 interface ActionRuntimeSnapshot {
-  effectivenessMultiplier: number;    // 理念偏离效果倍率
-  styleConflictTriggered: boolean;    // 是否触发风格冲突
-  styleAlignment?: string;            // 行动的理念对齐方向
+  effectivenessMultiplier: number; // 理念偏离效果倍率
+  styleConflictTriggered: boolean; // 是否触发风格冲突
+  styleAlignment?: string; // 行动的理念对齐方向
 }
 ```
 
@@ -194,18 +200,79 @@ interface ActionRuntimeSnapshot {
 - 不再使用玩家级临时倍率
 - 配置在行动执行期间变化不会影响已启动行动的快照
 
-## 事件系统（定义与执行基础层）
+## 事件系统（定义、编排与生命周期）
 
-旧事件原型（`GameEvent`/`EventCondition`/`EventOption`/`evaluateEventTrigger`/`filterAvailableEvents`）已删除。新事件系统建立在领域信号驱动之上：
+旧事件原型已删除。新事件系统分三层：定义层、执行基础层、编排与生命周期层。
+
+### 定义与执行基础（PR #100 已完成）
 
 - **事件定义**：`src/domain/events/definition.ts` 的 `EventDefinition`（触发器/重复策略/激活定义/选项）。
 - **统一条件解释器**：`src/engine/events/condition-interpreter.ts` 的 `evaluateCondition`（纯函数）。
 - **统一效果执行器**：`src/engine/events/effect-executor.ts` 的 `applyEffects`（原子事务，先验证全部目标再应用）。
-- **配置验证**：`src/domain/events/validation.ts` 的 `validateEventDefinitions`（引用完整性 + 零延迟循环检测），由 `validate:config` 复用。
-- **ConfigLoader 事件索引**：`getEventDefinition` / `getAllEventDefinitions` / `getEventDefinitionsBySignal`（返回深拷贝，不污染全局）。
-- **效果地址**：`EffectDefinition` 为按 `target` 判别的联合，机构/地区/政策指标通过 `institutionRef`/`regionRef`/`policyRef`（current_appointment / signal / fixed）明确来源，不拼接路径字符串。
+- **配置验证**：`src/domain/events/validation.ts` 的 `validateEventDefinitions`（引用完整性 + 零延迟循环检测）。
+- **ConfigLoader 事件索引**：`getEventDefinitionsBySignal` 按信号类型索引（返回深拷贝）。
 
-**仍未实现（后续事件编排器 PR）**：`processDomainSignal` 编排、概率加权选择、冷却/互斥运行时、事件链实例推进、`CHOOSE_EVENT_OPTION` Store action、事件 UI、可中断时间轴、行动/考核自动发信号。
+### 编排与生命周期（当前 PR）
+
+#### 领域信号进入事件编排器
+
+系统通过 `processDomainSignal`（`src/engine/events/event-orchestrator.ts`）接收领域信号（`DomainSignalSnapshot`），完成以下流程：
+
+1. **信号去重**：通过 `signalId` 检查信号是否已处理，防止重复消费。
+2. **来源键派生**：`deriveEventSourceKey(signal)` 根据信号类型统一派生 `sourceKey`（动作实例ID/政策实例ID/任职ID等）。
+3. **候选获取**：从 ConfigLoader 按 `signal.signalType` 获取匹配的事件定义，按稳定 `eventId` 排序。
+4. **资格评估**（同一初始状态快照、固定顺序）：
+   - 重复检查（once / once_per_source / once_per_chain / repeatable + maxActivations）
+   - 冷却检查（global / source / chain 三种作用域）
+   - 互斥组检查（同一 `mutexGroup` 内已有活动实例则阻止）
+   - 条件评估（`evaluateCondition`）
+   - 概率检查（注入 RNG，probability 默认 1）
+5. **互斥组选择**：同一 `mutexGroup` 内从通过资质的候选按 `weight`（默认 1）加权随机选择至多一个；无互斥事件全部创建。
+6. **实例创建**：构建 `EventExecutableSnapshot`（保存触发时的事件定义文本/选项/效果完整副本），计算 `deadlineDay` = `activatedAtDay + deadlineDays`。
+7. **自动事件即时结算**：`presentation: automatic` 的事件立即应用效果、调度后续、记录历史、生成 `event.resolved` 信号、更新冷却和事件链。
+8. **递归信号处理**：自动事件产生的 `event.resolved` 信号在同一事务内继续编排（广度优先，最大深度 16，最多 100 信号/事务）。
+
+#### 重复模式
+
+| 模式              | 语义                                 | 判定范围                                  |
+| ----------------- | ------------------------------------ | ----------------------------------------- |
+| `once`            | 整个存档最多触发一次                 | pending + scheduled + history（所有状态） |
+| `once_per_source` | 同一 eventId + sourceKey 最多一次    | pending + scheduled + history             |
+| `once_per_chain`  | 同一链实例内最多一次                 | pending + scheduled + history（链范围）   |
+| `repeatable`      | 可重复，受冷却和 maxActivations 限制 | 仅检查 maxActivations（过期/取消均计入）  |
+
+#### 概率与权重
+
+- `probability`：事件自身是否通过本次触发资格检查（0 永不触发，1 必然通过，默认 1）。
+- `weight`：同一 `mutexGroup` 内通过资格和概率检查后的相对权重（默认 1）。无互斥组的事件不被竞争。
+- RNG 注入确保可测试性；调用顺序由稳定 eventId 排序保证确定性。
+
+#### 冷却模型
+
+冷却使用 `EventCooldownRecord[]`（替代旧 `Record<string, number>`），支持三种作用域：
+
+- `global`：所有来源共享
+- `source`：按 `sourceKey` 隔离
+- `chain`：按 `chainInstanceId` 隔离
+
+#### 事件实例快照
+
+事件实例保存触发时完整快照（`EventExecutableSnapshot`），而非仅 `eventId`。玩家选择时从快照读取选项和效果，不重新读取当前配置。避免：事件已进入存档 → 内容更新 → 加载存档 → 选项/文字/效果变化。
+
+#### 事件链
+
+`EventChainInstance` 以 `sourceKey` 标识来源（替代旧的 `sourceEntityType/sourceEntityId`）。支持分支（`activeNodeIds` 数组同时追踪多个活动节点）。同一来源和链ID复用同一实例；不同来源创建独立实例。
+
+#### 选项结算
+
+`resolveEventOption` 纯函数 + `reduceChooseEventOption` Store reducer 实现原子选项结算：从快照查找选项 → 预解析效果 → 原子应用（`applyEffects`） → 写入历史 → 从 pending 移除 → 推进阻塞指针 → 生成 `event.resolved`。
+
+#### 计划事件激活与过期
+
+- `activateScheduledEvents`：按 `activateAtDay` → 优先级 → `instanceId` 稳定排序激活。
+- `expireEventInstances`：`currentDay > deadlineDay` 时过期（截止日当天仍可处理），记录 `finalStatus: 'expired'`。
+
+**当前尚未接入时间轴和 UI**（留给 #96）。
 
 ## 配置模型
 

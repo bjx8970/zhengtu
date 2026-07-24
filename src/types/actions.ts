@@ -19,6 +19,7 @@ export interface StartActionPayload {
 export interface AdvanceTimePayload {
   granularity: TimeGranularity;
   _rng?: () => number;
+  _idFactory?: () => string;
 }
 
 /** PROMOTION_RESOLVE_STAGE 动作参数 */
