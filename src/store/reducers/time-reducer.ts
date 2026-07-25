@@ -329,8 +329,9 @@ function reduceAdvanceTimeInternal(draft: PlayerSave, payload: AdvanceTimePayloa
     return;
   }
 
-  // 上一次事件事务可能因 blocker 留下未消费的级联信号；在处理新的计划事件前先恢复原队列。
-  if (draft.events.deferredSignals.length > 0) {
+  // 上一次事件事务可能因 blocker 留下未消费的实例/级联信号；在处理新的
+  // 计划事件前先恢复统一 continuation 队列。
+  if (draft.events.deferredContinuations.length > 0 || draft.events.deferredSignals.length > 0) {
     processCascadeSignals(draft, [], draft.time.totalDaysPlayed, rng, idFactory, definitions);
     if (draft.events.activeBlockingEventId !== null) {
       draft.time.granularity = payload.granularity;

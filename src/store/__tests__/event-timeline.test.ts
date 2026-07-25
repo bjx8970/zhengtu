@@ -193,6 +193,75 @@ describe('event timeline integration', () => {
     expect(after.character.vigor).toBe(originalVigor);
   });
 
+  it('keeps an urgent automatic event scheduled when a same-day low-priority blocker exists', () => {
+    const state = createInitialState();
+    const automatic = createEventSnapshot({
+      id: 'reverse_priority_automatic',
+      chainId: null,
+      nodeId: null,
+      title: 'Urgent automatic',
+      description: '',
+      category: 'governance',
+      priority: 'urgent',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [{ target: 'character', field: 'vigor', operation: 'add', value: 10 }],
+      },
+    });
+    const blocker = createEventSnapshot({
+      id: 'reverse_priority_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Low blocker',
+      description: '',
+      category: 'emergency',
+      priority: 'low',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'ack', label: '处理', description: '', effects: [] }],
+    });
+    state.events.scheduled.push(
+      {
+        instanceId: 'reverse_priority_automatic_instance',
+        eventId: automatic.eventId,
+        scheduledAtDay: 0,
+        activateAtDay: 1,
+        triggerContext: makeSignal('reverse_priority_automatic'),
+        sourceKey: 'reverse_priority',
+        chainInstanceId: null,
+        snapshot: automatic,
+      },
+      {
+        instanceId: 'reverse_priority_blocker_instance',
+        eventId: blocker.eventId,
+        scheduledAtDay: 0,
+        activateAtDay: 1,
+        triggerContext: makeSignal('reverse_priority_blocker'),
+        sourceKey: 'reverse_priority',
+        chainInstanceId: null,
+        snapshot: blocker,
+      },
+    );
+    const originalVigor = state.character.vigor;
+    const store = createTestStore(state);
+
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+    const after = store.getRawState();
+    expect(after.events.activeBlockingEventId).toBe('reverse_priority_blocker_instance');
+    expect(after.events.scheduled.map((item) => item.instanceId)).toContain(
+      'reverse_priority_automatic_instance',
+    );
+    expect(after.events.history.some((item) => item.eventId === automatic.eventId)).toBe(false);
+    expect(after.character.vigor).toBe(originalVigor);
+  });
+
   it('does not activate the remaining same-day events when an unresolved blocker advances again', () => {
     const state = createInitialState();
     const blocker = createEventSnapshot({

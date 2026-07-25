@@ -203,4 +203,64 @@ describe('planEventFollowups', () => {
 
     expect(result.immediateInstances.map((instance) => instance.eventId)).toEqual(['eligible']);
   });
+
+  it('orders an explicit zero-delay blocker before an earlier automatic schedule', () => {
+    const automatic = definition({
+      id: 'automatic_first_in_config',
+      priority: 'urgent',
+      presentation: 'automatic',
+      options: [],
+      automaticOutcome: { effects: [] },
+    });
+    const blocker = definition({
+      id: 'blocker_second_in_config',
+      priority: 'low',
+      presentation: 'blocking',
+    });
+
+    const result = plan(
+      createInitialState(),
+      automatic,
+      [
+        { eventId: automatic.id, delayDays: 0 },
+        { eventId: blocker.id, delayDays: 0 },
+      ],
+      [automatic, blocker],
+    );
+
+    expect(result.immediateInstances.map((instance) => instance.eventId)).toEqual([
+      blocker.id,
+      automatic.id,
+    ]);
+  });
+
+  it('orders a mutex-selected blocker before a non-mutex automatic follow-up', () => {
+    const automatic = definition({
+      id: 'automatic_first_in_config',
+      priority: 'urgent',
+      presentation: 'automatic',
+      options: [],
+      automaticOutcome: { effects: [] },
+    });
+    const blocker = definition({
+      id: 'mutex_blocker',
+      priority: 'low',
+      presentation: 'blocking',
+    });
+
+    const result = plan(
+      createInitialState(),
+      automatic,
+      [
+        { eventId: automatic.id, delayDays: 0 },
+        { eventId: blocker.id, delayDays: 0, mutexGroup: 'outcome' },
+      ],
+      [automatic, blocker],
+    );
+
+    expect(result.immediateInstances.map((instance) => instance.eventId)).toEqual([
+      blocker.id,
+      automatic.id,
+    ]);
+  });
 });

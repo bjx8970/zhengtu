@@ -12,6 +12,7 @@ export * from './core/timeline';
 export * from './events/condition-interpreter';
 export * from './events/effect-executor';
 export * from './events/event-cooldown';
+export * from './events/event-execution-order';
 export * from './events/event-followup-planner';
 export * from './events/event-orchestrator';
 export * from './events/event-resolver';

@@ -16,6 +16,7 @@ import {
   applyEventInstances,
   cancelScheduledByScope,
   processCascadeSignals,
+  processEventContinuations,
 } from '../reducers/event-reducer';
 
 function makeSignal() {
@@ -381,14 +382,24 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     expect(after.events.history.some((item) => item.eventId === 'formal_investigation')).toBe(
       false,
     );
-    expect(after.events.scheduled.some((item) => item.eventId === 'formal_investigation')).toBe(
-      true,
-    );
     expect(
-      after.events.deferredSignals.some(
-        (item) => item.signalType === 'event.resolved' && item.data.eventId === 'evt_first_blocker',
+      after.events.deferredContinuations.some(
+        (item) => item.kind === 'instance' && item.instance.eventId === 'formal_investigation',
       ),
     ).toBe(true);
+    expect(
+      after.events.deferredContinuations.some(
+        (item) =>
+          item.kind === 'signal' &&
+          item.signal.signalType === 'event.resolved' &&
+          item.signal.data.eventId === 'evt_first_blocker',
+      ),
+    ).toBe(true);
+    expect(
+      after.events.deferredContinuations.map((item) =>
+        item.kind === 'instance' ? item.instance.eventId : item.signal.signalId,
+      ),
+    ).toEqual(['formal_investigation', expect.any(String)]);
   });
 
   it('invalid option returns null (no state changes)', () => {
@@ -859,8 +870,13 @@ describe('event-reducer: cascade signals and scheduling', () => {
 
     expect(state.events.activeBlockingEventId).toBe('batch_0');
     expect(state.world.facts['should_not_apply']).toBeUndefined();
-    expect(state.events.scheduled.map((instance) => instance.instanceId)).toEqual(['batch_1']);
-    expect(state.events.scheduled[0]?.activateAtDay).toBe(1);
+    expect(
+      state.events.deferredContinuations.map((continuation) =>
+        continuation.kind === 'instance'
+          ? continuation.instance.instanceId
+          : continuation.signal.signalId,
+      ),
+    ).toEqual(['batch_1']);
   });
 
   it('prioritizes a signal-created blocker over an alphabetically earlier automatic instance', () => {
@@ -928,7 +944,11 @@ describe('event-reducer: cascade signals and scheduling', () => {
 
     expect(state.events.activeBlockingEventId).toBe('signal_order_0');
     expect(state.world.facts['automatic_ran_before_blocker']).toBeUndefined();
-    expect(state.events.scheduled.map((item) => item.eventId)).toContain('a_automatic');
+    expect(
+      state.events.deferredContinuations.some(
+        (item) => item.kind === 'instance' && item.instance.eventId === 'a_automatic',
+      ),
+    ).toBe(true);
   });
 
   it('processes zero-delay children before later siblings and pauses cascade signals at a blocker', () => {
@@ -1016,10 +1036,16 @@ describe('event-reducer: cascade signals and scheduling', () => {
 
     expect(state.events.activeBlockingEventId).toBe('causal_generated_1');
     expect(state.world.facts['late_sibling_ran']).toBeUndefined();
-    expect(state.events.scheduled.map((instance) => instance.instanceId)).toContain('causal_1');
-    expect(state.events.deferredSignals.map((signal) => signal.signalId)).toContain(
-      'causal_generated_0',
-    );
+    expect(
+      state.events.deferredContinuations.some(
+        (item) => item.kind === 'instance' && item.instance.instanceId === 'causal_1',
+      ),
+    ).toBe(true);
+    expect(
+      state.events.deferredContinuations.some(
+        (item) => item.kind === 'signal' && item.signal.signalId === 'causal_generated_0',
+      ),
+    ).toBe(true);
   });
 
   it('defers later cascade signals after an earlier signal activates a blocker', () => {
@@ -1089,8 +1115,12 @@ describe('event-reducer: cascade signals and scheduling', () => {
 
     expect(state.events.activeBlockingEventId).toBe('cascade_id');
     expect(state.world.facts['cascade_after_block']).toBeUndefined();
-    expect(state.events.deferredSignals.map((signal) => signal.signalId)).toEqual([
-      'cascade_after_signal',
+    expect(state.events.deferredContinuations).toEqual([
+      {
+        kind: 'signal',
+        signal: signals[1],
+        cascadeDepth: 0,
+      },
     ]);
 
     state.events.pending = [];
@@ -1104,8 +1134,141 @@ describe('event-reducer: cascade signals and scheduling', () => {
       [blocker, automatic],
     );
 
-    expect(state.events.deferredSignals).toHaveLength(0);
+    expect(state.events.deferredContinuations).toHaveLength(0);
     expect(state.world.facts['cascade_after_block']).toBe(true);
+  });
+
+  it('restores a two-blocker continuation sequence before the older paused tail', () => {
+    const state = createInitialState();
+    const resolvedSignal = (signalId: string, eventId: string): DomainSignalSnapshot => ({
+      signalId,
+      signalType: 'event.resolved',
+      occurredAtDay: 1,
+      data: { eventInstanceId: `${eventId}_instance`, eventId, optionId: null, occurredAtDay: 1 },
+    });
+    const makeResolvedListener = (eventId: string, listenerId: string): EventDefinition => ({
+      id: listenerId,
+      chainId: null,
+      nodeId: null,
+      title: listenerId,
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: {
+        sources: ['event.resolved'],
+        condition: { signalField: 'eventId', op: 'eq', value: eventId },
+      },
+      repeatPolicy: { mode: 'repeatable' },
+      activation: {},
+      options: [],
+      automaticOutcome: { effects: [] },
+    });
+    const blockerSnapshot = createEventSnapshot({
+      id: 'second_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Second blocker',
+      description: '',
+      category: 'story',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: { sources: ['event.resolved'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'resolve', label: '处理', description: '', effects: [] }],
+    });
+    const oldAutomaticSnapshot = createEventSnapshot({
+      id: 'old_immediate',
+      chainId: null,
+      nodeId: null,
+      title: 'Older immediate work',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['event.resolved'] },
+      repeatPolicy: { mode: 'repeatable' },
+      activation: {},
+      options: [],
+      automaticOutcome: { effects: [] },
+    });
+    const makeInstance = (
+      instanceId: string,
+      snapshot: ReturnType<typeof createEventSnapshot>,
+    ): EventInstance => ({
+      instanceId,
+      eventId: snapshot.eventId,
+      status: 'pending',
+      triggeredAtDay: 1,
+      activatedAtDay: 1,
+      deadlineDay: null,
+      triggerContext: makeSignal(),
+      sourceKey: 'continuation_source',
+      chainInstanceId: null,
+      snapshot,
+    });
+    const firstResolved = resolvedSignal('first_resolved', 'first_blocker');
+    const secondResolved = resolvedSignal('second_resolved', 'second_blocker');
+    const oldTail = resolvedSignal('old_tail', 'old_parent');
+    const definitions = [
+      makeResolvedListener('second_blocker', 'second_listener'),
+      makeResolvedListener('first_blocker', 'first_listener'),
+      makeResolvedListener('old_parent', 'old_listener'),
+    ];
+    let id = 0;
+    const idFactory = () => `continuation_${id++}`;
+
+    state.events.deferredContinuations = [
+      { kind: 'instance', instance: makeInstance('old_immediate_instance', oldAutomaticSnapshot) },
+      { kind: 'signal', signal: oldTail, cascadeDepth: 0 },
+    ];
+
+    // This is the work produced when the first blocker resolves: its immediate
+    // child becomes the next blocker, and its resolved signal must wait behind it
+    // but ahead of the tail that was already paused by the first blocker.
+    processEventContinuations(
+      state,
+      [
+        { kind: 'instance', instance: makeInstance('second_blocker_instance', blockerSnapshot) },
+        { kind: 'signal', signal: firstResolved, cascadeDepth: 0 },
+      ],
+      1,
+      () => 0,
+      idFactory,
+      definitions,
+      'front',
+    );
+
+    expect(state.events.activeBlockingEventId).toBe('second_blocker_instance');
+    expect(
+      state.events.deferredContinuations.map((item) =>
+        item.kind === 'instance' ? item.instance.eventId : item.signal.signalId,
+      ),
+    ).toEqual(['first_resolved', 'old_immediate', 'old_tail']);
+
+    // Simulate resolving the second blocker. Its newly emitted signal must run
+    // before the continuation tail from the first blocker, then the paused
+    // immediate instance and its older signal resume in their original order.
+    state.events.pending = [];
+    state.events.activeBlockingEventId = null;
+    processEventContinuations(
+      state,
+      [{ kind: 'signal', signal: secondResolved, cascadeDepth: 0 }],
+      1,
+      () => 0,
+      idFactory,
+      definitions,
+      'front',
+    );
+
+    expect(state.events.history.map((item) => item.eventId)).toEqual([
+      'second_listener',
+      'first_listener',
+      'old_immediate',
+      'old_listener',
+    ]);
+    expect(state.events.deferredContinuations).toHaveLength(0);
   });
 
   it('cascade-depth budget fails atomically instead of dropping remaining signals', () => {

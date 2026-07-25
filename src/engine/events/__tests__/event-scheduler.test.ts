@@ -281,6 +281,63 @@ describe('activateScheduledEvents', () => {
     expect(result.activatedInstances[1]!.instanceId).toBe('sched_z');
   });
 
+  it('orders a same-day low-priority blocker before an urgent automatic event', () => {
+    const state: PlayerSave = {
+      ...createInitialState(),
+      events: {
+        ...createInitialState().events,
+        scheduled: [
+          makeScheduled('scheduled_automatic', 'urgent_automatic', 50, 40, {
+            snapshot: createEventSnapshot({
+              id: 'urgent_automatic',
+              chainId: null,
+              nodeId: null,
+              title: 'Urgent automatic',
+              description: '',
+              category: 'governance',
+              priority: 'urgent',
+              presentation: 'automatic',
+              trigger: { sources: ['world.metric_changed'] },
+              repeatPolicy: { mode: 'once' },
+              activation: {},
+              options: [],
+              automaticOutcome: { effects: [] },
+            }),
+          }),
+          makeScheduled('scheduled_blocker', 'low_blocker', 50, 40, {
+            snapshot: createEventSnapshot({
+              id: 'low_blocker',
+              chainId: null,
+              nodeId: null,
+              title: 'Low blocker',
+              description: '',
+              category: 'governance',
+              priority: 'low',
+              presentation: 'blocking',
+              trigger: { sources: ['world.metric_changed'] },
+              repeatPolicy: { mode: 'once' },
+              activation: {},
+              options: [{ id: 'ack', label: '处理', description: '', effects: [] }],
+            }),
+          }),
+        ],
+      },
+    };
+
+    const result = activateScheduledEvents(
+      state,
+      50,
+      () => 0,
+      () => 'unused',
+    );
+
+    expect(result.activatedInstances.map((instance) => instance.instanceId)).toEqual([
+      'scheduled_blocker',
+      'scheduled_automatic',
+    ]);
+    expect(result.newlyBlockingInstanceId).toBe('scheduled_blocker');
+  });
+
   it('empty scheduled returns empty result', () => {
     const state = createInitialState();
     const result = activateScheduledEvents(

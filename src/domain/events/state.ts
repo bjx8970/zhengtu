@@ -69,6 +69,16 @@ export interface ScheduledEventInstance {
   snapshot: EventExecutableSnapshot;
 }
 
+/**
+ * 因 blocking 事件暂停、且必须按原因果顺序恢复的工作项。
+ *
+ * 实例与信号必须共用一个有序队列；分开保存会令 event.resolved
+ * 在它原本应先执行的零延迟后续之前恢复。
+ */
+export type EventContinuation =
+  | { kind: 'instance'; instance: EventInstance }
+  | { kind: 'signal'; signal: DomainSignalSnapshot; cascadeDepth: number };
+
 /** 已应用效果记录 */
 export interface AppliedEffectRecord {
   target: string;
@@ -115,6 +125,8 @@ export interface EventRuntimeState {
   chainInstances: Record<string, EventChainInstance>;
   /** 已处理信号 ID 集合（防重入），SignalId → completedAtDay */
   processedSignalIds: string[];
-  /** 因 blocking 事件暂停而尚未处理的级联信号，解除阻塞后按原顺序恢复。 */
+  /** 旧 Schema 4 信号队列；首次恢复时迁入 deferredContinuations。 */
   deferredSignals: DomainSignalSnapshot[];
+  /** 统一、可持久化的实例/信号 continuation 队列。 */
+  deferredContinuations: EventContinuation[];
 }

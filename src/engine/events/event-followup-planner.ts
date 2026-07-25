@@ -15,6 +15,7 @@ import type {
 import { evaluateCondition } from './condition-interpreter';
 import { createEventSnapshot } from './event-orchestrator';
 import { findEventCooldownEndDay, isEventRepeatBlocked } from './event-eligibility';
+import { compareEventInstanceExecutionOrder } from './event-execution-order';
 
 /** 后续事件规划结果 */
 export interface EventFollowupPlan {
@@ -277,6 +278,11 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
       });
     }
   }
+
+  // 显式 schedule 的发现顺序包含配置顺序和 mutex 选中顺序；在真正进入
+  // 即时执行队列前统一按 blocker-first 规则整理，保证不会让 automatic
+  // 效果越过同批 blocker。
+  immediateInstances.sort(compareEventInstanceExecutionOrder);
 
   completeParentNode(input, chains);
   return {

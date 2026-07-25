@@ -25,6 +25,7 @@ import { evaluateCondition } from './condition-interpreter';
 import { deriveEventSourceKey } from './source-key';
 import { CURRENT_CONTENT_VERSION } from '../../types/save';
 import { findEventCooldownEndDay, isEventRepeatBlocked } from './event-eligibility';
+import { compareEventDefinitionExecutionOrder } from './event-execution-order';
 
 const MAX_SIGNAL_DEPTH = 16;
 const MAX_SIGNALS_PER_TRANSACTION = 100;
@@ -139,36 +140,6 @@ function selectMutexGroupWinner(
     if (r < 0) return weightedCandidates[i]!;
   }
   return weightedCandidates[weightedCandidates.length - 1]!;
-}
-
-/**
- * 以阻塞语义为第一排序键的稳定执行顺序。
- *
- * 同一个领域信号可以同时产生 automatic 与 blocking 实例。blocking 必须先
- * 进入队列，否则按 eventId 排序会让 automatic 在 blocker 之前提交效果。
- *
- * @param left 左侧事件定义
- * @param right 右侧事件定义
- * @returns 负值表示左侧应先执行
- */
-function compareEventExecutionOrder(left: EventDefinition, right: EventDefinition): number {
-  const presentationOrder: Record<EventDefinition['presentation'], number> = {
-    blocking: 0,
-    automatic: 1,
-    inbox: 2,
-  };
-  const priorityOrder: Record<EventDefinition['priority'], number> = {
-    urgent: 0,
-    high: 1,
-    normal: 2,
-    low: 3,
-  };
-  const presentationDifference =
-    presentationOrder[left.presentation] - presentationOrder[right.presentation];
-  if (presentationDifference !== 0) return presentationDifference;
-  const priorityDifference = priorityOrder[left.priority] - priorityOrder[right.priority];
-  if (priorityDifference !== 0) return priorityDifference;
-  return left.id.localeCompare(right.id);
 }
 
 /**
@@ -407,7 +378,7 @@ function resolveSingleSignal(
 
   // Mutex winners are appended after non-mutex candidates above, so sort the final
   // execution batch rather than relying on definition ID or discovery order.
-  selectedDefs.sort(compareEventExecutionOrder);
+  selectedDefs.sort(compareEventDefinitionExecutionOrder);
 
   // 每个信号最多一个 blocking 事件标记为 active，其余标记为 pending
   // 如果持久化状态中已有活跃阻塞事件，本次 signal 触发的 blocking 事件亦标记为 pending

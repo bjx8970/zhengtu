@@ -12,6 +12,7 @@ import type {
   EventHistoryRecord,
   EventChainInstance,
 } from '../../domain/events/state';
+import { compareScheduledEventExecutionOrder } from './event-execution-order';
 
 /** 计划事件激活结果 */
 export interface ScheduledActivationResult {
@@ -29,7 +30,7 @@ export interface EventExpirationResult {
  * 激活到期的计划事件。
  *
  * 从 state.events.scheduled 中筛选 activateAtDay <= currentDay 的事件，
- * 按激活日期、优先级、实例 ID 排序后创建 EventInstance。
+ * 按激活日期、blocking-first 执行规则和实例 ID 排序后创建 EventInstance。
  *
  * @param state 游戏状态（只读）
  * @param currentDay 当前绝对游戏日
@@ -45,14 +46,10 @@ export function activateScheduledEvents(
 ): ScheduledActivationResult {
   const due = state.events.scheduled.filter((s) => s.activateAtDay <= currentDay);
 
-  // 按 activateAtDay, 优先级（快照中）, instanceId 排序
-  const priorityOrder: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+  // 不跨越绝对日期重排；同日才按统一的 blocker-first 执行规则排序。
   due.sort((a, b) => {
     if (a.activateAtDay !== b.activateAtDay) return a.activateAtDay - b.activateAtDay;
-    const pa = priorityOrder[a.snapshot.priority] ?? 2;
-    const pb = priorityOrder[b.snapshot.priority] ?? 2;
-    if (pa !== pb) return pa - pb;
-    return a.instanceId.localeCompare(b.instanceId);
+    return compareScheduledEventExecutionOrder(a, b);
   });
 
   const activated: EventInstance[] = [];

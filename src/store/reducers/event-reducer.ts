@@ -12,6 +12,7 @@ import type { PlayerSave } from '../../types/player';
 import { unwrap } from 'solid-js/store';
 import type {
   EventChainInstance,
+  EventContinuation,
   EventInstance,
   EventHistoryRecord,
 } from '../../domain/events/state';
@@ -171,35 +172,25 @@ function reduceChooseEventOptionInternal(
   };
   draft.events.history.push(history);
 
-  // 7. 移除当前 blocker 后立即提升下一项。若队列中仍有 blocker，当前
-  // 结算产生的即时后续和 resolved 信号都必须延后，不能绕过新的事务边界。
+  // 7. 移除当前 blocker 后立即提升下一项。即时后续必须位于当前
+  // event.resolved 之前；只有刚结算的 blocker 结果应抢在旧暂停尾部之前，
+  // 普通 inbox 结算仍追加，避免越过先前已暂停的因果链。
   advanceBlockingPointer(draft);
-  const nextBlockerActive = draft.events.activeBlockingEventId !== null;
-  let immediateResult: { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] };
-  if (nextBlockerActive) {
-    deferImmediateInstances(draft, plan.immediateInstances, currentDay);
-    immediateResult = { histories: [], cascadeSignals: [] };
-  } else {
-    immediateResult = applyEventInstances(
-      draft,
-      plan.immediateInstances,
-      currentDay,
-      rng,
-      idFactory,
-      definitions,
-    );
-  }
-
-  // 8. 处理父事件和即时自动事件的级联信号；processCascadeSignals 会在
-  // nextBlockerActive 时持久化该信号，等待 blocker 解除后恢复。
-  processCascadeSignals(draft, plan.emittedSignals, currentDay, rng, idFactory, definitions);
-  processCascadeSignals(
+  processEventContinuations(
     draft,
-    immediateResult.cascadeSignals,
+    [
+      ...plan.immediateInstances.map((instance) => ({ kind: 'instance' as const, instance })),
+      ...plan.emittedSignals.map((signal) => ({
+        kind: 'signal' as const,
+        signal,
+        cascadeDepth: 0,
+      })),
+    ],
     currentDay,
     rng,
     idFactory,
     definitions,
+    instance.snapshot.presentation === 'blocking' ? 'front' : 'back',
   );
 
   return history;
@@ -398,7 +389,7 @@ function applyEventInstancesInternal(
       draft.events.pending.push(instance);
       if (instance.snapshot.presentation === 'blocking') {
         advanceBlockingPointer(draft);
-        deferImmediateInstances(draft, queue.slice(index + 1), currentDay);
+        deferImmediateInstances(draft, queue.slice(index + 1));
         break;
       }
     }
@@ -409,33 +400,21 @@ function applyEventInstancesInternal(
 }
 
 /**
- * 将因 blocker 暂停的即时实例转为当前日计划项，保留完整快照与来源，等待解除阻塞后恢复。
+ * 将因 blocker 暂停的即时实例写入统一 continuation 队列。
+ *
+ * 不能将它们伪装成 scheduled：事件本身与其后续 resolved 信号必须在
+ * 解除 blocker 后按原有因果顺序一并恢复。
  *
  * @param draft 游戏状态草稿
  * @param instances 尚未消费的实例
- * @param currentDay 当前绝对游戏日
  * @returns void
  */
-function deferImmediateInstances(
-  draft: PlayerSave,
-  instances: readonly EventInstance[],
-  currentDay: number,
-): void {
-  for (const instance of instances) {
-    if (draft.events.scheduled.some((scheduled) => scheduled.instanceId === instance.instanceId)) {
-      continue;
-    }
-    draft.events.scheduled.push({
-      instanceId: instance.instanceId,
-      eventId: instance.eventId,
-      scheduledAtDay: currentDay,
-      activateAtDay: currentDay,
-      triggerContext: instance.triggerContext,
-      sourceKey: instance.sourceKey,
-      chainInstanceId: instance.chainInstanceId,
-      snapshot: instance.snapshot,
-    });
-  }
+function deferImmediateInstances(draft: PlayerSave, instances: readonly EventInstance[]): void {
+  deferEventContinuations(
+    draft,
+    instances.map((instance) => ({ kind: 'instance', instance })),
+    'front',
+  );
 }
 
 /**
@@ -504,8 +483,10 @@ export function applyEventOrchestrationPlan(
 }
 
 /**
- * 处理级联信号：对每个信号调用 processDomainSignal 并应用结果。
- * 使用 BFS 队列防止自动事件产生的无限级联。
+ * 处理级联信号，并恢复已暂停的实例/信号 continuation。
+ *
+ * 新到信号追加在已暂停工作之后；玩家刚结算 blocker 时会通过
+ * processEventContinuations 的 front 模式将当前结果放到旧尾部之前。
  *
  * @param draft 游戏状态草稿
  * @param signals 待处理的级联信号列表
@@ -522,86 +503,179 @@ export function processCascadeSignals(
   idFactory: () => string,
   definitions: readonly EventDefinition[],
 ): void {
-  // 让超限的级联保持原子性；成功时才替换调用方草稿。
-  const transaction = structuredClone(unwrap(draft));
-  processCascadeSignalsInternal(transaction, signals, currentDay, rng, idFactory, definitions);
-  Object.assign(draft, transaction);
+  processEventContinuations(
+    draft,
+    signals.map((signal) => ({ kind: 'signal', signal, cascadeDepth: 0 })),
+    currentDay,
+    rng,
+    idFactory,
+    definitions,
+    'back',
+  );
 }
 
-function processCascadeSignalsInternal(
+/**
+ * 以统一、可持久化的队列处理事件实例和级联信号。
+ *
+ * @param draft 游戏状态草稿
+ * @param continuations 本次新增的恢复工作
+ * @param currentDay 当前绝对游戏日
+ * @param rng 随机数生成器
+ * @param idFactory 事务共享 ID 工厂
+ * @param definitions 事件定义列表
+ * @param placement front 表示当前 blocker 的结果先于旧尾部恢复
+ * @returns void
+ */
+export function processEventContinuations(
   draft: PlayerSave,
-  signals: DomainSignalSnapshot[],
+  continuations: readonly EventContinuation[],
   currentDay: number,
   rng: () => number,
   idFactory: () => string,
   definitions: readonly EventDefinition[],
+  placement: 'front' | 'back' = 'back',
 ): void {
-  const maxCascadeIterations = 16;
-  const pendingSignalIds = new Set(draft.events.deferredSignals.map((signal) => signal.signalId));
-  const queue = [
-    ...draft.events.deferredSignals,
-    ...signals.filter((signal) => !pendingSignalIds.has(signal.signalId)),
-  ];
+  // 让超限的级联保持原子性；成功时才替换调用方草稿。
+  const transaction = structuredClone(unwrap(draft));
+  processEventContinuationsInternal(
+    transaction,
+    continuations,
+    currentDay,
+    rng,
+    idFactory,
+    definitions,
+    placement,
+  );
+  Object.assign(draft, transaction);
+}
+
+const MAX_CASCADE_DEPTH = 16;
+
+function continuationIdentity(continuation: EventContinuation): string {
+  return continuation.kind === 'instance'
+    ? `instance:${continuation.instance.instanceId}`
+    : `signal:${continuation.signal.signalId}`;
+}
+
+function deduplicateContinuations(
+  continuations: readonly EventContinuation[],
+): EventContinuation[] {
+  const known = new Set<string>();
+  return continuations.filter((continuation) => {
+    const identity = continuationIdentity(continuation);
+    if (known.has(identity)) return false;
+    known.add(identity);
+    return true;
+  });
+}
+
+function normalizeLegacyDeferredSignals(draft: PlayerSave): void {
+  if (draft.events.deferredSignals.length === 0) return;
+  const legacy = draft.events.deferredSignals.map((signal) => ({
+    kind: 'signal' as const,
+    signal,
+    cascadeDepth: 0,
+  }));
+  draft.events.deferredContinuations = deduplicateContinuations([
+    ...legacy,
+    ...draft.events.deferredContinuations,
+  ]);
   draft.events.deferredSignals = [];
+}
 
-  const deferSignals = (remaining: readonly DomainSignalSnapshot[]): void => {
-    const known = new Set(draft.events.deferredSignals.map((signal) => signal.signalId));
-    for (const signal of remaining) {
-      if (
-        !draft.events.processedSignalIds.includes(signal.signalId) &&
-        !known.has(signal.signalId)
-      ) {
-        draft.events.deferredSignals.push(signal);
-        known.add(signal.signalId);
-      }
+function deferEventContinuations(
+  draft: PlayerSave,
+  continuations: readonly EventContinuation[],
+  placement: 'front' | 'back',
+): void {
+  normalizeLegacyDeferredSignals(draft);
+  const unprocessed = continuations.filter(
+    (continuation) =>
+      continuation.kind !== 'signal' ||
+      !draft.events.processedSignalIds.includes(continuation.signal.signalId),
+  );
+  const combined =
+    placement === 'front'
+      ? [...unprocessed, ...draft.events.deferredContinuations]
+      : [...draft.events.deferredContinuations, ...unprocessed];
+  draft.events.deferredContinuations = deduplicateContinuations(combined);
+}
+
+function processEventContinuationsInternal(
+  draft: PlayerSave,
+  continuations: readonly EventContinuation[],
+  currentDay: number,
+  rng: () => number,
+  idFactory: () => string,
+  definitions: readonly EventDefinition[],
+  placement: 'front' | 'back',
+): void {
+  normalizeLegacyDeferredSignals(draft);
+  const deferred = draft.events.deferredContinuations;
+  draft.events.deferredContinuations = [];
+  const queue =
+    placement === 'front' ? [...continuations, ...deferred] : [...deferred, ...continuations];
+
+  while (queue.length > 0) {
+    if (draft.events.activeBlockingEventId !== null) {
+      deferEventContinuations(draft, queue, 'back');
+      return;
     }
-  };
 
-  if (draft.events.activeBlockingEventId !== null) {
-    deferSignals(queue);
-    return;
-  }
-
-  let currentQueue = queue;
-  for (let i = 0; i < maxCascadeIterations && currentQueue.length > 0; i++) {
-    const nextSignals: DomainSignalSnapshot[] = [];
-
-    for (let index = 0; index < currentQueue.length; index++) {
-      const sig = currentQueue[index]!;
-      if (draft.events.processedSignalIds.includes(sig.signalId)) {
-        continue;
-      }
-
-      const orchResult = processDomainSignal({
-        state: draft as Readonly<PlayerSave>,
-        signal: sig,
-        currentDay,
-        definitions,
-        rng,
-        idFactory,
-      });
-
-      const { cascadeSignals } = applyEventOrchestrationPlan(
+    const continuation = queue.shift();
+    if (!continuation) continue;
+    if (continuation.kind === 'instance') {
+      const { cascadeSignals } = applyEventInstances(
         draft,
-        orchResult,
+        [continuation.instance],
         currentDay,
         rng,
         idFactory,
         definitions,
       );
-      nextSignals.push(...cascadeSignals);
-      if (draft.events.activeBlockingEventId !== null) {
-        deferSignals([...nextSignals, ...currentQueue.slice(index + 1)]);
-        return;
-      }
+      queue.push(
+        ...cascadeSignals.map((signal) => ({ kind: 'signal' as const, signal, cascadeDepth: 0 })),
+      );
+      continue;
     }
 
-    currentQueue = nextSignals;
-  }
+    if (draft.events.processedSignalIds.includes(continuation.signal.signalId)) {
+      continue;
+    }
+    if (continuation.cascadeDepth >= MAX_CASCADE_DEPTH) {
+      throw new Error(
+        `Cascade depth exceeded (${MAX_CASCADE_DEPTH}); transaction was not committed`,
+      );
+    }
 
-  if (currentQueue.length > 0) {
-    throw new Error(
-      `Cascade depth exceeded (${maxCascadeIterations}); transaction was not committed`,
+    const orchestration = processDomainSignal({
+      state: draft as Readonly<PlayerSave>,
+      signal: continuation.signal,
+      currentDay,
+      definitions,
+      rng,
+      idFactory,
+    });
+    const { cascadeSignals } = applyEventOrchestrationPlan(
+      draft,
+      orchestration,
+      currentDay,
+      rng,
+      idFactory,
+      definitions,
+    );
+    const nextDepth = continuation.cascadeDepth + 1;
+    queue.push(
+      ...orchestration.emittedSignals.map((signal) => ({
+        kind: 'signal' as const,
+        signal,
+        cascadeDepth: nextDepth,
+      })),
+      ...cascadeSignals.map((signal) => ({
+        kind: 'signal' as const,
+        signal,
+        cascadeDepth: nextDepth,
+      })),
     );
   }
 }

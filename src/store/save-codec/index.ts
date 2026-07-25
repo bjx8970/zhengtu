@@ -215,6 +215,53 @@ const EventExecutableSnapshotSchema = z
   })
   .strict();
 
+/** EventInstance Schema */
+const EventInstanceSchema = z
+  .object({
+    instanceId: z.string(),
+    eventId: z.string(),
+    status: z.enum(EVENT_INSTANCE_STATUSES),
+    triggeredAtDay: z.number(),
+    activatedAtDay: z.number(),
+    deadlineDay: z.number().nullable(),
+    triggerContext: DomainSignalSnapshotSchema,
+    sourceKey: z.string(),
+    chainInstanceId: z.string().nullable(),
+    snapshot: EventExecutableSnapshotSchema,
+  })
+  .strict();
+
+/** ScheduledEventInstance Schema */
+const ScheduledEventInstanceSchema = z
+  .object({
+    instanceId: z.string(),
+    eventId: z.string(),
+    scheduledAtDay: z.number(),
+    activateAtDay: z.number(),
+    triggerContext: DomainSignalSnapshotSchema,
+    sourceKey: z.string(),
+    chainInstanceId: z.string().nullable(),
+    snapshot: EventExecutableSnapshotSchema,
+  })
+  .strict();
+
+/** 暂停实例/信号的统一 continuation 队列 Schema。 */
+const EventContinuationSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('instance'),
+      instance: EventInstanceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('signal'),
+      signal: DomainSignalSnapshotSchema,
+      cascadeDepth: z.number().int().nonnegative(),
+    })
+    .strict(),
+]);
+
 /** AppliedEffectRecord Schema */
 const AppliedEffectRecordSchema = z
   .object({
@@ -240,36 +287,8 @@ const EventCooldownRecordSchema = z
 const EventRuntimeStateSchema = z
   .object({
     activeBlockingEventId: z.string().nullable(),
-    pending: z.array(
-      z
-        .object({
-          instanceId: z.string(),
-          eventId: z.string(),
-          status: z.enum(EVENT_INSTANCE_STATUSES),
-          triggeredAtDay: z.number(),
-          activatedAtDay: z.number(),
-          deadlineDay: z.number().nullable(),
-          triggerContext: DomainSignalSnapshotSchema,
-          sourceKey: z.string(),
-          chainInstanceId: z.string().nullable(),
-          snapshot: EventExecutableSnapshotSchema,
-        })
-        .strict(),
-    ),
-    scheduled: z.array(
-      z
-        .object({
-          instanceId: z.string(),
-          eventId: z.string(),
-          scheduledAtDay: z.number(),
-          activateAtDay: z.number(),
-          triggerContext: DomainSignalSnapshotSchema,
-          sourceKey: z.string(),
-          chainInstanceId: z.string().nullable(),
-          snapshot: EventExecutableSnapshotSchema,
-        })
-        .strict(),
-    ),
+    pending: z.array(EventInstanceSchema),
+    scheduled: z.array(ScheduledEventInstanceSchema),
     history: z.array(
       z
         .object({
@@ -303,8 +322,10 @@ const EventRuntimeStateSchema = z
         .strict(),
     ),
     processedSignalIds: z.array(z.string()),
-    // 此字段在 Schema 4 已存在的存档中缺失时安全默认为空；其余未知字段仍由 strict() 拒绝。
+    // 兼容已写出的 Schema 4 存档；运行时会在首次使用时转入统一 continuation 队列。
     deferredSignals: z.array(DomainSignalSnapshotSchema).default([]),
+    // 新字段使用 default 保持 Schema 4 的前向兼容，未知字段仍由 strict() 拒绝。
+    deferredContinuations: z.array(EventContinuationSchema).default([]),
   })
   .strict();
 
@@ -618,6 +639,10 @@ export function migrateSchema3To4(raw: Record<string, unknown>): Record<string, 
 
     if (!events.deferredSignals) {
       (events as Record<string, unknown>).deferredSignals = [];
+    }
+
+    if (!events.deferredContinuations) {
+      (events as Record<string, unknown>).deferredContinuations = [];
     }
 
     // 迁移 pending/scheduled/history 中的事件实例

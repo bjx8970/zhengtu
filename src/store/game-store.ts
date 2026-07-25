@@ -71,6 +71,7 @@ function createDefaultEventRuntimeState(): EventRuntimeState {
     chainInstances: {},
     processedSignalIds: [],
     deferredSignals: [],
+    deferredContinuations: [],
   };
 }
 
