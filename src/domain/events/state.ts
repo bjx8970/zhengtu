@@ -76,7 +76,7 @@ export interface ScheduledEventInstance {
  * 在它原本应先执行的零延迟后续之前恢复。
  */
 export type EventContinuation =
-  | { kind: 'instance'; instance: EventInstance }
+  | { kind: 'instance'; instance: EventInstance; cascadeDepth: number }
   | { kind: 'signal'; signal: DomainSignalSnapshot; cascadeDepth: number };
 
 /** 已应用效果记录 */

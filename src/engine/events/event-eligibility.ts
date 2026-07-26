@@ -18,6 +18,12 @@ import type { PlayerSave } from '../../types/player';
 type EventOccurrence = Pick<EventHistoryRecord, 'eventId' | 'sourceKey' | 'chainInstanceId'>;
 type PlannedEventInstance = EventInstance | ScheduledEventInstance;
 
+function getDeferredInstances(state: Readonly<PlayerSave>): EventInstance[] {
+  return state.events.deferredContinuations.flatMap((continuation) =>
+    continuation.kind === 'instance' ? [continuation.instance] : [],
+  );
+}
+
 /**
  * 检查事件是否已被重复策略阻止。
  *
@@ -39,6 +45,7 @@ export function isEventRepeatBlocked(
     state.events.history.some(predicate) ||
     state.events.pending.some(predicate) ||
     state.events.scheduled.some(predicate) ||
+    getDeferredInstances(state).some(predicate) ||
     transactionInstances.some(predicate);
 
   switch (definition.repeatPolicy.mode) {
@@ -64,6 +71,7 @@ export function isEventRepeatBlocked(
         state.events.history.filter((item) => item.eventId === definition.id).length +
         state.events.pending.filter((item) => item.eventId === definition.id).length +
         state.events.scheduled.filter((item) => item.eventId === definition.id).length +
+        getDeferredInstances(state).filter((item) => item.eventId === definition.id).length +
         transactionInstances.filter((item) => item.eventId === definition.id).length;
       return total >= definition.repeatPolicy.maxActivations;
     }

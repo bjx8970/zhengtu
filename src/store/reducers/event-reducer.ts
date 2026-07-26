@@ -179,7 +179,11 @@ function reduceChooseEventOptionInternal(
   processEventContinuations(
     draft,
     [
-      ...plan.immediateInstances.map((instance) => ({ kind: 'instance' as const, instance })),
+      ...plan.immediateInstances.map((instance) => ({
+        kind: 'instance' as const,
+        instance,
+        cascadeDepth: 0,
+      })),
       ...plan.emittedSignals.map((signal) => ({
         kind: 'signal' as const,
         signal,
@@ -337,6 +341,8 @@ export function applyEventInstances(
   rng: () => number,
   idFactory: () => string,
   definitions: readonly EventDefinition[],
+  cascadeDepth = 0,
+  budget?: EventInstanceBudget,
 ): { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] } {
   // 即时自动链超过预算时，调用方必须能回滚整个批次，而不能丢弃尾部实例。
   const transaction = structuredClone(unwrap(draft));
@@ -347,9 +353,16 @@ export function applyEventInstances(
     rng,
     idFactory,
     definitions,
+    cascadeDepth,
+    budget,
   );
   Object.assign(draft, transaction);
   return result;
+}
+
+interface EventInstanceBudget {
+  consumed: number;
+  readonly limit: number;
 }
 
 function applyEventInstancesInternal(
@@ -359,18 +372,20 @@ function applyEventInstancesInternal(
   rng: () => number,
   idFactory: () => string,
   definitions: readonly EventDefinition[],
+  cascadeDepth = 0,
+  budget: EventInstanceBudget = { consumed: 0, limit: 100 },
 ): { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] } {
   const histories: EventHistoryRecord[] = [];
   const cascadeSignals: DomainSignalSnapshot[] = [];
   const queue = [...instances];
-  const maxImmediateInstances = 100;
 
   for (let index = 0; index < queue.length; index++) {
-    if (index >= maxImmediateInstances) {
+    if (budget.consumed >= budget.limit) {
       throw new Error(
-        `Immediate event budget exceeded (${maxImmediateInstances}); transaction was not committed`,
+        `Immediate event budget exceeded (${budget.limit}); transaction was not committed`,
       );
     }
+    budget.consumed += 1;
     const instance = queue[index]!;
     if (instance.snapshot.presentation === 'automatic') {
       const settled = handleAutoEventInstance(
@@ -389,7 +404,7 @@ function applyEventInstancesInternal(
       draft.events.pending.push(instance);
       if (instance.snapshot.presentation === 'blocking') {
         advanceBlockingPointer(draft);
-        deferImmediateInstances(draft, queue.slice(index + 1));
+        deferImmediateInstances(draft, queue.slice(index + 1), cascadeDepth);
         break;
       }
     }
@@ -409,10 +424,14 @@ function applyEventInstancesInternal(
  * @param instances 尚未消费的实例
  * @returns void
  */
-function deferImmediateInstances(draft: PlayerSave, instances: readonly EventInstance[]): void {
+function deferImmediateInstances(
+  draft: PlayerSave,
+  instances: readonly EventInstance[],
+  cascadeDepth: number,
+): void {
   deferEventContinuations(
     draft,
-    instances.map((instance) => ({ kind: 'instance', instance })),
+    instances.map((instance) => ({ kind: 'instance', instance, cascadeDepth })),
     'front',
   );
 }
@@ -439,6 +458,8 @@ export function applyEventOrchestrationPlan(
   rng: () => number,
   idFactory: () => string,
   definitions: readonly EventDefinition[],
+  cascadeDepth = 0,
+  budget?: EventInstanceBudget,
 ): { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] } {
   const histories: EventHistoryRecord[] = [];
 
@@ -477,6 +498,8 @@ export function applyEventOrchestrationPlan(
     rng,
     idFactory,
     definitions,
+    cascadeDepth,
+    budget,
   );
   histories.push(...instanceResult.histories);
   return { histories, cascadeSignals: instanceResult.cascadeSignals };
@@ -615,6 +638,7 @@ function processEventContinuationsInternal(
   draft.events.deferredContinuations = [];
   const queue =
     placement === 'front' ? [...continuations, ...deferred] : [...deferred, ...continuations];
+  const budget: EventInstanceBudget = { consumed: 0, limit: 100 };
 
   while (queue.length > 0) {
     if (draft.events.activeBlockingEventId !== null) {
@@ -632,9 +656,15 @@ function processEventContinuationsInternal(
         rng,
         idFactory,
         definitions,
+        continuation.cascadeDepth,
+        budget,
       );
       queue.push(
-        ...cascadeSignals.map((signal) => ({ kind: 'signal' as const, signal, cascadeDepth: 0 })),
+        ...cascadeSignals.map((signal) => ({
+          kind: 'signal' as const,
+          signal,
+          cascadeDepth: continuation.cascadeDepth,
+        })),
       );
       continue;
     }
@@ -663,6 +693,8 @@ function processEventContinuationsInternal(
       rng,
       idFactory,
       definitions,
+      continuation.cascadeDepth + 1,
+      budget,
     );
     const nextDepth = continuation.cascadeDepth + 1;
     queue.push(
@@ -718,48 +750,70 @@ export function cancelScheduledByScope(
   currentDay: number,
 ): void {
   const { eventId, scope } = cancellation;
-  const matchesScope = (scheduled: (typeof draft.events.scheduled)[number]): boolean => {
-    if (scheduled.eventId !== eventId) return false;
+  const matchesScope = (instance: {
+    eventId: string;
+    sourceKey: string;
+    chainInstanceId: string | null;
+  }): boolean => {
+    if (instance.eventId !== eventId) return false;
     switch (scope) {
       // 无链父事件没有可比较的“同链”范围，不能误伤全部无链计划事件。
       case 'same_chain':
-        return chainInstanceId !== null && scheduled.chainInstanceId === chainInstanceId;
+        return chainInstanceId !== null && instance.chainInstanceId === chainInstanceId;
       case 'same_source':
-        return scheduled.sourceKey === sourceKey;
+        return instance.sourceKey === sourceKey;
       case 'all':
         return true;
     }
   };
-  const cancelled = draft.events.scheduled.filter(matchesScope);
+  const cancelled = [
+    ...draft.events.scheduled.filter(matchesScope).map((instance) => ({
+      instance,
+      triggeredAtDay: instance.scheduledAtDay,
+    })),
+    ...draft.events.deferredContinuations.flatMap((continuation) =>
+      continuation.kind === 'instance' && matchesScope(continuation.instance)
+        ? [
+            {
+              instance: continuation.instance,
+              triggeredAtDay: continuation.instance.triggeredAtDay,
+            },
+          ]
+        : [],
+    ),
+  ];
   if (cancelled.length === 0) return;
   draft.events.scheduled = draft.events.scheduled.filter((scheduled) => !matchesScope(scheduled));
+  draft.events.deferredContinuations = draft.events.deferredContinuations.filter(
+    (continuation) => continuation.kind !== 'instance' || !matchesScope(continuation.instance),
+  );
 
   const chains = new Map<string, EventChainInstance>();
-  for (const scheduled of cancelled) {
+  for (const { instance: cancelledInstance, triggeredAtDay } of cancelled) {
     draft.events.history.push({
-      eventId: scheduled.eventId,
-      instanceId: scheduled.instanceId,
+      eventId: cancelledInstance.eventId,
+      instanceId: cancelledInstance.instanceId,
       finalStatus: 'cancelled',
-      triggeredAtDay: scheduled.scheduledAtDay,
+      triggeredAtDay,
       completedAtDay: currentDay,
-      sourceKey: scheduled.sourceKey,
-      chainInstanceId: scheduled.chainInstanceId,
-      titleSnapshot: scheduled.snapshot.title,
+      sourceKey: cancelledInstance.sourceKey,
+      chainInstanceId: cancelledInstance.chainInstanceId,
+      titleSnapshot: cancelledInstance.snapshot.title,
       chosenOptionId: null,
       chosenOptionLabel: null,
       appliedEffects: [],
     });
-    if (!scheduled.chainInstanceId) continue;
+    if (!cancelledInstance.chainInstanceId) continue;
     const persisted =
-      chains.get(scheduled.chainInstanceId) ??
-      draft.events.chainInstances[scheduled.chainInstanceId];
+      chains.get(cancelledInstance.chainInstanceId) ??
+      draft.events.chainInstances[cancelledInstance.chainInstanceId];
     if (!persisted) continue;
     const chain = chains.get(persisted.instanceId) ?? {
       ...persisted,
       activeNodeIds: [...persisted.activeNodeIds],
       completedNodeIds: [...persisted.completedNodeIds],
     };
-    const nodeId = scheduled.snapshot.nodeId ?? scheduled.eventId;
+    const nodeId = cancelledInstance.snapshot.nodeId ?? cancelledInstance.eventId;
     chain.activeNodeIds = chain.activeNodeIds.filter((id) => id !== nodeId);
     if (chain.activeNodeIds.length === 0) {
       chain.status = 'abandoned';

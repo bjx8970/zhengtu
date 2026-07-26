@@ -351,6 +351,46 @@ describe('processDomainSignal - 条件评估', () => {
 });
 
 describe('processDomainSignal - 重复控制', () => {
+  it.each([
+    { label: 'once', repeatPolicy: { mode: 'once' as const } },
+    { label: 'once_per_source', repeatPolicy: { mode: 'once_per_source' as const } },
+    { label: 'once_per_chain', repeatPolicy: { mode: 'once_per_chain' as const } },
+    { label: 'maxActivations', repeatPolicy: { mode: 'repeatable' as const, maxActivations: 1 } },
+  ])('treats a deferred continuation as an occurrence for $label', ({ repeatPolicy }) => {
+    const def = makeEventDef({
+      id: `evt_deferred_${repeatPolicy.mode}`,
+      chainId: repeatPolicy.mode === 'once_per_chain' ? 'deferred_chain' : null,
+      nodeId: repeatPolicy.mode === 'once_per_chain' ? 'deferred_node' : null,
+      repeatPolicy,
+      trigger: { sources: ['action.completed'] },
+    });
+    const first = processDomainSignal(
+      makeInput({
+        definitions: [def],
+        signal: makeActionSignal(`deferred_first_${repeatPolicy.mode}`, 'deferred_action'),
+      }),
+    );
+    const state = createInitialState();
+    state.events.deferredContinuations = [
+      { kind: 'instance', instance: first.createdInstances[0]!, cascadeDepth: 0 },
+    ];
+    for (const chain of first.updatedChainInstances) {
+      state.events.chainInstances[chain.instanceId] = chain;
+    }
+
+    const result = processDomainSignal(
+      makeInput({
+        state,
+        definitions: [def],
+        signal: makeActionSignal(`deferred_second_${repeatPolicy.mode}`, 'deferred_action'),
+      }),
+    );
+    expect(result.createdInstances).toHaveLength(0);
+    expect(result.diagnostics.some((diagnostic) => diagnostic.type === 'repeat_blocked')).toBe(
+      true,
+    );
+  });
+
   it('once mode: first trigger creates instance, second gets repeat_blocked', () => {
     const def = makeEventDef({ repeatPolicy: { mode: 'once' } });
     const input = makeInput({ definitions: [def], signal: makeSignal('sig_once_1') });

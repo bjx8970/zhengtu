@@ -730,6 +730,68 @@ describe('event-reducer: cascade signals and scheduling', () => {
     expect(state.events.chainInstances['cancel_chain_instance']?.completedAtDay).toBe(15);
   });
 
+  it('cancels a deferred continuation and closes its chain atomically', () => {
+    const state = createInitialState();
+    const snapshot = createEventSnapshot({
+      id: 'evt_deferred_cancelled_node',
+      chainId: 'deferred_cancel_chain',
+      nodeId: 'deferred_cancelled_node',
+      title: 'Deferred cancelled node',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once_per_chain' },
+      activation: {},
+      options: [],
+      automaticOutcome: { effects: [] },
+    });
+    state.events.deferredContinuations = [
+      {
+        kind: 'instance',
+        instance: {
+          instanceId: 'deferred_cancelled_node_instance',
+          eventId: snapshot.eventId,
+          status: 'pending',
+          triggeredAtDay: 10,
+          activatedAtDay: 10,
+          deadlineDay: null,
+          triggerContext: makeSignal(),
+          sourceKey: 'cancel_source',
+          chainInstanceId: 'deferred_cancel_chain_instance',
+          snapshot,
+        },
+        cascadeDepth: 3,
+      },
+    ];
+    state.events.chainInstances['deferred_cancel_chain_instance'] = {
+      instanceId: 'deferred_cancel_chain_instance',
+      chainId: 'deferred_cancel_chain',
+      status: 'active',
+      sourceKey: 'cancel_source',
+      activeNodeIds: ['deferred_cancelled_node'],
+      completedNodeIds: [],
+      startedAtDay: 10,
+      completedAtDay: null,
+    };
+
+    cancelScheduledByScope(
+      state,
+      { eventId: snapshot.eventId, scope: 'same_chain' },
+      'cancel_source',
+      'deferred_cancel_chain_instance',
+      15,
+    );
+
+    expect(state.events.deferredContinuations).toHaveLength(0);
+    expect(
+      state.events.history.find((item) => item.instanceId === 'deferred_cancelled_node_instance')
+        ?.finalStatus,
+    ).toBe('cancelled');
+    expect(state.events.chainInstances['deferred_cancel_chain_instance']?.status).toBe('abandoned');
+  });
+
   it('same_chain cancellation without a chain scope leaves unchained events intact', () => {
     const state = createInitialState();
     const snapshot = createEventSnapshot({
@@ -809,6 +871,121 @@ describe('event-reducer: cascade signals and scheduling', () => {
       ),
     ).toThrow('Immediate event budget exceeded');
     expect(state.events.pending).toHaveLength(0);
+  });
+
+  it('shares the immediate-event budget across continuation workers', () => {
+    const state = createInitialState();
+    const snapshot = createEventSnapshot({
+      id: 'evt_continuation_budget',
+      chainId: null,
+      nodeId: null,
+      title: 'Continuation budget',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'repeatable' },
+      activation: {},
+      options: [{ id: 'ack', label: '确认', description: '', effects: [] }],
+    });
+    const continuations = Array.from({ length: 101 }, (_, index) => ({
+      kind: 'instance' as const,
+      cascadeDepth: 0,
+      instance: {
+        instanceId: `continuation_budget_${index}`,
+        eventId: snapshot.eventId,
+        status: 'pending' as const,
+        triggeredAtDay: 1,
+        activatedAtDay: 1,
+        deadlineDay: null,
+        triggerContext: { ...makeSignal(), signalId: `continuation_budget_signal_${index}` },
+        sourceKey: 'continuation_budget_source',
+        chainInstanceId: null,
+        snapshot,
+      },
+    }));
+
+    expect(() =>
+      processEventContinuations(
+        state,
+        continuations,
+        1,
+        () => 0,
+        () => 'generated',
+        [],
+      ),
+    ).toThrow('Immediate event budget exceeded');
+    expect(state.events.pending).toHaveLength(0);
+  });
+
+  it('preserves a deferred instance cascade depth across a blocker pause', () => {
+    const state = createInitialState();
+    const seedSnapshot = createEventSnapshot({
+      id: 'evt_depth_seed',
+      chainId: null,
+      nodeId: null,
+      title: 'Depth seed',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: { effects: [] },
+    });
+    const listener: EventDefinition = {
+      id: 'evt_depth_listener',
+      chainId: null,
+      nodeId: null,
+      title: 'Depth listener',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: {
+        sources: ['event.resolved'],
+        condition: { signalField: 'eventId', op: 'eq', value: 'evt_depth_seed' },
+      },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: { effects: [] },
+    };
+
+    expect(() =>
+      processEventContinuations(
+        state,
+        [
+          {
+            kind: 'instance',
+            cascadeDepth: 15,
+            instance: {
+              instanceId: 'evt_depth_seed_instance',
+              eventId: seedSnapshot.eventId,
+              status: 'pending',
+              triggeredAtDay: 1,
+              activatedAtDay: 1,
+              deadlineDay: null,
+              triggerContext: makeSignal(),
+              sourceKey: 'depth_source',
+              chainInstanceId: null,
+              snapshot: seedSnapshot,
+            },
+          },
+        ],
+        1,
+        () => 0,
+        (() => {
+          let id = 0;
+          return () => `depth_${id++}`;
+        })(),
+        [listener],
+      ),
+    ).toThrow('Cascade depth exceeded');
+    expect(state.events.history).toHaveLength(0);
   });
 
   it('defers unconsumed immediate siblings when a blocker is activated', () => {
@@ -1220,7 +1397,11 @@ describe('event-reducer: cascade signals and scheduling', () => {
     const idFactory = () => `continuation_${id++}`;
 
     state.events.deferredContinuations = [
-      { kind: 'instance', instance: makeInstance('old_immediate_instance', oldAutomaticSnapshot) },
+      {
+        kind: 'instance',
+        instance: makeInstance('old_immediate_instance', oldAutomaticSnapshot),
+        cascadeDepth: 0,
+      },
       { kind: 'signal', signal: oldTail, cascadeDepth: 0 },
     ];
 
@@ -1230,7 +1411,11 @@ describe('event-reducer: cascade signals and scheduling', () => {
     processEventContinuations(
       state,
       [
-        { kind: 'instance', instance: makeInstance('second_blocker_instance', blockerSnapshot) },
+        {
+          kind: 'instance',
+          instance: makeInstance('second_blocker_instance', blockerSnapshot),
+          cascadeDepth: 0,
+        },
         { kind: 'signal', signal: firstResolved, cascadeDepth: 0 },
       ],
       1,

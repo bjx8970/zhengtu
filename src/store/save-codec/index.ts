@@ -251,6 +251,8 @@ const EventContinuationSchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('instance'),
       instance: EventInstanceSchema,
+      // Schema 4 初版没有为暂停实例写入深度；解码旧存档时按根深度恢复。
+      cascadeDepth: z.number().int().nonnegative().default(0),
     })
     .strict(),
   z
