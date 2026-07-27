@@ -597,6 +597,58 @@ describe('event-reducer: cascade signals and scheduling', () => {
     expect(chain?.status).toBe('abandoned');
   });
 
+  it('cancels a zero-delay option follow-up before it can execute or retain its chain node', () => {
+    const snapshot = createEventSnapshot({
+      id: 'evt_option_same_outcome_parent',
+      chainId: null,
+      nodeId: null,
+      title: 'Option parent',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [
+        {
+          id: 'schedule_and_cancel',
+          label: '调度后取消',
+          description: '',
+          effects: [],
+          schedule: [{ eventId: 'formal_investigation', delayDays: 0 }],
+          cancelScheduled: [{ eventId: 'formal_investigation', scope: 'same_source' }],
+        },
+      ],
+    });
+    const state = createStateWithPending({ eventId: snapshot.eventId, snapshot });
+    const store = createTestStore(state);
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'inst_reducer_001',
+      optionId: 'schedule_and_cancel',
+      _rng: () => 0,
+      _idFactory: (() => {
+        let id = 0;
+        return () => `option_same_outcome_${id++}`;
+      })(),
+    });
+
+    const after = store.getRawState();
+    expect(after.world.facts['formal_investigation_ongoing']).toBeUndefined();
+    expect(after.events.pending.some((item) => item.eventId === 'formal_investigation')).toBe(
+      false,
+    );
+    expect(
+      after.events.history.find((item) => item.eventId === 'formal_investigation')?.finalStatus,
+    ).toBe('cancelled');
+    const chain = Object.values(after.events.chainInstances).find(
+      (item) => item.chainId === 'investigation_chain',
+    );
+    expect(chain).toMatchObject({ status: 'abandoned', activeNodeIds: [] });
+  });
+
   it('option with cancelScheduledEvents removes matching scheduled events', () => {
     // Pre-populate a scheduled event
     const baseState = createStateWithSchedule();
