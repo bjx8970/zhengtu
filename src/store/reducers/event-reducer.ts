@@ -147,6 +147,10 @@ function reduceChooseEventOptionInternal(
     draft.events.scheduled.push(sched);
   }
 
+  // 与 automatic outcome 一致，零延迟 follow-up 必须在取消前进入一个
+  // 可变的事务视图。否则本次选项同时 schedule/cancel 某目标时，取消看不到
+  // 该目标，稍后它仍会被 continuation worker 执行。
+  const immediateInstances = [...plan.immediateInstances];
   for (const cancellation of plan.cancellations) {
     cancelScheduledByScope(
       draft,
@@ -154,6 +158,8 @@ function reduceChooseEventOptionInternal(
       instance.sourceKey,
       instance.chainInstanceId,
       currentDay,
+      undefined,
+      immediateInstances,
     );
   }
 
@@ -179,7 +185,7 @@ function reduceChooseEventOptionInternal(
   processEventContinuations(
     draft,
     [
-      ...plan.immediateInstances.map((instance) => ({
+      ...immediateInstances.map((instance) => ({
         kind: 'instance' as const,
         instance,
         cascadeDepth: 0,
