@@ -212,6 +212,7 @@ function reduceChooseEventOptionInternal(
  * @param idFactory ID 工厂
  * @param definitions 事件定义列表
  * @param inFlightContinuations 当前 worker 尚未消费的 continuation 队列
+ * @param inFlightImmediateInstances 当前即时批次尚未消费的实例
  * @returns 历史记录和发出的 cascade 信号
  */
 export function handleAutoEventInstance(
@@ -222,6 +223,7 @@ export function handleAutoEventInstance(
   idFactory: () => string,
   definitions: readonly EventDefinition[],
   inFlightContinuations?: EventContinuation[],
+  inFlightImmediateInstances?: EventInstance[],
 ): {
   history: EventHistoryRecord;
   cascadeSignals: DomainSignalSnapshot[];
@@ -272,6 +274,12 @@ export function handleAutoEventInstance(
     definitions,
     rng,
     idFactory,
+    transactionInstances: [
+      ...(inFlightContinuations ?? []).flatMap((continuation) =>
+        continuation.kind === 'instance' ? [continuation.instance] : [],
+      ),
+      ...(inFlightImmediateInstances ?? []),
+    ],
   });
   for (const chain of followups.chainUpdates) {
     draft.events.chainInstances[chain.instanceId] = chain;
@@ -304,6 +312,7 @@ export function handleAutoEventInstance(
         instance.chainInstanceId,
         currentDay,
         inFlightContinuations,
+        inFlightImmediateInstances,
       );
     }
   }
@@ -317,6 +326,7 @@ export function handleAutoEventInstance(
       instance.chainInstanceId,
       currentDay,
       inFlightContinuations,
+      inFlightImmediateInstances,
     );
   }
 
@@ -386,14 +396,15 @@ function applyEventInstancesInternal(
   const cascadeSignals: DomainSignalSnapshot[] = [];
   const queue = [...instances];
 
-  for (let index = 0; index < queue.length; index++) {
+  while (queue.length > 0) {
     if (budget.consumed >= budget.limit) {
       throw new Error(
         `Immediate event budget exceeded (${budget.limit}); transaction was not committed`,
       );
     }
     budget.consumed += 1;
-    const instance = queue[index]!;
+    const instance = queue.shift();
+    if (!instance) continue;
     if (instance.snapshot.presentation === 'automatic') {
       const settled = handleAutoEventInstance(
         draft,
@@ -403,16 +414,17 @@ function applyEventInstancesInternal(
         idFactory,
         definitions,
         inFlightContinuations,
+        queue,
       );
       histories.push(settled.history);
       cascadeSignals.push(...settled.cascadeSignals);
       // 先处理自动事件的零延迟后续，才能保证它产生的 blocker 会中断尚未消费的兄弟实例。
-      queue.splice(index + 1, 0, ...settled.immediateInstances);
+      queue.unshift(...settled.immediateInstances);
     } else {
       draft.events.pending.push(instance);
       if (instance.snapshot.presentation === 'blocking') {
         advanceBlockingPointer(draft);
-        deferImmediateInstances(draft, queue.slice(index + 1), cascadeDepth);
+        deferImmediateInstances(draft, queue, cascadeDepth);
         break;
       }
     }
@@ -757,6 +769,7 @@ export function advanceBlockingPointer(draft: PlayerSave): void {
  * @param chainInstanceId 当前事件实例的链实例 ID
  * @param currentDay 当前绝对游戏日
  * @param inFlightContinuations 当前 worker 尚未消费的 continuation 队列
+ * @param inFlightImmediateInstances 当前即时批次尚未消费的实例
  */
 export function cancelScheduledByScope(
   draft: PlayerSave,
@@ -765,6 +778,7 @@ export function cancelScheduledByScope(
   chainInstanceId: string | null,
   currentDay: number,
   inFlightContinuations?: EventContinuation[],
+  inFlightImmediateInstances?: EventInstance[],
 ): void {
   const { eventId, scope } = cancellation;
   const matchesScope = (instance: {
@@ -783,7 +797,7 @@ export function cancelScheduledByScope(
         return true;
     }
   };
-  const cancelled = [
+  const candidates = [
     ...draft.events.scheduled.filter(matchesScope).map((instance) => ({
       instance,
       triggeredAtDay: instance.scheduledAtDay,
@@ -808,6 +822,12 @@ export function cancelScheduledByScope(
           ]
         : [],
     ),
+    ...(inFlightImmediateInstances ?? [])
+      .filter(matchesScope)
+      .map((instance) => ({ instance, triggeredAtDay: instance.triggeredAtDay })),
+  ];
+  const cancelled = [
+    ...new Map(candidates.map((item) => [item.instance.instanceId, item])).values(),
   ];
   if (cancelled.length === 0) return;
   draft.events.scheduled = draft.events.scheduled.filter((scheduled) => !matchesScope(scheduled));
@@ -819,6 +839,13 @@ export function cancelScheduledByScope(
       const continuation = inFlightContinuations[index]!;
       if (continuation.kind === 'instance' && matchesScope(continuation.instance)) {
         inFlightContinuations.splice(index, 1);
+      }
+    }
+  }
+  if (inFlightImmediateInstances) {
+    for (let index = inFlightImmediateInstances.length - 1; index >= 0; index--) {
+      if (matchesScope(inFlightImmediateInstances[index]!)) {
+        inFlightImmediateInstances.splice(index, 1);
       }
     }
   }

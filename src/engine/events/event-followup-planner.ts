@@ -34,6 +34,8 @@ export interface PlanEventFollowupsInput {
   definitions: readonly EventDefinition[];
   rng: () => number;
   idFactory: () => string;
+  /** 当前事务中已排队但尚未消费的实例（例如同一信号生成的兄弟实例）。 */
+  transactionInstances?: readonly EventInstance[];
 }
 
 function cloneChain(chain: EventChainInstance): EventChainInstance {
@@ -141,6 +143,7 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
   const immediateInstances: EventInstance[] = [];
   const scheduledInstances: ScheduledEventInstance[] = [];
   const chains = new Map<string, EventChainInstance>();
+  const transactionInstances = [input.parentInstance, ...(input.transactionInstances ?? [])];
 
   const eligibleSchedules = (input.schedules ?? []).filter((schedule) => {
     if (schedule.condition) {
@@ -166,7 +169,7 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
         input.state,
         definition,
         input.parentInstance.sourceKey,
-        [input.parentInstance],
+        transactionInstances,
         existingChain,
       )
     ) {
@@ -222,8 +225,8 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
       : null;
     // 自动事件尚未写入 history，不能让它在结算 outcome 时绕过自己的
     // once / once_per_source / maxActivations 限制再次创建自身。
-    const transactionInstances = [
-      input.parentInstance,
+    const scheduledTransactionInstances = [
+      ...transactionInstances,
       ...immediateInstances,
       ...scheduledInstances,
     ];
@@ -232,7 +235,7 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
         input.state,
         definition,
         input.parentInstance.sourceKey,
-        transactionInstances,
+        scheduledTransactionInstances,
         existingChain,
       )
     ) {

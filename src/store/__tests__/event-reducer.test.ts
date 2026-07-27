@@ -14,6 +14,7 @@ import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import { getConfigLoader } from '../../config/loader';
 import {
   applyEventInstances,
+  applyEventOrchestrationPlan,
   cancelScheduledByScope,
   processCascadeSignals,
   processEventContinuations,
@@ -1340,6 +1341,142 @@ describe('event-reducer: cascade signals and scheduling', () => {
       ),
     ).toBe(true);
   });
+
+  it('lets a signal-created automatic event cancel a later instance in the same batch', () => {
+    const state = createInitialState();
+    const canceller: EventDefinition = {
+      id: 'a_signal_batch_canceller',
+      chainId: null,
+      nodeId: null,
+      title: 'Canceller',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [],
+        cancelScheduled: [{ eventId: 'z_signal_batch_target', scope: 'same_source' }],
+      },
+    };
+    const target: EventDefinition = {
+      id: 'z_signal_batch_target',
+      chainId: null,
+      nodeId: null,
+      title: 'Target',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [
+          {
+            target: 'world_fact',
+            factId: 'signal_batch_target_ran',
+            operation: 'set',
+            value: true,
+          },
+        ],
+      },
+    };
+    let id = 0;
+    const plan = processDomainSignal({
+      state,
+      signal: makeSignal(),
+      currentDay: 1,
+      definitions: [canceller, target],
+      rng: () => 0,
+      idFactory: () => `signal_batch_${id++}`,
+    });
+
+    applyEventOrchestrationPlan(
+      state,
+      plan,
+      1,
+      () => 0,
+      () => `apply_${id++}`,
+      [canceller, target],
+    );
+
+    expect(state.world.facts['signal_batch_target_ran']).toBeUndefined();
+    expect(state.events.history.find((item) => item.eventId === target.id)?.finalStatus).toBe(
+      'cancelled',
+    );
+  });
+
+  it.each([
+    { label: 'once', repeatPolicy: { mode: 'once' as const } },
+    { label: 'once_per_source', repeatPolicy: { mode: 'once_per_source' as const } },
+    {
+      label: 'maxActivations',
+      repeatPolicy: { mode: 'repeatable' as const, maxActivations: 1 },
+    },
+  ])(
+    'does not duplicate a signal-created $label target through an automatic follow-up',
+    ({ repeatPolicy }) => {
+      const state = createInitialState();
+      const automatic: EventDefinition = {
+        id: 'a_signal_batch_followup',
+        chainId: null,
+        nodeId: null,
+        title: 'Follow-up parent',
+        description: '',
+        category: 'story',
+        priority: 'normal',
+        presentation: 'automatic',
+        trigger: { sources: ['world.metric_changed'] },
+        repeatPolicy: { mode: 'once' },
+        activation: {},
+        options: [],
+        automaticOutcome: {
+          effects: [],
+          schedule: [{ eventId: 'z_signal_batch_once_target', delayDays: 0 }],
+        },
+      };
+      const target: EventDefinition = {
+        id: 'z_signal_batch_once_target',
+        chainId: null,
+        nodeId: null,
+        title: 'Already queued target',
+        description: '',
+        category: 'story',
+        priority: 'normal',
+        presentation: 'inbox',
+        trigger: { sources: ['world.metric_changed'] },
+        repeatPolicy,
+        activation: {},
+        options: [{ id: 'ack', label: '确认', description: '', effects: [] }],
+      };
+      let id = 0;
+      const plan = processDomainSignal({
+        state,
+        signal: makeSignal(),
+        currentDay: 1,
+        definitions: [automatic, target],
+        rng: () => 0,
+        idFactory: () => `signal_once_${id++}`,
+      });
+
+      applyEventOrchestrationPlan(
+        state,
+        plan,
+        1,
+        () => 0,
+        () => `apply_once_${id++}`,
+        [automatic, target],
+      );
+
+      expect(state.events.pending.filter((item) => item.eventId === target.id)).toHaveLength(1);
+      expect(state.events.scheduled.filter((item) => item.eventId === target.id)).toHaveLength(0);
+    },
+  );
 
   it('processes zero-delay children before later siblings and pauses cascade signals at a blocker', () => {
     const state = createInitialState();
