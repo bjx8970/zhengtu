@@ -38,6 +38,8 @@ export interface EventOrchestrationInput {
   definitions: readonly EventDefinition[];
   rng: () => number;
   idFactory: () => string;
+  /** 同一 reducer 事务中已排队但尚未消费的实例。 */
+  transactionInstances?: readonly EventInstance[];
 }
 
 /** 编排器输出 */
@@ -273,6 +275,7 @@ function resolveSingleSignal(
   allChains: Map<string, EventChainInstance>,
   allDiagnostics: EventOrchestrationDiagnostic[],
   processedIds: Set<string>,
+  transactionInstances: readonly EventInstance[],
 ): DomainSignalSnapshot[] {
   const nextSignals: DomainSignalSnapshot[] = [];
 
@@ -309,7 +312,7 @@ function resolveSingleSignal(
         state,
         def,
         sourceKey,
-        [...allNewInstances, ...allScheduled],
+        [...transactionInstances, ...allNewInstances, ...allScheduled],
         chainInstance,
       )
     ) {
@@ -471,7 +474,15 @@ function resolveSingleSignal(
  * @returns 编排结果
  */
 export function processDomainSignal(input: EventOrchestrationInput): EventOrchestrationResult {
-  const { state, signal, currentDay, definitions, rng, idFactory } = input;
+  const {
+    state,
+    signal,
+    currentDay,
+    definitions,
+    rng,
+    idFactory,
+    transactionInstances = [],
+  } = input;
 
   const allNewInstances: EventInstance[] = [];
   const allScheduled: ScheduledEventInstance[] = [];
@@ -508,6 +519,7 @@ export function processDomainSignal(input: EventOrchestrationInput): EventOrches
         allChains,
         allDiagnostics,
         processedIds,
+        transactionInstances,
       );
       nextQueue.push(...cascaded);
     }

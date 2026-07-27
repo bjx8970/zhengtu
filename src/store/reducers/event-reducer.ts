@@ -211,6 +211,7 @@ function reduceChooseEventOptionInternal(
  * @param rng 随机数生成器
  * @param idFactory ID 工厂
  * @param definitions 事件定义列表
+ * @param inFlightContinuations 当前 worker 尚未消费的 continuation 队列
  * @returns 历史记录和发出的 cascade 信号
  */
 export function handleAutoEventInstance(
@@ -220,6 +221,7 @@ export function handleAutoEventInstance(
   rng: () => number,
   idFactory: () => string,
   definitions: readonly EventDefinition[],
+  inFlightContinuations?: EventContinuation[],
 ): {
   history: EventHistoryRecord;
   cascadeSignals: DomainSignalSnapshot[];
@@ -301,6 +303,7 @@ export function handleAutoEventInstance(
         instance.sourceKey,
         instance.chainInstanceId,
         currentDay,
+        inFlightContinuations,
       );
     }
   }
@@ -313,6 +316,7 @@ export function handleAutoEventInstance(
       instance.sourceKey,
       instance.chainInstanceId,
       currentDay,
+      inFlightContinuations,
     );
   }
 
@@ -343,6 +347,7 @@ export function applyEventInstances(
   definitions: readonly EventDefinition[],
   cascadeDepth = 0,
   budget?: EventInstanceBudget,
+  inFlightContinuations?: EventContinuation[],
 ): { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] } {
   // 即时自动链超过预算时，调用方必须能回滚整个批次，而不能丢弃尾部实例。
   const transaction = structuredClone(unwrap(draft));
@@ -355,6 +360,7 @@ export function applyEventInstances(
     definitions,
     cascadeDepth,
     budget,
+    inFlightContinuations,
   );
   Object.assign(draft, transaction);
   return result;
@@ -374,6 +380,7 @@ function applyEventInstancesInternal(
   definitions: readonly EventDefinition[],
   cascadeDepth = 0,
   budget: EventInstanceBudget = { consumed: 0, limit: 100 },
+  inFlightContinuations?: EventContinuation[],
 ): { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] } {
   const histories: EventHistoryRecord[] = [];
   const cascadeSignals: DomainSignalSnapshot[] = [];
@@ -395,6 +402,7 @@ function applyEventInstancesInternal(
         rng,
         idFactory,
         definitions,
+        inFlightContinuations,
       );
       histories.push(settled.history);
       cascadeSignals.push(...settled.cascadeSignals);
@@ -460,6 +468,7 @@ export function applyEventOrchestrationPlan(
   definitions: readonly EventDefinition[],
   cascadeDepth = 0,
   budget?: EventInstanceBudget,
+  inFlightContinuations?: EventContinuation[],
 ): { histories: EventHistoryRecord[]; cascadeSignals: DomainSignalSnapshot[] } {
   const histories: EventHistoryRecord[] = [];
 
@@ -500,6 +509,7 @@ export function applyEventOrchestrationPlan(
     definitions,
     cascadeDepth,
     budget,
+    inFlightContinuations,
   );
   histories.push(...instanceResult.histories);
   return { histories, cascadeSignals: instanceResult.cascadeSignals };
@@ -658,6 +668,7 @@ function processEventContinuationsInternal(
         definitions,
         continuation.cascadeDepth,
         budget,
+        queue,
       );
       queue.push(
         ...cascadeSignals.map((signal) => ({
@@ -685,6 +696,9 @@ function processEventContinuationsInternal(
       definitions,
       rng,
       idFactory,
+      transactionInstances: queue.flatMap((item) =>
+        item.kind === 'instance' ? [item.instance] : [],
+      ),
     });
     const { cascadeSignals } = applyEventOrchestrationPlan(
       draft,
@@ -695,6 +709,7 @@ function processEventContinuationsInternal(
       definitions,
       continuation.cascadeDepth + 1,
       budget,
+      queue,
     );
     const nextDepth = continuation.cascadeDepth + 1;
     queue.push(
@@ -741,6 +756,7 @@ export function advanceBlockingPointer(draft: PlayerSave): void {
  * @param sourceKey 当前事件实例的来源键
  * @param chainInstanceId 当前事件实例的链实例 ID
  * @param currentDay 当前绝对游戏日
+ * @param inFlightContinuations 当前 worker 尚未消费的 continuation 队列
  */
 export function cancelScheduledByScope(
   draft: PlayerSave,
@@ -748,6 +764,7 @@ export function cancelScheduledByScope(
   sourceKey: string,
   chainInstanceId: string | null,
   currentDay: number,
+  inFlightContinuations?: EventContinuation[],
 ): void {
   const { eventId, scope } = cancellation;
   const matchesScope = (instance: {
@@ -781,12 +798,30 @@ export function cancelScheduledByScope(
           ]
         : [],
     ),
+    ...(inFlightContinuations ?? []).flatMap((continuation) =>
+      continuation.kind === 'instance' && matchesScope(continuation.instance)
+        ? [
+            {
+              instance: continuation.instance,
+              triggeredAtDay: continuation.instance.triggeredAtDay,
+            },
+          ]
+        : [],
+    ),
   ];
   if (cancelled.length === 0) return;
   draft.events.scheduled = draft.events.scheduled.filter((scheduled) => !matchesScope(scheduled));
   draft.events.deferredContinuations = draft.events.deferredContinuations.filter(
     (continuation) => continuation.kind !== 'instance' || !matchesScope(continuation.instance),
   );
+  if (inFlightContinuations) {
+    for (let index = inFlightContinuations.length - 1; index >= 0; index--) {
+      const continuation = inFlightContinuations[index]!;
+      if (continuation.kind === 'instance' && matchesScope(continuation.instance)) {
+        inFlightContinuations.splice(index, 1);
+      }
+    }
+  }
 
   const chains = new Map<string, EventChainInstance>();
   for (const { instance: cancelledInstance, triggeredAtDay } of cancelled) {

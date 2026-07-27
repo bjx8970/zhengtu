@@ -166,7 +166,7 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
         input.state,
         definition,
         input.parentInstance.sourceKey,
-        [],
+        [input.parentInstance],
         existingChain,
       )
     ) {
@@ -220,7 +220,13 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
     const existingChain = definition.chainId
       ? findExistingTargetChain(input, definition.chainId, chains)
       : null;
-    const transactionInstances = [...immediateInstances, ...scheduledInstances];
+    // 自动事件尚未写入 history，不能让它在结算 outcome 时绕过自己的
+    // once / once_per_source / maxActivations 限制再次创建自身。
+    const transactionInstances = [
+      input.parentInstance,
+      ...immediateInstances,
+      ...scheduledInstances,
+    ];
     if (
       isEventRepeatBlocked(
         input.state,

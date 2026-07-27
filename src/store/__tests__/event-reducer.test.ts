@@ -919,6 +919,219 @@ describe('event-reducer: cascade signals and scheduling', () => {
     expect(state.events.pending).toHaveLength(0);
   });
 
+  it('keeps in-flight deferred instances visible to signal repeat checks', () => {
+    const state = createInitialState();
+    const definition: EventDefinition = {
+      id: 'evt_inflight_once',
+      chainId: null,
+      nodeId: null,
+      title: 'In-flight once',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'ack', label: '确认', description: '', effects: [] }],
+    };
+    const snapshot = createEventSnapshot(definition);
+    const signal: DomainSignalSnapshot = {
+      signalId: 'inflight_repeat_signal',
+      signalType: 'world.metric_changed',
+      occurredAtDay: 1,
+      data: { metricId: 'inflight', value: 1 },
+    };
+    state.events.deferredContinuations = [
+      { kind: 'signal', signal, cascadeDepth: 0 },
+      {
+        kind: 'instance',
+        cascadeDepth: 0,
+        instance: {
+          instanceId: 'inflight_once_existing',
+          eventId: definition.id,
+          status: 'pending',
+          triggeredAtDay: 1,
+          activatedAtDay: 1,
+          deadlineDay: null,
+          triggerContext: signal,
+          sourceKey: 'inflight_source',
+          chainInstanceId: null,
+          snapshot,
+        },
+      },
+    ];
+
+    processEventContinuations(
+      state,
+      [],
+      1,
+      () => 0,
+      () => 'created',
+      [definition],
+    );
+
+    expect(state.events.pending.map((item) => item.instanceId)).toEqual(['inflight_once_existing']);
+  });
+
+  it('allows a deferred automatic event to cancel a later in-flight target', () => {
+    const state = createInitialState();
+    const canceller = createEventSnapshot({
+      id: 'evt_inflight_canceller',
+      chainId: null,
+      nodeId: null,
+      title: 'Canceller',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [],
+        cancelScheduled: [{ eventId: 'evt_inflight_target', scope: 'same_source' }],
+      },
+    });
+    const target = createEventSnapshot({
+      id: 'evt_inflight_target',
+      chainId: null,
+      nodeId: null,
+      title: 'Cancelled target',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [
+          { target: 'world_fact', factId: 'inflight_target_ran', operation: 'set', value: true },
+        ],
+      },
+    });
+    const signal = makeSignal();
+    const makeInstance = (
+      instanceId: string,
+      snapshot: ReturnType<typeof createEventSnapshot>,
+    ): EventInstance => ({
+      instanceId,
+      eventId: snapshot.eventId,
+      status: 'pending',
+      triggeredAtDay: 1,
+      activatedAtDay: 1,
+      deadlineDay: null,
+      triggerContext: signal,
+      sourceKey: 'inflight_cancel_source',
+      chainInstanceId: null,
+      snapshot,
+    });
+    state.events.deferredContinuations = [
+      {
+        kind: 'instance',
+        instance: makeInstance('inflight_canceller', canceller),
+        cascadeDepth: 0,
+      },
+      { kind: 'instance', instance: makeInstance('inflight_target', target), cascadeDepth: 0 },
+    ];
+
+    processEventContinuations(
+      state,
+      [],
+      1,
+      () => 0,
+      () => 'generated',
+      [],
+    );
+
+    expect(state.world.facts['inflight_target_ran']).toBeUndefined();
+    expect(
+      state.events.history.find((item) => item.instanceId === 'inflight_target')?.finalStatus,
+    ).toBe('cancelled');
+    expect(state.events.deferredContinuations).toHaveLength(0);
+  });
+
+  it.each([
+    { label: 'once', repeatPolicy: { mode: 'once' as const } },
+    { label: 'once_per_source', repeatPolicy: { mode: 'once_per_source' as const } },
+    { label: 'once_per_chain', repeatPolicy: { mode: 'once_per_chain' as const } },
+    {
+      label: 'maxActivations',
+      repeatPolicy: { mode: 'repeatable' as const, maxActivations: 1 },
+    },
+  ])(
+    'does not let an automatic $label event schedule itself before history is written',
+    ({ repeatPolicy }) => {
+      const state = createInitialState();
+      const definition: EventDefinition = {
+        id: `evt_auto_self_${repeatPolicy.mode}`,
+        chainId: repeatPolicy.mode === 'once_per_chain' ? 'auto_self_chain' : null,
+        nodeId: repeatPolicy.mode === 'once_per_chain' ? 'auto_self_node' : null,
+        title: 'Automatic self scheduler',
+        description: '',
+        category: 'story',
+        priority: 'normal',
+        presentation: 'automatic',
+        trigger: { sources: ['world.metric_changed'] },
+        repeatPolicy,
+        activation: {},
+        options: [],
+        automaticOutcome: {
+          effects: [],
+          schedule: [{ eventId: `evt_auto_self_${repeatPolicy.mode}`, delayDays: 0 }],
+        },
+      };
+      const snapshot = createEventSnapshot(definition);
+      const chainInstanceId =
+        repeatPolicy.mode === 'once_per_chain' ? 'auto_self_chain_instance' : null;
+      if (chainInstanceId) {
+        state.events.chainInstances[chainInstanceId] = {
+          instanceId: chainInstanceId,
+          chainId: 'auto_self_chain',
+          status: 'active',
+          sourceKey: 'auto_self_source',
+          activeNodeIds: ['auto_self_node'],
+          completedNodeIds: [],
+          startedAtDay: 1,
+          completedAtDay: null,
+        };
+      }
+
+      processEventContinuations(
+        state,
+        [
+          {
+            kind: 'instance',
+            cascadeDepth: 0,
+            instance: {
+              instanceId: `auto_self_parent_${repeatPolicy.mode}`,
+              eventId: definition.id,
+              status: 'pending',
+              triggeredAtDay: 1,
+              activatedAtDay: 1,
+              deadlineDay: null,
+              triggerContext: makeSignal(),
+              sourceKey: 'auto_self_source',
+              chainInstanceId,
+              snapshot,
+            },
+          },
+        ],
+        1,
+        () => 0,
+        () => 'generated',
+        [definition],
+      );
+
+      expect(state.events.history.filter((item) => item.eventId === definition.id)).toHaveLength(1);
+      expect(state.events.pending).toHaveLength(0);
+      expect(state.events.scheduled).toHaveLength(0);
+    },
+  );
+
   it('preserves a deferred instance cascade depth across a blocker pause', () => {
     const state = createInitialState();
     const seedSnapshot = createEventSnapshot({
