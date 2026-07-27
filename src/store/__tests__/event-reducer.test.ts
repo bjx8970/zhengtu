@@ -1478,6 +1478,87 @@ describe('event-reducer: cascade signals and scheduling', () => {
     },
   );
 
+  it('cancels a zero-delay automatic follow-up created by the same outcome', () => {
+    const state = createInitialState();
+    const parent = createEventSnapshot({
+      id: 'evt_same_outcome_parent',
+      chainId: null,
+      nodeId: null,
+      title: 'Parent',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [],
+        schedule: [{ eventId: 'evt_same_outcome_target', delayDays: 0 }],
+        cancelScheduled: [{ eventId: 'evt_same_outcome_target', scope: 'same_source' }],
+      },
+    });
+    const target: EventDefinition = {
+      id: 'evt_same_outcome_target',
+      chainId: 'same_outcome_chain',
+      nodeId: 'target',
+      title: 'Target',
+      description: '',
+      category: 'story',
+      priority: 'normal',
+      presentation: 'automatic',
+      trigger: { sources: ['event.resolved'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [],
+      automaticOutcome: {
+        effects: [
+          {
+            target: 'world_fact',
+            factId: 'same_outcome_target_ran',
+            operation: 'set',
+            value: true,
+          },
+        ],
+      },
+    };
+    const parentInstance: EventInstance = {
+      instanceId: 'same_outcome_parent_instance',
+      eventId: parent.eventId,
+      status: 'pending',
+      triggeredAtDay: 1,
+      activatedAtDay: 1,
+      deadlineDay: null,
+      triggerContext: makeSignal(),
+      sourceKey: 'same_outcome_source',
+      chainInstanceId: null,
+      snapshot: parent,
+    };
+
+    applyEventInstances(
+      state,
+      [parentInstance],
+      1,
+      () => 0,
+      (() => {
+        let id = 0;
+        return () => `same_outcome_${id++}`;
+      })(),
+      [target],
+    );
+
+    expect(state.world.facts['same_outcome_target_ran']).toBeUndefined();
+    expect(state.events.pending).toHaveLength(0);
+    expect(state.events.history.filter((item) => item.eventId === target.id)).toMatchObject([
+      { finalStatus: 'cancelled' },
+    ]);
+    const chain = Object.values(state.events.chainInstances).find(
+      (item) => item.chainId === target.chainId,
+    );
+    expect(chain).toMatchObject({ status: 'abandoned', activeNodeIds: [] });
+  });
+
   it('processes zero-delay children before later siblings and pauses cascade signals at a blocker', () => {
     const state = createInitialState();
     const automaticParent = createEventSnapshot({

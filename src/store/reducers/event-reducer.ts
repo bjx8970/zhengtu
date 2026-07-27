@@ -286,6 +286,14 @@ export function handleAutoEventInstance(
   }
   draft.events.scheduled.push(...followups.scheduledInstances);
 
+  // 零延迟后续必须在取消规则前加入同一事务队列。否则同一个 outcome
+  // 同时 schedule/cancel 某目标时，目标会在取消完成后才入队并继续执行。
+  // 由调用方传入的队列已是可变的未消费实例视图，后续取消会同步移除
+  // 这些实例、写入取消历史并收尾其链节点。
+  if (inFlightImmediateInstances) {
+    inFlightImmediateInstances.unshift(...followups.immediateInstances);
+  }
+
   // 历史记录
   const history: EventHistoryRecord = {
     eventId: instance.eventId,
@@ -333,7 +341,8 @@ export function handleAutoEventInstance(
   return {
     history,
     cascadeSignals: [resolvedSignal],
-    immediateInstances: followups.immediateInstances,
+    // 已插入当前事务队列的实例不能再次返回给调用方入队，否则会重复执行。
+    immediateInstances: inFlightImmediateInstances ? [] : followups.immediateInstances,
   };
 }
 
