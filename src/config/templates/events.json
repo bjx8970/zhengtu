@@ -31,9 +31,14 @@
         "description": "亲自到受灾现场指挥抢险，调动所有可用资源。",
         "effects": [
           { "target": "character", "field": "performance", "operation": "add", "value": 8 },
-          { "target": "character", "field": "charisma", "operation": "add", "value": 3 }
-        ],
-        "setFacts": [{ "factId": "flood_handled_personally", "value": true }]
+          { "target": "character", "field": "charisma", "operation": "add", "value": 3 },
+          {
+            "target": "world_fact",
+            "factId": "flood_handled_personally",
+            "operation": "set",
+            "value": true
+          }
+        ]
       },
       {
         "id": "coordinate_rescue",
@@ -54,5 +59,254 @@
         ]
       }
     ]
+  },
+  {
+    "id": "investigation_start",
+    "chainId": "investigation_chain",
+    "nodeId": "start",
+    "title": "腐败举报",
+    "description": "有匿名举报称辖区存在严重腐败问题，纪委即将介入调查。",
+    "category": "governance",
+    "priority": "urgent",
+    "presentation": "inbox",
+    "trigger": {
+      "sources": ["world.metric_changed"],
+      "condition": {
+        "all": [
+          {
+            "worldMetric": "corruption_report",
+            "op": "gte",
+            "value": 60
+          }
+        ]
+      },
+      "probability": 1,
+      "weight": 1
+    },
+    "repeatPolicy": {
+      "mode": "once_per_source"
+    },
+    "activation": {
+      "deadlineDays": 7
+    },
+    "options": [
+      {
+        "id": "cooperate",
+        "label": "配合调查",
+        "description": "全力配合纪委调查，主动提供相关材料。",
+        "effects": [
+          { "target": "character", "field": "integrity", "operation": "add", "value": 5 },
+          { "target": "character", "field": "stability", "operation": "add", "value": -3 }
+        ],
+        "schedule": [{ "eventId": "formal_investigation", "delayDays": 3, "probability": 1 }]
+      },
+      {
+        "id": "suppress",
+        "label": "压制举报",
+        "description": "私下联系相关人员，试图平息此事。",
+        "effects": [
+          { "target": "character", "field": "corruptionRisk", "operation": "add", "value": 15 },
+          { "target": "character", "field": "stability", "operation": "add", "value": 5 },
+          { "target": "character", "field": "integrity", "operation": "add", "value": -10 }
+        ],
+        "schedule": [{ "eventId": "suppress_investigation", "delayDays": 1, "probability": 1 }]
+      }
+    ]
+  },
+  {
+    "id": "formal_investigation",
+    "chainId": "investigation_chain",
+    "nodeId": "investigation",
+    "title": "正式调查",
+    "description": "纪委已正式启动调查程序，将全面审查相关案卷和财务记录。",
+    "category": "governance",
+    "priority": "high",
+    "presentation": "automatic",
+    "trigger": {
+      "sources": ["event.resolved"],
+      "probability": 1,
+      "scheduledOnly": true
+    },
+    "repeatPolicy": {
+      "mode": "once_per_chain"
+    },
+    "activation": {
+      "deadlineDays": 5
+    },
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        {
+          "target": "world_fact",
+          "factId": "formal_investigation_ongoing",
+          "operation": "set",
+          "value": true
+        },
+        { "target": "character", "field": "stability", "operation": "add", "value": -8 }
+      ],
+      "schedule": [
+        {
+          "eventId": "investigation_confirmed",
+          "delayDays": 2,
+          "probability": 0.7,
+          "mutexGroup": "investigation_outcome"
+        },
+        {
+          "eventId": "investigation_cleared",
+          "delayDays": 2,
+          "probability": 0.3,
+          "mutexGroup": "investigation_outcome"
+        }
+      ]
+    }
+  },
+  {
+    "id": "investigation_confirmed",
+    "chainId": "investigation_chain",
+    "nodeId": "confirmed",
+    "title": "问题属实",
+    "description": "调查发现确实存在违规问题，但未涉及你本人。需要表态如何处理。",
+    "category": "governance",
+    "priority": "urgent",
+    "presentation": "inbox",
+    "trigger": {
+      "sources": ["event.resolved"],
+      "probability": 1,
+      "scheduledOnly": true
+    },
+    "repeatPolicy": {
+      "mode": "once_per_chain"
+    },
+    "activation": {
+      "deadlineDays": 3
+    },
+    "options": [
+      {
+        "id": "accept_responsibility",
+        "label": "承担领导责任",
+        "description": "公开表示作为主管领导承担管理责任，承诺整改。",
+        "effects": [
+          { "target": "character", "field": "integrity", "operation": "add", "value": 3 },
+          { "target": "character", "field": "performance", "operation": "add", "value": -5 },
+          {
+            "target": "world_fact",
+            "factId": "took_responsibility",
+            "operation": "set",
+            "value": true
+          }
+        ]
+      },
+      {
+        "id": "shift_blame",
+        "label": "转移责任",
+        "description": "将责任推给具体经办人，强调自己不知情。",
+        "effects": [
+          { "target": "character", "field": "integrity", "operation": "add", "value": -8 },
+          { "target": "character", "field": "performance", "operation": "add", "value": 2 }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "investigation_cleared",
+    "chainId": "investigation_chain",
+    "nodeId": "cleared",
+    "title": "调查澄清",
+    "description": "调查结论：未发现实质性违纪问题。你的声誉得以维护。",
+    "category": "governance",
+    "priority": "normal",
+    "presentation": "automatic",
+    "trigger": {
+      "sources": ["event.resolved"],
+      "probability": 1,
+      "scheduledOnly": true
+    },
+    "repeatPolicy": {
+      "mode": "once_per_chain"
+    },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        { "target": "character", "field": "stability", "operation": "add", "value": 10 },
+        { "target": "character", "field": "integrity", "operation": "add", "value": 5 },
+        {
+          "target": "world_fact",
+          "factId": "formal_investigation_ongoing",
+          "operation": "set",
+          "value": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "suppress_investigation",
+    "chainId": "suppress_chain",
+    "nodeId": "suppress",
+    "title": "暗中操作",
+    "description": "你私下联系了相关人员，暂时压下了举报。但风声仍在外传。",
+    "category": "governance",
+    "priority": "normal",
+    "presentation": "inbox",
+    "trigger": {
+      "sources": ["event.resolved"],
+      "probability": 1,
+      "scheduledOnly": true
+    },
+    "repeatPolicy": {
+      "mode": "once_per_chain"
+    },
+    "activation": {
+      "deadlineDays": 5
+    },
+    "options": [
+      {
+        "id": "pay_off",
+        "label": "花钱消灾",
+        "description": "动用预算经费安抚关键人物，彻底平息风波。",
+        "effects": [
+          { "target": "character", "field": "stability", "operation": "add", "value": 5 },
+          { "target": "character", "field": "corruptionRisk", "operation": "add", "value": -5 }
+        ],
+        "schedule": [{ "eventId": "later_exposure", "delayDays": 30, "probability": 0.5 }]
+      },
+      {
+        "id": "do_nothing",
+        "label": "静观其变",
+        "description": "不采取额外行动，等待事态自然平息。",
+        "effects": [
+          { "target": "character", "field": "stability", "operation": "add", "value": -3 }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "later_exposure",
+    "chainId": "suppress_chain",
+    "nodeId": "exposure",
+    "title": "旧事重提",
+    "description": "一个月后，之前的举报被人重新翻出，媒体开始关注。",
+    "category": "governance",
+    "priority": "urgent",
+    "presentation": "automatic",
+    "trigger": {
+      "sources": ["event.resolved"],
+      "probability": 1,
+      "scheduledOnly": true
+    },
+    "repeatPolicy": {
+      "mode": "once_per_chain"
+    },
+    "activation": {
+      "delayDays": 30
+    },
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        { "target": "character", "field": "stability", "operation": "add", "value": -15 },
+        { "target": "character", "field": "corruptionRisk", "operation": "add", "value": 20 },
+        { "target": "world_fact", "factId": "media_exposure", "operation": "set", "value": true }
+      ]
+    }
   }
 ]

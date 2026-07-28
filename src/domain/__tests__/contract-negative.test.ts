@@ -356,6 +356,7 @@ describe('DomainSignalSnapshot 负向测试', () => {
 
   it('拒绝 action.completed 缺失 actionInstanceId', () => {
     const invalid = {
+      signalId: 's1',
       signalType: 'action.completed',
       occurredAtDay: 10,
       data: { actionId: 'a1', deptId: 'd1', regionId: 'r1', institutionId: 'i1' },
@@ -365,6 +366,7 @@ describe('DomainSignalSnapshot 负向测试', () => {
 
   it('接受完整 action.completed', () => {
     const valid = {
+      signalId: 's1',
       signalType: 'action.completed',
       occurredAtDay: 10,
       data: {
@@ -380,6 +382,7 @@ describe('DomainSignalSnapshot 负向测试', () => {
 
   it('拒绝 appointment.changed 缺失 previousPositionId', () => {
     const invalid = {
+      signalId: 's1',
       signalType: 'appointment.changed',
       occurredAtDay: 10,
       data: { experienceId: 'e1', positionId: 'p1', institutionId: 'i1', regionId: 'r1' },
@@ -389,6 +392,7 @@ describe('DomainSignalSnapshot 负向测试', () => {
 
   it('接受 appointment.changed 含 null previousPositionId', () => {
     const valid = {
+      signalId: 's1',
       signalType: 'appointment.changed',
       occurredAtDay: 10,
       data: {
@@ -404,6 +408,7 @@ describe('DomainSignalSnapshot 负向测试', () => {
 
   it('拒绝 event.resolved 缺失 eventInstanceId', () => {
     const invalid = {
+      signalId: 's1',
       signalType: 'event.resolved',
       occurredAtDay: 10,
       data: { eventId: 'ev1', optionId: 'opt1' },
@@ -413,15 +418,17 @@ describe('DomainSignalSnapshot 负向测试', () => {
 
   it('接受 event.resolved 含 null optionId（自动事件）', () => {
     const valid = {
+      signalId: 's1',
       signalType: 'event.resolved',
       occurredAtDay: 10,
-      data: { eventInstanceId: 'ei1', eventId: 'ev1', optionId: null },
+      data: { eventInstanceId: 'ei1', eventId: 'ev1', optionId: null, occurredAtDay: 10 },
     };
     expect(DomainSignalSnapshotSchema.safeParse(valid).success).toBe(true);
   });
 
   it('拒绝信号快照携带未知额外字段', () => {
     const invalid = {
+      signalId: 's1',
       signalType: 'world.metric_changed',
       occurredAtDay: 10,
       data: { metricId: 'm1', value: 5 },

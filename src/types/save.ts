@@ -13,13 +13,13 @@
 import type { PlayerSave } from './player';
 
 /** 当前存档 Schema 版本号，每次不兼容变更递增 */
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 /** 受支持可迁移的最低 Schema 版本（低于此版本拒绝） */
 export const MIN_MIGRATABLE_SCHEMA_VERSION = 2;
 
 /** 当前内容版本号，用于标识配置/内容包的版本（格式：YYYY.MM.REVISION） */
-export const CURRENT_CONTENT_VERSION = '2026.07.1';
+export const CURRENT_CONTENT_VERSION = '2026.07.2';
 
 /**
  * 存档外层封装
@@ -41,7 +41,11 @@ export interface SaveEnvelope {
 
 /** 存档解码错误类型 */
 export type SaveDecodeError =
-  'invalid_json' | 'legacy_save_unsupported' | 'future_version' | 'invalid_envelope';
+  | 'invalid_json'
+  | 'legacy_save_unsupported'
+  | 'future_version'
+  | 'invalid_envelope'
+  | 'migration_failed';
 
 /** 存档解码结果 */
 export interface SaveDecodeResult {

@@ -76,12 +76,13 @@ export const SIGNAL_TYPE_PAYLOAD_FIELDS: Record<DomainSignal, readonly string[]>
   ],
   'assessment.completed': ['year', 'score', 'tier'],
   'world.metric_changed': ['metricId', 'value'],
-  'event.resolved': ['eventInstanceId', 'eventId', 'optionId'],
+  'event.resolved': ['eventInstanceId', 'eventId', 'optionId', 'occurredAtDay'],
 };
 
-/** 领域信号快照（按信号类型判别联合，各类型有固定载荷 + 实例身份） */
+/** 领域信号快照（按信号类型判别联合，各类型有固定载荷 + 实例身份 + 信号唯一ID） */
 export type DomainSignalSnapshot =
   | {
+      signalId: string;
       signalType: 'action.completed';
       occurredAtDay: number;
       data: {
@@ -93,21 +94,25 @@ export type DomainSignalSnapshot =
       };
     }
   | {
+      signalId: string;
       signalType: 'policy.approved';
       occurredAtDay: number;
       data: { policyInstanceId: string; policyId: string; regionId: string };
     }
   | {
+      signalId: string;
       signalType: 'policy.phase_changed';
       occurredAtDay: number;
       data: { policyInstanceId: string; policyId: string; phaseId: string };
     }
   | {
+      signalId: string;
       signalType: 'policy.metric_changed';
       occurredAtDay: number;
       data: { policyInstanceId: string; policyId: string; metricId: string; value: number };
     }
   | {
+      signalId: string;
       signalType: 'appointment.changed';
       occurredAtDay: number;
       data: {
@@ -119,25 +124,34 @@ export type DomainSignalSnapshot =
       };
     }
   | {
+      signalId: string;
       signalType: 'assessment.completed';
       occurredAtDay: number;
       data: { year: number; score: number; tier: string };
     }
   | {
+      signalId: string;
       signalType: 'world.metric_changed';
       occurredAtDay: number;
       data: { metricId: string; value: number };
     }
   | {
+      signalId: string;
       signalType: 'event.resolved';
       occurredAtDay: number;
-      data: { eventInstanceId: string; eventId: string; optionId: string | null };
+      data: {
+        eventInstanceId: string;
+        eventId: string;
+        optionId: string | null;
+        occurredAtDay: number;
+      };
     };
 
 /** 领域信号快照 Zod Schema（按 signalType 判别，含实例身份） */
 export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
   z
     .object({
+      signalId: z.string(),
       signalType: z.literal('action.completed'),
       occurredAtDay: z.number(),
       data: z
@@ -153,6 +167,7 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
     .strict(),
   z
     .object({
+      signalId: z.string(),
       signalType: z.literal('policy.approved'),
       occurredAtDay: z.number(),
       data: z
@@ -162,6 +177,7 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
     .strict(),
   z
     .object({
+      signalId: z.string(),
       signalType: z.literal('policy.phase_changed'),
       occurredAtDay: z.number(),
       data: z
@@ -171,6 +187,7 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
     .strict(),
   z
     .object({
+      signalId: z.string(),
       signalType: z.literal('policy.metric_changed'),
       occurredAtDay: z.number(),
       data: z
@@ -185,6 +202,7 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
     .strict(),
   z
     .object({
+      signalId: z.string(),
       signalType: z.literal('appointment.changed'),
       occurredAtDay: z.number(),
       data: z
@@ -200,6 +218,7 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
     .strict(),
   z
     .object({
+      signalId: z.string(),
       signalType: z.literal('assessment.completed'),
       occurredAtDay: z.number(),
       data: z.object({ year: z.number(), score: z.number(), tier: z.string() }).strict(),
@@ -207,6 +226,7 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
     .strict(),
   z
     .object({
+      signalId: z.string(),
       signalType: z.literal('world.metric_changed'),
       occurredAtDay: z.number(),
       data: z.object({ metricId: z.string(), value: z.number() }).strict(),
@@ -214,6 +234,7 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
     .strict(),
   z
     .object({
+      signalId: z.string(),
       signalType: z.literal('event.resolved'),
       occurredAtDay: z.number(),
       data: z
@@ -221,6 +242,7 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
           eventInstanceId: z.string(),
           eventId: z.string(),
           optionId: z.string().nullable(),
+          occurredAtDay: z.number(),
         })
         .strict(),
     })

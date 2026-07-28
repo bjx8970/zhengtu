@@ -44,6 +44,22 @@ describe('EventDefinitionSchema 约束', () => {
     expect(EventDefinitionSchema.safeParse(invalid).success).toBe(false);
   });
 
+  it('已废弃的 setFacts 被拒绝，世界事实必须使用标准 effect', () => {
+    const invalid = {
+      ...makeEvent(),
+      options: [
+        {
+          id: 'legacy',
+          label: '旧格式',
+          description: '',
+          effects: [],
+          setFacts: [{ factId: 'legacy_fact', value: true }],
+        },
+      ],
+    };
+    expect(EventDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
   it('sources 为空被拒绝', () => {
     const invalid = makeEvent({ trigger: { sources: [] } });
     expect(EventDefinitionSchema.safeParse(invalid).success).toBe(false);

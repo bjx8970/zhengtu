@@ -1,11 +1,14 @@
 /**
  * 事件运行时持久化状态
  *
- * 定义 EventRuntimeState 及其子结构：
- * - EventInstance：事件实例（保存来源信号和触发时上下文快照）
- * - ScheduledEventInstance：计划事件
+ * 定义 EventRuntimeState 及其子结构（Schema 4）：
+ * - EventExecutableSnapshot：事件可执行快照（从 EventDefinition 复制）
+ * - EventInstance：事件实例（含来源键和快照）
+ * - ScheduledEventInstance：计划事件实例
+ * - AppliedEffectRecord：已应用效果记录
  * - EventHistoryRecord：事件历史记录
  * - EventChainInstance：事件链实例
+ * - cooldowns 数组取代旧 cooldownUntilDay 字典
  */
 
 import type {
@@ -13,91 +16,117 @@ import type {
   EventChainStatus,
   EventPriority,
   EventPresentation,
+  EventCooldownRecord,
 } from './types';
 import type { DomainSignalSnapshot } from '../governance/types';
+import type { EventOptionDefinition, EventOutcomePayload, EventRepeatPolicy } from './definition';
+
+/** 事件可执行快照 */
+export interface EventExecutableSnapshot {
+  eventId: string;
+  title: string;
+  description: string;
+  category: string;
+  priority: EventPriority;
+  presentation: EventPresentation;
+  options: EventOptionDefinition[];
+  automaticOutcome: EventOutcomePayload | null;
+  mutexGroup: string | null;
+  contentVersion: string;
+  /** 截止天数（从激活日开始计算，null 表示无截止） */
+  deadlineDays: number | null;
+  /** 事件链 ID（null 表示不属于链） */
+  chainId: string | null;
+  /** 链内节点 ID（null 表示非链节点） */
+  nodeId: string | null;
+  /** 实例创建时冻结的重复与冷却策略 */
+  repeatPolicy: EventRepeatPolicy;
+}
 
 /** 事件实例 */
 export interface EventInstance {
-  /** 唯一实例 ID */
   instanceId: string;
-  /** 事件配置 ID */
   eventId: string;
-  /** 当前状态 */
   status: EventInstanceStatus;
-  /** 优先级 */
-  priority: EventPriority;
-  /** 呈现方式 */
-  presentation: EventPresentation;
-  /** 触发的绝对游戏日 */
   triggeredAtDay: number;
-  /** 触发信号快照（单一事实来源，不再单独保存 sourceSignal） */
-  triggerContext: DomainSignalSnapshot;
-  /** 截止时间（null 表示无截止） */
+  activatedAtDay: number;
   deadlineDay: number | null;
-  /** 所属事件链实例 ID（null 表示独立事件） */
+  triggerContext: DomainSignalSnapshot;
+  sourceKey: string;
   chainInstanceId: string | null;
+  snapshot: EventExecutableSnapshot;
 }
 
 /** 计划事件实例 */
 export interface ScheduledEventInstance {
-  /** 唯一实例 ID */
   instanceId: string;
-  /** 事件配置 ID */
   eventId: string;
-  /** 计划激活的绝对游戏日 */
+  scheduledAtDay: number;
   activateAtDay: number;
-  /** 触发信号快照 */
   triggerContext: DomainSignalSnapshot;
-  /** 所属事件链实例 ID */
+  sourceKey: string;
   chainInstanceId: string | null;
+  snapshot: EventExecutableSnapshot;
+}
+
+/**
+ * 因 blocking 事件暂停、且必须按原因果顺序恢复的工作项。
+ *
+ * 实例与信号必须共用一个有序队列；分开保存会令 event.resolved
+ * 在它原本应先执行的零延迟后续之前恢复。
+ */
+export type EventContinuation =
+  | { kind: 'instance'; instance: EventInstance; cascadeDepth: number }
+  | { kind: 'signal'; signal: DomainSignalSnapshot; cascadeDepth: number };
+
+/** 已应用效果记录 */
+export interface AppliedEffectRecord {
+  target: string;
+  field?: string;
+  operation: string;
+  value: boolean | number | string;
+  label: string;
 }
 
 /** 事件历史记录 */
 export interface EventHistoryRecord {
-  /** 事件配置 ID */
   eventId: string;
-  /** 实例 ID */
   instanceId: string;
-  /** 解决的绝对游戏日 */
-  resolvedAtDay: number;
-  /** 玩家选择的选项 ID */
+  finalStatus: 'resolved' | 'expired' | 'cancelled';
+  triggeredAtDay: number;
+  completedAtDay: number;
+  sourceKey: string;
+  chainInstanceId: string | null;
+  titleSnapshot: string;
   chosenOptionId: string | null;
-  /** 最终结果描述 */
-  outcome: string;
+  chosenOptionLabel: string | null;
+  appliedEffects: AppliedEffectRecord[];
 }
 
-/** 事件链实例（支持分支） */
+/** 事件链实例 */
 export interface EventChainInstance {
-  /** 唯一实例 ID */
   instanceId: string;
-  /** 事件链配置 ID */
   chainId: string;
-  /** 当前状态 */
   status: EventChainStatus;
-  /** 当前活动节点 ID 列表（支持分支，多个活动节点） */
+  sourceKey: string;
   activeNodeIds: string[];
-  /** 已完成节点 ID 列表 */
   completedNodeIds: string[];
-  /** 来源实体类型（政策/项目/任职/地区/剧情） */
-  sourceEntityType: 'policy' | 'project' | 'appointment' | 'region' | 'story';
-  /** 来源实体 ID */
-  sourceEntityId: string;
-  /** 开始的绝对游戏日 */
   startedAtDay: number;
+  completedAtDay: number | null;
 }
 
 /** 事件运行时状态（PlayerSave 子状态） */
 export interface EventRuntimeState {
-  /** 当前阻塞事件 ID（null 表示无阻塞） */
   activeBlockingEventId: string | null;
-  /** 待处理事件实例 */
   pending: EventInstance[];
-  /** 计划事件实例 */
   scheduled: ScheduledEventInstance[];
-  /** 事件历史记录 */
   history: EventHistoryRecord[];
-  /** 事件冷却（事件 ID → 可再次触发的绝对游戏日） */
-  cooldownUntilDay: Record<string, number>;
-  /** 事件链实例（链实例 ID → 实例） */
+  cooldowns: EventCooldownRecord[];
   chainInstances: Record<string, EventChainInstance>;
+  /** 已处理信号 ID 集合（防重入），SignalId → completedAtDay */
+  processedSignalIds: string[];
+  /** 旧 Schema 4 信号队列；首次恢复时迁入 deferredContinuations。 */
+  deferredSignals: DomainSignalSnapshot[];
+  /** 统一、可持久化的实例/信号 continuation 队列。 */
+  deferredContinuations: EventContinuation[];
 }
