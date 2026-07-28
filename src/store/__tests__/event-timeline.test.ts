@@ -183,6 +183,9 @@ describe('event timeline integration', () => {
     expect(
       after.events.pending.find((item) => item.instanceId === 'scheduled_blocker')?.status,
     ).toBe('active');
+    expect(after.time.pendingContinuation?.remainingNodes.map((node) => node.type)).not.toContain(
+      'scheduled_event_activation',
+    );
   });
 
   it('expires overdue pending events before an active blocker pauses advancement', () => {
@@ -401,6 +404,12 @@ describe('event timeline integration', () => {
     expect(resumed.events.scheduled.map((item) => item.instanceId)).not.toContain(
       'same_day_automatic_instance',
     );
+    expect(resumed.events.pending.map((item) => item.instanceId)).not.toContain(
+      'same_day_blocker_instance',
+    );
+    expect(
+      resumed.events.history.filter((item) => item.instanceId === 'same_day_blocker_instance'),
+    ).toHaveLength(1);
     expect(resumed.events.history.some((item) => item.eventId === 'same_day_automatic')).toBe(true);
     expect(resumed.character.vigor).toBe(originalVigor - 10);
   });

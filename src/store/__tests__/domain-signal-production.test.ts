@@ -168,6 +168,7 @@ describe('domain signal production', () => {
     });
     expect(blocked.time.pendingContinuation).not.toBeNull();
     expect(blocked.assessments.annualAssessments).toHaveLength(1);
+    const budgetAfterSettlement = blocked.remainingBudget;
     if (!event) return;
 
     store.dispatch({
@@ -187,8 +188,10 @@ describe('domain signal production', () => {
       config.monthsPerYear * config.daysPerMonth,
     );
     expect(store.getRawState().assessments.annualAssessments).toHaveLength(1);
+    expect(store.getRawState().remainingBudget).toBe(budgetAfterSettlement);
     store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
     expect(store.getRawState().assessments.annualAssessments).toHaveLength(1);
+    expect(store.getRawState().remainingBudget).toBe(budgetAfterSettlement);
   });
 
   it('政策效果产生 policy.metric_changed 并使用冻结原始上下文', () => {

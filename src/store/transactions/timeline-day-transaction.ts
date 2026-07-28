@@ -132,9 +132,15 @@ export function processTimelineNodes(
       case 'scheduled_event_activation':
         activateEventsAtDay(draft, node.absoluteDay, rng, idFactory, definitions);
         if (draft.events.activeBlockingEventId !== null) {
-          // 激活器只提交到首个 blocker；其后的同日到期事件仍在 scheduled 中，
-          // 因此恢复时必须重试本节点，而不能像已完整提交的年考节点那样跳过。
-          return { interrupted: true, remainingNodes: nodes.slice(index) };
+          const hasRemainingDueEvent = draft.events.scheduled.some(
+            (event) => event.activateAtDay <= node.absoluteDay,
+          );
+          // 激活器只提交到首个 blocker；仅当其后仍有同日到期事件时才保留本节点。
+          // 已完整提交的节点必须跳过，避免恢复时重复无效编排。
+          return {
+            interrupted: true,
+            remainingNodes: nodes.slice(hasRemainingDueEvent ? index : index + 1),
+          };
         }
         break;
       case 'event_deadline':
