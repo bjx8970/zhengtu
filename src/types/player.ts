@@ -1,5 +1,5 @@
 /**
- * 玩家存档类型定义（Schema 2）
+ * 玩家存档类型定义（Schema 5）
  *
  * PlayerSave 重构为正式子状态结构：
  * - character：角色基础信息和属性
@@ -166,7 +166,7 @@ export interface GameTimeState extends GameTime {
 // ===== 新版 PlayerSave =====
 
 /**
- * 玩家存档（Schema 2）
+ * 玩家存档（Schema 5）
  *
  * 重构为正式子状态结构，删除旧职业事实来源。
  */

@@ -21,6 +21,7 @@ export function deriveEventSourceKey(signal: DomainSignalSnapshot): string {
     case 'policy.approved':
     case 'policy.phase_changed':
     case 'policy.metric_changed':
+    case 'policy.status_changed':
       return signal.data.policyInstanceId;
     case 'appointment.changed':
       return signal.data.experienceId;

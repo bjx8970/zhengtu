@@ -25,6 +25,15 @@ import { reduceStartAction } from './reducers/action-reducer';
 import { reduceAdvanceTime } from './reducers/time-reducer';
 import { reduceNewGame, reduceLoadSave } from './reducers/character-reducer';
 import { reduceChooseEventOption } from './reducers/event-reducer';
+import {
+  reduceProposePolicy,
+  reduceApprovePolicy,
+  reduceActivatePolicy,
+  reduceSuspendPolicy,
+  reduceResumePolicy,
+  reduceFailPolicy,
+  reduceRepealPolicy,
+} from './reducers/policy-reducer';
 
 /** 游戏动作联合类型（Schema 2 精简版） */
 export type GameAction =
@@ -46,6 +55,49 @@ export type GameAction =
       type: 'CHOOSE_EVENT_OPTION';
       eventInstanceId: string;
       optionId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'PROPOSE_POLICY';
+      policyId: string;
+      regionId?: string;
+      institutionId?: string;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'APPROVE_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'ACTIVATE_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'SUSPEND_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'RESUME_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'FAIL_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'REPEAL_POLICY';
+      policyInstanceId: string;
       _rng?: () => number;
       _idFactory?: () => string;
     };
@@ -85,7 +137,7 @@ function createDefaultWorldState(): WorldState {
 }
 
 /**
- * 创建初始游戏状态（Schema 2）
+ * 创建初始游戏状态（当前 Schema）
  *
  * @param overrides 可选的部分覆盖
  * @returns 完整的 PlayerSave
@@ -251,6 +303,98 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
         {
           eventInstanceId: action.eventInstanceId,
           optionId: action.optionId,
+          _rng: action._rng,
+          _idFactory: action._idFactory,
+        },
+        currentDay,
+      );
+      return result !== null;
+    }
+    case 'PROPOSE_POLICY': {
+      const currentDay = draft.time.totalDaysPlayed;
+      const result = reduceProposePolicy(
+        draft,
+        {
+          policyId: action.policyId,
+          regionId: action.regionId,
+          institutionId: action.institutionId,
+          _idFactory: action._idFactory,
+        },
+        currentDay,
+      );
+      return result !== null;
+    }
+    case 'APPROVE_POLICY': {
+      const currentDay = draft.time.totalDaysPlayed;
+      const result = reduceApprovePolicy(
+        draft,
+        {
+          policyInstanceId: action.policyInstanceId,
+          _rng: action._rng,
+          _idFactory: action._idFactory,
+        },
+        currentDay,
+      );
+      return result !== null;
+    }
+    case 'ACTIVATE_POLICY': {
+      const currentDay = draft.time.totalDaysPlayed;
+      const result = reduceActivatePolicy(
+        draft,
+        {
+          policyInstanceId: action.policyInstanceId,
+          _rng: action._rng,
+          _idFactory: action._idFactory,
+        },
+        currentDay,
+      );
+      return result !== null;
+    }
+    case 'SUSPEND_POLICY': {
+      const currentDay = draft.time.totalDaysPlayed;
+      const result = reduceSuspendPolicy(
+        draft,
+        {
+          policyInstanceId: action.policyInstanceId,
+          _rng: action._rng,
+          _idFactory: action._idFactory,
+        },
+        currentDay,
+      );
+      return result !== null;
+    }
+    case 'RESUME_POLICY': {
+      const currentDay = draft.time.totalDaysPlayed;
+      const result = reduceResumePolicy(
+        draft,
+        {
+          policyInstanceId: action.policyInstanceId,
+          _rng: action._rng,
+          _idFactory: action._idFactory,
+        },
+        currentDay,
+      );
+      return result !== null;
+    }
+    case 'FAIL_POLICY': {
+      const currentDay = draft.time.totalDaysPlayed;
+      const result = reduceFailPolicy(
+        draft,
+        {
+          policyInstanceId: action.policyInstanceId,
+          _rng: action._rng,
+          _idFactory: action._idFactory,
+        },
+        currentDay,
+      );
+      return result !== null;
+    }
+    case 'REPEAL_POLICY': {
+      const currentDay = draft.time.totalDaysPlayed;
+      const result = reduceRepealPolicy(
+        draft,
+        {
+          policyInstanceId: action.policyInstanceId,
           _rng: action._rng,
           _idFactory: action._idFactory,
         },

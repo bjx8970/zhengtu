@@ -8,6 +8,8 @@
 import { z } from 'zod';
 import { INSTITUTION_LEVELS, POSITION_DOMAINS, LEADERSHIP_RANKS } from '../domain/career/types';
 import { ConditionExpressionSchema } from '../domain/conditions';
+import { EffectDefinitionSchema } from '../domain/conditions';
+import { PolicyCategorySchema } from '../domain/governance/types';
 
 /** 机构配置 Schema */
 export const InstitutionConfigSchema = z
@@ -72,3 +74,42 @@ export function validatePositionInstitutionConsistency(
   }
   return errors;
 }
+
+// ===== 政策配置 Schema =====
+
+/** 政策阶段配置 Schema */
+export const PolicyPhaseConfigSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string(),
+    durationDays: z.number().int().positive(),
+    entryEffects: z.array(EffectDefinitionSchema),
+    completionEffects: z.array(EffectDefinitionSchema),
+  })
+  .strict();
+
+/** 政策定义配置 Schema */
+export const PolicyDefinitionConfigSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string(),
+    category: PolicyCategorySchema,
+    tags: z.array(z.string().min(1)).min(1),
+    availabilityCondition: ConditionExpressionSchema.optional(),
+    effectiveDelayDays: z.number().int().min(0),
+    approvalEffects: z.array(EffectDefinitionSchema),
+    phases: z.array(PolicyPhaseConfigSchema).min(1),
+  })
+  .strict()
+  .refine(
+    (data) => {
+      const phaseIds = data.phases.map((p) => p.id);
+      return new Set(phaseIds).size === phaseIds.length;
+    },
+    { message: '政策阶段 ID 必须在单项政策内唯一' },
+  );
+
+/** 政策定义数组 Schema */
+export const PolicyDefinitionArraySchema = z.array(PolicyDefinitionConfigSchema);

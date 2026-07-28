@@ -1,9 +1,9 @@
 /**
- * 存档严格解码器（Schema 4）
+ * 存档严格解码器（Schema 5）
  *
- * 只接受当前版本（Schema 4）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 5）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -26,7 +26,12 @@ import {
   CAREER_OPPORTUNITY_TYPES,
   CAREER_OPPORTUNITY_STATUSES,
 } from '../../domain/career/types';
-import { POLICY_STATUSES, DomainSignalSnapshotSchema } from '../../domain/governance/types';
+import {
+  POLICY_STATUSES,
+  POLICY_CATEGORIES,
+  DomainSignalSnapshotSchema,
+} from '../../domain/governance/types';
+import { EffectDefinitionSchema } from '../../domain/conditions';
 import {
   EVENT_PRIORITIES,
   EVENT_PRESENTATIONS,
@@ -158,7 +163,19 @@ const CareerStateSchema = z
   })
   .strict();
 
-/** GovernanceState Schema */
+/** PolicyPhaseDefinition Schema */
+const PolicyPhaseDefinitionSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    durationDays: z.number(),
+    entryEffects: z.array(EffectDefinitionSchema),
+    completionEffects: z.array(EffectDefinitionSchema),
+  })
+  .strict();
+
+/** GovernanceState Schema（Schema 5：PolicyInstance 使用 originContext + snapshot） */
 const GovernanceStateSchema = z
   .object({
     policies: z.array(
@@ -170,9 +187,37 @@ const GovernanceStateSchema = z
           proposedAtDay: z.number(),
           approvedAtDay: z.number().nullable(),
           effectiveAtDay: z.number().nullable(),
-          regionId: z.string(),
-          responsibleInstitutionId: z.string(),
-          currentPhaseId: z.string(),
+          currentPhaseId: z.string().nullable(),
+          phaseEnteredAtDay: z.number().nullable(),
+          nextMilestoneAtDay: z.number().nullable(),
+          suspendedAtDay: z.number().nullable(),
+          accumulatedSuspendedDays: z.number(),
+          completedAtDay: z.number().nullable(),
+          failedAtDay: z.number().nullable(),
+          repealedAtDay: z.number().nullable(),
+          originContext: z
+            .object({
+              positionId: z.string(),
+              institutionId: z.string(),
+              regionId: z.string(),
+              institutionLevel: z.enum(INSTITUTION_LEVELS),
+              positionDomain: z.enum(POSITION_DOMAINS),
+              leadershipRank: z.enum(LEADERSHIP_RANKS),
+              experienceId: z.string().nullable(),
+            })
+            .strict(),
+          snapshot: z
+            .object({
+              policyId: z.string(),
+              name: z.string(),
+              description: z.string(),
+              category: z.enum(POLICY_CATEGORIES),
+              tags: z.array(z.string()),
+              effectiveDelayDays: z.number(),
+              phases: z.array(PolicyPhaseDefinitionSchema),
+              contentVersion: z.string(),
+            })
+            .strict(),
           metrics: z.record(z.number()),
         })
         .strict(),
@@ -467,7 +512,7 @@ const CharacterStateSchema = z
   })
   .strict();
 
-/** PlayerSave Schema（Schema 2，.strict() 拒绝旧职业字段） */
+/** PlayerSave Schema（当前版本，.strict() 拒绝未知字段） */
 const PlayerSaveSchema = z
   .object({
     character: CharacterStateSchema,
@@ -514,7 +559,7 @@ const PlayerSaveSchema = z
   })
   .strict();
 
-/** SaveEnvelope Schema（Schema 2） */
+/** SaveEnvelope Schema（当前版本） */
 const SaveEnvelopeSchema = z
   .object({
     schemaVersion: z.number().int().min(0),
@@ -542,7 +587,7 @@ void _typeConsistencyCheck;
 // ===== 公开 API =====
 
 /**
- * 验证 PlayerSave 数据是否符合 Schema 2。
+ * 验证 PlayerSave 数据是否符合当前 Schema。
  *
  * @param data 待验证数据
  * @returns 验证结果
@@ -741,13 +786,76 @@ export function migrateSchema3To4(raw: Record<string, unknown>): Record<string, 
 }
 
 /**
+ * Schema 4 → 5 迁移：PolicyInstance 扁平字段 → originContext + snapshot 复合结构。
+ *
+ * Schema 4 的 PolicyInstance 使用 regionId/responsibleInstitutionId 等扁平字段。
+ * Schema 5 将其收束到 originContext（位置/机构/地区）和 snapshot（政策定义快照）。
+ * 旧记录缺少任职信息，迁移时使用哨兵值并由游戏逻辑自行纠正。
+ *
+ * @param prev Schema 4 SaveEnvelope 对象
+ * @returns 迁移后的 Schema 5 SaveEnvelope 对象
+ */
+export function migrateSchema4To5(prev: Record<string, unknown>): Record<string, unknown> {
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const governance = state?.governance as Record<string, unknown> | undefined;
+  const oldPolicies = (governance?.policies ?? []) as Array<Record<string, unknown>>;
+
+  const migratedPolicies = oldPolicies.map((old) => ({
+    instanceId: old.instanceId as string,
+    policyId: old.policyId as string,
+    status: old.status as string,
+    proposedAtDay: (old.proposedAtDay as number) ?? 0,
+    approvedAtDay: (old.approvedAtDay as number | null) ?? null,
+    effectiveAtDay: (old.effectiveAtDay as number | null) ?? null,
+    currentPhaseId: (old.currentPhaseId as string | null) ?? null,
+    phaseEnteredAtDay: null,
+    nextMilestoneAtDay: null,
+    suspendedAtDay: null,
+    accumulatedSuspendedDays: 0,
+    completedAtDay: null,
+    failedAtDay: null,
+    repealedAtDay: null,
+    originContext: {
+      positionId: 'migrated',
+      institutionId: (old.responsibleInstitutionId as string) ?? 'unknown',
+      regionId: (old.regionId as string) ?? 'unknown',
+      institutionLevel: 'local',
+      positionDomain: 'comprehensive',
+      leadershipRank: 'unknown',
+      experienceId: null,
+    },
+    snapshot: {
+      policyId: old.policyId as string,
+      name: `政策-${old.policyId}`,
+      description: '从 Schema 4 迁移的政策',
+      category: 'economic',
+      tags: [],
+      effectiveDelayDays: 0,
+      phases: [],
+      contentVersion: 'migrated',
+    },
+    metrics: (old.metrics as Record<string, number>) ?? {},
+  }));
+
+  if (governance) {
+    (governance as Record<string, unknown>).policies = migratedPolicies;
+  }
+
+  migrated.schemaVersion = 5;
+  (migrated as Record<string, unknown>).contentVersion = '2026.07.3';
+  return migrated;
+}
+
+/**
  * 严格解码存档数据（已解析的对象）。
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
- * - Schema 2：迁移至 Schema 3 后解碼，Schema 3 再迁移至 4；
- * - Schema 3：迁移至 Schema 4；
- * - 当前版本（Schema 4）：直接解碼；
+ * - Schema 2：迁移至 Schema 3 后解码，Schema 3 迁移至 4，再迁移至 5；
+ * - Schema 3：迁移至 Schema 4 后再迁移至 5；
+ * - Schema 4：迁移至 Schema 5；
+ * - 当前版本（Schema 5）：直接解码；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
@@ -787,9 +895,11 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
   let target: unknown = data;
   try {
     if (obj.schemaVersion === 2) {
-      target = migrateSchema3To4(migrateSchema2To3(obj));
+      target = migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj)));
     } else if (obj.schemaVersion === 3) {
-      target = migrateSchema3To4(obj);
+      target = migrateSchema4To5(migrateSchema3To4(obj));
+    } else if (obj.schemaVersion === 4) {
+      target = migrateSchema4To5(obj);
     }
   } catch (e) {
     return {

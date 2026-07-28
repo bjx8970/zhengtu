@@ -22,6 +22,7 @@ export * from './governance/kpi';
 export * from './governance/budget';
 export * from './governance/assessment';
 export * from './governance/dimensions';
+export * from './governance/policy-lifecycle';
 export * from './career/promotion';
 export * from './career/promotion-final';
 export * from './career/promotion-target';

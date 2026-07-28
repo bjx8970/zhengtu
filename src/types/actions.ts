@@ -32,3 +32,20 @@ export interface PromotionResolvePayload {
 export interface NewGamePayload {
   data: Record<string, unknown>;
 }
+
+// ===== Phase 2: 政策运行时 =====
+
+/** 共同政策运行时载荷（RNG/ID 可注入） */
+export interface PolicyRuntimePayload {
+  policyInstanceId: string;
+  _rng?: () => number;
+  _idFactory?: () => string;
+}
+
+/** 提议政策载荷 */
+export interface ProposePolicyPayload {
+  policyId: string;
+  regionId?: string;
+  institutionId?: string;
+  _idFactory?: () => string;
+}

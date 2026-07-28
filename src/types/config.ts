@@ -11,6 +11,9 @@
 
 import type { CareerLine } from './enums';
 import type { SlotTierKey } from './player';
+import type { ConditionExpression } from '../domain/conditions';
+import type { EffectDefinition } from '../domain/conditions';
+import type { PolicyCategory } from '../domain/governance/types';
 
 /** 行动分类，决定行动冷却规则 */
 export type ActionCategory = 'major' | 'minor' | 'routine';
@@ -380,4 +383,41 @@ export interface DeviationResult {
 export interface UnlockedExtremeContent {
   actions: ExtremeActionConfig[];
   events: ExtremeEventConfig[];
+}
+
+// ===== 政策配置类型 =====
+
+/** 政策阶段定义（配置格式） */
+export interface PolicyPhaseConfig {
+  id: string;
+  name: string;
+  description: string;
+  /** 阶段持续天数（正整数） */
+  durationDays: number;
+  /** 进入本阶段时应用的效果 */
+  entryEffects: EffectDefinition[];
+  /** 完成本阶段时应用的效果 */
+  completionEffects: EffectDefinition[];
+}
+
+/** 政策定义配置 */
+export interface PolicyDefinitionConfig {
+  /** 政策配置 ID（全局唯一） */
+  id: string;
+  /** 政策名称 */
+  name: string;
+  /** 政策描述 */
+  description: string;
+  /** 政策分类 */
+  category: PolicyCategory;
+  /** 政策标签 */
+  tags: string[];
+  /** 可用性条件（提议前检查） */
+  availabilityCondition?: ConditionExpression;
+  /** 生效延迟天数（批准后到可实施） */
+  effectiveDelayDays: number;
+  /** 批准时立即应用的效果 */
+  approvalEffects: EffectDefinition[];
+  /** 阶段列表（按顺序线性推进，至少 1 个） */
+  phases: PolicyPhaseConfig[];
 }
