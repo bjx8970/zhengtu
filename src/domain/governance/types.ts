@@ -44,6 +44,7 @@ export const DOMAIN_SIGNALS = [
   'policy.approved',
   'policy.phase_changed',
   'policy.metric_changed',
+  'policy.status_changed',
   'appointment.changed',
   'assessment.completed',
   'world.metric_changed',
@@ -64,9 +65,40 @@ export const DomainSignalSchema = z.enum(DOMAIN_SIGNALS);
  */
 export const SIGNAL_TYPE_PAYLOAD_FIELDS: Record<DomainSignal, readonly string[]> = {
   'action.completed': ['actionInstanceId', 'actionId', 'deptId', 'regionId', 'institutionId'],
-  'policy.approved': ['policyInstanceId', 'policyId', 'regionId'],
-  'policy.phase_changed': ['policyInstanceId', 'policyId', 'phaseId'],
-  'policy.metric_changed': ['policyInstanceId', 'policyId', 'metricId', 'value'],
+  'policy.approved': [
+    'policyInstanceId',
+    'policyId',
+    'regionId',
+    'institutionId',
+    'originPositionId',
+  ],
+  'policy.phase_changed': [
+    'policyInstanceId',
+    'policyId',
+    'regionId',
+    'institutionId',
+    'originPositionId',
+    'previousPhaseId',
+    'currentPhaseId',
+  ],
+  'policy.metric_changed': [
+    'policyInstanceId',
+    'policyId',
+    'metricId',
+    'value',
+    'regionId',
+    'institutionId',
+    'originPositionId',
+  ],
+  'policy.status_changed': [
+    'policyInstanceId',
+    'policyId',
+    'previousStatus',
+    'currentStatus',
+    'regionId',
+    'institutionId',
+    'originPositionId',
+  ],
   'appointment.changed': [
     'experienceId',
     'positionId',
@@ -97,19 +129,55 @@ export type DomainSignalSnapshot =
       signalId: string;
       signalType: 'policy.approved';
       occurredAtDay: number;
-      data: { policyInstanceId: string; policyId: string; regionId: string };
+      data: {
+        policyInstanceId: string;
+        policyId: string;
+        regionId: string;
+        institutionId: string;
+        originPositionId: string;
+      };
     }
   | {
       signalId: string;
       signalType: 'policy.phase_changed';
       occurredAtDay: number;
-      data: { policyInstanceId: string; policyId: string; phaseId: string };
+      data: {
+        policyInstanceId: string;
+        policyId: string;
+        regionId: string;
+        institutionId: string;
+        originPositionId: string;
+        previousPhaseId: string | null;
+        currentPhaseId: string | null;
+      };
     }
   | {
       signalId: string;
       signalType: 'policy.metric_changed';
       occurredAtDay: number;
-      data: { policyInstanceId: string; policyId: string; metricId: string; value: number };
+      data: {
+        policyInstanceId: string;
+        policyId: string;
+        metricId: string;
+        value: number;
+        regionId: string;
+        institutionId: string;
+        originPositionId: string;
+      };
+    }
+  | {
+      signalId: string;
+      signalType: 'policy.status_changed';
+      occurredAtDay: number;
+      data: {
+        policyInstanceId: string;
+        policyId: string;
+        previousStatus: PolicyStatus;
+        currentStatus: PolicyStatus;
+        regionId: string;
+        institutionId: string;
+        originPositionId: string;
+      };
     }
   | {
       signalId: string;
@@ -171,7 +239,13 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
       signalType: z.literal('policy.approved'),
       occurredAtDay: z.number(),
       data: z
-        .object({ policyInstanceId: z.string(), policyId: z.string(), regionId: z.string() })
+        .object({
+          policyInstanceId: z.string(),
+          policyId: z.string(),
+          regionId: z.string(),
+          institutionId: z.string(),
+          originPositionId: z.string(),
+        })
         .strict(),
     })
     .strict(),
@@ -181,7 +255,15 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
       signalType: z.literal('policy.phase_changed'),
       occurredAtDay: z.number(),
       data: z
-        .object({ policyInstanceId: z.string(), policyId: z.string(), phaseId: z.string() })
+        .object({
+          policyInstanceId: z.string(),
+          policyId: z.string(),
+          regionId: z.string(),
+          institutionId: z.string(),
+          originPositionId: z.string(),
+          previousPhaseId: z.string().nullable(),
+          currentPhaseId: z.string().nullable(),
+        })
         .strict(),
     })
     .strict(),
@@ -196,6 +278,27 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
           policyId: z.string(),
           metricId: z.string(),
           value: z.number(),
+          regionId: z.string(),
+          institutionId: z.string(),
+          originPositionId: z.string(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalId: z.string(),
+      signalType: z.literal('policy.status_changed'),
+      occurredAtDay: z.number(),
+      data: z
+        .object({
+          policyInstanceId: z.string(),
+          policyId: z.string(),
+          previousStatus: PolicyStatusSchema,
+          currentStatus: PolicyStatusSchema,
+          regionId: z.string(),
+          institutionId: z.string(),
+          originPositionId: z.string(),
         })
         .strict(),
     })
@@ -248,3 +351,33 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
     })
     .strict(),
 ]);
+
+// ===== 政策分类 =====
+
+/** 政策分类常量数组 */
+export const POLICY_CATEGORIES = [
+  'economic',
+  'social',
+  'public_service',
+  'public_safety',
+  'environmental',
+  'governance',
+  'organization',
+] as const;
+
+/** 政策分类类型 */
+export type PolicyCategory = (typeof POLICY_CATEGORIES)[number];
+
+/** 政策分类中文标签 */
+export const POLICY_CATEGORY_LABELS: Record<PolicyCategory, string> = {
+  economic: '经济',
+  social: '社会',
+  public_service: '公共服务',
+  public_safety: '公共安全',
+  environmental: '环境',
+  governance: '治理',
+  organization: '组织',
+};
+
+/** 政策分类 Zod Schema */
+export const PolicyCategorySchema = z.enum(POLICY_CATEGORIES);

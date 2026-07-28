@@ -1,0 +1,125 @@
+[
+  {
+    "id": "industrial_park_support",
+    "name": "产业园区扶持政策",
+    "description": "通过设立产业园区扶持专项资金、优化审批流程和提供税收优惠，推动地方产业集聚发展。",
+    "category": "economic",
+    "tags": ["产业", "园区", "招商引资", "经济"],
+    "effectiveDelayDays": 0,
+    "availabilityCondition": {
+      "all": []
+    },
+    "approvalEffects": [
+      {
+        "target": "institution_metric",
+        "institutionRef": { "source": "signal", "field": "institutionId" },
+        "metricId": "policy_count",
+        "operation": "add",
+        "value": 1
+      },
+      {
+        "target": "region_metric",
+        "regionRef": { "source": "signal", "field": "regionId" },
+        "metricId": "active_policies",
+        "operation": "add",
+        "value": 1
+      }
+    ],
+    "phases": [
+      {
+        "id": "preparation",
+        "name": "准备阶段",
+        "description": "完成产业园区规划、资金筹措和审批手续",
+        "durationDays": 30,
+        "entryEffects": [
+          {
+            "target": "region_metric",
+            "regionRef": { "source": "signal", "field": "regionId" },
+            "metricId": "investment_progress",
+            "operation": "add",
+            "value": 5
+          }
+        ],
+        "completionEffects": [
+          {
+            "target": "region_metric",
+            "regionRef": { "source": "signal", "field": "regionId" },
+            "metricId": "investment_progress",
+            "operation": "add",
+            "value": 15
+          },
+          {
+            "target": "character",
+            "field": "stability",
+            "operation": "add",
+            "value": 5
+          }
+        ]
+      },
+      {
+        "id": "implementation",
+        "name": "实施阶段",
+        "description": "园区基础设施建设、招商引资和企业入驻",
+        "durationDays": 90,
+        "entryEffects": [
+          {
+            "target": "region_metric",
+            "regionRef": { "source": "signal", "field": "regionId" },
+            "metricId": "investment_progress",
+            "operation": "add",
+            "value": 10
+          }
+        ],
+        "completionEffects": [
+          {
+            "target": "region_metric",
+            "regionRef": { "source": "signal", "field": "regionId" },
+            "metricId": "investment_progress",
+            "operation": "add",
+            "value": 40
+          },
+          {
+            "target": "character",
+            "field": "stability",
+            "operation": "add",
+            "value": 15
+          },
+          {
+            "target": "character",
+            "field": "diligence",
+            "operation": "add",
+            "value": 10
+          }
+        ]
+      },
+      {
+        "id": "evaluation",
+        "name": "评估阶段",
+        "description": "园区运营效果评估、总结经验并形成推广方案",
+        "durationDays": 30,
+        "entryEffects": [],
+        "completionEffects": [
+          {
+            "target": "region_metric",
+            "regionRef": { "source": "signal", "field": "regionId" },
+            "metricId": "investment_progress",
+            "operation": "add",
+            "value": 30
+          },
+          {
+            "target": "character",
+            "field": "stability",
+            "operation": "add",
+            "value": 10
+          },
+          {
+            "target": "character",
+            "field": "integrity",
+            "operation": "add",
+            "value": 5
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -575,6 +575,39 @@ export function processCascadeSignals(
 }
 
 /**
+ * 在调用方持有的事务副本上处理级联信号。
+ *
+ * 此入口不会再次克隆状态；调用方必须确保异常时丢弃传入的 draft，
+ * 成功后再自行提交，避免嵌套事务重复深拷贝完整存档。
+ *
+ * @param draft 调用方创建的游戏状态事务副本
+ * @param signals 待处理的级联信号列表
+ * @param currentDay 当前绝对游戏日
+ * @param rng 随机数生成器
+ * @param idFactory ID 工厂
+ * @param definitions 事件定义列表
+ * @returns void
+ */
+export function processCascadeSignalsInTransaction(
+  draft: PlayerSave,
+  signals: DomainSignalSnapshot[],
+  currentDay: number,
+  rng: () => number,
+  idFactory: () => string,
+  definitions: readonly EventDefinition[],
+): void {
+  processEventContinuationsInternal(
+    draft,
+    signals.map((signal) => ({ kind: 'signal', signal, cascadeDepth: 0 })),
+    currentDay,
+    rng,
+    idFactory,
+    definitions,
+    'back',
+  );
+}
+
+/**
  * 以统一、可持久化的队列处理事件实例和级联信号。
  *
  * @param draft 游戏状态草稿

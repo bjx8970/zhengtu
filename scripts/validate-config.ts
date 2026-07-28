@@ -27,6 +27,7 @@ import backgroundData from '../src/config/templates/backgrounds.json' with { typ
 import leadershipStyles from '../src/config/templates/leadership-styles.json' with { type: 'json' };
 import positionsData from '../src/config/positions/positions.json' with { type: 'json' };
 import institutionsData from '../src/config/institutions/institutions.json' with { type: 'json' };
+import policiesData from '../src/config/templates/policies.json' with { type: 'json' };
 import { EventDefinitionArraySchema } from '../src/domain/events/definition';
 import type { EventDefinition } from '../src/domain/events/definition';
 import { validateEventDefinitions } from '../src/domain/events/validation';
@@ -612,7 +613,9 @@ import {
   PositionConfigArraySchema,
   InstitutionConfigMapSchema,
   validatePositionInstitutionConsistency,
+  PolicyDefinitionArraySchema,
 } from '../src/config/schemas';
+import { validatePolicyEffectReferences } from '../src/config/policy-reference-validation';
 
 // 使用正式 Schema 解析（与 ConfigLoader 共用同一入口）
 const parsedPositionsResult = PositionConfigArraySchema.safeParse(positionsData);
@@ -632,6 +635,13 @@ if (!parsedInstitutionsResult.success) {
     errors++;
   }
 }
+
+const policyReferenceCatalog = {
+  institutionIds: new Set(
+    parsedInstitutionsResult.success ? Object.keys(parsedInstitutionsResult.data) : [],
+  ),
+  regionIds: new Set(Object.keys(regionData)),
+};
 
 if (parsedPositionsResult.success && parsedInstitutionsResult.success) {
   const validPositions = parsedPositionsResult.data;
@@ -687,6 +697,58 @@ if (parsedPositionsResult.success && parsedInstitutionsResult.success) {
     console.log(`   ✅ ${Object.keys(validInstitutions).length} 个机构配置有效`);
     console.log(`   ✅ 职位—机构交叉一致性通过（层级 + 地区）`);
     console.log(`   ✅ 所有部门/KPI 引用完整`);
+  }
+}
+
+// ===== 政策配置校验 =====
+console.log('\n--- 政策配置校验 (policies.json) ---\n');
+
+const parsedPoliciesResult = PolicyDefinitionArraySchema.safeParse(policiesData);
+if (!parsedPoliciesResult.success) {
+  for (const issue of parsedPoliciesResult.error.issues) {
+    console.error(`❌ policies.json [${issue.path.join('.')}] ${issue.message}`);
+    errors++;
+  }
+} else {
+  const validPolicies = parsedPoliciesResult.data;
+  const policyIds = new Set<string>();
+
+  for (const policy of validPolicies) {
+    // ID 唯一性
+    if (policyIds.has(policy.id)) {
+      console.error(`❌ 政策 ID "${policy.id}" 重复`);
+      errors++;
+    }
+    policyIds.add(policy.id);
+
+    // 阶段 ID 唯一性（Schema 中已有 refine 检查，此处作为二重保障）
+    const phaseIds = new Set<string>();
+    for (const phase of policy.phases) {
+      if (phaseIds.has(phase.id)) {
+        console.error(`❌ 政策 "${policy.id}" 阶段 ID "${phase.id}" 重复`);
+        errors++;
+      }
+      phaseIds.add(phase.id);
+    }
+
+    for (const error of validatePolicyEffectReferences([policy], policyReferenceCatalog)) {
+      console.error(`❌ ${error}`);
+      errors++;
+    }
+
+    // 标签去重
+    const tagSet = new Set(policy.tags);
+    if (tagSet.size !== policy.tags.length) {
+      console.error(`❌ 政策 "${policy.id}" 标签有重复`);
+      errors++;
+    }
+  }
+
+  if (errors === 0) {
+    console.log(`   ✅ ${validPolicies.length} 个政策定义全部通过校验`);
+    console.log(`   ✅ 政策 ID 全局唯一`);
+    console.log(`   ✅ 各政策阶段 ID 唯一`);
+    console.log(`   ✅ 标签去重通过`);
   }
 }
 

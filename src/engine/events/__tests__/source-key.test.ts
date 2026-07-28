@@ -35,7 +35,13 @@ function makePolicyApprovedSig(
     signalId,
     signalType: 'policy.approved',
     occurredAtDay: 10,
-    data: { policyInstanceId, policyId: 'tax_reform', regionId: 'central' },
+    data: {
+      policyInstanceId,
+      policyId: 'tax_reform',
+      regionId: 'central',
+      institutionId: 'inst_01',
+      originPositionId: 'pos_01',
+    },
   };
 }
 
@@ -48,7 +54,15 @@ function makePolicyPhaseChangedSig(
     signalId,
     signalType: 'policy.phase_changed',
     occurredAtDay: 20,
-    data: { policyInstanceId, policyId: 'edu_reform', phaseId: 'phase_2' },
+    data: {
+      policyInstanceId,
+      policyId: 'edu_reform',
+      regionId: 'region_01',
+      institutionId: 'inst_01',
+      originPositionId: 'pos_01',
+      previousPhaseId: null,
+      currentPhaseId: 'phase_2',
+    },
   };
 }
 
@@ -61,7 +75,15 @@ function makePolicyMetricChangedSig(
     signalId,
     signalType: 'policy.metric_changed',
     occurredAtDay: 30,
-    data: { policyInstanceId, policyId: 'health_reform', metricId: 'coverage', value: 85 },
+    data: {
+      policyInstanceId,
+      policyId: 'health_reform',
+      metricId: 'coverage',
+      value: 85,
+      regionId: 'region_01',
+      institutionId: 'inst_01',
+      originPositionId: 'pos_01',
+    },
   };
 }
 

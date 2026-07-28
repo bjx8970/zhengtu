@@ -106,6 +106,37 @@ describe('Schema 2 存档', () => {
     expect(result.state?.governance.regionMetrics).toEqual({});
   });
 
+  it('Schema 4 含政策实例时明确迁移失败并保留原始备份', () => {
+    const state = createInitialState();
+    const schema4Envelope = {
+      ...wrapSaveEnvelope(state),
+      schemaVersion: 4,
+      contentVersion: '2026.07.2',
+      state: {
+        ...state,
+        governance: {
+          ...state.governance,
+          policies: [
+            {
+              instanceId: 'legacy_policy_1',
+              policyId: 'industrial_park_support',
+              status: 'approved',
+              regionId: 'region_qingyun_town',
+              responsibleInstitutionId: 'township_govt_01',
+            },
+          ],
+        },
+      },
+    };
+    const json = JSON.stringify(schema4Envelope);
+    const result = decodeCurrentSave(json);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('migration_failed');
+    expect(result.backupKey).toBeDefined();
+    expect(localStorage.getItem(result.backupKey!)).toBe(json);
+  });
+
   it('旧职业字段被 .strict() 拒绝', () => {
     const state = createInitialState();
     // 注入旧字段
@@ -254,9 +285,34 @@ describe('NEW_GAME 隔离性', () => {
         proposedAtDay: 0,
         approvedAtDay: 10,
         effectiveAtDay: 20,
-        regionId: 'region_qingyun_town',
-        responsibleInstitutionId: 'township_govt_01',
         currentPhaseId: 'phase_1',
+        phaseEnteredAtDay: 20,
+        nextMilestoneAtDay: 50,
+        suspendedAtDay: null,
+        accumulatedSuspendedDays: 0,
+        completedAtDay: null,
+        failedAtDay: null,
+        repealedAtDay: null,
+        originContext: {
+          positionId: 'admin_l2_0',
+          institutionId: 'township_govt_01',
+          regionId: 'region_qingyun_town',
+          institutionLevel: 'township',
+          positionDomain: 'local_governance',
+          leadershipRank: 'township_deputy',
+          experienceId: 'exp_1',
+        },
+        snapshot: {
+          policyId: 'test_policy',
+          name: '测试政策',
+          description: '',
+          category: 'economic',
+          tags: [],
+          effectiveDelayDays: 0,
+          approvalEffects: [],
+          phases: [],
+          contentVersion: 'test',
+        },
         metrics: {},
       },
     ];

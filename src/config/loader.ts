@@ -27,7 +27,12 @@ import type { PositionConfigV2, InstitutionConfig } from '../types/position-v2';
 import type { InstitutionLevel } from '../domain/career/types';
 import type { EventDefinition } from '../domain/events/definition';
 import type { DomainSignal } from '../domain/governance/types';
-import { PositionConfigArraySchema, InstitutionConfigMapSchema } from './schemas';
+import type { PolicyDefinitionConfig } from '../types/config';
+import {
+  PositionConfigArraySchema,
+  InstitutionConfigMapSchema,
+  PolicyDefinitionArraySchema,
+} from './schemas';
 import { EventDefinitionArraySchema } from '../domain/events/definition';
 import deptTemplateData from './templates/departments.json' with { type: 'json' };
 import deptExtraData from './templates/departments-extra.json' with { type: 'json' };
@@ -40,6 +45,7 @@ import universityData from './templates/universities.json' with { type: 'json' }
 import backgroundData from './templates/backgrounds.json' with { type: 'json' };
 import leadershipStyleData from './templates/leadership-styles.json' with { type: 'json' };
 import eventsData from './templates/events.json' with { type: 'json' };
+import policiesData from './templates/policies.json' with { type: 'json' };
 
 type RawDeptMap = Record<string, DepartmentTemplate>;
 
@@ -54,9 +60,11 @@ const ALL_KPI_TEMPLATES = kpiData as Record<string, KPITemplate>;
 const parsedPositions = PositionConfigArraySchema.parse(positionsData);
 const parsedInstitutions = InstitutionConfigMapSchema.parse(institutionsData);
 const parsedEvents = EventDefinitionArraySchema.parse(eventsData);
+const parsedPolicies = PolicyDefinitionArraySchema.parse(policiesData);
 const ALL_POSITIONS = parsedPositions;
 const ALL_INSTITUTIONS = parsedInstitutions;
 const ALL_EVENTS = parsedEvents;
+const ALL_POLICIES = parsedPolicies;
 
 /**
  * ConfigLoader 单例（Schema 2）
@@ -70,6 +78,7 @@ class ConfigLoader {
   private institutions: Map<string, InstitutionConfig>;
   private events: Map<string, EventDefinition>;
   private eventsBySignal: Map<DomainSignal, EventDefinition[]>;
+  private policies: Map<string, PolicyDefinitionConfig>;
   private regionConfig: RegionConfig;
   private universityConfig: UniversityConfig;
   private backgroundConfig: BackgroundConfig;
@@ -91,6 +100,7 @@ class ConfigLoader {
         this.eventsBySignal.set(signal, list);
       }
     }
+    this.policies = new Map(ALL_POLICIES.map((p) => [p.id, p]));
     this.gameConfig = constantsData as unknown as GameConfig;
     this.regionConfig = regionData as unknown as RegionConfig;
     this.universityConfig = universityData as unknown as UniversityConfig;
@@ -139,6 +149,17 @@ class ConfigLoader {
   getEventDefinitionsBySignal(signalType: DomainSignal): EventDefinition[] {
     const list = this.eventsBySignal.get(signalType) ?? [];
     return list.map((e) => structuredClone(e));
+  }
+
+  /** 按稳定 ID 查询政策定义（未知 ID 返回 null） */
+  getPolicyDefinition(policyId: string): PolicyDefinitionConfig | null {
+    const policy = this.policies.get(policyId);
+    return policy ? structuredClone(policy) : null;
+  }
+
+  /** 获取全部政策定义（深拷贝） */
+  getAllPolicyDefinitions(): PolicyDefinitionConfig[] {
+    return ALL_POLICIES.map((p) => structuredClone(p));
   }
 
   /** 展开职位的部门配置 */
