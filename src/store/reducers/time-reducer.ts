@@ -24,7 +24,11 @@ import type {
 import { getConfigLoader } from '../../config/loader';
 import { createRuntimeIdFactory } from '../runtime-id';
 import { processCascadeSignalsInTransaction } from './event-reducer';
-import { processDailyFacts, processTimelineNodes } from '../transactions/timeline-day-transaction';
+import {
+  expireEventsAtDay,
+  processDailyFacts,
+  processTimelineNodes,
+} from '../transactions/timeline-day-transaction';
 
 /**
  * 原子处理 ADVANCE_TIME。
@@ -48,6 +52,9 @@ function reduceAdvanceTimeInternal(draft: PlayerSave, payload: AdvanceTimePayloa
   const notifications: CompletedActionNotification[] = [];
   draft.time.granularity = payload.granularity;
 
+  // 延续旧时间轴语义：即使 blocker 仍未解决，也要先清理已经越过截止日的事件。
+  // 否则恢复 continuation 时，旧 pending 实例可能错误阻止同来源的可重复事件。
+  expireEventsAtDay(draft, draft.time.totalDaysPlayed);
   if (draft.events.activeBlockingEventId !== null) return;
 
   if (draft.events.deferredContinuations.length > 0 || draft.events.deferredSignals.length > 0) {

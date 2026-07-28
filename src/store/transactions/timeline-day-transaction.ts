@@ -315,7 +315,14 @@ function processAnnualAssessment(
   };
 }
 
-function expireEventsAtDay(draft: PlayerSave, currentDay: number): void {
+/**
+ * 将当前绝对日之前已到期的待处理事件提交为过期历史。
+ *
+ * @param draft 可变事务状态
+ * @param currentDay 当前绝对日
+ * @returns void
+ */
+export function expireEventsAtDay(draft: PlayerSave, currentDay: number): void {
   const result = expireEventInstances(draft as Readonly<PlayerSave>, currentDay);
   draft.events.history.push(...result.expiredRecords);
   const expired = new Set(result.expiredRecords.map((record) => record.instanceId));

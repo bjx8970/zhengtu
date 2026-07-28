@@ -9,6 +9,7 @@ import { createInitialState, createTestStore } from '../game-store';
 import { createEventSnapshot } from '../../engine/events/event-orchestrator';
 import { getConfigLoader } from '../../config/loader';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
+import type { EventInstance } from '../../domain/events/state';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
 
 function makeSignal(signalId: string, occurredAtDay = 0): DomainSignalSnapshot {
@@ -182,6 +183,80 @@ describe('event timeline integration', () => {
     expect(
       after.events.pending.find((item) => item.instanceId === 'scheduled_blocker')?.status,
     ).toBe('active');
+  });
+
+  it('expires overdue pending events before an active blocker pauses advancement', () => {
+    const state = createInitialState();
+    state.time.totalDaysPlayed = 5;
+    const overdueSnapshot = createEventSnapshot({
+      id: 'overdue_before_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Overdue event',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'repeatable' },
+      activation: { deadlineDays: 1 },
+      options: [{ id: 'ack', label: '处理', description: '', effects: [] }],
+    });
+    const blockerSnapshot = createEventSnapshot({
+      id: 'existing_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Existing blocker',
+      description: '',
+      category: 'emergency',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'ack', label: '处理', description: '', effects: [] }],
+    });
+    const overdue: EventInstance = {
+      instanceId: 'overdue_instance',
+      eventId: overdueSnapshot.eventId,
+      status: 'pending',
+      triggeredAtDay: 2,
+      activatedAtDay: 2,
+      deadlineDay: 4,
+      triggerContext: makeSignal('overdue_signal', 2),
+      sourceKey: 'repeatable_source',
+      chainInstanceId: null,
+      snapshot: overdueSnapshot,
+    };
+    const blocker: EventInstance = {
+      instanceId: 'existing_blocker_instance',
+      eventId: blockerSnapshot.eventId,
+      status: 'active',
+      triggeredAtDay: 5,
+      activatedAtDay: 5,
+      deadlineDay: null,
+      triggerContext: makeSignal('blocker_signal', 5),
+      sourceKey: 'blocker_source',
+      chainInstanceId: null,
+      snapshot: blockerSnapshot,
+    };
+    state.events.pending.push(overdue, blocker);
+    state.events.activeBlockingEventId = blocker.instanceId;
+    const store = createTestStore(state);
+
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+    const after = store.getRawState();
+    expect(after.time.totalDaysPlayed).toBe(5);
+    expect(after.events.activeBlockingEventId).toBe(blocker.instanceId);
+    expect(after.events.pending.map((event) => event.instanceId)).not.toContain(overdue.instanceId);
+    expect(after.events.history).toContainEqual(
+      expect.objectContaining({
+        instanceId: overdue.instanceId,
+        finalStatus: 'expired',
+        completedAtDay: 5,
+      }),
+    );
   });
 
   it('activates a year-end blocker before monthly settlement and annual assessment', () => {
