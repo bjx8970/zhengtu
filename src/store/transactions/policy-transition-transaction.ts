@@ -35,10 +35,28 @@ export function commitPolicyTransitionInTransaction(
     return { success: false, emittedSignals: [], appliedEffects: [] };
   }
 
-  if (policyIndex !== null && policyIndex >= 0 && policyIndex < draft.governance.policies.length) {
-    draft.governance.policies[policyIndex] = result.instance;
-  } else {
+  if (policyIndex === null) {
+    if (
+      draft.governance.policies.some((policy) => policy.instanceId === result.instance.instanceId)
+    ) {
+      throw new Error(`Policy instance "${result.instance.instanceId}" already exists`);
+    }
     draft.governance.policies.push(result.instance);
+  } else {
+    if (
+      !Number.isInteger(policyIndex) ||
+      policyIndex < 0 ||
+      policyIndex >= draft.governance.policies.length
+    ) {
+      throw new Error(`Policy index "${policyIndex}" is invalid`);
+    }
+    const existing = draft.governance.policies[policyIndex];
+    if (!existing || existing.instanceId !== result.instance.instanceId) {
+      throw new Error(
+        `Policy index "${policyIndex}" does not match instance "${result.instance.instanceId}"`,
+      );
+    }
+    draft.governance.policies[policyIndex] = result.instance;
   }
 
   let appliedEffects: ReturnType<typeof applyEffects>['applied'] = [];
@@ -65,9 +83,7 @@ export function commitPolicyTransitionInTransaction(
   );
   return {
     success: true,
-    instance: draft.governance.policies.find(
-      (policy) => policy.instanceId === result.instance.instanceId,
-    ),
+    instance: result.instance,
     emittedSignals: [...result.emittedSignals, ...metricSignals],
     appliedEffects,
   };

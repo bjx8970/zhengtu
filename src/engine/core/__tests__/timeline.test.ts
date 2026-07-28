@@ -11,10 +11,32 @@
  */
 import { describe, it, expect } from 'vitest';
 import { advanceTimeline } from '../timeline';
-import type { SlotState } from '../../../types/player';
+import type { ActionExecutableSnapshot, SlotState } from '../../../types/player';
 import { getConfigLoader } from '../../../config/loader';
 
 const cfg = getConfigLoader().getGameConfig();
+
+function executableSnapshot(
+  actionId: string,
+  actionName: string,
+  deptId: string,
+  durationDays: number,
+  cooldownDays: number,
+): ActionExecutableSnapshot {
+  return {
+    contentVersion: 'test',
+    department: { id: deptId, name: deptId },
+    action: {
+      id: actionId,
+      name: actionName,
+      category: 'minor',
+      durationDays,
+      cooldownDays,
+      budgetDelta: 0,
+      effects: [],
+    },
+  };
+}
 
 /** 创建空槽位状态 */
 function makeEmptySlots(): SlotState {
@@ -62,6 +84,7 @@ describe('advanceTimeline', () => {
       startedAtDay: 27,
       durationDays: 3, // 第 30 天完成（月末）
       cooldownDays: 7,
+      executableSnapshot: executableSnapshot('test', '测试', 'dept', 3, 7),
     };
 
     const result = advanceTimeline({ year: 2024, month: 1, day: 1 }, 30, 0, slots, 1990, cfg);
@@ -140,6 +163,7 @@ describe('advanceTimeline', () => {
       startedAtDay: 0,
       durationDays: 5,
       cooldownDays: 7,
+      executableSnapshot: executableSnapshot('action1', '行动1', 'dept1', 5, 7),
     };
     slots.primary.occupants[1] = {
       instanceId: 'action-2',
@@ -153,6 +177,7 @@ describe('advanceTimeline', () => {
       startedAtDay: 0,
       durationDays: 10,
       cooldownDays: 7,
+      executableSnapshot: executableSnapshot('action2', '行动2', 'dept2', 10, 7),
     };
 
     const result = advanceTimeline({ year: 2024, month: 1, day: 1 }, 15, 0, slots, 1990, cfg);
@@ -177,6 +202,7 @@ describe('advanceTimeline', () => {
       startedAtDay: 357,
       durationDays: 3, // 第 360 天完成
       cooldownDays: 7,
+      executableSnapshot: executableSnapshot('year_end_action', '年末行动', 'dept', 3, 7),
     };
 
     const result = advanceTimeline({ year: 2024, month: 1, day: 1 }, 360, 0, slots, 1990, cfg);

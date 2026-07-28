@@ -43,6 +43,8 @@ import {
   EventOutcomePayloadSchema,
   EventRepeatPolicySchema,
 } from '../../domain/events/definition';
+import { getConfigLoader } from '../../config/loader';
+import { createActionExecutableSnapshot } from '../action-executable-snapshot';
 
 /** 不兼容存档备份的 localStorage key 前缀 */
 const BACKUP_KEY_PREFIX = 'zhengtu_incompatible_save';
@@ -396,6 +398,48 @@ const WorldStateSchema = z
   })
   .strict();
 
+/** ActionExecutableSnapshot Schema */
+const ActionExecutableSnapshotSchema = z
+  .object({
+    contentVersion: z.string().min(1),
+    department: z
+      .object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+      })
+      .strict(),
+    action: z
+      .object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        description: z.string().optional(),
+        durationDays: z.number().int().nonnegative(),
+        category: z.enum(['major', 'minor', 'routine']),
+        cooldownDays: z.number().int().nonnegative(),
+        budgetDelta: z.number(),
+        effects: z.array(
+          z
+            .object({
+              target: z.string().min(1),
+              operation: z.enum(['add', 'multiply', 'set']),
+              value: z.number(),
+              range: z
+                .object({
+                  min: z.number(),
+                  max: z.number(),
+                })
+                .strict()
+                .optional(),
+            })
+            .strict(),
+        ),
+        unlockLevel: z.number().optional(),
+        styleAlignment: z.string().optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
 /** SlotOccupant Schema */
 const SlotOccupantSchema = z
   .object({
@@ -410,6 +454,7 @@ const SlotOccupantSchema = z
     startedAtDay: z.number(),
     durationDays: z.number(),
     cooldownDays: z.number(),
+    executableSnapshot: ActionExecutableSnapshotSchema,
     runtimeSnapshot: z
       .object({
         effectivenessMultiplier: z.number(),
@@ -419,7 +464,24 @@ const SlotOccupantSchema = z
       .strict()
       .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((occupant, ctx) => {
+    const action = occupant.executableSnapshot.action;
+    const department = occupant.executableSnapshot.department;
+    if (
+      action.id !== occupant.actionId ||
+      action.name !== occupant.actionName ||
+      action.category !== occupant.category ||
+      action.durationDays !== occupant.durationDays ||
+      action.cooldownDays !== occupant.cooldownDays ||
+      department.id !== occupant.deptId
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Action executable snapshot does not match its slot occupant',
+      });
+    }
+  });
 
 /** ActionRuntimeState Schema */
 const ActionRuntimeStateSchema = z
@@ -927,6 +989,12 @@ export function migrateSchema4To5(prev: Record<string, unknown>): Record<string,
  */
 export function migrateSchema5To6(prev: Record<string, unknown>): Record<string, unknown> {
   const migrated = structuredClone(prev);
+  const legacyContentVersion = migrated.contentVersion;
+  if (legacyContentVersion !== '2026.07.3') {
+    throw new Error(
+      `Schema 5 content version "${String(legacyContentVersion)}" has no reliable action migration`,
+    );
+  }
   const state = migrated.state as Record<string, unknown> | undefined;
   const time = state?.time as Record<string, unknown> | undefined;
   const career = state?.career as Record<string, unknown> | undefined;
@@ -946,6 +1014,7 @@ export function migrateSchema5To6(prev: Record<string, unknown>): Record<string,
   ) {
     throw new Error('Schema 5 appointment context is invalid');
   }
+  const departments = getConfigLoader().resolvePositionDepartments(positionId);
   time.pendingContinuation = null;
   for (const tier of ['primary', 'secondary', 'reserve'] as const) {
     const group = slots[tier] as Record<string, unknown> | undefined;
@@ -955,13 +1024,40 @@ export function migrateSchema5To6(prev: Record<string, unknown>): Record<string,
       if (!occupant) return;
       const startedAtDay = occupant.startedAtDay;
       const actionId = occupant.actionId;
-      if (typeof startedAtDay !== 'number' || typeof actionId !== 'string') {
+      const deptId = occupant.deptId;
+      if (
+        typeof startedAtDay !== 'number' ||
+        typeof actionId !== 'string' ||
+        typeof deptId !== 'string'
+      ) {
         throw new Error(`Schema 5 action in "${tier}" slot ${slotIndex} is invalid`);
+      }
+      const department = departments.find((item) => item.id === deptId);
+      const action = department?.actions.find((item) => item.id === actionId);
+      if (!department || !action) {
+        throw new Error(
+          `Schema 5 action "${deptId}/${actionId}" cannot be migrated from content 2026.07.3`,
+        );
+      }
+      if (
+        occupant.actionName !== action.name ||
+        occupant.category !== action.category ||
+        occupant.durationDays !== action.durationDays ||
+        occupant.cooldownDays !== action.cooldownDays
+      ) {
+        throw new Error(
+          `Schema 5 action "${deptId}/${actionId}" no longer matches its executable definition`,
+        );
       }
       occupant.instanceId = `legacy-action-${tier}-${slotIndex}-${startedAtDay}-${actionId}`;
       occupant.originPositionId = positionId;
       occupant.originInstitutionId = institutionId;
       occupant.originRegionId = regionId;
+      occupant.executableSnapshot = createActionExecutableSnapshot(
+        department,
+        action,
+        legacyContentVersion,
+      );
     });
   }
   migrated.schemaVersion = 6;

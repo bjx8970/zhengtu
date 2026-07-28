@@ -82,18 +82,22 @@ blocking 出现时保存尚未执行节点。行动先全部结算再处理信�
 
 ### 7. Schema 5→6
 
-Schema 6 新增 `time.pendingContinuation` 和行动稳定身份/来源字段。迁移规则：
+Schema 6 新增 `time.pendingContinuation`、行动稳定身份/来源字段和完整 `ActionExecutableSnapshot`。迁移规则：
 
 - `pendingContinuation = null`；
 - 执行中行动 ID 为 `legacy-action-{tier}-{slotIndex}-{startedAtDay}-{actionId}`；
 - 来源使用 Schema 5 当前任职；
+- 仅接受已知的 Schema 5 内容版本，并按稳定部门/行动 ID 补齐部门显示、完整行动定义和内容版本；
+- 行动无法解析，或名称、分类、持续时间、冷却与已知定义不一致时，在解码阶段拒绝迁移并保留原始备份；
 - 不使用随机数、系统时间或数组索引作为新运行时身份（槽位索引仅参与确定性的旧存档迁移键）；
 - 不改变行动开始日、持续时间或完成日；
 - Schema 2→3→4→5→6 继续链式迁移。
 
 ## 原子边界
 
-整个 `ADVANCE_TIME` 在完整 `PlayerSave` 副本上运行。效果目标解析失败、政策状态不一致、事件级联超限、配置引用缺失或 continuation 非法时，副本被丢弃；时间、行动、政策、月结、年考和事件队列均不提交部分结果。
+整个 `ADVANCE_TIME` 在完整 `PlayerSave` 副本上运行。效果目标解析失败、政策状态不一致、事件级联超限、快照不一致或 continuation 非法时，副本被丢弃；时间、行动、政策、月结、年考和事件队列均不提交部分结果。
+
+政策转换中只有 `policyIndex === null` 表示新实例。非空索引必须是有效整数、位于数组范围内，且原实例 ID 与转换结果一致；违反任一不变量都会抛错，禁止静默追加重复实例。
 
 ## 后果
 

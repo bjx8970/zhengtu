@@ -31,6 +31,19 @@ function occupant(overrides?: Partial<SlotOccupant>): SlotOccupant {
     startedAtDay: 0,
     durationDays: 3,
     cooldownDays: 5,
+    executableSnapshot: {
+      contentVersion: 'test',
+      department: { id: 'dept_a', name: '部门 A' },
+      action: {
+        id: 'other_action',
+        name: '行动',
+        category: 'minor',
+        durationDays: 3,
+        cooldownDays: 5,
+        budgetDelta: 0,
+        effects: [],
+      },
+    },
     ...overrides,
   };
 }

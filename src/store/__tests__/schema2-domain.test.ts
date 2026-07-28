@@ -13,6 +13,7 @@ import { createInitialState, createTestStore } from '../game-store';
 import { decodeCurrentSave, wrapSaveEnvelope, validatePlayerSave } from '../save-codec';
 import { CURRENT_SCHEMA_VERSION } from '../../types/save';
 import { getConfigLoader } from '../../config/loader';
+import { createActionExecutableSnapshot } from '../action-executable-snapshot';
 import {
   INSTITUTION_LEVELS,
   POSITION_DOMAINS,
@@ -96,18 +97,26 @@ describe('Schema 2 存档', () => {
 
   it('Schema 5→6 确定性迁移执行中行动及来源上下文', () => {
     const state = createInitialState();
+    const department = getConfigLoader()
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.actions.some((action) => action.id === 'document_processing'));
+    const action = department?.actions.find((item) => item.id === 'document_processing');
+    expect(department).toBeDefined();
+    expect(action).toBeDefined();
+    if (!department || !action) return;
     state.actions.slots.primary.occupants[0] = {
       instanceId: 'schema6-only',
-      actionId: 'document_processing',
-      deptId: 'admin_l1_0_dept_0',
-      actionName: '公文处理',
+      actionId: action.id,
+      deptId: department.id,
+      actionName: action.name,
       originPositionId: state.career.appointment.positionId,
       originInstitutionId: state.career.appointment.institutionId,
       originRegionId: state.career.appointment.regionId,
-      category: 'major',
+      category: action.category,
       startedAtDay: 7,
-      durationDays: 3,
-      cooldownDays: 14,
+      durationDays: action.durationDays,
+      cooldownDays: action.cooldownDays,
+      executableSnapshot: createActionExecutableSnapshot(department, action, '2026.07.3'),
     };
     const schema5Envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(state))) as Record<
       string,
@@ -129,6 +138,7 @@ describe('Schema 2 存档', () => {
     delete occupant.originPositionId;
     delete occupant.originInstitutionId;
     delete occupant.originRegionId;
+    delete occupant.executableSnapshot;
 
     const result = decodeCurrentSave(JSON.stringify(schema5Envelope));
     expect(result.success).toBe(true);
@@ -139,8 +149,70 @@ describe('Schema 2 存档', () => {
       originInstitutionId: state.career.appointment.institutionId,
       originRegionId: state.career.appointment.regionId,
       startedAtDay: 7,
-      durationDays: 3,
+      durationDays: action.durationDays,
+      executableSnapshot: {
+        contentVersion: '2026.07.3',
+        department: { id: department.id, name: department.name },
+        action,
+      },
     });
+  });
+
+  it('Schema 5→6 无法解析在途行动时拒绝迁移并保留备份', () => {
+    const state = createInitialState();
+    const department = getConfigLoader().resolvePositionDepartments(
+      state.career.appointment.positionId,
+    )[0];
+    expect(department).toBeDefined();
+    if (!department) return;
+    const action = department.actions[0];
+    expect(action).toBeDefined();
+    if (!action) return;
+    state.actions.slots.primary.occupants[0] = {
+      instanceId: 'schema6-only',
+      actionId: action.id,
+      deptId: department.id,
+      actionName: action.name,
+      originPositionId: state.career.appointment.positionId,
+      originInstitutionId: state.career.appointment.institutionId,
+      originRegionId: state.career.appointment.regionId,
+      category: action.category,
+      startedAtDay: 7,
+      durationDays: action.durationDays,
+      cooldownDays: action.cooldownDays,
+      executableSnapshot: createActionExecutableSnapshot(department, action, '2026.07.3'),
+    };
+    const schema5Envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(state))) as Record<
+      string,
+      unknown
+    >;
+    schema5Envelope.schemaVersion = 5;
+    schema5Envelope.contentVersion = '2026.07.3';
+    const legacyState = schema5Envelope.state as Record<string, unknown>;
+    delete (legacyState.time as Record<string, unknown>).pendingContinuation;
+    const legacySlots = (legacyState.actions as Record<string, unknown>).slots as Record<
+      string,
+      unknown
+    >;
+    const primary = legacySlots.primary as Record<string, unknown>;
+    const occupant = (primary.occupants as Array<Record<string, unknown> | null>)[0];
+    expect(occupant).not.toBeNull();
+    if (!occupant) return;
+    occupant.actionId = 'removed_action';
+    delete occupant.instanceId;
+    delete occupant.originPositionId;
+    delete occupant.originInstitutionId;
+    delete occupant.originRegionId;
+    delete occupant.executableSnapshot;
+    const json = JSON.stringify(schema5Envelope);
+
+    const result = decodeCurrentSave(json);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('migration_failed');
+    expect(result.backupKey).toBeDefined();
+    if (!result.backupKey) return;
+    expect(localStorage.getItem(result.backupKey)).toBe(json);
   });
 
   it('Schema 1 存档被拒绝并创建备份', () => {

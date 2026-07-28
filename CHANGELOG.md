@@ -10,7 +10,7 @@
 
 - 到期政策按绝对日自动生效，实施中政策按稳定顺序推进一个阶段；暂停和终态政策不会推进。
 - 持久化 `time.pendingContinuation`，blocking 后保存计划事件、过期、月结、年考、政治周期和退休检查等同日剩余节点。
-- 行动实例稳定 ID 与启动时职位/机构/地区快照；行动完成后发出 `action.completed`。
+- 行动实例稳定 ID、职位/机构/地区来源快照与完整 `ActionExecutableSnapshot`；完成时只读取冻结的部门显示、行动效果、理念语义和内容版本，并发出 `action.completed`。
 - 年度考核记录和属性影响提交后发出 `assessment.completed`。
 - `deriveMetricSignalsFromEffects()` 将实际发生的世界/政策指标变化折叠为 `world.metric_changed` / `policy.metric_changed`。
 - 玩家事件选项与自动事件均先派生指标信号，再处理 `event.resolved`。
@@ -21,13 +21,14 @@
 
 - `ADVANCE_TIME` 固定为：行动完成 → 政策生效 → 政策里程碑 → 领域信号 → 计划事件 → 过期 → 月结 → 年考/考核信号 → 政治周期 → 退休检查。
 - 显式政策 Action 与自动时间轴复用同一个政策转换事务提交器。
+- 政策转换事务仅允许 `policyIndex === null` 新增实例；已有实例必须使用有效索引且实例 ID 一致，否则抛错并由外层事务回滚。
 - 整个时间推进继续在状态副本上原子执行；效果、级联或 continuation 校验失败不提交部分状态。
 - 内容版本由 `2026.07.3` 提升为 `2026.07.4`。
 
 ### Save compatibility
 
 - 存档 Schema 由 5 提升至 6。
-- Schema 5→6 将 `time.pendingContinuation` 初始化为 null，并为各层级执行中行动生成 `legacy-action-{tier}-{slotIndex}-{startedAtDay}-{actionId}`，使用旧存档当前任职补齐冻结来源。
+- Schema 5→6 将 `time.pendingContinuation` 初始化为 null，为各层级执行中行动生成 `legacy-action-{tier}-{slotIndex}-{startedAtDay}-{actionId}`，并按旧内容版本、当前任职和稳定行动 ID 补齐完整可执行快照；无法解析或语义字段不一致时拒绝迁移并保留原始备份。
 - Schema 2→3→4→5→6 确定性链式迁移继续受支持；非法 continuation 和未来 Schema 严格拒绝。
 
 ### 未实现

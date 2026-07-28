@@ -14,6 +14,8 @@ import { startAction } from '../../engine/core/action';
 import { calculateDeviationPenalty } from '../../engine/career/deviation-penalty';
 import { getConfigLoader } from '../../config/loader';
 import { clampAttr } from '../../utils/math';
+import { CURRENT_CONTENT_VERSION } from '../../types/save';
+import { createActionExecutableSnapshot } from '../action-executable-snapshot';
 import { createRuntimeIdFactory } from '../runtime-id';
 
 /**
@@ -78,6 +80,11 @@ export function reduceStartAction(draft: PlayerSave, payload: StartActionPayload
     startedAtDay: draft.time.totalDaysPlayed,
     durationDays: actionConfig.durationDays,
     cooldownDays: actionConfig.cooldownDays,
+    executableSnapshot: createActionExecutableSnapshot(
+      deptConfig,
+      actionConfig,
+      CURRENT_CONTENT_VERSION,
+    ),
     runtimeSnapshot,
   };
 

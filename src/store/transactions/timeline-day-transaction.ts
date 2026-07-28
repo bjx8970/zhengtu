@@ -174,14 +174,15 @@ function processActionCompletion(
 ): DomainSignalSnapshot {
   const loader = getConfigLoader();
   const cfg = loader.getGameConfig();
-  const departments = loader.resolvePositionDepartments(event.occupant.originPositionId);
-  const deptCfg = departments.find((item) => item.id === event.occupant.deptId);
-  const actionCfg = deptCfg?.actions.find((item) => item.id === event.occupant.actionId);
-  if (!deptCfg || !actionCfg) {
-    throw new Error(`Action config "${event.occupant.actionId}" cannot be resolved`);
+  const snapshot = event.occupant.executableSnapshot;
+  if (
+    snapshot.department.id !== event.occupant.deptId ||
+    snapshot.action.id !== event.occupant.actionId
+  ) {
+    throw new Error(`Action snapshot "${event.occupant.instanceId}" is inconsistent`);
   }
   const devMult = event.occupant.runtimeSnapshot?.effectivenessMultiplier ?? 1;
-  const result = resolveActionEffects(actionCfg, rng);
+  const result = resolveActionEffects(snapshot.action, rng);
   const labels: string[] = [];
   for (const change of result.kpiChanges) {
     const state = draft.actions.departmentStates[event.occupant.deptId];
@@ -213,8 +214,8 @@ function processActionCompletion(
     applyPlayerAttr(draft, 'ambition', -5, cfg.attributeBounds);
   }
   notifications.push({
-    actionName: event.occupant.actionName,
-    deptName: deptCfg.name,
+    actionName: snapshot.action.name,
+    deptName: snapshot.department.name,
     effects: labels,
     completedAtDay: event.absoluteDay,
   });

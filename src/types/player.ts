@@ -19,7 +19,7 @@
 
 import type { TimeGranularity } from './enums';
 import type { FiveDimensionScore, ActionRuntimeSnapshot } from './game';
-import type { ActionCategory } from './config';
+import type { ActionCategory, ActionTemplate } from './config';
 import type { CareerState } from '../domain/career/state';
 import type { GovernanceState } from '../domain/governance/state';
 import type { EventRuntimeState } from '../domain/events/state';
@@ -29,6 +29,19 @@ import type { WorldState } from '../domain/world-state';
 
 /** 槽位等级 key */
 export type SlotTierKey = 'primary' | 'secondary' | 'reserve';
+
+/** 行动启动时冻结的完整可执行快照。 */
+export interface ActionExecutableSnapshot {
+  /** 创建快照时的内容包版本。 */
+  contentVersion: string;
+  /** 部门显示与稳定标识快照。 */
+  department: {
+    id: string;
+    name: string;
+  };
+  /** 完整行动定义；完成时不得重新读取当前内容配置。 */
+  action: ActionTemplate;
+}
 
 /** 槽位占用记录 */
 export interface SlotOccupant {
@@ -49,6 +62,8 @@ export interface SlotOccupant {
   durationDays: number;
   /** 启动时的冷却天数快照 */
   cooldownDays: number;
+  /** 启动时冻结的完整行动执行语义。 */
+  executableSnapshot: ActionExecutableSnapshot;
   /** 行动启动时的理念偏离快照 */
   runtimeSnapshot?: ActionRuntimeSnapshot;
 }

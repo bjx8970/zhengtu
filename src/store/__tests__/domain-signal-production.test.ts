@@ -50,7 +50,7 @@ afterEach(() => {
 });
 
 describe('domain signal production', () => {
-  it('START_ACTION 冻结来源，完成后只发一次 action.completed', () => {
+  it('START_ACTION 冻结完整执行快照，配置移除后仍完成且只发一次 action.completed', () => {
     const loader = getConfigLoader();
     const actionEvent = eventDefinition('action-completed-test', 'action.completed');
     vi.spyOn(loader, 'getAllEventDefinitions').mockReturnValue([
@@ -84,6 +84,11 @@ describe('domain signal production', () => {
       originPositionId: state.career.appointment.positionId,
       originInstitutionId: state.career.appointment.institutionId,
       originRegionId: state.career.appointment.regionId,
+      executableSnapshot: {
+        contentVersion: '2026.07.4',
+        department: { id: department.id, name: department.name },
+        action: { id: 'document_processing' },
+      },
     });
     if (!occupant) return;
 
@@ -92,6 +97,7 @@ describe('domain signal production', () => {
     transferred.career.appointment.institutionId = 'county_govt_01';
     transferred.career.appointment.regionId = 'region_yongning_county';
     const transferredStore = createTestStore(transferred);
+    vi.spyOn(loader, 'resolvePositionDepartments').mockReturnValue([]);
     let sequence = 0;
     for (let day = 0; day < occupant.durationDays; day++) {
       transferredStore.dispatch({

@@ -219,12 +219,20 @@ interface ActionRuntimeSnapshot {
   styleConflictTriggered: boolean; // 是否触发风格冲突
   styleAlignment?: string; // 行动的理念对齐方向
 }
+
+interface ActionExecutableSnapshot {
+  contentVersion: string;
+  department: { id: string; name: string };
+  action: ActionTemplate; // 完整效果、显示和理念语义
+}
 ```
 
 - 理念偏离倍率和冲突状态绑定到具体行动实例（`SlotOccupant.runtimeSnapshot`）
 - `SlotOccupant.instanceId` 是稳定行动身份；职位、机构和地区在启动时冻结
+- `SlotOccupant.executableSnapshot` 冻结部门显示、完整行动定义和内容版本
 - 不再使用玩家级临时倍率
-- 配置在行动执行期间变化不会影响已启动行动的快照
+- 行动完成只读取可执行快照，不重新解析当前部门或行动配置
+- Schema 5→6 只迁移能按旧内容版本和稳定 ID 可靠补全快照的在途行动；否则在解码阶段拒绝并备份原存档
 - 行动完成、效果、冷却、槽位释放和 `action.completed` 属于同一事务
 
 ## 事件系统（定义、编排与生命周期）
