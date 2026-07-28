@@ -45,6 +45,8 @@ Schema 严格要求 continuation 只属于 `time.totalDaysPlayed`，节点绝对
 
 blocking 出现时保存尚未执行节点。行动先全部结算再处理信号，避免首个行动触发 blocker 后丢失同日其他行动。考核信号在政治周期和退休检查之前处理。
 
+计划事件激活是唯一允许“节点内部分提交”的工作：激活器只处理到首个 blocking 实例，其后的同日到期实例仍留在 `events.scheduled`。因此该节点被中断时必须把自身保留在 continuation 中；恢复后重试节点以激活剩余实例。已经完整提交后才产生 blocker 的节点（例如年度考核）则从下一个节点恢复。
+
 ### 3. 同日恢复语义
 
 每次 `ADVANCE_TIME` 依次检查：

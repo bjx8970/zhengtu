@@ -275,7 +275,7 @@ describe('event timeline integration', () => {
       activation: {},
       options: [],
       automaticOutcome: {
-        effects: [{ target: 'character', field: 'vigor', operation: 'add', value: 10 }],
+        effects: [{ target: 'character', field: 'vigor', operation: 'add', value: -10 }],
       },
     });
     state.events.scheduled.push(
@@ -312,6 +312,22 @@ describe('event timeline integration', () => {
     );
     expect(after.events.history.some((item) => item.eventId === 'same_day_automatic')).toBe(false);
     expect(after.character.vigor).toBe(originalVigor);
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'same_day_blocker_instance',
+      optionId: 'ack',
+    });
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+    const resumed = store.getRawState();
+    expect(resumed.time.totalDaysPlayed).toBe(1);
+    expect(resumed.time.pendingContinuation).toBeNull();
+    expect(resumed.events.scheduled.map((item) => item.instanceId)).not.toContain(
+      'same_day_automatic_instance',
+    );
+    expect(resumed.events.history.some((item) => item.eventId === 'same_day_automatic')).toBe(true);
+    expect(resumed.character.vigor).toBe(originalVigor - 10);
   });
 
   it('keeps an urgent automatic event scheduled when a same-day low-priority blocker exists', () => {
