@@ -9,6 +9,7 @@ import { createInitialState, createTestStore } from '../game-store';
 import { createEventSnapshot } from '../../engine/events/event-orchestrator';
 import { getConfigLoader } from '../../config/loader';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
+import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
 
 function makeSignal(signalId: string, occurredAtDay = 0): DomainSignalSnapshot {
   return {
@@ -20,6 +21,125 @@ function makeSignal(signalId: string, occurredAtDay = 0): DomainSignalSnapshot {
 }
 
 describe('event timeline integration', () => {
+  it('自动激活政策、推进里程碑，并在存档恢复后补做同日月结', () => {
+    const loader = getConfigLoader();
+    const state = createInitialState();
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.baseConsumption * item.consumptionCoefficient > 0);
+    expect(department).toBeDefined();
+    if (!department) return;
+    state.remainingBudget = 10_000;
+    state.actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `policy-timeline-${sequence++}`;
+
+    store.dispatch({
+      type: 'PROPOSE_POLICY',
+      policyId: 'industrial_park_support',
+      _idFactory: nextId,
+    });
+    const policy = store.getRawState().governance.policies[0];
+    expect(policy).toBeDefined();
+    if (!policy) return;
+    store.dispatch({
+      type: 'APPROVE_POLICY',
+      policyInstanceId: policy.instanceId,
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const activated = store.getRawState().governance.policies[0];
+    expect(activated?.status).toBe('implementing');
+    expect(activated?.currentPhaseId).toBe('preparation');
+    expect(activated?.phaseEnteredAtDay).toBe(0);
+    expect(activated?.nextMilestoneAtDay).toBe(30);
+    expect(store.getRawState().time.totalDaysPlayed).toBe(1);
+
+    const stabilityBeforeMilestone = store.getRawState().character.stability;
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'month',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const blocked = store.getRawState();
+    const blocker = blocked.events.pending.find(
+      (event) => event.eventId === 'industrial_park_progress_crisis',
+    );
+    expect(blocked.time.totalDaysPlayed).toBe(30);
+    expect(blocked.governance.policies[0]?.currentPhaseId).toBe('implementation');
+    expect(blocked.character.stability).toBe(stabilityBeforeMilestone + 5);
+    expect(blocker?.instanceId).toBe(blocked.events.activeBlockingEventId);
+    expect(blocker?.sourceKey).toBe(policy.instanceId);
+    expect(blocker?.triggerContext.data).toMatchObject({
+      policyInstanceId: policy.instanceId,
+      previousPhaseId: 'preparation',
+      currentPhaseId: 'implementation',
+    });
+    expect(blocked.time.pendingContinuation?.remainingNodes.map((node) => node.type)).toContain(
+      'monthly_settlement',
+    );
+    expect(blocked.remainingBudget).toBe(10_000);
+
+    const decoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(blocked)));
+    expect(decoded.success).toBe(true);
+    expect(decoded.state).toBeDefined();
+    if (!decoded.state || !blocker) return;
+    const resumedStore = createTestStore(decoded.state);
+    resumedStore.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: blocker.instanceId,
+      optionId: 'rectification_plan',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    resumedStore.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const resumed = resumedStore.getRawState();
+    expect(resumed.time.totalDaysPlayed).toBe(30);
+    expect(resumed.time.pendingContinuation).toBeNull();
+    expect(resumed.remainingBudget).toBeLessThan(10_000);
+    expect(resumed.governance.policies[0]?.currentPhaseId).toBe('implementation');
+    expect(resumed.character.stability).toBe(stabilityBeforeMilestone + 5);
+    const budgetAfterSettlement = resumed.remainingBudget;
+
+    resumedStore.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    const nextDay = resumedStore.getRawState();
+    expect(nextDay.time.totalDaysPlayed).toBe(31);
+    expect(nextDay.remainingBudget).toBe(budgetAfterSettlement);
+    expect(
+      nextDay.events.history.filter(
+        (record) => record.eventId === 'industrial_park_progress_crisis',
+      ),
+    ).toHaveLength(1);
+  });
+
   it('stops a long advance on the exact day a blocking event activates', () => {
     const state = createInitialState();
     const snapshot = createEventSnapshot({
@@ -80,6 +200,7 @@ describe('event timeline integration', () => {
       day: config.daysPerMonth,
       granularity: 'day',
       totalDaysPlayed: config.monthsPerYear * config.daysPerMonth - 1,
+      pendingContinuation: null,
     };
     state.remainingBudget = 10_000;
     state.actions.departmentStates[department.id] = {

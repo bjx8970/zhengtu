@@ -199,9 +199,13 @@ describe('行动效果结算语义', () => {
           count: 3,
           occupants: [
             {
+              instanceId: occupant.instanceId ?? 'action-instance',
               actionId: occupant.actionId ?? 'document_processing',
               deptId: occupant.deptId ?? 'admin_l1_0_dept_0',
               actionName: '公文处理',
+              originPositionId: occupant.originPositionId ?? 'admin_l1_0',
+              originInstitutionId: occupant.originInstitutionId ?? 'institution_county_government',
+              originRegionId: occupant.originRegionId ?? 'region_county_a',
               category: 'major',
               startedAtDay: occupant.startedAtDay ?? 0,
               durationDays: occupant.durationDays ?? 3,
@@ -441,7 +445,7 @@ describe('行动效果结算语义', () => {
   it('冷却使用 SlotOccupant.cooldownDays 快照', () => {
     const store = createTestStore({
       actions: makeSlotsWithAction({
-        actionId: 'approve_project',
+        actionId: 'document_processing',
         startedAtDay: 0,
         durationDays: 3,
         cooldownDays: 20, // 自定义冷却快照
@@ -459,7 +463,7 @@ describe('行动效果结算语义', () => {
     // completesAtDay = 0 + 3 = 3, cooldownUntil = 3 + 20 = 23
     expect(
       state.actions.departmentStates['admin_l1_0_dept_0']?.actionCooldownUntilDays[
-        'approve_project'
+        'document_processing'
       ],
     ).toBe(23);
   });

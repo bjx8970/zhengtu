@@ -38,7 +38,14 @@ describe('SplashPage local archive entry', () => {
     state.character.characterName = '林致远';
     state.career.appointment.positionId = 'admin_l2_0';
     state.career.appointment.leadershipRank = 'township_deputy';
-    state.time = { year: 2028, month: 6, day: 15, granularity: 'day', totalDaysPlayed: 0 };
+    state.time = {
+      year: 2028,
+      month: 6,
+      day: 15,
+      granularity: 'day',
+      totalDaysPlayed: 0,
+      pendingContinuation: null,
+    };
     dispatch({ type: 'LOAD_SAVE', save: state });
     setStartupSaveResult({ status: 'loaded', state });
 
@@ -87,7 +94,14 @@ describe('SplashPage local archive entry', () => {
     state.character.characterName = '新角色';
     state.career.appointment.positionId = 'admin_l1_0';
     state.career.appointment.leadershipRank = 'none';
-    state.time = { year: 2012, month: 1, day: 1, granularity: 'day', totalDaysPlayed: 0 };
+    state.time = {
+      year: 2012,
+      month: 1,
+      day: 1,
+      granularity: 'day',
+      totalDaysPlayed: 0,
+      pendingContinuation: null,
+    };
     dispatch({ type: 'LOAD_SAVE', save: state });
 
     render(() => <SplashPage />);

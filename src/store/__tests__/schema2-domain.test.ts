@@ -1,5 +1,5 @@
 /**
- * Schema 2 与领域模型集成测试
+ * 当前存档 Schema 与领域模型集成测试
  *
  * 覆盖：
  * - Schema 2 完整往返
@@ -46,6 +46,101 @@ describe('Schema 2 存档', () => {
     const result = decodeCurrentSave(json);
     expect(result.success).toBe(true);
     expect(result.state?.character.characterName).toBe('测试角色');
+  });
+
+  it('Schema 6 非空时间轴 continuation 可完整往返', () => {
+    const state = createInitialState();
+    state.time.totalDaysPlayed = 30;
+    state.time.pendingContinuation = {
+      absoluteDay: 30,
+      remainingNodes: [
+        { type: 'monthly_settlement', absoluteDay: 30, month: 7, year: 2012 },
+        { type: 'annual_assessment', absoluteDay: 30, year: 2012 },
+      ],
+    };
+    const result = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+    expect(result.success).toBe(true);
+    expect(result.state?.time.pendingContinuation).toEqual(state.time.pendingContinuation);
+  });
+
+  it('Schema 6 拒绝错误日期、重复或乱序 continuation 节点', () => {
+    const cases = [
+      {
+        absoluteDay: 31,
+        remainingNodes: [{ type: 'event_deadline' as const, absoluteDay: 31 }],
+      },
+      {
+        absoluteDay: 30,
+        remainingNodes: [
+          { type: 'event_deadline' as const, absoluteDay: 30 },
+          { type: 'event_deadline' as const, absoluteDay: 30 },
+        ],
+      },
+      {
+        absoluteDay: 30,
+        remainingNodes: [
+          { type: 'annual_assessment' as const, absoluteDay: 30, year: 2012 },
+          { type: 'monthly_settlement' as const, absoluteDay: 30, month: 7, year: 2012 },
+        ],
+      },
+    ];
+    for (const pendingContinuation of cases) {
+      const state = createInitialState();
+      state.time.totalDaysPlayed = 30;
+      state.time.pendingContinuation = pendingContinuation;
+      const result = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('invalid_envelope');
+    }
+  });
+
+  it('Schema 5→6 确定性迁移执行中行动及来源上下文', () => {
+    const state = createInitialState();
+    state.actions.slots.primary.occupants[0] = {
+      instanceId: 'schema6-only',
+      actionId: 'document_processing',
+      deptId: 'admin_l1_0_dept_0',
+      actionName: '公文处理',
+      originPositionId: state.career.appointment.positionId,
+      originInstitutionId: state.career.appointment.institutionId,
+      originRegionId: state.career.appointment.regionId,
+      category: 'major',
+      startedAtDay: 7,
+      durationDays: 3,
+      cooldownDays: 14,
+    };
+    const schema5Envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(state))) as Record<
+      string,
+      unknown
+    >;
+    schema5Envelope.schemaVersion = 5;
+    schema5Envelope.contentVersion = '2026.07.3';
+    const legacyState = schema5Envelope.state as Record<string, unknown>;
+    const legacyTime = legacyState.time as Record<string, unknown>;
+    delete legacyTime.pendingContinuation;
+    const legacyActions = legacyState.actions as Record<string, unknown>;
+    const legacySlots = legacyActions.slots as Record<string, unknown>;
+    const primary = legacySlots.primary as Record<string, unknown>;
+    const occupants = primary.occupants as Array<Record<string, unknown> | null>;
+    const occupant = occupants[0];
+    expect(occupant).not.toBeNull();
+    if (!occupant) return;
+    delete occupant.instanceId;
+    delete occupant.originPositionId;
+    delete occupant.originInstitutionId;
+    delete occupant.originRegionId;
+
+    const result = decodeCurrentSave(JSON.stringify(schema5Envelope));
+    expect(result.success).toBe(true);
+    expect(result.state?.time.pendingContinuation).toBeNull();
+    expect(result.state?.actions.slots.primary.occupants[0]).toMatchObject({
+      instanceId: 'legacy-action-primary-0-7-document_processing',
+      originPositionId: state.career.appointment.positionId,
+      originInstitutionId: state.career.appointment.institutionId,
+      originRegionId: state.career.appointment.regionId,
+      startedAtDay: 7,
+      durationDays: 3,
+    });
   });
 
   it('Schema 1 存档被拒绝并创建备份', () => {

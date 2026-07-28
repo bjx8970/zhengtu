@@ -20,9 +20,13 @@ function makeAction(overrides?: Partial<ActionTemplate>): ActionTemplate {
 
 function occupant(overrides?: Partial<SlotOccupant>): SlotOccupant {
   return {
+    instanceId: 'action-instance',
     actionId: 'other_action',
     deptId: 'dept_a',
     actionName: '行动',
+    originPositionId: 'position-a',
+    originInstitutionId: 'institution-a',
+    originRegionId: 'region-a',
     category: 'minor',
     startedAtDay: 0,
     durationDays: 3,

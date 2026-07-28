@@ -51,9 +51,13 @@ describe('advanceTimeline', () => {
   it('行动完成事件在月度结算之前（同一天）', () => {
     const slots = makeEmptySlots();
     slots.primary.occupants[0] = {
+      instanceId: 'action-test',
       actionId: 'test',
       deptId: 'dept',
       actionName: '测试',
+      originPositionId: 'position',
+      originInstitutionId: 'institution',
+      originRegionId: 'region',
       category: 'minor',
       startedAtDay: 27,
       durationDays: 3, // 第 30 天完成（月末）
@@ -125,18 +129,26 @@ describe('advanceTimeline', () => {
   it('多个并发行动各自产生独立事件并按时间排序', () => {
     const slots = makeEmptySlots();
     slots.primary.occupants[0] = {
+      instanceId: 'action-1',
       actionId: 'action1',
       deptId: 'dept1',
       actionName: '行动1',
+      originPositionId: 'position',
+      originInstitutionId: 'institution',
+      originRegionId: 'region',
       category: 'minor',
       startedAtDay: 0,
       durationDays: 5,
       cooldownDays: 7,
     };
     slots.primary.occupants[1] = {
+      instanceId: 'action-2',
       actionId: 'action2',
       deptId: 'dept2',
       actionName: '行动2',
+      originPositionId: 'position',
+      originInstitutionId: 'institution',
+      originRegionId: 'region',
       category: 'minor',
       startedAtDay: 0,
       durationDays: 10,
@@ -154,9 +166,13 @@ describe('advanceTimeline', () => {
   it('行动完成在年度考核之前（年末场景）', () => {
     const slots = makeEmptySlots();
     slots.primary.occupants[0] = {
+      instanceId: 'action-year-end',
       actionId: 'year_end_action',
       deptId: 'dept',
       actionName: '年末行动',
+      originPositionId: 'position',
+      originInstitutionId: 'institution',
+      originRegionId: 'region',
       category: 'minor',
       startedAtDay: 357,
       durationDays: 3, // 第 360 天完成

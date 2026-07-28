@@ -83,7 +83,14 @@ function createStateWithPending(overrides?: Partial<EventInstance>): PlayerSave 
 
   return {
     ...createInitialState(),
-    time: { year: 0, month: 1, day: 1, granularity: 'day' as const, totalDaysPlayed: 100 },
+    time: {
+      year: 0,
+      month: 1,
+      day: 1,
+      granularity: 'day' as const,
+      totalDaysPlayed: 100,
+      pendingContinuation: null,
+    },
     events: {
       ...createInitialState().events,
       pending: [inst],
@@ -205,7 +212,14 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     const baseState = createInitialState();
     const stateOverride: PlayerSave = {
       ...baseState,
-      time: { year: 0, month: 1, day: 1, granularity: 'day' as const, totalDaysPlayed: 100 },
+      time: {
+        year: 0,
+        month: 1,
+        day: 1,
+        granularity: 'day' as const,
+        totalDaysPlayed: 100,
+        pendingContinuation: null,
+      },
       events: {
         ...baseState.events,
         activeBlockingEventId: 'inst_block_reducer',
@@ -288,7 +302,14 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
 
     const stateOverride: PlayerSave = {
       ...baseState,
-      time: { year: 0, month: 1, day: 1, granularity: 'day' as const, totalDaysPlayed: 100 },
+      time: {
+        year: 0,
+        month: 1,
+        day: 1,
+        granularity: 'day' as const,
+        totalDaysPlayed: 100,
+        pendingContinuation: null,
+      },
       events: {
         ...baseState.events,
         activeBlockingEventId: 'inst_block_1',
@@ -435,7 +456,14 @@ describe('event-reducer: CHOOSE_EVENT_OPTION', () => {
     const expiredState = createStateWithPending({ deadlineDay: 0 });
     const store = createTestStore({
       ...expiredState,
-      time: { year: 1, month: 1, day: 1, granularity: 'day' as const, totalDaysPlayed: 400 },
+      time: {
+        year: 1,
+        month: 1,
+        day: 1,
+        granularity: 'day' as const,
+        totalDaysPlayed: 400,
+        pendingContinuation: null,
+      },
     });
 
     // currentDay in dispatch is derived from draft.time; deadline is 30
@@ -526,7 +554,14 @@ describe('event-reducer: cascade signals and scheduling', () => {
 
     return {
       ...createInitialState(),
-      time: { year: 0, month: 1, day: 1, granularity: 'day' as const, totalDaysPlayed: 100 },
+      time: {
+        year: 0,
+        month: 1,
+        day: 1,
+        granularity: 'day' as const,
+        totalDaysPlayed: 100,
+        pendingContinuation: null,
+      },
       events: {
         ...createInitialState().events,
         pending: [inst],
