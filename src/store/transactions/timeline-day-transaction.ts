@@ -355,46 +355,42 @@ function activateEventsAtDay(
     rng,
     idFactory,
   );
-  const blockerIndex = activation.activatedInstances.findIndex(
-    (instance) => instance.snapshot.presentation === 'blocking' && instance.status === 'active',
-  );
-  const instances =
-    blockerIndex === -1
-      ? activation.activatedInstances
-      : activation.activatedInstances.slice(0, blockerIndex + 1);
-  const ids = new Set(instances.map((instance) => instance.instanceId));
-  draft.events.scheduled = draft.events.scheduled.filter(
-    (instance) => !ids.has(instance.instanceId),
-  );
-  // 防御早期 Schema 4 已写出的计划链节点：激活时补齐缺失的链实例。
-  for (const instance of instances) {
-    if (!instance.snapshot.chainId || instance.chainInstanceId) continue;
-    const existing = Object.values(draft.events.chainInstances).find(
-      (chain) =>
-        chain.chainId === instance.snapshot.chainId && chain.sourceKey === instance.sourceKey,
+  for (const instance of activation.activatedInstances) {
+    // 每次只提交一个实例，让它产生的级联信号有机会在消费同日兄弟实例前中断时间轴。
+    draft.events.scheduled = draft.events.scheduled.filter(
+      (scheduled) => scheduled.instanceId !== instance.instanceId,
     );
-    const chain = existing ?? {
-      instanceId: idFactory(),
-      chainId: instance.snapshot.chainId,
-      status: 'active' as const,
-      sourceKey: instance.sourceKey,
-      activeNodeIds: [],
-      completedNodeIds: [],
-      startedAtDay: currentDay,
-      completedAtDay: null,
-    };
-    const nodeId = instance.snapshot.nodeId ?? instance.eventId;
-    if (!chain.activeNodeIds.includes(nodeId)) chain.activeNodeIds.push(nodeId);
-    draft.events.chainInstances[chain.instanceId] = chain;
-    instance.chainInstanceId = chain.instanceId;
+    // 防御早期 Schema 4 已写出的计划链节点：激活时补齐缺失的链实例。
+    if (instance.snapshot.chainId && !instance.chainInstanceId) {
+      const existing = Object.values(draft.events.chainInstances).find(
+        (chain) =>
+          chain.chainId === instance.snapshot.chainId && chain.sourceKey === instance.sourceKey,
+      );
+      const chain = existing ?? {
+        instanceId: idFactory(),
+        chainId: instance.snapshot.chainId,
+        status: 'active' as const,
+        sourceKey: instance.sourceKey,
+        activeNodeIds: [],
+        completedNodeIds: [],
+        startedAtDay: currentDay,
+        completedAtDay: null,
+      };
+      const nodeId = instance.snapshot.nodeId ?? instance.eventId;
+      if (!chain.activeNodeIds.includes(nodeId)) chain.activeNodeIds.push(nodeId);
+      draft.events.chainInstances[chain.instanceId] = chain;
+      instance.chainInstanceId = chain.instanceId;
+    }
+
+    const applied = applyEventInstances(draft, [instance], currentDay, rng, idFactory, definitions);
+    processCascadeSignalsInTransaction(
+      draft,
+      applied.cascadeSignals,
+      currentDay,
+      rng,
+      idFactory,
+      definitions,
+    );
+    if (draft.events.activeBlockingEventId !== null) return;
   }
-  const applied = applyEventInstances(draft, instances, currentDay, rng, idFactory, definitions);
-  processCascadeSignalsInTransaction(
-    draft,
-    applied.cascadeSignals,
-    currentDay,
-    rng,
-    idFactory,
-    definitions,
-  );
 }

@@ -363,9 +363,10 @@ describe('domain signal production', () => {
     expect(result.events.activeBlockingEventId).not.toBeNull();
   });
 
-  it('自动事件效果采用相同指标信号顺序', () => {
+  it('自动事件指标信号产生 blocker 时暂停并仅一次恢复同日兄弟事件', () => {
     const definition: EventDefinition = {
       ...eventDefinition('metric-auto-source', 'event.resolved', 'automatic'),
+      trigger: { sources: ['event.resolved'], scheduledOnly: true },
       automaticOutcome: {
         effects: [
           {
@@ -377,35 +378,102 @@ describe('domain signal production', () => {
         ],
       },
     };
+    const sibling: EventDefinition = {
+      ...eventDefinition('metric-auto-sibling', 'event.resolved', 'automatic'),
+      priority: 'low',
+      trigger: { sources: ['event.resolved'], scheduledOnly: true },
+      automaticOutcome: {
+        effects: [
+          {
+            target: 'character',
+            field: 'vigor',
+            operation: 'add',
+            value: -7,
+          },
+        ],
+      },
+    };
     const loader = getConfigLoader();
     vi.spyOn(loader, 'getAllEventDefinitions').mockReturnValue([
       ...loader.getAllEventDefinitions(),
       definition,
+      sibling,
     ]);
     const state = createInitialState();
-    state.events.scheduled.push({
-      instanceId: 'metric-auto-instance',
-      eventId: definition.id,
-      scheduledAtDay: 0,
-      activateAtDay: 1,
-      triggerContext: metricSeedSignal(),
-      sourceKey: 'metric-auto-source',
-      chainInstanceId: null,
-      snapshot: createEventSnapshot(definition),
-    });
+    state.events.scheduled.push(
+      {
+        instanceId: 'metric-auto-instance',
+        eventId: definition.id,
+        scheduledAtDay: 0,
+        activateAtDay: 1,
+        triggerContext: metricSeedSignal(),
+        sourceKey: 'metric-auto-source',
+        chainInstanceId: null,
+        snapshot: createEventSnapshot(definition),
+      },
+      {
+        instanceId: 'metric-auto-sibling-instance',
+        eventId: sibling.id,
+        scheduledAtDay: 0,
+        activateAtDay: 1,
+        triggerContext: metricSeedSignal(),
+        sourceKey: 'metric-auto-sibling',
+        chainInstanceId: null,
+        snapshot: createEventSnapshot(sibling),
+      },
+    );
+    const originalVigor = state.character.vigor;
     const store = createTestStore(state);
     let sequence = 0;
+    const nextId = () => `auto-metric-signal-${sequence++}`;
     store.dispatch({
       type: 'ADVANCE_TIME',
       granularity: 'day',
       _rng: () => 0,
-      _idFactory: () => `auto-metric-signal-${sequence++}`,
+      _idFactory: nextId,
     });
 
-    const result = store.getRawState();
-    expect(result.world.metrics.flood_risk).toBe(80);
-    expect(result.events.history.some((record) => record.eventId === definition.id)).toBe(true);
-    expect(result.events.pending.some((event) => event.eventId === 'flood_emergency')).toBe(true);
-    expect(result.time.pendingContinuation).not.toBeNull();
+    const interrupted = store.getRawState();
+    const blocker = interrupted.events.pending.find((event) => event.eventId === 'flood_emergency');
+    expect(interrupted.world.metrics.flood_risk).toBe(80);
+    expect(
+      interrupted.events.history.filter((record) => record.eventId === definition.id),
+    ).toHaveLength(1);
+    expect(blocker?.instanceId).toBe(interrupted.events.activeBlockingEventId);
+    expect(interrupted.events.scheduled.map((event) => event.instanceId)).toContain(
+      'metric-auto-sibling-instance',
+    );
+    expect(interrupted.events.history.some((record) => record.eventId === sibling.id)).toBe(false);
+    expect(interrupted.character.vigor).toBe(originalVigor);
+    expect(interrupted.time.pendingContinuation).not.toBeNull();
+    if (!blocker) return;
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: blocker.instanceId,
+      optionId: 'coordinate_rescue',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const resumed = store.getRawState();
+    expect(resumed.time.totalDaysPlayed).toBe(1);
+    expect(resumed.time.pendingContinuation).toBeNull();
+    expect(resumed.events.scheduled.map((event) => event.instanceId)).not.toContain(
+      'metric-auto-sibling-instance',
+    );
+    expect(
+      resumed.events.history.filter((record) => record.eventId === definition.id),
+    ).toHaveLength(1);
+    expect(resumed.events.history.filter((record) => record.eventId === sibling.id)).toHaveLength(
+      1,
+    );
+    expect(resumed.character.vigor).toBe(originalVigor - 7);
   });
 });
