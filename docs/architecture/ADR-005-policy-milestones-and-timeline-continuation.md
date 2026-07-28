@@ -89,7 +89,7 @@ Schema 6 新增 `time.pendingContinuation`、行动稳定身份/来源字段和�
 - `pendingContinuation = null`；
 - 执行中行动 ID 为 `legacy-action-{tier}-{slotIndex}-{startedAtDay}-{actionId}`；
 - 来源使用 Schema 5 当前任职；
-- 仅接受已知的 Schema 5 内容版本，并按稳定部门/行动 ID 补齐部门显示、完整行动定义和内容版本；
+- 仅接受已知的 Schema 5 内容版本，并按稳定部门/行动 ID 补齐部门显示、完整行动定义、属性边界和内容版本；
 - 行动无法解析，或名称、分类、持续时间、冷却与已知定义不一致时，在解码阶段拒绝迁移并保留原始备份；
 - 不使用随机数、系统时间或数组索引作为新运行时身份（槽位索引仅参与确定性的旧存档迁移键）；
 - 不改变行动开始日、持续时间或完成日；

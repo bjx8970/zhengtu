@@ -50,7 +50,7 @@ afterEach(() => {
 });
 
 describe('domain signal production', () => {
-  it('START_ACTION 冻结完整执行快照，配置移除后仍完成且只发一次 action.completed', () => {
+  it('START_ACTION 冻结完整执行快照，配置移除和边界漂移后仍按原语义完成', () => {
     const loader = getConfigLoader();
     const actionEvent = eventDefinition('action-completed-test', 'action.completed');
     vi.spyOn(loader, 'getAllEventDefinitions').mockReturnValue([
@@ -58,7 +58,9 @@ describe('domain signal production', () => {
       actionEvent,
     ]);
     const state = createInitialState();
-    const department = loader.resolvePositionDepartments(state.career.appointment.positionId)[0];
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.actions.some((action) => action.id === 'staff_meeting'));
     expect(department).toBeDefined();
     if (!department) return;
     state.actions.departmentStates[department.id] = {
@@ -73,7 +75,7 @@ describe('domain signal production', () => {
     store.dispatch({
       type: 'START_ACTION',
       deptId: department.id,
-      actionId: 'document_processing',
+      actionId: 'staff_meeting',
       tierKey: 'primary',
       _idFactory: () => 'stable-action-instance',
     });
@@ -87,17 +89,27 @@ describe('domain signal production', () => {
       executableSnapshot: {
         contentVersion: '2026.07.4',
         department: { id: department.id, name: department.name },
-        action: { id: 'document_processing' },
+        action: { id: 'staff_meeting' },
+        attributeBounds: { competence: [0, 100] },
       },
     });
     if (!occupant) return;
+    const competenceBeforeCompletion = started.character.competence;
 
     const transferred = structuredClone(started);
     transferred.career.appointment.positionId = 'admin_l2_0';
     transferred.career.appointment.institutionId = 'county_govt_01';
     transferred.career.appointment.regionId = 'region_yongning_county';
     const transferredStore = createTestStore(transferred);
+    const driftedConfig = structuredClone(loader.getGameConfig());
     vi.spyOn(loader, 'resolvePositionDepartments').mockReturnValue([]);
+    vi.spyOn(loader, 'getGameConfig').mockReturnValue({
+      ...driftedConfig,
+      attributeBounds: {
+        ...driftedConfig.attributeBounds,
+        competence: [0, 0],
+      },
+    });
     let sequence = 0;
     for (let day = 0; day < occupant.durationDays; day++) {
       transferredStore.dispatch({
@@ -109,6 +121,7 @@ describe('domain signal production', () => {
     }
 
     const completed = transferredStore.getRawState();
+    expect(completed.character.competence).toBe(competenceBeforeCompletion + 1);
     const triggered = completed.events.pending.find((event) => event.eventId === actionEvent.id);
     expect(triggered?.sourceKey).toBe('stable-action-instance');
     expect(triggered?.triggerContext).toMatchObject({

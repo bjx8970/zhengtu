@@ -19,7 +19,7 @@
 
 import type { TimeGranularity } from './enums';
 import type { FiveDimensionScore, ActionRuntimeSnapshot } from './game';
-import type { ActionCategory, ActionTemplate } from './config';
+import type { ActionCategory, ActionTemplate, GameConfig } from './config';
 import type { CareerState } from '../domain/career/state';
 import type { GovernanceState } from '../domain/governance/state';
 import type { EventRuntimeState } from '../domain/events/state';
@@ -41,6 +41,8 @@ export interface ActionExecutableSnapshot {
   };
   /** 完整行动定义；完成时不得重新读取当前内容配置。 */
   action: ActionTemplate;
+  /** 行动效果结算使用的属性边界；防止内容版本变化改变钳制结果。 */
+  attributeBounds: GameConfig['attributeBounds'];
 }
 
 /** 槽位占用记录 */

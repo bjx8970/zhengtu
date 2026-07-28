@@ -84,6 +84,7 @@ export function reduceStartAction(draft: PlayerSave, payload: StartActionPayload
       deptConfig,
       actionConfig,
       CURRENT_CONTENT_VERSION,
+      cfg.attributeBounds,
     ),
     runtimeSnapshot,
   };

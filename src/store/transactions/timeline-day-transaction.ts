@@ -183,8 +183,6 @@ function processActionCompletion(
   notifications: CompletedActionNotification[],
   idFactory: () => string,
 ): DomainSignalSnapshot {
-  const loader = getConfigLoader();
-  const cfg = loader.getGameConfig();
   const snapshot = event.occupant.executableSnapshot;
   if (
     snapshot.department.id !== event.occupant.deptId ||
@@ -214,15 +212,15 @@ function processActionCompletion(
         : change.operation === 'multiply'
           ? getPlayerAttr(draft, change.attr) * change.delta
           : getPlayerAttr(draft, change.attr) + change.delta * devMult;
-    setPlayerAttrDirect(draft, change.attr, value, cfg.attributeBounds);
+    setPlayerAttrDirect(draft, change.attr, value, snapshot.attributeBounds);
     labels.push(`${change.attr} ${change.operation} ${change.delta}`);
   }
   for (const [key, delta] of Object.entries(result.styleDeltas)) {
     applyStyleDelta(draft, key, delta);
   }
   if (event.occupant.runtimeSnapshot?.styleConflictTriggered) {
-    applyPlayerAttr(draft, 'vigor', -5, cfg.attributeBounds);
-    applyPlayerAttr(draft, 'ambition', -5, cfg.attributeBounds);
+    applyPlayerAttr(draft, 'vigor', -5, snapshot.attributeBounds);
+    applyPlayerAttr(draft, 'ambition', -5, snapshot.attributeBounds);
   }
   notifications.push({
     actionName: snapshot.action.name,

@@ -116,7 +116,12 @@ describe('Schema 2 存档', () => {
       startedAtDay: 7,
       durationDays: action.durationDays,
       cooldownDays: action.cooldownDays,
-      executableSnapshot: createActionExecutableSnapshot(department, action, '2026.07.3'),
+      executableSnapshot: createActionExecutableSnapshot(
+        department,
+        action,
+        '2026.07.3',
+        getConfigLoader().getGameConfig().attributeBounds,
+      ),
     };
     const schema5Envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(state))) as Record<
       string,
@@ -154,6 +159,7 @@ describe('Schema 2 存档', () => {
         contentVersion: '2026.07.3',
         department: { id: department.id, name: department.name },
         action,
+        attributeBounds: getConfigLoader().getGameConfig().attributeBounds,
       },
     });
   });
@@ -180,7 +186,12 @@ describe('Schema 2 存档', () => {
       startedAtDay: 7,
       durationDays: action.durationDays,
       cooldownDays: action.cooldownDays,
-      executableSnapshot: createActionExecutableSnapshot(department, action, '2026.07.3'),
+      executableSnapshot: createActionExecutableSnapshot(
+        department,
+        action,
+        '2026.07.3',
+        getConfigLoader().getGameConfig().attributeBounds,
+      ),
     };
     const schema5Envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(state))) as Record<
       string,

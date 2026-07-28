@@ -202,6 +202,7 @@ describe('行动效果结算语义', () => {
     const executableSnapshot = occupant.executableSnapshot ?? {
       contentVersion: 'test',
       department: { id: deptId, name: '综合办公室' },
+      attributeBounds: getConfigLoader().getGameConfig().attributeBounds,
       action: {
         id: actionId,
         name: actionName,

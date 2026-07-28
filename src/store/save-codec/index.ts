@@ -437,6 +437,7 @@ const ActionExecutableSnapshotSchema = z
         styleAlignment: z.string().optional(),
       })
       .strict(),
+    attributeBounds: z.record(z.string(), z.tuple([z.number(), z.number()])),
   })
   .strict();
 
@@ -1014,7 +1015,9 @@ export function migrateSchema5To6(prev: Record<string, unknown>): Record<string,
   ) {
     throw new Error('Schema 5 appointment context is invalid');
   }
-  const departments = getConfigLoader().resolvePositionDepartments(positionId);
+  const loader = getConfigLoader();
+  const departments = loader.resolvePositionDepartments(positionId);
+  const attributeBounds = loader.getGameConfig().attributeBounds;
   time.pendingContinuation = null;
   for (const tier of ['primary', 'secondary', 'reserve'] as const) {
     const group = slots[tier] as Record<string, unknown> | undefined;
@@ -1057,6 +1060,7 @@ export function migrateSchema5To6(prev: Record<string, unknown>): Record<string,
         department,
         action,
         legacyContentVersion,
+        attributeBounds,
       );
     });
   }

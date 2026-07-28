@@ -10,7 +10,7 @@
 
 - 到期政策按绝对日自动生效，实施中政策按稳定顺序推进一个阶段；暂停和终态政策不会推进。
 - 持久化 `time.pendingContinuation`，blocking 后保存计划事件、过期、月结、年考、政治周期和退休检查等同日剩余节点。
-- 行动实例稳定 ID、职位/机构/地区来源快照与完整 `ActionExecutableSnapshot`；完成时只读取冻结的部门显示、行动效果、理念语义和内容版本，并发出 `action.completed`。
+- 行动实例稳定 ID、职位/机构/地区来源快照与完整 `ActionExecutableSnapshot`；完成时只读取冻结的部门显示、行动效果、理念语义、属性边界和内容版本，并发出 `action.completed`。
 - 年度考核记录和属性影响提交后发出 `assessment.completed`。
 - `deriveMetricSignalsFromEffects()` 将实际发生的世界/政策指标变化折叠为 `world.metric_changed` / `policy.metric_changed`。
 - 玩家事件选项与自动事件均先派生指标信号，再处理 `event.resolved`。

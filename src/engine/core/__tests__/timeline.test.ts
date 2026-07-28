@@ -26,6 +26,7 @@ function executableSnapshot(
   return {
     contentVersion: 'test',
     department: { id: deptId, name: deptId },
+    attributeBounds: {},
     action: {
       id: actionId,
       name: actionName,

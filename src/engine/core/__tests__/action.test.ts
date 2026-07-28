@@ -34,6 +34,7 @@ function occupant(overrides?: Partial<SlotOccupant>): SlotOccupant {
     executableSnapshot: {
       contentVersion: 'test',
       department: { id: 'dept_a', name: '部门 A' },
+      attributeBounds: {},
       action: {
         id: 'other_action',
         name: '行动',
