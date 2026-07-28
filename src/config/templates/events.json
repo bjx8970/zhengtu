@@ -308,5 +308,57 @@
         { "target": "world_fact", "factId": "media_exposure", "operation": "set", "value": true }
       ]
     }
+  },
+  {
+    "id": "industrial_park_progress_crisis",
+    "chainId": null,
+    "nodeId": null,
+    "title": "产业园区推进危机",
+    "description": "园区建设进入实施阶段后暴露出审批与施工衔接问题，必须立即确定整改方案。",
+    "category": "governance",
+    "priority": "urgent",
+    "presentation": "blocking",
+    "trigger": {
+      "sources": ["policy.phase_changed"],
+      "condition": {
+        "all": [
+          {
+            "signalField": "policyId",
+            "op": "eq",
+            "value": "industrial_park_support"
+          },
+          {
+            "signalField": "previousPhaseId",
+            "op": "eq",
+            "value": "preparation"
+          },
+          {
+            "signalField": "currentPhaseId",
+            "op": "eq",
+            "value": "implementation"
+          }
+        ]
+      },
+      "probability": 1
+    },
+    "repeatPolicy": {
+      "mode": "once_per_source"
+    },
+    "activation": {},
+    "options": [
+      {
+        "id": "rectification_plan",
+        "label": "制定整改方案",
+        "description": "明确责任清单和限期整改安排，维持政策实施节奏。",
+        "effects": [
+          {
+            "target": "character",
+            "field": "competence",
+            "operation": "add",
+            "value": 2
+          }
+        ]
+      }
+    ]
   }
 ]

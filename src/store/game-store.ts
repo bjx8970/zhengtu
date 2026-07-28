@@ -1,15 +1,12 @@
 /**
- * 游戏状态管理（Schema 2）
+ * 游戏状态管理（Schema 6）
  *
  * 核心设计：
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 仅在实际状态变化时写入 localStorage
  *
- * Schema 2 变更：
- * - PlayerSave 重构为子状态结构（character/career/governance/events/world/actions/assessments）
- * - 删除旧职业事实来源（currentLevel/currentCareerLine/promotionStage 等）
- * - 旧主动晋升运行时已删除
+ * 当前持久化结构为 Schema 6，包含政策/事件运行时和同日时间轴 continuation。
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
@@ -35,7 +32,7 @@ import {
   reduceRepealPolicy,
 } from './reducers/policy-reducer';
 
-/** 游戏动作联合类型（Schema 2 精简版） */
+/** 游戏动作联合类型 */
 export type GameAction =
   | { type: 'NEW_GAME'; data: Record<string, unknown> }
   | { type: 'LOAD_SAVE'; save: PlayerSave }
@@ -44,6 +41,7 @@ export type GameAction =
       deptId: string;
       actionId: string;
       tierKey: 'primary' | 'secondary' | 'reserve';
+      _idFactory?: () => string;
     }
   | {
       type: 'ADVANCE_TIME';
@@ -198,6 +196,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       day: 1,
       granularity: 'day',
       totalDaysPlayed: 0,
+      pendingContinuation: null,
     },
     career: {
       appointment: {
@@ -277,6 +276,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
         deptId: action.deptId,
         actionId: action.actionId,
         tierKey: action.tierKey,
+        _idFactory: action._idFactory,
       });
       return draft.actions.totalActions !== before;
     }

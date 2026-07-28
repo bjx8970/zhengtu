@@ -1,5 +1,5 @@
 /**
- * 玩家存档类型定义（Schema 5）
+ * 玩家存档类型定义（Schema 6）
  *
  * PlayerSave 重构为正式子状态结构：
  * - character：角色基础信息和属性
@@ -32,9 +32,17 @@ export type SlotTierKey = 'primary' | 'secondary' | 'reserve';
 
 /** 槽位占用记录 */
 export interface SlotOccupant {
+  /** 稳定行动实例 ID */
+  instanceId: string;
   actionId: string;
   deptId: string;
   actionName: string;
+  /** 行动启动时冻结的职位 ID */
+  originPositionId: string;
+  /** 行动启动时冻结的机构 ID */
+  originInstitutionId: string;
+  /** 行动启动时冻结的地区 ID */
+  originRegionId: string;
   /** 启动时的行动分类快照 */
   category: ActionCategory;
   startedAtDay: number;
@@ -161,12 +169,31 @@ export interface GameTime {
 /** 时间状态（PlayerSave 子状态） */
 export interface GameTimeState extends GameTime {
   totalDaysPlayed: number;
+  /** blocking 事件后尚未执行的同日时间轴工作 */
+  pendingContinuation: TimelineContinuation | null;
+}
+
+/** 可持久化的同日时间轴节点。 */
+export type TimelineContinuationNode =
+  | { type: 'scheduled_event_activation'; absoluteDay: number }
+  | { type: 'event_deadline'; absoluteDay: number }
+  | { type: 'monthly_settlement'; absoluteDay: number; month: number; year: number }
+  | { type: 'annual_assessment'; absoluteDay: number; year: number }
+  | { type: 'political_cycle'; absoluteDay: number; year: number }
+  | { type: 'retirement_check'; absoluteDay: number };
+
+/** blocking 事件暂停的同日时间轴工作。 */
+export interface TimelineContinuation {
+  /** continuation 所属绝对日，必须等于当前时间绝对日 */
+  absoluteDay: number;
+  /** 按固定同日优先级保存的尚未执行节点 */
+  remainingNodes: TimelineContinuationNode[];
 }
 
 // ===== 新版 PlayerSave =====
 
 /**
- * 玩家存档（Schema 5）
+ * 玩家存档（Schema 6）
  *
  * 重构为正式子状态结构，删除旧职业事实来源。
  */

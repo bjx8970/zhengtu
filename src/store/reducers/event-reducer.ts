@@ -20,6 +20,7 @@ import type { ScheduledEventCancellation } from '../../domain/events/types';
 import type { EventDefinition } from '../../domain/events/definition';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import { applyEffects } from '../../engine/events/effect-executor';
+import { deriveMetricSignalsFromEffects } from '../../engine/events/metric-signal-bridge';
 import { resolveEventOption } from '../../engine/events/event-resolver';
 import { buildEventCooldownRecord } from '../../engine/events/event-cooldown';
 import { processDomainSignal } from '../../engine/events/event-orchestrator';
@@ -127,7 +128,7 @@ function reduceChooseEventOptionInternal(
   // 构建 appliedEffects 记录
   const appliedEffects = result.applied.map((rec) => ({
     target: rec.effect.target,
-    field: 'field' in rec.effect ? (rec.effect as unknown as { field: string }).field : undefined,
+    field: 'field' in rec.effect ? rec.effect.field : undefined,
     operation: rec.effect.operation,
     value: rec.newValue,
     label: rec.targetDescription,
@@ -178,6 +179,12 @@ function reduceChooseEventOptionInternal(
   };
   draft.events.history.push(history);
 
+  const metricSignals = deriveMetricSignalsFromEffects(
+    result.applied,
+    { currentDay, policies: draft.governance.policies },
+    idFactory,
+  );
+
   // 7. 移除当前 blocker 后立即提升下一项。即时后续必须位于当前
   // event.resolved 之前；只有刚结算的 blocker 结果应抢在旧暂停尾部之前，
   // 普通 inbox 结算仍追加，避免越过先前已暂停的因果链。
@@ -188,6 +195,11 @@ function reduceChooseEventOptionInternal(
       ...immediateInstances.map((instance) => ({
         kind: 'instance' as const,
         instance,
+        cascadeDepth: 0,
+      })),
+      ...metricSignals.map((signal) => ({
+        kind: 'signal' as const,
+        signal,
         cascadeDepth: 0,
       })),
       ...plan.emittedSignals.map((signal) => ({
@@ -247,7 +259,7 @@ export function handleAutoEventInstance(
 
   const appliedEffects = result.applied.map((rec) => ({
     target: rec.effect.target,
-    field: 'field' in rec.effect ? (rec.effect as unknown as { field: string }).field : undefined,
+    field: 'field' in rec.effect ? rec.effect.field : undefined,
     operation: rec.effect.operation,
     value: rec.newValue,
     label: rec.targetDescription,
@@ -258,6 +270,11 @@ export function handleAutoEventInstance(
     draft.events.cooldowns.push(cooldown);
   }
 
+  const metricSignals = deriveMetricSignalsFromEffects(
+    result.applied,
+    { currentDay, policies: draft.governance.policies },
+    idFactory,
+  );
   const resolvedSignal: DomainSignalSnapshot = {
     signalId: idFactory(),
     signalType: 'event.resolved',
@@ -346,7 +363,7 @@ export function handleAutoEventInstance(
 
   return {
     history,
-    cascadeSignals: [resolvedSignal],
+    cascadeSignals: [...metricSignals, resolvedSignal],
     // 已插入当前事务队列的实例不能再次返回给调用方入队，否则会重复执行。
     immediateInstances: inFlightImmediateInstances ? [] : followups.immediateInstances,
   };

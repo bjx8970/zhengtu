@@ -12,13 +12,9 @@
 import type { PlayerSave } from '../../types/player';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { PolicyInstance, PolicyOriginContextSnapshot } from '../../domain/governance/state';
-import type { EventDefinition } from '../../domain/events/definition';
 import type { ConditionExpression } from '../../domain/conditions';
-import { unwrap } from 'solid-js/store';
 import { getConfigLoader } from '../../config/loader';
-import { processCascadeSignalsInTransaction } from './event-reducer';
 import { evaluateCondition } from '../../engine/events/condition-interpreter';
-import { applyEffects } from '../../engine/events/effect-executor';
 import {
   proposePolicy,
   approvePolicy,
@@ -30,6 +26,7 @@ import {
 } from '../../engine/governance/policy-lifecycle';
 import type { PolicyTransitionResult } from '../../engine/governance/policy-lifecycle';
 import { createRuntimeIdFactory } from '../runtime-id';
+import { commitPolicyTransition as commitPolicyTransitionTransaction } from '../transactions/policy-transition-transaction';
 
 /**
  * 从当前任职构建政策原始上下文快照。
@@ -62,61 +59,19 @@ function commitPolicyTransition(
   currentDay: number,
   rng: () => number,
   idFactory: () => string,
-  definitions: readonly EventDefinition[],
+  definitions: readonly import('../../domain/events/definition').EventDefinition[],
   policyIdx: number | null,
 ): { success: boolean; instance?: PolicyInstance } {
-  if (!result.success) return { success: false };
-
-  // 政策转换、效果和事件级联必须同进同退；级联的事务入口还会处理 blocker continuation。
-  const transaction = structuredClone(unwrap(draft));
-
-  // 应用效果
-  if (result.effects.length > 0) {
-    // 效果引用 signal 字段时必须有真实来源；该不变量一旦被新转换破坏，应在提交前失败。
-    const contextSignal = result.emittedSignals[0];
-    if (!contextSignal) {
-      throw new Error('Policy transition emitted effects without a context signal');
-    }
-    const effectContext = buildEffectContext(transaction, currentDay, contextSignal);
-    applyEffects(transaction, result.effects, effectContext);
-  }
-
-  // 更新政策实例
-  if (policyIdx !== null && policyIdx >= 0 && policyIdx < transaction.governance.policies.length) {
-    transaction.governance.policies[policyIdx] = result.instance;
-  } else {
-    transaction.governance.policies.push(result.instance);
-  }
-
-  // 复用事件 reducer 的统一 continuation 入口，避免 policy reducer 重复实现级联队列。
-  if (result.emittedSignals.length > 0) {
-    processCascadeSignalsInTransaction(
-      transaction,
-      result.emittedSignals,
-      currentDay,
-      rng,
-      idFactory,
-      definitions,
-    );
-  }
-
-  Object.assign(draft, transaction);
-  return { success: true, instance: result.instance };
-}
-
-/**
- * 构建效果执行上下文。
- */
-function buildEffectContext(_draft: PlayerSave, currentDay: number, signal: DomainSignalSnapshot) {
-  const loader = getConfigLoader();
-  const institutions = loader.getAllInstitutions();
-  return {
-    signal,
+  const instance = commitPolicyTransitionTransaction(
+    draft,
+    result,
+    policyIdx,
     currentDay,
-    attributeBounds: loader.getGameConfig().attributeBounds,
-    knownInstitutionIds: new Set(institutions.map((i) => i.id)),
-    knownRegionIds: new Set(institutions.map((i) => i.regionId)),
-  };
+    rng,
+    idFactory,
+    definitions,
+  );
+  return instance ? { success: true, instance } : { success: false };
 }
 
 // ===== Reducer 入口 =====
