@@ -21,6 +21,18 @@ describe('ConfigLoader - 政策定义', () => {
     it('返回 null 当政策不存在', () => {
       expect(loader.getPolicyDefinition('nonexistent_policy')).toBeNull();
     });
+
+    it('返回深拷贝，调用方修改不会污染后续查询', () => {
+      const first = loader.getPolicyDefinition('industrial_park_support')!;
+      first.tags.push('mutated');
+      first.approvalEffects.length = 0;
+      first.phases[0]!.name = 'mutated';
+
+      const second = loader.getPolicyDefinition('industrial_park_support')!;
+      expect(second.tags).not.toContain('mutated');
+      expect(second.approvalEffects).toHaveLength(2);
+      expect(second.phases[0]!.name).toBe('准备阶段');
+    });
   });
 
   describe('getAllPolicyDefinitions', () => {

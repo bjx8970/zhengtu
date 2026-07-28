@@ -791,7 +791,8 @@ export function migrateSchema3To4(raw: Record<string, unknown>): Record<string, 
  *
  * Schema 4 的 PolicyInstance 使用 regionId/responsibleInstitutionId 等扁平字段。
  * Schema 5 将其收束到 originContext（位置/机构/地区）和 snapshot（政策定义快照）。
- * 旧记录缺少任职信息，迁移时使用哨兵值并由游戏逻辑自行纠正。
+ * 旧记录没有足以重建不可变政策快照的任职与阶段信息，因此只有空政策集合
+ * 能确定性升级；含有政策实例时必须显式失败并由调用方保留原始备份。
  *
  * @param prev Schema 4 SaveEnvelope 对象
  * @returns 迁移后的 Schema 5 SaveEnvelope 对象
@@ -801,47 +802,10 @@ export function migrateSchema4To5(prev: Record<string, unknown>): Record<string,
   const state = migrated.state as Record<string, unknown> | undefined;
   const governance = state?.governance as Record<string, unknown> | undefined;
   const oldPolicies = (governance?.policies ?? []) as Array<Record<string, unknown>>;
-
-  const migratedPolicies = oldPolicies.map((old) => ({
-    instanceId: old.instanceId as string,
-    policyId: old.policyId as string,
-    status: old.status as string,
-    proposedAtDay: (old.proposedAtDay as number) ?? 0,
-    approvedAtDay: (old.approvedAtDay as number | null) ?? null,
-    effectiveAtDay: (old.effectiveAtDay as number | null) ?? null,
-    currentPhaseId: (old.currentPhaseId as string | null) ?? null,
-    phaseEnteredAtDay: null,
-    nextMilestoneAtDay: null,
-    suspendedAtDay: null,
-    accumulatedSuspendedDays: 0,
-    completedAtDay: null,
-    failedAtDay: null,
-    repealedAtDay: null,
-    originContext: {
-      positionId: 'migrated',
-      institutionId: (old.responsibleInstitutionId as string) ?? 'unknown',
-      regionId: (old.regionId as string) ?? 'unknown',
-      institutionLevel: 'local',
-      positionDomain: 'comprehensive',
-      leadershipRank: 'unknown',
-      experienceId: null,
-    },
-    snapshot: {
-      policyId: old.policyId as string,
-      name: `政策-${old.policyId}`,
-      description: '从 Schema 4 迁移的政策',
-      category: 'economic',
-      tags: [],
-      effectiveDelayDays: 0,
-      approvalEffects: [],
-      phases: [],
-      contentVersion: 'migrated',
-    },
-    metrics: (old.metrics as Record<string, number>) ?? {},
-  }));
-
-  if (governance) {
-    (governance as Record<string, unknown>).policies = migratedPolicies;
+  if (oldPolicies.length > 0) {
+    throw new Error(
+      'Schema 4 save contains policy instances that cannot be migrated without executable snapshots',
+    );
   }
 
   migrated.schemaVersion = 5;

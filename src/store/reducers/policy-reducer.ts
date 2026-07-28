@@ -14,9 +14,9 @@ import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { PolicyInstance, PolicyOriginContextSnapshot } from '../../domain/governance/state';
 import type { EventDefinition } from '../../domain/events/definition';
 import type { ConditionExpression } from '../../domain/conditions';
+import { unwrap } from 'solid-js/store';
 import { getConfigLoader } from '../../config/loader';
-import { processDomainSignal } from '../../engine/events/event-orchestrator';
-import { applyEventOrchestrationPlan } from './event-reducer';
+import { processCascadeSignals } from './event-reducer';
 import { evaluateCondition } from '../../engine/events/condition-interpreter';
 import { applyEffects } from '../../engine/events/effect-executor';
 import {
@@ -30,8 +30,6 @@ import {
 } from '../../engine/governance/policy-lifecycle';
 import type { PolicyTransitionResult } from '../../engine/governance/policy-lifecycle';
 import { createRuntimeIdFactory } from '../runtime-id';
-
-const MAX_CASCADE_DEPTH = 16;
 
 /**
  * 从当前任职构建政策原始上下文快照。
@@ -69,127 +67,39 @@ function commitPolicyTransition(
 ): { success: boolean; instance?: PolicyInstance } {
   if (!result.success) return { success: false };
 
+  // 政策转换、效果和事件级联必须同进同退；级联的事务入口还会处理 blocker continuation。
+  const transaction = structuredClone(unwrap(draft));
+
   // 使用第一个已发出信号作为效果上下文（所有政策信号均携带 institutionId/regionId/originPositionId）
   const contextSignal = result.emittedSignals[0] ?? null;
 
   // 应用效果
   if (result.effects.length > 0) {
-    const effectContext = buildEffectContext(draft, currentDay, contextSignal);
-    applyEffects(draft, result.effects, effectContext);
+    const effectContext = buildEffectContext(transaction, currentDay, contextSignal);
+    applyEffects(transaction, result.effects, effectContext);
   }
 
   // 更新政策实例
-  if (policyIdx !== null && policyIdx >= 0 && policyIdx < draft.governance.policies.length) {
-    draft.governance.policies[policyIdx] = result.instance;
+  if (policyIdx !== null && policyIdx >= 0 && policyIdx < transaction.governance.policies.length) {
+    transaction.governance.policies[policyIdx] = result.instance;
   } else {
-    draft.governance.policies.push(result.instance);
+    transaction.governance.policies.push(result.instance);
   }
 
-  // 编排信号
+  // 复用事件 reducer 的统一 continuation 入口，避免 policy reducer 重复实现级联队列。
   if (result.emittedSignals.length > 0) {
-    processPolicySignals(draft, result.emittedSignals, currentDay, rng, idFactory, definitions);
+    processCascadeSignals(
+      transaction,
+      result.emittedSignals,
+      currentDay,
+      rng,
+      idFactory,
+      definitions,
+    );
   }
 
+  Object.assign(draft, transaction);
   return { success: true, instance: result.instance };
-}
-
-/**
- * 将政策信号送入事件编排器。
- */
-function processPolicySignals(
-  draft: PlayerSave,
-  signals: DomainSignalSnapshot[],
-  currentDay: number,
-  rng: () => number,
-  idFactory: () => string,
-  definitions: readonly EventDefinition[],
-): void {
-  const budget = { consumed: 0, limit: MAX_CASCADE_DEPTH };
-  const queue: Array<{ kind: 'signal'; signal: DomainSignalSnapshot; cascadeDepth: number }> = [];
-
-  for (const signal of signals) {
-    if (draft.events.processedSignalIds.includes(signal.signalId)) continue;
-
-    const orchestration = processDomainSignal({
-      state: draft as Readonly<PlayerSave>,
-      signal,
-      currentDay,
-      definitions,
-      rng,
-      idFactory,
-      transactionInstances: [],
-    });
-
-    const { cascadeSignals } = applyEventOrchestrationPlan(
-      draft,
-      orchestration,
-      currentDay,
-      rng,
-      idFactory,
-      definitions,
-      0,
-      budget,
-      queue,
-    );
-
-    const nextDepth = 1;
-    queue.push(
-      ...orchestration.emittedSignals.map((s) => ({
-        kind: 'signal' as const,
-        signal: s,
-        cascadeDepth: nextDepth,
-      })),
-      ...cascadeSignals.map((s) => ({
-        kind: 'signal' as const,
-        signal: s,
-        cascadeDepth: nextDepth,
-      })),
-    );
-  }
-
-  // 处理级联队列
-  let iteration = 0;
-  while (queue.length > 0 && iteration < 200) {
-    iteration++;
-    const item = queue.shift()!;
-    if (draft.events.processedSignalIds.includes(item.signal.signalId)) continue;
-    if (item.cascadeDepth >= MAX_CASCADE_DEPTH) continue;
-
-    const orchestration = processDomainSignal({
-      state: draft as Readonly<PlayerSave>,
-      signal: item.signal,
-      currentDay,
-      definitions,
-      rng,
-      idFactory,
-    });
-
-    const { cascadeSignals } = applyEventOrchestrationPlan(
-      draft,
-      orchestration,
-      currentDay,
-      rng,
-      idFactory,
-      definitions,
-      item.cascadeDepth + 1,
-      budget,
-      queue,
-    );
-
-    const nextDepth = item.cascadeDepth + 1;
-    queue.push(
-      ...orchestration.emittedSignals.map((s) => ({
-        kind: 'signal' as const,
-        signal: s,
-        cascadeDepth: nextDepth,
-      })),
-      ...cascadeSignals.map((s) => ({
-        kind: 'signal' as const,
-        signal: s,
-        cascadeDepth: nextDepth,
-      })),
-    );
-  }
 }
 
 /**
@@ -235,15 +145,15 @@ export function reduceProposePolicy(
 
   const originContext = buildOriginContext(draft);
 
-  // 如果显式传入地区/机构，则覆盖
-  if (payload.regionId) {
-    const institution = loader.getInstitutionById(
-      payload.institutionId ?? draft.career.appointment.institutionId,
-    );
-    if (!institution) return null;
-    originContext.regionId = payload.regionId;
-    originContext.institutionId = payload.institutionId ?? draft.career.appointment.institutionId;
-  }
+  // 覆盖后的归属必须始终可在配置中定位，且机构与地区不能跨域组合。
+  const institutionId = payload.institutionId ?? originContext.institutionId;
+  const institution = loader.getInstitutionById(institutionId);
+  if (!institution) return null;
+  const regionId = payload.regionId ?? institution.regionId;
+  const knownRegionIds = new Set(loader.getAllInstitutions().map((item) => item.regionId));
+  if (!knownRegionIds.has(regionId) || institution.regionId !== regionId) return null;
+  originContext.institutionId = institution.id;
+  originContext.regionId = regionId;
 
   const result = proposePolicy({
     definition,

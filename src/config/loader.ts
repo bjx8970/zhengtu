@@ -153,7 +153,8 @@ class ConfigLoader {
 
   /** 按稳定 ID 查询政策定义（未知 ID 返回 null） */
   getPolicyDefinition(policyId: string): PolicyDefinitionConfig | null {
-    return this.policies.get(policyId) ?? null;
+    const policy = this.policies.get(policyId);
+    return policy ? structuredClone(policy) : null;
   }
 
   /** 获取全部政策定义（深拷贝） */
