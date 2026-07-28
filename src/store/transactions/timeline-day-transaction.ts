@@ -131,6 +131,9 @@ export function processTimelineNodes(
     switch (node.type) {
       case 'scheduled_event_activation':
         activateEventsAtDay(draft, node.absoluteDay, rng, idFactory, definitions);
+        // 截止处理必须与计划激活同属一个不可分割节点；否则 blocker 会让刚刚
+        // 越过截止日的旧 pending 实例滞留到下一次 ADVANCE_TIME。
+        expireEventsAtDay(draft, node.absoluteDay);
         if (draft.events.activeBlockingEventId !== null) {
           const hasRemainingDueEvent = draft.events.scheduled.some(
             (event) => event.activateAtDay <= node.absoluteDay,

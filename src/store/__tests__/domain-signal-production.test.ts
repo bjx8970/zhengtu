@@ -140,6 +140,11 @@ describe('domain signal production', () => {
     ]);
     const config = loader.getGameConfig();
     const state = createInitialState();
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.baseConsumption * item.consumptionCoefficient > 0);
+    expect(department).toBeDefined();
+    if (!department) return;
     state.time = {
       year: config.startYear,
       month: config.monthsPerYear,
@@ -147,6 +152,15 @@ describe('domain signal production', () => {
       granularity: 'day',
       totalDaysPlayed: config.monthsPerYear * config.daysPerMonth - 1,
       pendingContinuation: null,
+    };
+    state.remainingBudget = 10_000;
+    state.actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
     };
     const store = createTestStore(state);
     let sequence = 0;
@@ -169,6 +183,7 @@ describe('domain signal production', () => {
     expect(blocked.time.pendingContinuation).not.toBeNull();
     expect(blocked.assessments.annualAssessments).toHaveLength(1);
     const budgetAfterSettlement = blocked.remainingBudget;
+    expect(budgetAfterSettlement).toBeLessThan(10_000);
     if (!event) return;
 
     store.dispatch({

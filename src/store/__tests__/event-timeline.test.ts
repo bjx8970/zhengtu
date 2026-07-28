@@ -188,9 +188,8 @@ describe('event timeline integration', () => {
     );
   });
 
-  it('expires overdue pending events before an active blocker pauses advancement', () => {
+  it('expires newly overdue pending events before a same-day blocker pauses advancement', () => {
     const state = createInitialState();
-    state.time.totalDaysPlayed = 5;
     const overdueSnapshot = createEventSnapshot({
       id: 'overdue_before_blocker',
       chainId: null,
@@ -223,41 +222,38 @@ describe('event timeline integration', () => {
       instanceId: 'overdue_instance',
       eventId: overdueSnapshot.eventId,
       status: 'pending',
-      triggeredAtDay: 2,
-      activatedAtDay: 2,
-      deadlineDay: 4,
-      triggerContext: makeSignal('overdue_signal', 2),
+      triggeredAtDay: 0,
+      activatedAtDay: 0,
+      deadlineDay: 0,
+      triggerContext: makeSignal('overdue_signal'),
       sourceKey: 'repeatable_source',
       chainInstanceId: null,
       snapshot: overdueSnapshot,
     };
-    const blocker: EventInstance = {
-      instanceId: 'existing_blocker_instance',
+    state.events.pending.push(overdue);
+    state.events.scheduled.push({
+      instanceId: 'scheduled_blocker_instance',
       eventId: blockerSnapshot.eventId,
-      status: 'active',
-      triggeredAtDay: 5,
-      activatedAtDay: 5,
-      deadlineDay: null,
-      triggerContext: makeSignal('blocker_signal', 5),
+      scheduledAtDay: 0,
+      activateAtDay: 1,
+      triggerContext: makeSignal('blocker_signal'),
       sourceKey: 'blocker_source',
       chainInstanceId: null,
       snapshot: blockerSnapshot,
-    };
-    state.events.pending.push(overdue, blocker);
-    state.events.activeBlockingEventId = blocker.instanceId;
+    });
     const store = createTestStore(state);
 
     store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
 
     const after = store.getRawState();
-    expect(after.time.totalDaysPlayed).toBe(5);
-    expect(after.events.activeBlockingEventId).toBe(blocker.instanceId);
+    expect(after.time.totalDaysPlayed).toBe(1);
+    expect(after.events.activeBlockingEventId).toBe('scheduled_blocker_instance');
     expect(after.events.pending.map((event) => event.instanceId)).not.toContain(overdue.instanceId);
     expect(after.events.history).toContainEqual(
       expect.objectContaining({
         instanceId: overdue.instanceId,
         finalStatus: 'expired',
-        completedAtDay: 5,
+        completedAtDay: 1,
       }),
     );
   });
