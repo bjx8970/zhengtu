@@ -34,7 +34,7 @@
         "entryEffects": [
           {
             "target": "region_metric",
-            "regionRef": { "source": "fixed", "regionId": "region_jiangyuan_province" },
+            "regionRef": { "source": "signal", "field": "regionId" },
             "metricId": "investment_progress",
             "operation": "add",
             "value": 5
@@ -43,7 +43,7 @@
         "completionEffects": [
           {
             "target": "region_metric",
-            "regionRef": { "source": "fixed", "regionId": "region_jiangyuan_province" },
+            "regionRef": { "source": "signal", "field": "regionId" },
             "metricId": "investment_progress",
             "operation": "add",
             "value": 15
@@ -64,7 +64,7 @@
         "entryEffects": [
           {
             "target": "region_metric",
-            "regionRef": { "source": "fixed", "regionId": "region_jiangyuan_province" },
+            "regionRef": { "source": "signal", "field": "regionId" },
             "metricId": "investment_progress",
             "operation": "add",
             "value": 10
@@ -73,7 +73,7 @@
         "completionEffects": [
           {
             "target": "region_metric",
-            "regionRef": { "source": "fixed", "regionId": "region_jiangyuan_province" },
+            "regionRef": { "source": "signal", "field": "regionId" },
             "metricId": "investment_progress",
             "operation": "add",
             "value": 40
@@ -101,7 +101,7 @@
         "completionEffects": [
           {
             "target": "region_metric",
-            "regionRef": { "source": "fixed", "regionId": "region_jiangyuan_province" },
+            "regionRef": { "source": "signal", "field": "regionId" },
             "metricId": "investment_progress",
             "operation": "add",
             "value": 30

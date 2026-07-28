@@ -615,6 +615,7 @@ import {
   validatePositionInstitutionConsistency,
   PolicyDefinitionArraySchema,
 } from '../src/config/schemas';
+import { validatePolicyEffectReferences } from '../src/config/policy-reference-validation';
 
 // 使用正式 Schema 解析（与 ConfigLoader 共用同一入口）
 const parsedPositionsResult = PositionConfigArraySchema.safeParse(positionsData);
@@ -634,6 +635,13 @@ if (!parsedInstitutionsResult.success) {
     errors++;
   }
 }
+
+const policyReferenceCatalog = {
+  institutionIds: new Set(
+    parsedInstitutionsResult.success ? Object.keys(parsedInstitutionsResult.data) : [],
+  ),
+  regionIds: new Set(Object.keys(regionData)),
+};
 
 if (parsedPositionsResult.success && parsedInstitutionsResult.success) {
   const validPositions = parsedPositionsResult.data;
@@ -721,6 +729,11 @@ if (!parsedPoliciesResult.success) {
         errors++;
       }
       phaseIds.add(phase.id);
+    }
+
+    for (const error of validatePolicyEffectReferences([policy], policyReferenceCatalog)) {
+      console.error(`❌ ${error}`);
+      errors++;
     }
 
     // 标签去重

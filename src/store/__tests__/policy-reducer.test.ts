@@ -77,6 +77,31 @@ describe('policy-reducer dispatch', () => {
     expect(origin.regionId).toBe('region_yongning_county');
   });
 
+  it('县级实例的阶段效果只写入其实例地区', () => {
+    const store = createTestStore();
+    store.dispatch({
+      type: 'PROPOSE_POLICY',
+      policyId,
+      institutionId: 'county_govt_01',
+      _idFactory: idFactory('policy'),
+    });
+    const proposed = store.getRawState().governance.policies[0]!;
+    store.dispatch({
+      type: 'APPROVE_POLICY',
+      policyInstanceId: proposed.instanceId,
+      _idFactory: idFactory('signal'),
+    });
+    store.dispatch({
+      type: 'ACTIVATE_POLICY',
+      policyInstanceId: proposed.instanceId,
+      _idFactory: idFactory('signal'),
+    });
+
+    const metrics = store.getRawState().governance.regionMetrics;
+    expect(metrics.region_yongning_county?.investment_progress).toBe(5);
+    expect(metrics.region_jiangyuan_province?.investment_progress).toBeUndefined();
+  });
+
   it('blocker 存在时将政策信号作为 continuation 延后处理', () => {
     const base = createInitialState();
     base.events.activeBlockingEventId = 'blocking_event';
