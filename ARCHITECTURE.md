@@ -1,12 +1,12 @@
 # 政途人生 — 架构文档
 
-> 当前版本：0.1.0-alpha.1 | 存档 Schema：4 | 内容版本：2026.07.2
+> 当前版本：0.1.0-alpha.1 | 存档 Schema：6 | 内容版本：2026.07.4
 
 ## 当前范围
 
-当前版本是可运行的单机原型，已存在行政线 L1-L11 的配置与 L11 终局代码（36 个职位），但连续晋升链路尚未通过真实验证（当前存在 `multi_region` 履历判定阻塞）。已完成基础工程整理（严格存档解码、统一时间轴、行动快照、Reducer 拆分）。
+当前版本是可运行的单机原型。职业、治理、事件与世界状态已使用新版领域骨架；政策生命周期、事件编排、真实领域信号和可中断统一时间轴已经闭环。职级晋升、岗位机会与任职变化运行时尚未实现，属于 #95 的范围。
 
-当前职业模型为旧式单一线性等级结构（`currentLevel` 同时表达职位高低、机关层级和晋升目标）。职务与职级双通道、岗位领域交流和机会驱动选拔尚未实现，属于后续重构对象。
+当前仍没有政策列表、事件收件箱或 blocking 弹窗 UI；本阶段通过 Store 与无 UI 集成测试验证运行时。
 
 ## 技术栈
 
@@ -56,15 +56,17 @@ src/
 │   │   ├── action.ts            # 行动校验与效果解析
 │   │   ├── effect.ts            # 效果应用
 │   │   ├── time.ts              # 时间推进基础
-│   │   └── timeline.ts          # 统一时间轴引擎
+│   │   ├── timeline.ts          # 统一时间轴引擎
+│   │   └── daily-timeline-plan.ts # 可持久化同日节点计划
 │   ├── events/
 │   │   ├── condition-interpreter.ts  # 统一条件解释器（纯函数）
 │   │   ├── effect-executor.ts        # 统一效果执行器（原子事务）
 │   │   ├── event-orchestrator.ts     # 领域信号驱动的事件编排器（纯函数）
 │   │   ├── event-resolver.ts         # 玩家选项结算（纯函数）
 │   │   ├── event-scheduler.ts        # 计划事件激活与过期（纯函数）
-│   │   └── source-key.ts             # 来源键派生函数
-│   ├── governance/              # assessment/budget/kpi/dimensions
+│   │   ├── source-key.ts             # 来源键派生函数
+│   │   └── metric-signal-bridge.ts   # 指标效果→领域信号
+│   ├── governance/              # assessment/budget/kpi/policy lifecycle
 │   ├── career/                  # promotion/deviation-penalty/spectrum 等
 │   └── index.ts                 # 引擎聚合导出
 ├── store/
@@ -76,8 +78,11 @@ src/
 │   │   ├── character-reducer.ts # NEW_GAME / LOAD_SAVE
 │   │   ├── event-reducer.ts     # CHOOSE_EVENT_OPTION + 原子效果应用
 │   │   └── shared.ts            # 共享辅助函数
+│   ├── transactions/
+│   │   ├── timeline-day-transaction.ts
+│   │   └── policy-transition-transaction.ts
 │   └── save-codec/
-│       └── index.ts             # 严格存档解码器（Zod Schema, Schema 4）
+│       └── index.ts             # 严格存档解码器（Zod Schema 6）
 └── services/
     ├── save-repo.ts             # 本地/远程存档读写
     ├── startup-save-state.ts    # 启动存档状态服务
@@ -129,8 +134,8 @@ UI（页面/组件） → Store（dispatch/reducer） → Engine（纯函数） 
 
 ```typescript
 interface SaveEnvelope {
-  schemaVersion: number; // 存档结构版本（当前：4）
-  contentVersion: string; // 内容配置版本（当前：2026.07.2）
+  schemaVersion: number; // 存档结构版本（当前：6）
+  contentVersion: string; // 内容配置版本（当前：2026.07.4）
   revision: number; // 同一存档的逻辑修订号
   savedAt: number; // 保存时间戳
   state: PlayerSave; // 实际游戏状态
@@ -140,7 +145,7 @@ interface SaveEnvelope {
 ### 严格解码行为
 
 - 只接受当前 `schemaVersion` 的完整 SaveEnvelope
-- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → 4
+- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → 4 → 5 → 6
 - `schemaVersion < 2` → 拒绝（`legacy_save_unsupported`）
 - `schemaVersion > CURRENT` → 拒绝（`future_version`）
 - 结构验证失败 → 拒绝（`invalid_envelope`）
@@ -150,7 +155,7 @@ interface SaveEnvelope {
 
 ### 兼容性说明
 
-解码器仅校验 `schemaVersion`，不校验 `contentVersion`。因此基础工程重构期间（PR #88）生成的 `schemaVersion: 1` 存档在当前版本仍可加载。正式版本体系建立前（PR #88 之前）的裸 PlayerSave 存档因缺少 Envelope 封装而被拒绝。
+解码器以 `schemaVersion` 决定结构兼容性，不以 `contentVersion` 拒绝存档。Schema 2–5 通过确定性迁移链升级；Schema 1 和缺少 Envelope 的裸 PlayerSave 被拒绝并保留只读备份。
 
 ### revision 和 updatedAt
 
@@ -176,7 +181,27 @@ type TimelineEvent =
 
 ### 同日事件排序
 
-同一天内按类型优先级：行动完成(0) < 月度结算(1) < 年度考核(2) < 政治周期(3) < 退休检查(4)。
+最终顺序固定为：
+
+1. 落到当日绝对时间坐标；
+2. 结算当日全部行动；
+3. 自动激活到期政策；
+4. 每项实施中政策最多推进一个到期阶段；
+5. 统一处理行动和政策领域信号；
+6. 激活到期计划事件；
+7. 处理事件过期；
+8. 月度结算；
+9. 年度考核并处理 `assessment.completed`；
+10. 政治周期；
+11. 退休检查。
+
+行动全部结算后才处理信号，因此第一个行动触发 blocker 不会丢失同日其他已完成行动。政策事实全部提交后才进入计划事件；考核信号产生的 blocker 发生在政治周期和退休检查之前。
+
+### blocking 与同日 continuation
+
+事件级 `deferredContinuations` 只恢复事件实例/领域信号因果链；`time.pendingContinuation` 独立保存时间轴工作。节点可包含计划事件激活、过期、月结、年考、政治周期和退休检查，且必须属于当前绝对日、按固定顺序、无重复。
+
+`ADVANCE_TIME` 先检查活动 blocker，再恢复事件 continuation，最后恢复 `time.pendingContinuation`。恢复同日节点的这次操作不会增加日期；全部完成并清空 continuation 后，下一次推进才进入新日。整个 `ADVANCE_TIME` 在完整状态副本上执行，效果解析、政策转换、信号级联或 continuation 校验失败均不提交部分状态。
 
 ### 跨月和跨年
 
@@ -197,8 +222,10 @@ interface ActionRuntimeSnapshot {
 ```
 
 - 理念偏离倍率和冲突状态绑定到具体行动实例（`SlotOccupant.runtimeSnapshot`）
+- `SlotOccupant.instanceId` 是稳定行动身份；职位、机构和地区在启动时冻结
 - 不再使用玩家级临时倍率
 - 配置在行动执行期间变化不会影响已启动行动的快照
+- 行动完成、效果、冷却、槽位释放和 `action.completed` 属于同一事务
 
 ## 事件系统（定义、编排与生命周期）
 
@@ -212,7 +239,7 @@ interface ActionRuntimeSnapshot {
 - **配置验证**：`src/domain/events/validation.ts` 的 `validateEventDefinitions`（引用完整性 + 零延迟循环检测）。
 - **ConfigLoader 事件索引**：`getEventDefinitionsBySignal` 按信号类型索引（返回深拷贝）。
 
-### 编排与生命周期（当前 PR）
+### 编排与生命周期
 
 #### 领域信号进入事件编排器
 
@@ -263,16 +290,25 @@ interface ActionRuntimeSnapshot {
 
 `EventChainInstance` 以 `sourceKey` 标识来源（替代旧的 `sourceEntityType/sourceEntityId`）。支持分支（`activeNodeIds` 数组同时追踪多个活动节点）。同一来源和链ID复用同一实例；不同来源创建独立实例。
 
-#### 选项结算
+#### 选项结算与指标信号
 
-`resolveEventOption` 纯函数 + `reduceChooseEventOption` Store reducer 实现原子选项结算：从快照查找选项 → 预解析效果 → 原子应用（`applyEffects`） → 写入历史 → 从 pending 移除 → 推进阻塞指针 → 生成 `event.resolved`。
+`resolveEventOption` 纯函数 + `reduceChooseEventOption` Store reducer 实现原子选项结算：从快照查找选项 → 原子应用效果 → 从 `AppliedEffectRecord[]` 派生指标信号 → 写入历史 → 从 pending 移除 → 推进阻塞指针 → 生成 `event.resolved`。指标信号固定先于 `event.resolved` 进入级联；自动事件采用相同顺序。
 
 #### 计划事件激活与过期
 
 - `activateScheduledEvents`：按 `activateAtDay` → 优先级 → `instanceId` 稳定排序激活。
 - `expireEventInstances`：`currentDay > deadlineDay` 时过期（截止日当天仍可处理），记录 `finalStatus: 'expired'`。
 
-**当前尚未接入时间轴和 UI**（留给 #96）。
+计划事件和过期处理已经接入可中断时间轴；UI 仍留给 #98。
+
+## 政策时间轴与领域信号
+
+- `approved && effectiveAtDay <= currentDay` 的政策按 `effectiveAtDay → instanceId` 自动调用 `activatePolicy()`。
+- `implementing && nextMilestoneAtDay <= currentDay` 的政策按 `nextMilestoneAtDay → instanceId` 调用 `advancePolicyPhase()`；暂停与终态政策不会入选，同一日每项政策最多推进一次。
+- 显式政策 Action 和自动时间轴共用 `policy-transition-transaction.ts`，统一应用效果、更新实例、派生指标信号并交给事件 continuation。
+- `deriveMetricSignalsFromEffects()` 只为实际发生的 `world_metric` / `policy_metric` 变化发出信号；同一事务同一指标折叠为最终值并保持首次出现顺序。政策指标上下文来自实例冻结的 `originContext`。
+- 年度记录和属性影响提交后发出 `assessment.completed`；行动实例完成后发出 `action.completed`。
+- 当前正式最小事件 `industrial_park_progress_crisis` 验证政策阶段变化触发 urgent blocking 与同日月结恢复；政策和事件 UI 尚未实现。
 
 ## 配置模型
 
