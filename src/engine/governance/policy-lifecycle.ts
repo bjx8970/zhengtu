@@ -120,6 +120,7 @@ export function createPolicySnapshot(definition: PolicyDefinitionConfig): Policy
     category: definition.category,
     tags: [...definition.tags],
     effectiveDelayDays: definition.effectiveDelayDays,
+    approvalEffects: definition.approvalEffects.map((e) => structuredClone(e)),
     phases: definition.phases.map((phase) => ({
       id: phase.id,
       name: phase.name,
@@ -281,7 +282,7 @@ export function approvePolicy(params: ApprovePolicyParams): PolicyTransitionResu
   return {
     success: true,
     instance: updated,
-    effects: updated.snapshot.phases.length > 0 ? [] : [],
+    effects: updated.snapshot.approvalEffects,
     emittedSignals: signals,
   };
 }

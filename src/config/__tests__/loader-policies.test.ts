@@ -18,7 +18,7 @@ describe('ConfigLoader - 政策定义', () => {
       expect(policy!.category).toBe('economic');
     });
 
-    it('返回 undefined 当政策不存在', () => {
+    it('返回 null 当政策不存在', () => {
       expect(loader.getPolicyDefinition('nonexistent_policy')).toBeNull();
     });
   });

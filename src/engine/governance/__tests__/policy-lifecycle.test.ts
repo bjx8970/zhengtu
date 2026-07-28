@@ -663,6 +663,9 @@ describe('createPolicySnapshot', () => {
   it('从定义创建快照', () => {
     const def = makeDefinition({
       id: 'policy_snap',
+      approvalEffects: [
+        { target: 'character' as const, field: 'vigor', operation: 'set' as const, value: 10 },
+      ],
       phases: [
         {
           id: 'p1',

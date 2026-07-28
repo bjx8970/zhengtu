@@ -278,6 +278,7 @@ describe('NEW_GAME 隔离性', () => {
           category: 'economic',
           tags: [],
           effectiveDelayDays: 0,
+          approvalEffects: [],
           phases: [],
           contentVersion: 'test',
         },

@@ -190,6 +190,7 @@ describe('效果执行器 - 机构/地区/政策指标', () => {
           category: 'economic' as const,
           tags: [],
           effectiveDelayDays: 0,
+          approvalEffects: [],
           phases: [],
           contentVersion: 'test',
         },

@@ -50,6 +50,8 @@ export interface PolicyExecutableSnapshot {
   tags: string[];
   /** 生效延迟天数（批准后到可实施） */
   effectiveDelayDays: number;
+  /** 批准时立即应用的效果 */
+  approvalEffects: EffectDefinition[];
   /** 阶段列表（按顺序线性推进） */
   phases: PolicyPhaseDefinition[];
   /** 快照时的内容版本 */

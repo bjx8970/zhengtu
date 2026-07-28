@@ -69,9 +69,12 @@ function commitPolicyTransition(
 ): { success: boolean; instance?: PolicyInstance } {
   if (!result.success) return { success: false };
 
+  // 使用第一个已发出信号作为效果上下文（所有政策信号均携带 institutionId/regionId/originPositionId）
+  const contextSignal = result.emittedSignals[0] ?? null;
+
   // 应用效果
   if (result.effects.length > 0) {
-    const effectContext = buildEffectContext(draft, currentDay);
+    const effectContext = buildEffectContext(draft, currentDay, contextSignal);
     applyEffects(draft, result.effects, effectContext);
   }
 
@@ -192,11 +195,15 @@ function processPolicySignals(
 /**
  * 构建效果执行上下文。
  */
-function buildEffectContext(_draft: PlayerSave, currentDay: number) {
+function buildEffectContext(
+  _draft: PlayerSave,
+  currentDay: number,
+  signal: DomainSignalSnapshot | null,
+) {
   const loader = getConfigLoader();
   const institutions = loader.getAllInstitutions();
   return {
-    signal: null as unknown as DomainSignalSnapshot,
+    signal: signal as unknown as DomainSignalSnapshot,
     currentDay,
     attributeBounds: loader.getGameConfig().attributeBounds,
     knownInstitutionIds: new Set(institutions.map((i) => i.id)),
@@ -314,21 +321,10 @@ export function reduceApprovePolicy(
 
   if (!result.success) return null;
 
-  // 批准效果来自快照的 approvalEffects 实际不存在在 snapshot 中，
-  // 所以我们需要从原始定义获取批准效果
-  const definition = loader.getPolicyDefinition(instance.policyId);
-  const approvalEffects = definition?.approvalEffects ?? [];
-
-  // 构建包含批准效果的扩展结果
-  const extendedResult: PolicyTransitionResult = {
-    ...result,
-    effects: [...approvalEffects],
-  };
-
   const definitions = loader.getAllEventDefinitions();
   const committed = commitPolicyTransition(
     draft,
-    extendedResult,
+    result,
     currentDay,
     rng,
     idFactory,

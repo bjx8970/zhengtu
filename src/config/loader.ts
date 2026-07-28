@@ -156,9 +156,9 @@ class ConfigLoader {
     return this.policies.get(policyId) ?? null;
   }
 
-  /** 获取全部政策定义 */
+  /** 获取全部政策定义（深拷贝） */
   getAllPolicyDefinitions(): PolicyDefinitionConfig[] {
-    return ALL_POLICIES;
+    return ALL_POLICIES.map((p) => structuredClone(p));
   }
 
   /** 展开职位的部门配置 */
