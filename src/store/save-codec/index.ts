@@ -1,7 +1,7 @@
 /**
  * 存档严格解码器（Schema 7）
  *
- * 只接受当前版本（Schema 6）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 7）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
  * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 链式迁移。
  *

@@ -132,8 +132,10 @@ export function evaluateCivilServiceRankEligibility(
     (state.world.metrics[rule.quotaRequirement.metricId] ?? 0) < rule.quotaRequirement.requiredValue
   )
     add('quota_unavailable', 'Rank quota unavailable');
+  // Rank rules intentionally reject signalField conditions: eligibility is derived
+  // from durable career and assessment state, not a transient event payload.
   const signal = {
-    signalId: 'eligibility',
+    signalId: 'rank-eligibility',
     signalType: 'assessment.completed' as const,
     occurredAtDay: currentDay,
     data: { year: 0, score: 0, tier: '' },

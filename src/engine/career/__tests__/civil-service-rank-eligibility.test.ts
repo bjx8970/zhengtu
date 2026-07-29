@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../../store/game-store';
 import { getConfigLoader } from '../../../config/loader';
+import { CivilServiceRankConfigSchema } from '../../../config/schemas';
 import {
   calculateCareerServiceDays,
   evaluateCivilServiceRankEligibility,
@@ -71,5 +72,26 @@ describe('civil-service rank eligibility', () => {
     expect(evaluateCivilServiceRankEligibility(state, 360, 360, rule).failures[0]?.reason).toBe(
       'disciplinary_restriction',
     );
+  });
+
+  it('rejects transient signal-field conditions in rank rules', () => {
+    const config = {
+      definitions: getConfigLoader().getAllCivilServiceRankDefinitions(),
+      progressionRules: [
+        {
+          id: 'invalid',
+          fromRank: 'clerk_2',
+          toRank: 'clerk_1',
+          minDaysInRank: 0,
+          minServiceDays: 0,
+          minAssessmentCount: 0,
+          minQualifiedAssessmentCount: 0,
+          minExcellentAssessmentCount: 0,
+          quotaRequirement: null,
+          additionalConditions: [{ signalField: 'tier', op: 'eq', value: '优秀' }],
+        },
+      ],
+    };
+    expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(false);
   });
 });

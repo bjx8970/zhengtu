@@ -148,6 +148,15 @@ export const CivilServiceRankProgressionRuleSchema = z
     additionalConditions: z.array(ConditionExpressionSchema),
   })
   .strict();
+
+function hasSignalFieldCondition(
+  condition: import('../domain/conditions').ConditionExpression,
+): boolean {
+  if ('signalField' in condition) return true;
+  if ('all' in condition) return condition.all.some(hasSignalFieldCondition);
+  if ('any' in condition) return condition.any.some(hasSignalFieldCondition);
+  return 'not' in condition && hasSignalFieldCondition(condition.not);
+}
 export const CivilServiceRankConfigSchema = z
   .object({
     definitions: z.array(CivilServiceRankDefinitionSchema),
@@ -179,6 +188,11 @@ export const CivilServiceRankConfigSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Progression must be to the adjacent rank',
+        });
+      if (rule.additionalConditions.some(hasSignalFieldCondition))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Rank progression additional conditions cannot depend on an event signal',
         });
     }
   });
