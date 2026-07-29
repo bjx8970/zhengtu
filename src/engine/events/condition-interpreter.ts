@@ -148,6 +148,12 @@ function evaluateCareer(
       const years = (ctx.currentDay - appt.startedAtDay) / ctx.daysPerYear;
       return compareNumber(years, cond.value, cond.op);
     }
+    case 'days_in_civil_service_rank':
+      return compareNumber(
+        ctx.currentDay - career.civilServiceRankStartedAtDay,
+        cond.value,
+        cond.op,
+      );
     case 'has_experience': {
       // 履历中存在匹配机构 ID 或职位 ID 的记录
       return career.experiences.some(

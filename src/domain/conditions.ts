@@ -84,6 +84,11 @@ export type CareerCondition =
       op?: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
     }
   | { careerCheck: 'years_in_position'; value: number; op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq' }
+  | {
+      careerCheck: 'days_in_civil_service_rank';
+      value: number;
+      op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+    }
   | { careerCheck: 'has_experience'; value: string; op?: 'eq' };
 
 /** 世界指标条件 */
@@ -165,6 +170,13 @@ const SignalFieldConditionSchema = z.union([
       signalField: z.enum(SIGNAL_STRING_FIELDS),
       op: z.enum(['eq', 'neq']),
       value: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('days_in_civil_service_rank'),
+      value: z.number(),
+      op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
     })
     .strict(),
   // 数值字段：数值比较 + number

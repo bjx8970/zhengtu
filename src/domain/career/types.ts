@@ -154,6 +154,15 @@ export const CIVIL_SERVICE_RANK_LABELS: Record<CivilServiceRank, string> = {
 /** 公务员职级 Zod Schema */
 export const CivilServiceRankSchema = z.enum(CIVIL_SERVICE_RANKS);
 
+/** 职业限制类型。 */
+export const CAREER_RESTRICTION_TYPES = [
+  'rank_advancement_freeze',
+  'appointment_selection_freeze',
+  'disciplinary_action',
+] as const;
+export type CareerRestrictionType = (typeof CAREER_RESTRICTION_TYPES)[number];
+export const CareerRestrictionTypeSchema = z.enum(CAREER_RESTRICTION_TYPES);
+
 // ===== 任职类型 =====
 
 /** 任职类型常量数组 */
@@ -207,10 +216,11 @@ export const AppointmentReasonSchema = z.enum(APPOINTMENT_REASONS);
 
 /** 职业机会类型常量数组 */
 export const CAREER_OPPORTUNITY_TYPES = [
-  'promotion',
+  'leadership_vacancy',
   'lateral_transfer',
-  'rotation',
+  'temporary_assignment',
   'secondment',
+  'training',
   'demotion',
   'retirement',
 ] as const;
@@ -226,11 +236,12 @@ export const CareerOpportunityTypeSchema = z.enum(CAREER_OPPORTUNITY_TYPES);
 /** 职业机会状态常量数组 */
 export const CAREER_OPPORTUNITY_STATUSES = [
   'available',
-  'applied',
-  'under_review',
   'accepted',
   'rejected',
   'expired',
+  'in_process',
+  'resolved',
+  'cancelled',
 ] as const;
 
 /** 职业机会状态 */

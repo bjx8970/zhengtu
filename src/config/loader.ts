@@ -24,7 +24,7 @@ import type {
   LeadershipStyleConfig,
 } from '../types/config';
 import type { PositionConfigV2, InstitutionConfig } from '../types/position-v2';
-import type { InstitutionLevel } from '../domain/career/types';
+import type { CivilServiceRank, InstitutionLevel } from '../domain/career/types';
 import type { EventDefinition } from '../domain/events/definition';
 import type { DomainSignal } from '../domain/governance/types';
 import type { PolicyDefinitionConfig } from '../types/config';
@@ -32,6 +32,7 @@ import {
   PositionConfigArraySchema,
   InstitutionConfigMapSchema,
   PolicyDefinitionArraySchema,
+  CivilServiceRankConfigSchema,
 } from './schemas';
 import { EventDefinitionArraySchema } from '../domain/events/definition';
 import deptTemplateData from './templates/departments.json' with { type: 'json' };
@@ -46,6 +47,7 @@ import backgroundData from './templates/backgrounds.json' with { type: 'json' };
 import leadershipStyleData from './templates/leadership-styles.json' with { type: 'json' };
 import eventsData from './templates/events.json' with { type: 'json' };
 import policiesData from './templates/policies.json' with { type: 'json' };
+import civilServiceRanksData from './career/civil-service-ranks.json' with { type: 'json' };
 
 type RawDeptMap = Record<string, DepartmentTemplate>;
 
@@ -61,6 +63,7 @@ const parsedPositions = PositionConfigArraySchema.parse(positionsData);
 const parsedInstitutions = InstitutionConfigMapSchema.parse(institutionsData);
 const parsedEvents = EventDefinitionArraySchema.parse(eventsData);
 const parsedPolicies = PolicyDefinitionArraySchema.parse(policiesData);
+const parsedCivilServiceRanks = CivilServiceRankConfigSchema.parse(civilServiceRanksData);
 const ALL_POSITIONS = parsedPositions;
 const ALL_INSTITUTIONS = parsedInstitutions;
 const ALL_EVENTS = parsedEvents;
@@ -79,6 +82,7 @@ class ConfigLoader {
   private events: Map<string, EventDefinition>;
   private eventsBySignal: Map<DomainSignal, EventDefinition[]>;
   private policies: Map<string, PolicyDefinitionConfig>;
+  private civilServiceRanks: typeof parsedCivilServiceRanks;
   private regionConfig: RegionConfig;
   private universityConfig: UniversityConfig;
   private backgroundConfig: BackgroundConfig;
@@ -101,6 +105,7 @@ class ConfigLoader {
       }
     }
     this.policies = new Map(ALL_POLICIES.map((p) => [p.id, p]));
+    this.civilServiceRanks = parsedCivilServiceRanks;
     this.gameConfig = constantsData as unknown as GameConfig;
     this.regionConfig = regionData as unknown as RegionConfig;
     this.universityConfig = universityData as unknown as UniversityConfig;
@@ -160,6 +165,23 @@ class ConfigLoader {
   /** 获取全部政策定义（深拷贝） */
   getAllPolicyDefinitions(): PolicyDefinitionConfig[] {
     return ALL_POLICIES.map((p) => structuredClone(p));
+  }
+
+  /** 查询公务员职级定义，未知职级不回退。 */
+  getCivilServiceRankDefinition(rank: CivilServiceRank) {
+    const definition = this.civilServiceRanks.definitions.find((item) => item.id === rank);
+    return definition ? structuredClone(definition) : null;
+  }
+
+  /** 查询当前职级的唯一晋升规则。 */
+  getCivilServiceRankProgressionRule(rank: CivilServiceRank) {
+    const rule = this.civilServiceRanks.progressionRules.find((item) => item.fromRank === rank);
+    return rule ? structuredClone(rule) : null;
+  }
+
+  /** 获取所有正式职级定义。 */
+  getAllCivilServiceRankDefinitions() {
+    return this.civilServiceRanks.definitions.map((item) => structuredClone(item));
   }
 
   /** 展开职位的部门配置 */

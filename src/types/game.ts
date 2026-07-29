@@ -7,15 +7,7 @@
  * - game.ts：引擎计算过程中的中间数据结构
  */
 
-import type {
-  FileType,
-  FileCategory,
-  SentimentType,
-  OrgInspectResult,
-  PromotionStage,
-  InvestigationEvidence,
-  CareerLine,
-} from './enums';
+import type { FileType, FileCategory, SentimentType, InvestigationEvidence } from './enums';
 import type { KPITier } from './enums';
 import type { SlotTierKey, SlotOccupant, SlotState } from './player';
 import type { ActionTemplate } from './config';
@@ -118,46 +110,6 @@ export interface Sentiment {
   heatIndex: number;
   remainingDays: number;
   resolved: boolean;
-}
-
-/** 晋升目标候选职位 */
-export interface PromotionCandidate {
-  positionId: string;
-  positionName: string;
-  level: number;
-  careerLine: CareerLine;
-}
-
-/** 晋升流程的上下文数据（传入各阶段计算函数） */
-export interface PromotionContext {
-  playerLevel: number;
-  playerScore: number;
-  yearsInPosition: number;
-  politicalCapital: number;
-  corruptionRisk: number;
-  styleScores: Record<string, number>;
-  relations: { colleagues: Record<string, number> };
-  assessmentHistory: { score: number; tier: string }[];
-  hasDisciplinaryRecord: boolean;
-  hasGrassrootsExperience: boolean;
-  hasMultiRegionExperience: boolean;
-  charisma: number;
-  superiorFavor: number;
-  performance: number;
-  competence: number;
-  integrity: number;
-}
-
-/** 晋升流程的阶段性结果 */
-export interface PromotionResult {
-  stage: PromotionStage;
-  passed: boolean;
-  details: string;
-  voteCount?: number;
-  inspectionResult?: OrgInspectResult;
-  reviewOpinions?: Record<string, 'pass' | 'fail'>;
-  committeeVotes?: { for: number; against: number };
-  complaints?: boolean;
 }
 
 /** 单个 KPI 指标的计算结果 */

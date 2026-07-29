@@ -88,7 +88,7 @@ describe('domain signal production', () => {
       originInstitutionId: state.career.appointment.institutionId,
       originRegionId: state.career.appointment.regionId,
       executableSnapshot: {
-        contentVersion: '2026.07.4',
+        contentVersion: '2026.07.5',
         department: { id: department.id, name: department.name },
         action: { id: 'staff_meeting' },
         attributeBounds: { competence: [0, 100] },
