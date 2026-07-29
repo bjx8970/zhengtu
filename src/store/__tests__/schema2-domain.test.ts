@@ -226,6 +226,35 @@ describe('Schema 2 存档', () => {
     expect(localStorage.getItem(result.backupKey)).toBe(json);
   });
 
+  it('Schema 6→7 确定性补齐任职与职级运行时字段', () => {
+    const state = createInitialState();
+    const envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(state))) as Record<string, unknown>;
+    envelope.schemaVersion = 6;
+    envelope.contentVersion = '2026.07.4';
+    const career = (envelope.state as Record<string, unknown>).career as Record<string, unknown>;
+    const appointment = career.appointment as Record<string, unknown>;
+    delete appointment.appointmentId;
+    delete appointment.appointmentReason;
+    delete appointment.sourceOpportunityId;
+    delete career.civilServiceRankStartedAtDay;
+    delete career.civilServiceRankHistory;
+    delete career.restrictions;
+
+    const result = decodeCurrentSave(JSON.stringify(envelope));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.career.appointment).toMatchObject({
+      appointmentId: `legacy-appointment-${state.career.appointment.positionId}-0`,
+      appointmentReason: 'initial_assignment',
+      sourceOpportunityId: null,
+    });
+    expect(result.state?.career).toMatchObject({
+      civilServiceRankStartedAtDay: 0,
+      civilServiceRankHistory: [],
+      restrictions: [],
+    });
+  });
+
   it('Schema 1 存档被拒绝并创建备份', () => {
     const schema1Envelope = {
       schemaVersion: 1,

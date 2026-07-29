@@ -16,4 +16,20 @@ describe('ADVANCE_CIVIL_SERVICE_RANK', () => {
     expect(store.getState().world.metrics['rank_quota.clerk_1']).toBe(0);
     expect(store.getState().career.civilServiceRankHistory[0]?.id).toBe('rank-change');
   });
+
+  it('does not modify state when the current rank has no progression rule', () => {
+    const state = createInitialState();
+    state.career.civilServiceRank = 'inspector_1';
+    const store = createTestStore(state);
+    const before = structuredClone(store.getRawState());
+    store.dispatch({ type: 'ADVANCE_CIVIL_SERVICE_RANK' });
+    expect(store.getRawState()).toEqual(before);
+  });
+
+  it('does not modify state when eligibility fails', () => {
+    const store = createTestStore();
+    const before = structuredClone(store.getRawState());
+    store.dispatch({ type: 'ADVANCE_CIVIL_SERVICE_RANK' });
+    expect(store.getRawState()).toEqual(before);
+  });
 });

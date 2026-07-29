@@ -1,9 +1,9 @@
 /**
- * 存档严格解码器（Schema 6）
+ * 存档严格解码器（Schema 7）
  *
  * 只接受当前版本（Schema 6）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 → 5 → 6 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -1232,10 +1232,11 @@ export function migrateSchema6To7(prev: Record<string, unknown>): Record<string,
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
  * - Schema 2：链式迁移至 Schema 7；
- * - Schema 3：链式迁移至 Schema 6；
- * - Schema 4：链式迁移至 Schema 6；
- * - Schema 5：迁移至 Schema 6；
- * - 当前版本（Schema 6）：直接解码；
+ * - Schema 3：链式迁移至 Schema 7；
+ * - Schema 4：链式迁移至 Schema 7；
+ * - Schema 5：链式迁移至 Schema 7；
+ * - Schema 6：迁移至 Schema 7；
+ * - 当前版本（Schema 7）：直接解码；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
