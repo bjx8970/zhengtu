@@ -10,6 +10,7 @@ import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import { createEventSnapshot } from '../../engine/events/event-orchestrator';
 import { getConfigLoader } from '../../config/loader';
 import { createInitialState, createTestStore } from '../game-store';
+import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
 
 function eventDefinition(
   id: string,
@@ -446,23 +447,27 @@ describe('domain signal production', () => {
     expect(interrupted.events.history.some((record) => record.eventId === sibling.id)).toBe(false);
     expect(interrupted.character.vigor).toBe(originalVigor);
     expect(interrupted.time.pendingContinuation).not.toBeNull();
-    if (!blocker) return;
+    const decoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(interrupted)));
+    expect(decoded.success).toBe(true);
+    expect(decoded.state).toBeDefined();
+    if (!decoded.state || !blocker) return;
+    const resumedStore = createTestStore(decoded.state);
 
-    store.dispatch({
+    resumedStore.dispatch({
       type: 'CHOOSE_EVENT_OPTION',
       eventInstanceId: blocker.instanceId,
       optionId: 'coordinate_rescue',
       _rng: () => 0,
       _idFactory: nextId,
     });
-    store.dispatch({
+    resumedStore.dispatch({
       type: 'ADVANCE_TIME',
       granularity: 'day',
       _rng: () => 0,
       _idFactory: nextId,
     });
 
-    const resumed = store.getRawState();
+    const resumed = resumedStore.getRawState();
     expect(resumed.time.totalDaysPlayed).toBe(1);
     expect(resumed.time.pendingContinuation).toBeNull();
     expect(resumed.events.scheduled.map((event) => event.instanceId)).not.toContain(
