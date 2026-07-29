@@ -172,13 +172,6 @@ const SignalFieldConditionSchema = z.union([
       value: z.string(),
     })
     .strict(),
-  z
-    .object({
-      careerCheck: z.literal('days_in_civil_service_rank'),
-      value: z.number(),
-      op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
-    })
-    .strict(),
   // 数值字段：数值比较 + number
   z
     .object({
@@ -230,6 +223,13 @@ const CareerConditionSchema = z.union([
   z
     .object({
       careerCheck: z.literal('years_in_position'),
+      value: z.number(),
+      op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('days_in_civil_service_rank'),
       value: z.number(),
       op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
     })

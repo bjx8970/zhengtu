@@ -149,13 +149,14 @@ export const CivilServiceRankProgressionRuleSchema = z
   })
   .strict();
 
-function hasSignalFieldCondition(
+function hasSignalDependentCondition(
   condition: import('../domain/conditions').ConditionExpression,
 ): boolean {
   if ('signalField' in condition) return true;
-  if ('all' in condition) return condition.all.some(hasSignalFieldCondition);
-  if ('any' in condition) return condition.any.some(hasSignalFieldCondition);
-  return 'not' in condition && hasSignalFieldCondition(condition.not);
+  if ('policyRef' in condition && condition.policyRef.source === 'signal') return true;
+  if ('all' in condition) return condition.all.some(hasSignalDependentCondition);
+  if ('any' in condition) return condition.any.some(hasSignalDependentCondition);
+  return 'not' in condition && hasSignalDependentCondition(condition.not);
 }
 export const CivilServiceRankConfigSchema = z
   .object({
@@ -189,7 +190,7 @@ export const CivilServiceRankConfigSchema = z
           code: z.ZodIssueCode.custom,
           message: 'Progression must be to the adjacent rank',
         });
-      if (rule.additionalConditions.some(hasSignalFieldCondition))
+      if (rule.additionalConditions.some(hasSignalDependentCondition))
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Rank progression additional conditions cannot depend on an event signal',

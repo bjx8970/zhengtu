@@ -94,4 +94,31 @@ describe('civil-service rank eligibility', () => {
     };
     expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(false);
   });
+
+  it('rejects signal-sourced policy conditions in rank rules', () => {
+    const config = {
+      definitions: getConfigLoader().getAllCivilServiceRankDefinitions(),
+      progressionRules: [
+        {
+          id: 'invalid-policy-signal',
+          fromRank: 'clerk_2',
+          toRank: 'clerk_1',
+          minDaysInRank: 0,
+          minServiceDays: 0,
+          minAssessmentCount: 0,
+          minQualifiedAssessmentCount: 0,
+          minExcellentAssessmentCount: 0,
+          quotaRequirement: null,
+          additionalConditions: [
+            {
+              policyRef: { source: 'signal' },
+              check: 'status_is',
+              value: 'implementing',
+            },
+          ],
+        },
+      ],
+    };
+    expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(false);
+  });
 });

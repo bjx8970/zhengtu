@@ -6,7 +6,7 @@
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 仅在实际状态变化时写入 localStorage
  *
- * 当前持久化结构为 Schema 6，包含政策/事件运行时和同日时间轴 continuation。
+ * 当前持久化结构为 Schema 7，包含政策/事件运行时、同日时间轴 continuation 与职级履历。
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
