@@ -9,6 +9,8 @@ import { createInitialState, createTestStore } from '../game-store';
 import { createEventSnapshot } from '../../engine/events/event-orchestrator';
 import { getConfigLoader } from '../../config/loader';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
+import type { EventInstance } from '../../domain/events/state';
+import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
 
 function makeSignal(signalId: string, occurredAtDay = 0): DomainSignalSnapshot {
   return {
@@ -20,6 +22,125 @@ function makeSignal(signalId: string, occurredAtDay = 0): DomainSignalSnapshot {
 }
 
 describe('event timeline integration', () => {
+  it('自动激活政策、推进里程碑，并在存档恢复后补做同日月结', () => {
+    const loader = getConfigLoader();
+    const state = createInitialState();
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.baseConsumption * item.consumptionCoefficient > 0);
+    expect(department).toBeDefined();
+    if (!department) return;
+    state.remainingBudget = 10_000;
+    state.actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `policy-timeline-${sequence++}`;
+
+    store.dispatch({
+      type: 'PROPOSE_POLICY',
+      policyId: 'industrial_park_support',
+      _idFactory: nextId,
+    });
+    const policy = store.getRawState().governance.policies[0];
+    expect(policy).toBeDefined();
+    if (!policy) return;
+    store.dispatch({
+      type: 'APPROVE_POLICY',
+      policyInstanceId: policy.instanceId,
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const activated = store.getRawState().governance.policies[0];
+    expect(activated?.status).toBe('implementing');
+    expect(activated?.currentPhaseId).toBe('preparation');
+    expect(activated?.phaseEnteredAtDay).toBe(0);
+    expect(activated?.nextMilestoneAtDay).toBe(30);
+    expect(store.getRawState().time.totalDaysPlayed).toBe(1);
+
+    const stabilityBeforeMilestone = store.getRawState().character.stability;
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'month',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const blocked = store.getRawState();
+    const blocker = blocked.events.pending.find(
+      (event) => event.eventId === 'industrial_park_progress_crisis',
+    );
+    expect(blocked.time.totalDaysPlayed).toBe(30);
+    expect(blocked.governance.policies[0]?.currentPhaseId).toBe('implementation');
+    expect(blocked.character.stability).toBe(stabilityBeforeMilestone + 5);
+    expect(blocker?.instanceId).toBe(blocked.events.activeBlockingEventId);
+    expect(blocker?.sourceKey).toBe(policy.instanceId);
+    expect(blocker?.triggerContext.data).toMatchObject({
+      policyInstanceId: policy.instanceId,
+      previousPhaseId: 'preparation',
+      currentPhaseId: 'implementation',
+    });
+    expect(blocked.time.pendingContinuation?.remainingNodes.map((node) => node.type)).toContain(
+      'monthly_settlement',
+    );
+    expect(blocked.remainingBudget).toBe(10_000);
+
+    const decoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(blocked)));
+    expect(decoded.success).toBe(true);
+    expect(decoded.state).toBeDefined();
+    if (!decoded.state || !blocker) return;
+    const resumedStore = createTestStore(decoded.state);
+    resumedStore.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: blocker.instanceId,
+      optionId: 'rectification_plan',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    resumedStore.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const resumed = resumedStore.getRawState();
+    expect(resumed.time.totalDaysPlayed).toBe(30);
+    expect(resumed.time.pendingContinuation).toBeNull();
+    expect(resumed.remainingBudget).toBeLessThan(10_000);
+    expect(resumed.governance.policies[0]?.currentPhaseId).toBe('implementation');
+    expect(resumed.character.stability).toBe(stabilityBeforeMilestone + 5);
+    const budgetAfterSettlement = resumed.remainingBudget;
+
+    resumedStore.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    const nextDay = resumedStore.getRawState();
+    expect(nextDay.time.totalDaysPlayed).toBe(31);
+    expect(nextDay.remainingBudget).toBe(budgetAfterSettlement);
+    expect(
+      nextDay.events.history.filter(
+        (record) => record.eventId === 'industrial_park_progress_crisis',
+      ),
+    ).toHaveLength(1);
+  });
+
   it('stops a long advance on the exact day a blocking event activates', () => {
     const state = createInitialState();
     const snapshot = createEventSnapshot({
@@ -62,6 +183,79 @@ describe('event timeline integration', () => {
     expect(
       after.events.pending.find((item) => item.instanceId === 'scheduled_blocker')?.status,
     ).toBe('active');
+    expect(after.time.pendingContinuation?.remainingNodes.map((node) => node.type)).not.toContain(
+      'scheduled_event_activation',
+    );
+  });
+
+  it('expires newly overdue pending events before a same-day blocker pauses advancement', () => {
+    const state = createInitialState();
+    const overdueSnapshot = createEventSnapshot({
+      id: 'overdue_before_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Overdue event',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'repeatable' },
+      activation: { deadlineDays: 1 },
+      options: [{ id: 'ack', label: '处理', description: '', effects: [] }],
+    });
+    const blockerSnapshot = createEventSnapshot({
+      id: 'existing_blocker',
+      chainId: null,
+      nodeId: null,
+      title: 'Existing blocker',
+      description: '',
+      category: 'emergency',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'ack', label: '处理', description: '', effects: [] }],
+    });
+    const overdue: EventInstance = {
+      instanceId: 'overdue_instance',
+      eventId: overdueSnapshot.eventId,
+      status: 'pending',
+      triggeredAtDay: 0,
+      activatedAtDay: 0,
+      deadlineDay: 0,
+      triggerContext: makeSignal('overdue_signal'),
+      sourceKey: 'repeatable_source',
+      chainInstanceId: null,
+      snapshot: overdueSnapshot,
+    };
+    state.events.pending.push(overdue);
+    state.events.scheduled.push({
+      instanceId: 'scheduled_blocker_instance',
+      eventId: blockerSnapshot.eventId,
+      scheduledAtDay: 0,
+      activateAtDay: 1,
+      triggerContext: makeSignal('blocker_signal'),
+      sourceKey: 'blocker_source',
+      chainInstanceId: null,
+      snapshot: blockerSnapshot,
+    });
+    const store = createTestStore(state);
+
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+    const after = store.getRawState();
+    expect(after.time.totalDaysPlayed).toBe(1);
+    expect(after.events.activeBlockingEventId).toBe('scheduled_blocker_instance');
+    expect(after.events.pending.map((event) => event.instanceId)).not.toContain(overdue.instanceId);
+    expect(after.events.history).toContainEqual(
+      expect.objectContaining({
+        instanceId: overdue.instanceId,
+        finalStatus: 'expired',
+        completedAtDay: 1,
+      }),
+    );
   });
 
   it('activates a year-end blocker before monthly settlement and annual assessment', () => {
@@ -80,6 +274,7 @@ describe('event timeline integration', () => {
       day: config.daysPerMonth,
       granularity: 'day',
       totalDaysPlayed: config.monthsPerYear * config.daysPerMonth - 1,
+      pendingContinuation: null,
     };
     state.remainingBudget = 10_000;
     state.actions.departmentStates[department.id] = {
@@ -154,7 +349,7 @@ describe('event timeline integration', () => {
       activation: {},
       options: [],
       automaticOutcome: {
-        effects: [{ target: 'character', field: 'vigor', operation: 'add', value: 10 }],
+        effects: [{ target: 'character', field: 'vigor', operation: 'add', value: -10 }],
       },
     });
     state.events.scheduled.push(
@@ -191,6 +386,28 @@ describe('event timeline integration', () => {
     );
     expect(after.events.history.some((item) => item.eventId === 'same_day_automatic')).toBe(false);
     expect(after.character.vigor).toBe(originalVigor);
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: 'same_day_blocker_instance',
+      optionId: 'ack',
+    });
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+
+    const resumed = store.getRawState();
+    expect(resumed.time.totalDaysPlayed).toBe(1);
+    expect(resumed.time.pendingContinuation).toBeNull();
+    expect(resumed.events.scheduled.map((item) => item.instanceId)).not.toContain(
+      'same_day_automatic_instance',
+    );
+    expect(resumed.events.pending.map((item) => item.instanceId)).not.toContain(
+      'same_day_blocker_instance',
+    );
+    expect(
+      resumed.events.history.filter((item) => item.instanceId === 'same_day_blocker_instance'),
+    ).toHaveLength(1);
+    expect(resumed.events.history.some((item) => item.eventId === 'same_day_automatic')).toBe(true);
+    expect(resumed.character.vigor).toBe(originalVigor - 10);
   });
 
   it('keeps an urgent automatic event scheduled when a same-day low-priority blocker exists', () => {

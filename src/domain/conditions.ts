@@ -40,7 +40,12 @@ export const SIGNAL_STRING_FIELDS = [
 export const SIGNAL_NUMERIC_FIELDS = ['value', 'year', 'score'] as const;
 
 /** 可空字符串字段（允许 eq/neq + string|null，可表达 null 语义） */
-export const SIGNAL_NULLABLE_FIELDS = ['previousPositionId', 'optionId'] as const;
+export const SIGNAL_NULLABLE_FIELDS = [
+  'previousPositionId',
+  'previousPhaseId',
+  'currentPhaseId',
+  'optionId',
+] as const;
 
 /** 信号字段条件：按字段类别判别联合，约束操作符和值类型 */
 export type SignalFieldCondition =

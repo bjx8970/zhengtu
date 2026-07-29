@@ -20,13 +20,31 @@ function makeAction(overrides?: Partial<ActionTemplate>): ActionTemplate {
 
 function occupant(overrides?: Partial<SlotOccupant>): SlotOccupant {
   return {
+    instanceId: 'action-instance',
     actionId: 'other_action',
     deptId: 'dept_a',
     actionName: '行动',
+    originPositionId: 'position-a',
+    originInstitutionId: 'institution-a',
+    originRegionId: 'region-a',
     category: 'minor',
     startedAtDay: 0,
     durationDays: 3,
     cooldownDays: 5,
+    executableSnapshot: {
+      contentVersion: 'test',
+      department: { id: 'dept_a', name: '部门 A' },
+      attributeBounds: {},
+      action: {
+        id: 'other_action',
+        name: '行动',
+        category: 'minor',
+        durationDays: 3,
+        cooldownDays: 5,
+        budgetDelta: 0,
+        effects: [],
+      },
+    },
     ...overrides,
   };
 }

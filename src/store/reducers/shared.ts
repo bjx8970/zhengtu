@@ -1,5 +1,5 @@
 /**
- * Reducer 共享工具函数（Schema 2）
+ * Reducer 共享工具函数
  *
  * 提供各 reducer 模块共用的辅助函数。
  */

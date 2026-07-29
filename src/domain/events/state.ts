@@ -1,7 +1,7 @@
 /**
  * 事件运行时持久化状态
  *
- * 定义 EventRuntimeState 及其子结构（Schema 4）：
+ * 定义 EventRuntimeState 及其子结构（该模型在 Schema 4 引入）：
  * - EventExecutableSnapshot：事件可执行快照（从 EventDefinition 复制）
  * - EventInstance：事件实例（含来源键和快照）
  * - ScheduledEventInstance：计划事件实例

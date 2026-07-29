@@ -192,6 +192,33 @@ describe('dispatch 持久化行为', () => {
 
 describe('行动效果结算语义', () => {
   function makeSlotsWithAction(occupant: Partial<SlotOccupant>): PlayerSave['actions'] {
+    const instanceId = occupant.instanceId ?? 'action-instance';
+    const actionId = occupant.actionId ?? 'document_processing';
+    const deptId = occupant.deptId ?? 'admin_l1_0_dept_0';
+    const actionName = occupant.actionName ?? '公文处理';
+    const category = occupant.category ?? 'major';
+    const durationDays = occupant.durationDays ?? 3;
+    const cooldownDays = occupant.cooldownDays ?? 14;
+    const executableSnapshot = occupant.executableSnapshot ?? {
+      contentVersion: 'test',
+      department: { id: deptId, name: '综合办公室' },
+      attributeBounds: getConfigLoader().getGameConfig().attributeBounds,
+      action: {
+        id: actionId,
+        name: actionName,
+        category,
+        durationDays,
+        cooldownDays,
+        budgetDelta: 0,
+        effects: [
+          {
+            target: 'dept.kpi.office_efficiency',
+            operation: 'add' as const,
+            value: 5,
+          },
+        ],
+      },
+    };
     return {
       slots: {
         primary: {
@@ -199,13 +226,18 @@ describe('行动效果结算语义', () => {
           count: 3,
           occupants: [
             {
-              actionId: occupant.actionId ?? 'document_processing',
-              deptId: occupant.deptId ?? 'admin_l1_0_dept_0',
-              actionName: '公文处理',
-              category: 'major',
+              instanceId,
+              actionId,
+              deptId,
+              actionName,
+              originPositionId: occupant.originPositionId ?? 'admin_l1_0',
+              originInstitutionId: occupant.originInstitutionId ?? 'institution_county_government',
+              originRegionId: occupant.originRegionId ?? 'region_county_a',
+              category,
               startedAtDay: occupant.startedAtDay ?? 0,
-              durationDays: occupant.durationDays ?? 3,
-              cooldownDays: occupant.cooldownDays ?? 14,
+              durationDays,
+              cooldownDays,
+              executableSnapshot,
               runtimeSnapshot: occupant.runtimeSnapshot,
             },
             null,
@@ -441,7 +473,7 @@ describe('行动效果结算语义', () => {
   it('冷却使用 SlotOccupant.cooldownDays 快照', () => {
     const store = createTestStore({
       actions: makeSlotsWithAction({
-        actionId: 'approve_project',
+        actionId: 'document_processing',
         startedAtDay: 0,
         durationDays: 3,
         cooldownDays: 20, // 自定义冷却快照
@@ -459,7 +491,7 @@ describe('行动效果结算语义', () => {
     // completesAtDay = 0 + 3 = 3, cooldownUntil = 3 + 20 = 23
     expect(
       state.actions.departmentStates['admin_l1_0_dept_0']?.actionCooldownUntilDays[
-        'approve_project'
+        'document_processing'
       ],
     ).toBe(23);
   });

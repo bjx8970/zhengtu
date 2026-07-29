@@ -1,9 +1,9 @@
 /**
- * 存档严格解码器（Schema 5）
+ * 存档严格解码器（Schema 6）
  *
- * 只接受当前版本（Schema 5）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 6）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 → 5 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 → 6 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -43,6 +43,8 @@ import {
   EventOutcomePayloadSchema,
   EventRepeatPolicySchema,
 } from '../../domain/events/definition';
+import { getConfigLoader } from '../../config/loader';
+import { createActionExecutableSnapshot } from '../action-executable-snapshot';
 
 /** 不兼容存档备份的 localStorage key 前缀 */
 const BACKUP_KEY_PREFIX = 'zhengtu_incompatible_save';
@@ -396,16 +398,64 @@ const WorldStateSchema = z
   })
   .strict();
 
+/** ActionExecutableSnapshot Schema */
+const ActionExecutableSnapshotSchema = z
+  .object({
+    contentVersion: z.string().min(1),
+    department: z
+      .object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+      })
+      .strict(),
+    action: z
+      .object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        description: z.string().optional(),
+        durationDays: z.number().int().nonnegative(),
+        category: z.enum(['major', 'minor', 'routine']),
+        cooldownDays: z.number().int().nonnegative(),
+        budgetDelta: z.number(),
+        effects: z.array(
+          z
+            .object({
+              target: z.string().min(1),
+              operation: z.enum(['add', 'multiply', 'set']),
+              value: z.number(),
+              range: z
+                .object({
+                  min: z.number(),
+                  max: z.number(),
+                })
+                .strict()
+                .optional(),
+            })
+            .strict(),
+        ),
+        unlockLevel: z.number().optional(),
+        styleAlignment: z.string().optional(),
+      })
+      .strict(),
+    attributeBounds: z.record(z.string(), z.tuple([z.number(), z.number()])),
+  })
+  .strict();
+
 /** SlotOccupant Schema */
 const SlotOccupantSchema = z
   .object({
+    instanceId: z.string().min(1),
     actionId: z.string(),
     deptId: z.string(),
     actionName: z.string(),
+    originPositionId: z.string().min(1),
+    originInstitutionId: z.string().min(1),
+    originRegionId: z.string().min(1),
     category: z.enum(['major', 'minor', 'routine']),
     startedAtDay: z.number(),
     durationDays: z.number(),
     cooldownDays: z.number(),
+    executableSnapshot: ActionExecutableSnapshotSchema,
     runtimeSnapshot: z
       .object({
         effectivenessMultiplier: z.number(),
@@ -415,7 +465,24 @@ const SlotOccupantSchema = z
       .strict()
       .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((occupant, ctx) => {
+    const action = occupant.executableSnapshot.action;
+    const department = occupant.executableSnapshot.department;
+    if (
+      action.id !== occupant.actionId ||
+      action.name !== occupant.actionName ||
+      action.category !== occupant.category ||
+      action.durationDays !== occupant.durationDays ||
+      action.cooldownDays !== occupant.cooldownDays ||
+      department.id !== occupant.deptId
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Action executable snapshot does not match its slot occupant',
+      });
+    }
+  });
 
 /** ActionRuntimeState Schema */
 const ActionRuntimeStateSchema = z
@@ -513,19 +580,118 @@ const CharacterStateSchema = z
   })
   .strict();
 
+const TimelineContinuationNodeSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('scheduled_event_activation'),
+      absoluteDay: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('event_deadline'),
+      absoluteDay: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('monthly_settlement'),
+      absoluteDay: z.number().int().nonnegative(),
+      month: z.number().int().min(1).max(12),
+      year: z.number().int().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('annual_assessment'),
+      absoluteDay: z.number().int().nonnegative(),
+      year: z.number().int().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('political_cycle'),
+      absoluteDay: z.number().int().nonnegative(),
+      year: z.number().int().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('retirement_check'),
+      absoluteDay: z.number().int().nonnegative(),
+    })
+    .strict(),
+]);
+
+const TIMELINE_NODE_PRIORITY: Record<
+  z.infer<typeof TimelineContinuationNodeSchema>['type'],
+  number
+> = {
+  scheduled_event_activation: 0,
+  event_deadline: 1,
+  monthly_settlement: 2,
+  annual_assessment: 3,
+  political_cycle: 4,
+  retirement_check: 5,
+};
+
+const GameTimeStateSchema = z
+  .object({
+    year: z.number().int().min(1),
+    month: z.number().int().min(1).max(12),
+    day: z.number().int().min(1).max(30),
+    granularity: z.enum(['day', 'week', 'month']),
+    totalDaysPlayed: z.number().int().nonnegative(),
+    pendingContinuation: z
+      .object({
+        absoluteDay: z.number().int().nonnegative(),
+        remainingNodes: z.array(TimelineContinuationNodeSchema),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict()
+  .superRefine((time, ctx) => {
+    const continuation = time.pendingContinuation;
+    if (!continuation) return;
+    if (continuation.absoluteDay !== time.totalDaysPlayed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Timeline continuation must belong to the current absolute day',
+      });
+    }
+    const seen = new Set<string>();
+    let previousPriority = -1;
+    for (const node of continuation.remainingNodes) {
+      if (node.absoluteDay !== continuation.absoluteDay) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Timeline continuation node absolute day mismatch',
+        });
+      }
+      if (seen.has(node.type)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate timeline continuation node "${node.type}"`,
+        });
+      }
+      seen.add(node.type);
+      const priority = TIMELINE_NODE_PRIORITY[node.type];
+      if (priority < previousPriority) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Timeline continuation nodes are not in fixed execution order',
+        });
+      }
+      previousPriority = priority;
+    }
+  });
+
 /** PlayerSave Schema（当前版本，.strict() 拒绝未知字段） */
 const PlayerSaveSchema = z
   .object({
     character: CharacterStateSchema,
-    time: z
-      .object({
-        year: z.number().int().min(1),
-        month: z.number().int().min(1).max(12),
-        day: z.number().int().min(1).max(30),
-        granularity: z.enum(['day', 'week', 'month']),
-        totalDaysPlayed: z.number().min(0),
-      })
-      .strict(),
+    time: GameTimeStateSchema,
     career: CareerStateSchema,
     governance: GovernanceStateSchema,
     events: EventRuntimeStateSchema,
@@ -814,14 +980,105 @@ export function migrateSchema4To5(prev: Record<string, unknown>): Record<string,
 }
 
 /**
+ * 将 Schema 5 存档迁移至 Schema 6。
+ *
+ * 新增空时间轴 continuation，并使用 Schema 5 当前任职为执行中行动冻结
+ * 来源上下文；行动 ID 完全由槽位、开始日和行动配置 ID 确定。
+ *
+ * @param prev Schema 5 SaveEnvelope 对象
+ * @returns 迁移后的 Schema 6 SaveEnvelope 对象
+ */
+export function migrateSchema5To6(prev: Record<string, unknown>): Record<string, unknown> {
+  const migrated = structuredClone(prev);
+  const legacyContentVersion = migrated.contentVersion;
+  if (legacyContentVersion !== '2026.07.3') {
+    throw new Error(
+      `Schema 5 content version "${String(legacyContentVersion)}" has no reliable action migration`,
+    );
+  }
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const time = state?.time as Record<string, unknown> | undefined;
+  const career = state?.career as Record<string, unknown> | undefined;
+  const appointment = career?.appointment as Record<string, unknown> | undefined;
+  const actions = state?.actions as Record<string, unknown> | undefined;
+  const slots = actions?.slots as Record<string, unknown> | undefined;
+  if (!time || !appointment || !slots) {
+    throw new Error('Schema 5 save is missing time, appointment, or action slots');
+  }
+  const positionId = appointment.positionId;
+  const institutionId = appointment.institutionId;
+  const regionId = appointment.regionId;
+  if (
+    typeof positionId !== 'string' ||
+    typeof institutionId !== 'string' ||
+    typeof regionId !== 'string'
+  ) {
+    throw new Error('Schema 5 appointment context is invalid');
+  }
+  const loader = getConfigLoader();
+  const departments = loader.resolvePositionDepartments(positionId);
+  const attributeBounds = loader.getGameConfig().attributeBounds;
+  time.pendingContinuation = null;
+  for (const tier of ['primary', 'secondary', 'reserve'] as const) {
+    const group = slots[tier] as Record<string, unknown> | undefined;
+    const occupants = group?.occupants as Array<Record<string, unknown> | null> | undefined;
+    if (!occupants) throw new Error(`Schema 5 action tier "${tier}" is invalid`);
+    occupants.forEach((occupant, slotIndex) => {
+      if (!occupant) return;
+      const startedAtDay = occupant.startedAtDay;
+      const actionId = occupant.actionId;
+      const deptId = occupant.deptId;
+      if (
+        typeof startedAtDay !== 'number' ||
+        typeof actionId !== 'string' ||
+        typeof deptId !== 'string'
+      ) {
+        throw new Error(`Schema 5 action in "${tier}" slot ${slotIndex} is invalid`);
+      }
+      const department = departments.find((item) => item.id === deptId);
+      const action = department?.actions.find((item) => item.id === actionId);
+      if (!department || !action) {
+        throw new Error(
+          `Schema 5 action "${deptId}/${actionId}" cannot be migrated from content 2026.07.3`,
+        );
+      }
+      if (
+        occupant.actionName !== action.name ||
+        occupant.category !== action.category ||
+        occupant.durationDays !== action.durationDays ||
+        occupant.cooldownDays !== action.cooldownDays
+      ) {
+        throw new Error(
+          `Schema 5 action "${deptId}/${actionId}" no longer matches its executable definition`,
+        );
+      }
+      occupant.instanceId = `legacy-action-${tier}-${slotIndex}-${startedAtDay}-${actionId}`;
+      occupant.originPositionId = positionId;
+      occupant.originInstitutionId = institutionId;
+      occupant.originRegionId = regionId;
+      occupant.executableSnapshot = createActionExecutableSnapshot(
+        department,
+        action,
+        legacyContentVersion,
+        attributeBounds,
+      );
+    });
+  }
+  migrated.schemaVersion = 6;
+  migrated.contentVersion = CURRENT_CONTENT_VERSION;
+  return migrated;
+}
+
+/**
  * 严格解码存档数据（已解析的对象）。
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
- * - Schema 2：迁移至 Schema 3 后解码，Schema 3 迁移至 4，再迁移至 5；
- * - Schema 3：迁移至 Schema 4 后再迁移至 5；
- * - Schema 4：迁移至 Schema 5；
- * - 当前版本（Schema 5）：直接解码；
+ * - Schema 2：链式迁移至 Schema 6；
+ * - Schema 3：链式迁移至 Schema 6；
+ * - Schema 4：链式迁移至 Schema 6；
+ * - Schema 5：迁移至 Schema 6；
+ * - 当前版本（Schema 6）：直接解码；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
@@ -861,11 +1118,13 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
   let target: unknown = data;
   try {
     if (obj.schemaVersion === 2) {
-      target = migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj)));
+      target = migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj))));
     } else if (obj.schemaVersion === 3) {
-      target = migrateSchema4To5(migrateSchema3To4(obj));
+      target = migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(obj)));
     } else if (obj.schemaVersion === 4) {
-      target = migrateSchema4To5(obj);
+      target = migrateSchema5To6(migrateSchema4To5(obj));
+    } else if (obj.schemaVersion === 5) {
+      target = migrateSchema5To6(obj);
     }
   } catch (e) {
     return {

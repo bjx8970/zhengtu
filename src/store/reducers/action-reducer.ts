@@ -1,5 +1,5 @@
 /**
- * 行动 Reducer（Schema 2）
+ * 行动 Reducer（Schema 6）
  *
  * 处理 START_ACTION 动作：
  * - 校验行动合法性（分类、预算、冷却、槽位）
@@ -14,6 +14,9 @@ import { startAction } from '../../engine/core/action';
 import { calculateDeviationPenalty } from '../../engine/career/deviation-penalty';
 import { getConfigLoader } from '../../config/loader';
 import { clampAttr } from '../../utils/math';
+import { CURRENT_CONTENT_VERSION } from '../../types/save';
+import { createActionExecutableSnapshot } from '../action-executable-snapshot';
+import { createRuntimeIdFactory } from '../runtime-id';
 
 /**
  * 处理 START_ACTION 动作。
@@ -66,13 +69,23 @@ export function reduceStartAction(draft: PlayerSave, payload: StartActionPayload
   }
 
   const occupant: SlotOccupant = {
+    instanceId: (payload._idFactory ?? createRuntimeIdFactory('action'))(),
     actionId: actionConfig.id,
     deptId: payload.deptId,
     actionName: actionConfig.name,
+    originPositionId: draft.career.appointment.positionId,
+    originInstitutionId: draft.career.appointment.institutionId,
+    originRegionId: draft.career.appointment.regionId,
     category: actionConfig.category,
     startedAtDay: draft.time.totalDaysPlayed,
     durationDays: actionConfig.durationDays,
     cooldownDays: actionConfig.cooldownDays,
+    executableSnapshot: createActionExecutableSnapshot(
+      deptConfig,
+      actionConfig,
+      CURRENT_CONTENT_VERSION,
+      cfg.attributeBounds,
+    ),
     runtimeSnapshot,
   };
 

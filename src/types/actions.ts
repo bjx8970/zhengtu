@@ -13,6 +13,7 @@ export interface StartActionPayload {
   deptId: string;
   actionId: string;
   tierKey: SlotTierKey;
+  _idFactory?: () => string;
 }
 
 /** ADVANCE_TIME 动作参数 */

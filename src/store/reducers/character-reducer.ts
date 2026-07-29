@@ -1,5 +1,5 @@
 /**
- * 角色 Reducer（Schema 2）
+ * 角色 Reducer
  *
  * 处理角色相关动作：
  * - NEW_GAME：初始化新游戏
