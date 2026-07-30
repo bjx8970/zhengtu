@@ -1,5 +1,17 @@
 # 更新日志
 
+## [Unreleased] — Phase 2 职级晋升与职业契约
+
+### Added
+
+- 配置驱动的公务员职级规则、资格评估、职数、历史和职业限制。
+- `civil_service_rank.changed` 信号、原子 Store 晋升事务和稳定任职实例 ID。
+- Schema 7 / 内容版本 `2026.07.5`，以及严格岗位机会和职业流程契约。
+
+### Removed
+
+- 旧 L+1 目标职位主动晋升内核；本批次不包含岗位机会生成或任职变化运行时。
+
 本文件记录政途人生的用户可见变化、重要开发者契约变化和兼容性变化。
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/)，版本号遵循语义化版本。分类：Added / Changed / Fixed / Deprecated / Removed / Save compatibility。

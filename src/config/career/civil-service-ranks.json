@@ -1,0 +1,194 @@
+{
+  "definitions": [
+    { "id": "clerk_2", "name": "二级科员", "order": 1 },
+    { "id": "clerk_1", "name": "一级科员", "order": 2 },
+    { "id": "section_member_4", "name": "四级主任科员", "order": 3 },
+    { "id": "section_member_3", "name": "三级主任科员", "order": 4 },
+    { "id": "section_member_2", "name": "二级主任科员", "order": 5 },
+    { "id": "section_member_1", "name": "一级主任科员", "order": 6 },
+    { "id": "researcher_4", "name": "四级调研员", "order": 7 },
+    { "id": "researcher_3", "name": "三级调研员", "order": 8 },
+    { "id": "researcher_2", "name": "二级调研员", "order": 9 },
+    { "id": "researcher_1", "name": "一级调研员", "order": 10 },
+    { "id": "inspector_2", "name": "二级巡视员", "order": 11 },
+    { "id": "inspector_1", "name": "一级巡视员", "order": 12 }
+  ],
+  "progressionRules": [
+    {
+      "id": "clerk_2_to_clerk_1",
+      "fromRank": "clerk_2",
+      "toRank": "clerk_1",
+      "minDaysInRank": 360,
+      "minServiceDays": 360,
+      "minAssessmentCount": 1,
+      "minQualifiedAssessmentCount": 1,
+      "minExcellentAssessmentCount": 0,
+      "quotaRequirement": {
+        "metricId": "rank_quota.clerk_1",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "clerk_1_to_section_member_4",
+      "fromRank": "clerk_1",
+      "toRank": "section_member_4",
+      "minDaysInRank": 720,
+      "minServiceDays": 1080,
+      "minAssessmentCount": 2,
+      "minQualifiedAssessmentCount": 2,
+      "minExcellentAssessmentCount": 0,
+      "quotaRequirement": {
+        "metricId": "rank_quota.section_member_4",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "section_member_4_to_section_member_3",
+      "fromRank": "section_member_4",
+      "toRank": "section_member_3",
+      "minDaysInRank": 720,
+      "minServiceDays": 1800,
+      "minAssessmentCount": 3,
+      "minQualifiedAssessmentCount": 3,
+      "minExcellentAssessmentCount": 0,
+      "quotaRequirement": {
+        "metricId": "rank_quota.section_member_3",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "section_member_3_to_section_member_2",
+      "fromRank": "section_member_3",
+      "toRank": "section_member_2",
+      "minDaysInRank": 1080,
+      "minServiceDays": 2880,
+      "minAssessmentCount": 5,
+      "minQualifiedAssessmentCount": 5,
+      "minExcellentAssessmentCount": 1,
+      "quotaRequirement": {
+        "metricId": "rank_quota.section_member_2",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "section_member_2_to_section_member_1",
+      "fromRank": "section_member_2",
+      "toRank": "section_member_1",
+      "minDaysInRank": 1080,
+      "minServiceDays": 3960,
+      "minAssessmentCount": 7,
+      "minQualifiedAssessmentCount": 7,
+      "minExcellentAssessmentCount": 1,
+      "quotaRequirement": {
+        "metricId": "rank_quota.section_member_1",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "section_member_1_to_researcher_4",
+      "fromRank": "section_member_1",
+      "toRank": "researcher_4",
+      "minDaysInRank": 1440,
+      "minServiceDays": 5400,
+      "minAssessmentCount": 10,
+      "minQualifiedAssessmentCount": 9,
+      "minExcellentAssessmentCount": 2,
+      "quotaRequirement": {
+        "metricId": "rank_quota.researcher_4",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "researcher_4_to_researcher_3",
+      "fromRank": "researcher_4",
+      "toRank": "researcher_3",
+      "minDaysInRank": 1440,
+      "minServiceDays": 7200,
+      "minAssessmentCount": 14,
+      "minQualifiedAssessmentCount": 13,
+      "minExcellentAssessmentCount": 3,
+      "quotaRequirement": {
+        "metricId": "rank_quota.researcher_3",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "researcher_3_to_researcher_2",
+      "fromRank": "researcher_3",
+      "toRank": "researcher_2",
+      "minDaysInRank": 1800,
+      "minServiceDays": 9000,
+      "minAssessmentCount": 18,
+      "minQualifiedAssessmentCount": 16,
+      "minExcellentAssessmentCount": 4,
+      "quotaRequirement": {
+        "metricId": "rank_quota.researcher_2",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "researcher_2_to_researcher_1",
+      "fromRank": "researcher_2",
+      "toRank": "researcher_1",
+      "minDaysInRank": 1800,
+      "minServiceDays": 10800,
+      "minAssessmentCount": 22,
+      "minQualifiedAssessmentCount": 20,
+      "minExcellentAssessmentCount": 5,
+      "quotaRequirement": {
+        "metricId": "rank_quota.researcher_1",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "researcher_1_to_inspector_2",
+      "fromRank": "researcher_1",
+      "toRank": "inspector_2",
+      "minDaysInRank": 2160,
+      "minServiceDays": 12600,
+      "minAssessmentCount": 26,
+      "minQualifiedAssessmentCount": 23,
+      "minExcellentAssessmentCount": 6,
+      "quotaRequirement": {
+        "metricId": "rank_quota.inspector_2",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "inspector_2_to_inspector_1",
+      "fromRank": "inspector_2",
+      "toRank": "inspector_1",
+      "minDaysInRank": 2160,
+      "minServiceDays": 14400,
+      "minAssessmentCount": 30,
+      "minQualifiedAssessmentCount": 27,
+      "minExcellentAssessmentCount": 7,
+      "quotaRequirement": {
+        "metricId": "rank_quota.inspector_1",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    }
+  ]
+}

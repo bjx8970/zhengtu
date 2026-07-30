@@ -1,12 +1,12 @@
 /**
- * 游戏状态管理（Schema 6）
+ * 游戏状态管理（Schema 7）
  *
  * 核心设计：
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 仅在实际状态变化时写入 localStorage
  *
- * 当前持久化结构为 Schema 6，包含政策/事件运行时和同日时间轴 continuation。
+ * 当前持久化结构为 Schema 7，包含政策/事件运行时、同日时间轴 continuation 与职级履历。
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
@@ -31,6 +31,7 @@ import {
   reduceFailPolicy,
   reduceRepealPolicy,
 } from './reducers/policy-reducer';
+import { reduceAdvanceCivilServiceRank } from './reducers/career-rank-reducer';
 
 /** 游戏动作联合类型 */
 export type GameAction =
@@ -98,6 +99,14 @@ export type GameAction =
       policyInstanceId: string;
       _rng?: () => number;
       _idFactory?: () => string;
+    }
+  | {
+      type: 'ADVANCE_CIVIL_SERVICE_RANK';
+      sourceType?: 'assessment' | 'event' | 'policy' | 'system';
+      sourceId?: string | null;
+      sourceAssessmentYear?: number | null;
+      _idFactory?: () => string;
+      _rng?: () => number;
     };
 
 /** 创建默认治理状态 */
@@ -129,7 +138,7 @@ function createDefaultEventRuntimeState(): EventRuntimeState {
 function createDefaultWorldState(): WorldState {
   return {
     facts: {},
-    metrics: {},
+    metrics: getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
     activeCycles: [],
   };
 }
@@ -200,6 +209,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     },
     career: {
       appointment: {
+        appointmentId: `initial-appointment-${initialPosition.id}`,
         positionId: initialPosition.id,
         institutionId: initialPosition.institutionId,
         regionId: initialPosition.regionId,
@@ -208,9 +218,14 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
         leadershipRank: initialPosition.leadershipRank,
         startedAtDay: 0,
         appointmentType: 'substantive',
+        appointmentReason: 'initial_assignment',
+        sourceOpportunityId: null,
         probationEndsAtDay: 360,
       },
       civilServiceRank: 'clerk_2',
+      civilServiceRankStartedAtDay: 0,
+      civilServiceRankHistory: [],
+      restrictions: [],
       experiences: [],
       specialties: {},
       opportunities: [],
@@ -402,6 +417,8 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
       );
       return result !== null;
     }
+    case 'ADVANCE_CIVIL_SERVICE_RANK':
+      return reduceAdvanceCivilServiceRank(draft, action, draft.time.totalDaysPlayed);
     default:
       return false;
   }

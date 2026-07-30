@@ -46,6 +46,7 @@ export const DOMAIN_SIGNALS = [
   'policy.metric_changed',
   'policy.status_changed',
   'appointment.changed',
+  'civil_service_rank.changed',
   'assessment.completed',
   'world.metric_changed',
   'event.resolved',
@@ -105,6 +106,14 @@ export const SIGNAL_TYPE_PAYLOAD_FIELDS: Record<DomainSignal, readonly string[]>
     'institutionId',
     'regionId',
     'previousPositionId',
+  ],
+  'civil_service_rank.changed': [
+    'rankChangeId',
+    'previousRank',
+    'currentRank',
+    'reason',
+    'sourceType',
+    'sourceId',
   ],
   'assessment.completed': ['year', 'score', 'tier'],
   'world.metric_changed': ['metricId', 'value'],
@@ -193,6 +202,19 @@ export type DomainSignalSnapshot =
     }
   | {
       signalId: string;
+      signalType: 'civil_service_rank.changed';
+      occurredAtDay: number;
+      data: {
+        rankChangeId: string;
+        previousRank: import('../career/types').CivilServiceRank;
+        currentRank: import('../career/types').CivilServiceRank;
+        reason: 'regular_advancement' | 'exceptional_advancement' | 'demotion';
+        sourceType: 'assessment' | 'event' | 'policy' | 'system';
+        sourceId: string | null;
+      };
+    }
+  | {
+      signalId: string;
       signalType: 'assessment.completed';
       occurredAtDay: number;
       data: { year: number; score: number; tier: string };
@@ -229,6 +251,49 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
           deptId: z.string(),
           regionId: z.string(),
           institutionId: z.string(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalId: z.string(),
+      signalType: z.literal('civil_service_rank.changed'),
+      occurredAtDay: z.number(),
+      data: z
+        .object({
+          rankChangeId: z.string(),
+          previousRank: z.enum([
+            'clerk_2',
+            'clerk_1',
+            'section_member_4',
+            'section_member_3',
+            'section_member_2',
+            'section_member_1',
+            'researcher_4',
+            'researcher_3',
+            'researcher_2',
+            'researcher_1',
+            'inspector_2',
+            'inspector_1',
+          ]),
+          currentRank: z.enum([
+            'clerk_2',
+            'clerk_1',
+            'section_member_4',
+            'section_member_3',
+            'section_member_2',
+            'section_member_1',
+            'researcher_4',
+            'researcher_3',
+            'researcher_2',
+            'researcher_1',
+            'inspector_2',
+            'inspector_1',
+          ]),
+          reason: z.enum(['regular_advancement', 'exceptional_advancement', 'demotion']),
+          sourceType: z.enum(['assessment', 'event', 'policy', 'system']),
+          sourceId: z.string().nullable(),
         })
         .strict(),
     })

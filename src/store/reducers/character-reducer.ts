@@ -100,6 +100,7 @@ export function reduceNewGame(
   const firstPosition = cfg.getPositionById(gameCfg.initialPositionId);
   if (firstPosition) {
     draft.career.appointment = {
+      appointmentId: `initial-appointment-${firstPosition.id}`,
       positionId: firstPosition.id,
       institutionId: firstPosition.institutionId,
       regionId: firstPosition.regionId,
@@ -108,6 +109,8 @@ export function reduceNewGame(
       leadershipRank: firstPosition.leadershipRank,
       startedAtDay: 0,
       appointmentType: 'substantive',
+      appointmentReason: 'initial_assignment',
+      sourceOpportunityId: null,
       probationEndsAtDay: 360,
     };
     draft.remainingBudget = firstPosition.annualBudget;

@@ -1,9 +1,9 @@
 /**
- * 存档严格解码器（Schema 6）
+ * 存档严格解码器（Schema 7）
  *
- * 只接受当前版本（Schema 6）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 7）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 → 5 → 6 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -31,7 +31,7 @@ import {
   POLICY_CATEGORIES,
   DomainSignalSnapshotSchema,
 } from '../../domain/governance/types';
-import { EffectDefinitionSchema } from '../../domain/conditions';
+import { ConditionExpressionSchema, EffectDefinitionSchema } from '../../domain/conditions';
 import {
   EVENT_PRIORITIES,
   EVENT_PRESENTATIONS,
@@ -81,6 +81,7 @@ export function backupIncompatibleSave(rawData: string): string {
 /** CurrentAppointment Schema */
 const CurrentAppointmentSchema = z
   .object({
+    appointmentId: z.string().min(1),
     positionId: z.string(),
     institutionId: z.string(),
     regionId: z.string(),
@@ -89,6 +90,8 @@ const CurrentAppointmentSchema = z
     leadershipRank: z.enum(LEADERSHIP_RANKS),
     startedAtDay: z.number(),
     appointmentType: z.enum(APPOINTMENT_TYPES),
+    appointmentReason: z.enum(APPOINTMENT_REASONS),
+    sourceOpportunityId: z.string().nullable(),
     probationEndsAtDay: z.number().nullable(),
   })
   .strict();
@@ -126,38 +129,214 @@ const CareerOpportunitySchema = z
     id: z.string(),
     type: z.enum(CAREER_OPPORTUNITY_TYPES),
     status: z.enum(CAREER_OPPORTUNITY_STATUSES),
-    targetPositionId: z.string(),
-    targetInstitutionId: z.string(),
-    targetRegionId: z.string(),
+    source: z
+      .object({
+        sourceType: z.enum([
+          'assessment',
+          'political_cycle',
+          'event',
+          'policy',
+          'vacancy',
+          'system',
+        ]),
+        sourceId: z.string().min(1),
+        signalId: z.string().nullable(),
+        description: z.string(),
+      })
+      .strict(),
+    target: z
+      .object({
+        positionId: z.string(),
+        positionName: z.string(),
+        institutionId: z.string(),
+        institutionName: z.string(),
+        regionId: z.string(),
+        institutionLevel: z.enum(INSTITUTION_LEVELS),
+        positionDomain: z.enum(POSITION_DOMAINS),
+        leadershipRank: z.enum(LEADERSHIP_RANKS),
+      })
+      .strict(),
+    appointmentType: z.enum(APPOINTMENT_TYPES).nullable(),
+    appointmentReason: z.enum(APPOINTMENT_REASONS).nullable(),
     appearedAtDay: z.number(),
     expiresAtDay: z.number().nullable(),
+    acceptedAtDay: z.number().nullable(),
+    rejectedAtDay: z.number().nullable(),
+    resolvedAtDay: z.number().nullable(),
+    cancelledAtDay: z.number().nullable(),
+    requiresSelection: z.boolean(),
+    eligibilityConditions: z.array(ConditionExpressionSchema),
+    finalOutcome: z
+      .enum(['appointed', 'continued_observation', 'not_selected', 'withdrawn'])
+      .nullable(),
     reason: z.string(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    const dateFields = [
+      ['acceptedAtDay', value.acceptedAtDay],
+      ['rejectedAtDay', value.rejectedAtDay],
+      ['resolvedAtDay', value.resolvedAtDay],
+      ['cancelledAtDay', value.cancelledAtDay],
+    ] as const;
+    for (const [field, date] of dateFields) {
+      if (date !== null && date < value.appearedAtDay)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: `${field} cannot predate opportunity appearance`,
+        });
+    }
+
+    const requireDate = (field: (typeof dateFields)[number][0], required: boolean) => {
+      const date = value[field];
+      if ((date !== null) !== required)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: required
+            ? `${field} is required for ${value.status} opportunities`
+            : `${field} is not allowed for ${value.status} opportunities`,
+        });
+    };
+    const requireOutcome = value.status === 'resolved';
+    if ((value.finalOutcome !== null) !== requireOutcome)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['finalOutcome'],
+        message: 'finalOutcome is required only for resolved opportunities',
+      });
+
+    switch (value.status) {
+      case 'available':
+      case 'expired':
+        for (const [field] of dateFields) requireDate(field, false);
+        if (value.status === 'expired' && value.expiresAtDay === null)
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['expiresAtDay'],
+            message: 'expiresAtDay is required for expired opportunities',
+          });
+        break;
+      case 'accepted':
+      case 'in_process':
+        requireDate('acceptedAtDay', true);
+        requireDate('rejectedAtDay', false);
+        requireDate('resolvedAtDay', false);
+        requireDate('cancelledAtDay', false);
+        break;
+      case 'rejected':
+        requireDate('acceptedAtDay', false);
+        requireDate('rejectedAtDay', true);
+        requireDate('resolvedAtDay', false);
+        requireDate('cancelledAtDay', false);
+        break;
+      case 'resolved':
+        requireDate('acceptedAtDay', true);
+        requireDate('rejectedAtDay', false);
+        requireDate('resolvedAtDay', true);
+        requireDate('cancelledAtDay', false);
+        break;
+      case 'cancelled':
+        requireDate('rejectedAtDay', false);
+        requireDate('resolvedAtDay', false);
+        requireDate('cancelledAtDay', true);
+        break;
+    }
+  });
 
 /** CareerProcess Schema（stageResults 使用明确结构） */
 const CareerProcessSchema = z
   .object({
-    type: z.enum(['selection', 'inspection', 'probation']),
+    id: z.string().min(1),
+    type: z.enum([
+      'leadership_selection',
+      'appointment_review',
+      'probation',
+      'temporary_assignment',
+      'training',
+    ]),
+    status: z.enum(['active', 'completed', 'failed', 'cancelled']),
     opportunityId: z.string(),
-    currentStage: z.string(),
+    currentStage: z.enum([
+      'eligibility_review',
+      'democratic_recommendation',
+      'organization_inspection',
+      'collective_decision',
+      'public_notice',
+      'appointment',
+      'probation',
+      'finalization',
+    ]),
     startedAtDay: z.number(),
-    stageResults: z
-      .object({
-        voteFor: z.number().optional(),
-        voteAgainst: z.number().optional(),
-        inspectionResult: z.string().optional(),
-        passed: z.boolean().optional(),
-      })
-      .strict(),
+    completedAtDay: z.number().nullable(),
+    stageResults: z.array(
+      z
+        .object({
+          stage: z.enum([
+            'eligibility_review',
+            'democratic_recommendation',
+            'organization_inspection',
+            'collective_decision',
+            'public_notice',
+            'appointment',
+            'probation',
+            'finalization',
+          ]),
+          resolvedAtDay: z.number(),
+          outcome: z.enum(['passed', 'failed', 'continued', 'cancelled']),
+          score: z.number().nullable(),
+          detail: z.string(),
+        })
+        .strict(),
+    ),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if ((value.status === 'active') !== (value.completedAtDay === null))
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Process completion date must match status',
+      });
+  });
 
 /** CareerState Schema */
 const CareerStateSchema = z
   .object({
     appointment: CurrentAppointmentSchema,
     civilServiceRank: z.enum(CIVIL_SERVICE_RANKS),
+    civilServiceRankStartedAtDay: z.number().int().nonnegative(),
+    civilServiceRankHistory: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          previousRank: z.enum(CIVIL_SERVICE_RANKS),
+          currentRank: z.enum(CIVIL_SERVICE_RANKS),
+          changedAtDay: z.number().int().nonnegative(),
+          reason: z.enum(['regular_advancement', 'exceptional_advancement', 'demotion']),
+          sourceType: z.enum(['assessment', 'event', 'policy', 'system']),
+          sourceId: z.string().nullable(),
+          sourceAssessmentYear: z.number().int().nullable(),
+        })
+        .strict(),
+    ),
+    restrictions: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          type: z.enum([
+            'rank_advancement_freeze',
+            'appointment_selection_freeze',
+            'disciplinary_action',
+          ]),
+          startedAtDay: z.number().int().nonnegative(),
+          endsAtDay: z.number().int().nullable(),
+          reason: z.string(),
+          sourceType: z.enum(['assessment', 'event', 'policy', 'system']),
+          sourceId: z.string().nullable(),
+        })
+        .strict(),
+    ),
     experiences: z.array(CareerExperienceSchema),
     specialties: z.record(z.number()),
     opportunities: z.array(CareerOpportunitySchema),
@@ -1069,16 +1248,60 @@ export function migrateSchema5To6(prev: Record<string, unknown>): Record<string,
   return migrated;
 }
 
+/** 将 Schema 6 存档迁移至 Schema 7。 */
+export function migrateSchema6To7(prev: Record<string, unknown>): Record<string, unknown> {
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const career = state?.career as Record<string, unknown> | undefined;
+  const world = state?.world as Record<string, unknown> | undefined;
+  const metrics = world?.metrics as Record<string, unknown> | undefined;
+  const appointment = career?.appointment as Record<string, unknown> | undefined;
+  if (
+    !career ||
+    !appointment ||
+    typeof appointment.positionId !== 'string' ||
+    typeof appointment.startedAtDay !== 'number'
+  ) {
+    throw new Error('Schema 6 save is missing a valid appointment');
+  }
+  const opportunities = career.opportunities;
+  const activeProcess = career.activeProcess;
+  if (!Array.isArray(opportunities) || opportunities.length > 0)
+    throw new Error(
+      'Schema 6 non-empty career opportunities cannot be migrated without source and target snapshots',
+    );
+  if (activeProcess !== null)
+    throw new Error(
+      'Schema 6 active career process cannot be migrated from an open stage vocabulary',
+    );
+  appointment.appointmentId = `legacy-appointment-${appointment.positionId}-${appointment.startedAtDay}`;
+  appointment.appointmentReason = 'initial_assignment';
+  appointment.sourceOpportunityId = null;
+  career.civilServiceRankStartedAtDay = 0;
+  career.civilServiceRankHistory = [];
+  career.restrictions = [];
+  if (!metrics) throw new Error('Schema 6 save is missing world metrics');
+  for (const [metricId, initialValue] of Object.entries(
+    getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
+  )) {
+    if (metrics[metricId] === undefined) metrics[metricId] = initialValue;
+  }
+  migrated.schemaVersion = 7;
+  migrated.contentVersion = CURRENT_CONTENT_VERSION;
+  return migrated;
+}
+
 /**
  * 严格解码存档数据（已解析的对象）。
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
- * - Schema 2：链式迁移至 Schema 6；
- * - Schema 3：链式迁移至 Schema 6；
- * - Schema 4：链式迁移至 Schema 6；
- * - Schema 5：迁移至 Schema 6；
- * - 当前版本（Schema 6）：直接解码；
+ * - Schema 2：链式迁移至 Schema 7；
+ * - Schema 3：链式迁移至 Schema 7；
+ * - Schema 4：链式迁移至 Schema 7；
+ * - Schema 5：链式迁移至 Schema 7；
+ * - Schema 6：迁移至 Schema 7；
+ * - 当前版本（Schema 7）：直接解码；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
@@ -1118,13 +1341,17 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
   let target: unknown = data;
   try {
     if (obj.schemaVersion === 2) {
-      target = migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj))));
+      target = migrateSchema6To7(
+        migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj)))),
+      );
     } else if (obj.schemaVersion === 3) {
-      target = migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(obj)));
+      target = migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(obj))));
     } else if (obj.schemaVersion === 4) {
-      target = migrateSchema5To6(migrateSchema4To5(obj));
+      target = migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(obj)));
     } else if (obj.schemaVersion === 5) {
-      target = migrateSchema5To6(obj);
+      target = migrateSchema6To7(migrateSchema5To6(obj));
+    } else if (obj.schemaVersion === 6) {
+      target = migrateSchema6To7(obj);
     }
   } catch (e) {
     return {

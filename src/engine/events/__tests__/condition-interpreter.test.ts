@@ -157,6 +157,20 @@ describe('条件解释器 - 职业状态', () => {
     expect(evalCond({ careerCheck: 'years_in_position', value: 3, op: 'gte' }, ctx)).toBe(false);
   });
 
+  it('公务员职级任职天数', () => {
+    const ctx = makeContext((c) => {
+      c.state.career.appointment.startedAtDay = 0;
+      c.state.career.civilServiceRankStartedAtDay = 800;
+      c.currentDay = 1000;
+    });
+    expect(
+      evalCond({ careerCheck: 'days_in_civil_service_rank', value: 200, op: 'gte' }, ctx),
+    ).toBe(true);
+    expect(
+      evalCond({ careerCheck: 'days_in_civil_service_rank', value: 201, op: 'gte' }, ctx),
+    ).toBe(false);
+  });
+
   it('履历条件 has_experience', () => {
     const ctx = makeContext((c) => {
       c.state.career.experiences = [

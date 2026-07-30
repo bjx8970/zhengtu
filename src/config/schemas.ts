@@ -6,7 +6,12 @@
  */
 
 import { z } from 'zod';
-import { INSTITUTION_LEVELS, POSITION_DOMAINS, LEADERSHIP_RANKS } from '../domain/career/types';
+import {
+  CIVIL_SERVICE_RANKS,
+  INSTITUTION_LEVELS,
+  POSITION_DOMAINS,
+  LEADERSHIP_RANKS,
+} from '../domain/career/types';
 import { ConditionExpressionSchema } from '../domain/conditions';
 import { EffectDefinitionSchema } from '../domain/conditions';
 import { PolicyCategorySchema } from '../domain/governance/types';
@@ -113,3 +118,105 @@ export const PolicyDefinitionConfigSchema = z
 
 /** 政策定义数组 Schema */
 export const PolicyDefinitionArraySchema = z.array(PolicyDefinitionConfigSchema);
+
+/** 公务员职级定义。 */
+export const CivilServiceRankDefinitionSchema = z
+  .object({
+    id: z.enum(CIVIL_SERVICE_RANKS),
+    name: z.string().min(1),
+    order: z.number().int().positive(),
+  })
+  .strict();
+export const RankQuotaRequirementSchema = z
+  .object({
+    metricId: z.string().min(1),
+    requiredValue: z.number().nonnegative(),
+    consumeValue: z.number().nonnegative(),
+  })
+  .strict()
+  .refine((quota) => quota.consumeValue <= quota.requiredValue, {
+    message: 'Quota consume value cannot exceed its required value',
+  });
+export const CivilServiceRankProgressionRuleSchema = z
+  .object({
+    id: z.string().min(1),
+    fromRank: z.enum(CIVIL_SERVICE_RANKS),
+    toRank: z.enum(CIVIL_SERVICE_RANKS),
+    minDaysInRank: z.number().int().nonnegative(),
+    minServiceDays: z.number().int().nonnegative(),
+    minAssessmentCount: z.number().int().nonnegative(),
+    minQualifiedAssessmentCount: z.number().int().nonnegative(),
+    minExcellentAssessmentCount: z.number().int().nonnegative(),
+    quotaRequirement: RankQuotaRequirementSchema.nullable(),
+    additionalConditions: z.array(ConditionExpressionSchema),
+  })
+  .strict();
+
+function hasSignalDependentCondition(
+  condition: import('../domain/conditions').ConditionExpression,
+): boolean {
+  if ('signalField' in condition) return true;
+  if ('policyRef' in condition && condition.policyRef.source === 'signal') return true;
+  if ('all' in condition) return condition.all.some(hasSignalDependentCondition);
+  if ('any' in condition) return condition.any.some(hasSignalDependentCondition);
+  return 'not' in condition && hasSignalDependentCondition(condition.not);
+}
+export const CivilServiceRankConfigSchema = z
+  .object({
+    definitions: z.array(CivilServiceRankDefinitionSchema),
+    progressionRules: z.array(CivilServiceRankProgressionRuleSchema),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    const ids = data.definitions.map((item) => item.id);
+    if (ids.length !== CIVIL_SERVICE_RANKS.length || new Set(ids).size !== ids.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'All civil-service ranks must be defined exactly once',
+      });
+    if (new Set(data.definitions.map((item) => item.order)).size !== data.definitions.length)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rank orders must be unique' });
+    for (const definition of data.definitions) {
+      const expectedOrder = CIVIL_SERVICE_RANKS.indexOf(definition.id) + 1;
+      if (definition.order !== expectedOrder)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Rank ${definition.id} must use canonical order ${expectedOrder}`,
+        });
+    }
+    const ruleIds = new Set<string>();
+    const sourceRanks = new Set<string>();
+    for (const rule of data.progressionRules) {
+      if (sourceRanks.has(rule.fromRank) || ruleIds.has(rule.id))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Progression rule IDs and source ranks must be unique',
+        });
+      sourceRanks.add(rule.fromRank);
+      ruleIds.add(rule.id);
+      if (
+        CIVIL_SERVICE_RANKS.indexOf(rule.toRank) !==
+        CIVIL_SERVICE_RANKS.indexOf(rule.fromRank) + 1
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Progression must be to the adjacent rank',
+        });
+      if (rule.additionalConditions.some(hasSignalDependentCondition))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Rank progression additional conditions cannot depend on an event signal',
+        });
+    }
+    const nonHighestRanks = CIVIL_SERVICE_RANKS.slice(0, -1);
+    if (
+      sourceRanks.size !== nonHighestRanks.length ||
+      nonHighestRanks.some((rank) => !sourceRanks.has(rank))
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Every non-highest civil-service rank must have one progression rule',
+      });
+  });
+export type CivilServiceRankDefinition = z.infer<typeof CivilServiceRankDefinitionSchema>;
+export type CivilServiceRankProgressionRule = z.infer<typeof CivilServiceRankProgressionRuleSchema>;

@@ -14,6 +14,7 @@ import { decodeCurrentSave, wrapSaveEnvelope, validatePlayerSave } from '../save
 import { CURRENT_SCHEMA_VERSION } from '../../types/save';
 import { getConfigLoader } from '../../config/loader';
 import { createActionExecutableSnapshot } from '../action-executable-snapshot';
+import type { CareerOpportunity } from '../../domain/career/state';
 import {
   INSTITUTION_LEVELS,
   POSITION_DOMAINS,
@@ -224,6 +225,122 @@ describe('Schema 2 存档', () => {
     expect(result.backupKey).toBeDefined();
     if (!result.backupKey) return;
     expect(localStorage.getItem(result.backupKey)).toBe(json);
+  });
+
+  it('Schema 6→7 确定性补齐任职与职级运行时字段', () => {
+    const state = createInitialState();
+    const envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(state))) as Record<string, unknown>;
+    envelope.schemaVersion = 6;
+    envelope.contentVersion = '2026.07.4';
+    const career = (envelope.state as Record<string, unknown>).career as Record<string, unknown>;
+    const appointment = career.appointment as Record<string, unknown>;
+    delete appointment.appointmentId;
+    delete appointment.appointmentReason;
+    delete appointment.sourceOpportunityId;
+    delete career.civilServiceRankStartedAtDay;
+    delete career.civilServiceRankHistory;
+    delete career.restrictions;
+    const metrics = ((envelope.state as Record<string, unknown>).world as Record<string, unknown>)
+      .metrics as Record<string, unknown>;
+    delete metrics['rank_quota.clerk_1'];
+    metrics['rank_quota.section_4'] = 7;
+
+    const result = decodeCurrentSave(JSON.stringify(envelope));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.career.appointment).toMatchObject({
+      appointmentId: `legacy-appointment-${state.career.appointment.positionId}-0`,
+      appointmentReason: 'initial_assignment',
+      sourceOpportunityId: null,
+    });
+    expect(result.state?.career).toMatchObject({
+      civilServiceRankStartedAtDay: 0,
+      civilServiceRankHistory: [],
+      restrictions: [],
+    });
+    expect(result.state?.world.metrics).toMatchObject({
+      ...getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
+      'rank_quota.section_4': 7,
+    });
+  });
+
+  it('rejects career opportunities with invalid lifecycle dates during strict decode', () => {
+    const invalidOpportunities: Array<Partial<CareerOpportunity>> = [
+      { status: 'available', acceptedAtDay: 1 },
+      { status: 'accepted' },
+      { status: 'in_process' },
+      { status: 'rejected' },
+      { status: 'resolved', resolvedAtDay: 1, finalOutcome: 'appointed' },
+      { status: 'expired', expiresAtDay: null },
+      { status: 'cancelled' },
+    ];
+    for (const patch of invalidOpportunities) {
+      const state = createInitialState();
+      const opportunity: CareerOpportunity = {
+        id: 'invalid-lifecycle',
+        type: 'leadership_vacancy',
+        status: 'available',
+        source: {
+          sourceType: 'system',
+          sourceId: 'test-source',
+          signalId: null,
+          description: 'test',
+        },
+        target: {
+          positionId: 'test-position',
+          positionName: 'test position',
+          institutionId: 'test-institution',
+          institutionName: 'test institution',
+          regionId: 'test-region',
+          institutionLevel: 'township',
+          positionDomain: 'local_governance',
+          leadershipRank: 'none',
+        },
+        appointmentType: null,
+        appointmentReason: null,
+        appearedAtDay: 0,
+        expiresAtDay: 10,
+        acceptedAtDay: null,
+        rejectedAtDay: null,
+        resolvedAtDay: null,
+        cancelledAtDay: null,
+        requiresSelection: true,
+        eligibilityConditions: [],
+        finalOutcome: null,
+        reason: 'test',
+        ...patch,
+      };
+      state.career.opportunities = [opportunity];
+      const result = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('invalid_envelope');
+    }
+  });
+
+  it('Schema 6→7 拒绝非空机会或进行中的职业流程并保留备份', () => {
+    const cases: Array<{ careerField: 'opportunities' | 'activeProcess'; value: unknown }> = [
+      { careerField: 'opportunities', value: [{}] },
+      { careerField: 'activeProcess', value: {} },
+    ];
+    for (const { careerField, value } of cases) {
+      const envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(createInitialState()))) as Record<
+        string,
+        unknown
+      >;
+      envelope.schemaVersion = 6;
+      envelope.contentVersion = '2026.07.4';
+      const career = (envelope.state as Record<string, unknown>).career as Record<string, unknown>;
+      career[careerField] = value;
+      const json = JSON.stringify(envelope);
+
+      const result = decodeCurrentSave(json);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('migration_failed');
+      expect(result.backupKey).toBeDefined();
+      if (!result.backupKey) continue;
+      expect(localStorage.getItem(result.backupKey)).toBe(json);
+    }
   });
 
   it('Schema 1 存档被拒绝并创建备份', () => {
