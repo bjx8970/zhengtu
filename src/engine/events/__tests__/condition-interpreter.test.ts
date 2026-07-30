@@ -176,6 +176,7 @@ describe('条件解释器 - 职业状态', () => {
       c.state.career.experiences = [
         {
           id: 'exp1',
+          appointmentId: 'appointment-exp1',
           positionId: 'admin_l1_0',
           positionNameSnapshot: '科员',
           institutionId: 'inst_001',
@@ -187,6 +188,9 @@ describe('条件解释器 - 职业状态', () => {
           startedAtDay: 0,
           endedAtDay: 100,
           appointmentReason: 'initial_assignment',
+          appointmentType: 'substantive',
+          sourceOpportunityId: null,
+          endReason: 'promotion',
           assessmentResults: [],
         },
       ];
@@ -531,6 +535,7 @@ describe('条件解释器 - 履历条件', () => {
       c.state.career.experiences = [
         {
           id: 'e1',
+          appointmentId: 'appointment-e1',
           positionId: 'p1',
           positionNameSnapshot: '',
           institutionId: 'i1',
@@ -542,10 +547,14 @@ describe('条件解释器 - 履历条件', () => {
           startedAtDay: 0,
           endedAtDay: 10,
           appointmentReason: 'initial_assignment',
+          appointmentType: 'substantive',
+          sourceOpportunityId: null,
+          endReason: 'promotion',
           assessmentResults: [],
         },
         {
           id: 'e2',
+          appointmentId: 'appointment-e2',
           positionId: 'p2',
           positionNameSnapshot: '',
           institutionId: 'i2',
@@ -557,6 +566,9 @@ describe('条件解释器 - 履历条件', () => {
           startedAtDay: 10,
           endedAtDay: 20,
           appointmentReason: 'rotation',
+          appointmentType: 'substantive',
+          sourceOpportunityId: null,
+          endReason: 'rotation',
           assessmentResults: [],
         },
       ];
@@ -571,6 +583,7 @@ describe('条件解释器 - 履历条件', () => {
       c.state.career.experiences = [
         {
           id: 'e1',
+          appointmentId: 'appointment-e1',
           positionId: 'p1',
           positionNameSnapshot: '',
           institutionId: 'i1',
@@ -582,6 +595,9 @@ describe('条件解释器 - 履历条件', () => {
           startedAtDay: 0,
           endedAtDay: 10,
           appointmentReason: 'initial_assignment',
+          appointmentType: 'substantive',
+          sourceOpportunityId: null,
+          endReason: 'promotion',
           assessmentResults: [],
         },
       ];

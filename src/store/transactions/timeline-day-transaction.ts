@@ -42,6 +42,8 @@ import {
   setPlayerAttrDirect,
 } from '../reducers/shared';
 import { commitPolicyTransitionInTransaction } from './policy-transition-transaction';
+import { expireCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
+import { processCareerOpportunitySignal } from '../../engine/career/opportunity-orchestrator';
 
 /**
  * 结算当日行动与到期政策，再统一处理它们产生的领域信号。
@@ -105,6 +107,7 @@ export function processDailyFacts(
 
   if (signals.length > 0) {
     processCascadeSignalsInTransaction(draft, signals, currentDay, rng, idFactory, definitions);
+    generateCareerOpportunities(draft, signals, currentDay, idFactory);
   }
 }
 
@@ -129,6 +132,9 @@ export function processTimelineNodes(
     const node = nodes[index];
     if (!node) continue;
     switch (node.type) {
+      case 'career_opportunity_expiry':
+        expireCareerOpportunitiesAtDay(draft, node.absoluteDay);
+        break;
       case 'scheduled_event_activation':
         activateEventsAtDay(draft, node.absoluteDay, rng, idFactory, definitions);
         // 截止处理必须与计划激活同属一个不可分割节点；否则 blocker 会让刚刚
@@ -162,6 +168,7 @@ export function processTimelineNodes(
           idFactory,
           definitions,
         );
+        generateCareerOpportunities(draft, [signal], node.absoluteDay, idFactory);
         if (draft.events.activeBlockingEventId !== null) {
           return { interrupted: true, remainingNodes: nodes.slice(index + 1) };
         }
@@ -174,6 +181,47 @@ export function processTimelineNodes(
     }
   }
   return { interrupted: false, remainingNodes: [] };
+}
+
+function generateCareerOpportunities(
+  draft: PlayerSave,
+  signals: readonly DomainSignalSnapshot[],
+  currentDay: number,
+  idFactory: () => string,
+): void {
+  const loader = getConfigLoader();
+  for (const signal of signals) {
+    const result = processCareerOpportunitySignal({
+      state: draft,
+      signal,
+      currentDay,
+      idFactory,
+      definitions: loader.getCareerOpportunityDefinitionsBySignal(signal.signalType),
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: loader.getGameConfig().daysPerMonth * loader.getGameConfig().monthsPerYear,
+    });
+    draft.career.opportunities.push(...result.created);
+  }
+}
+
+function expireCareerOpportunitiesAtDay(draft: PlayerSave, currentDay: number): void {
+  const due = draft.career.opportunities
+    .filter(
+      (opportunity) =>
+        opportunity.status === 'available' &&
+        opportunity.expiresAtDay !== null &&
+        opportunity.expiresAtDay <= currentDay,
+    )
+    .sort(
+      (left, right) => left.expiresAtDay! - right.expiresAtDay! || left.id.localeCompare(right.id),
+    );
+  for (const opportunity of due) {
+    const result = expireCareerOpportunity(opportunity, currentDay);
+    if (!result.success || !result.opportunity) continue;
+    const index = draft.career.opportunities.findIndex((item) => item.id === opportunity.id);
+    if (index >= 0) draft.career.opportunities[index] = result.opportunity;
+  }
 }
 
 function processActionCompletion(

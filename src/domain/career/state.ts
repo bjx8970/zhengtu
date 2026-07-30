@@ -20,6 +20,7 @@ import type {
   CareerRestrictionType,
 } from './types';
 import type { ConditionExpression } from '../conditions';
+import type { EffectDefinition } from '../conditions';
 
 /** 当前任职状态 */
 export interface CurrentAppointment {
@@ -83,6 +84,8 @@ export interface CareerAssessmentRecord {
 export interface CareerExperience {
   /** 唯一 ID */
   id: string;
+  /** 与当前/历史任职实例一一对应的稳定 ID。 */
+  appointmentId: string;
   /** 稳定职位 ID */
   positionId: string;
   /** 职位名称快照 */
@@ -105,22 +108,30 @@ export interface CareerExperience {
   endedAtDay: number | null;
   /** 任职原因 */
   appointmentReason: AppointmentReason;
+  /** 任职类型。 */
+  appointmentType: AppointmentType;
+  /** 产生任职的机会；初始任职为 null。 */
+  sourceOpportunityId: string | null;
+  /** 结束原因；开放履历必须为 null。 */
+  endReason: AppointmentEndReason | null;
   /** 该任期内的考核记录 */
   assessmentResults: CareerAssessmentRecord[];
 }
 
-/** 职业机会 */
-export interface CareerOpportunity {
+/** 任职区间结束原因。 */
+export type AppointmentEndReason = Exclude<AppointmentReason, 'initial_assignment'> | 'retirement';
+
+/** 职业机会共享字段。 */
+export interface CareerOpportunityBase {
   /** 唯一 ID */
   id: string;
+  /** 配置定义 ID，用于来源去重和历史审计。 */
+  definitionId: string;
   /** 机会类型 */
   type: CareerOpportunityType;
   /** 机会状态 */
   status: CareerOpportunityStatus;
   source: CareerOpportunitySource;
-  target: CareerOpportunityTargetSnapshot;
-  appointmentType: AppointmentType | null;
-  appointmentReason: AppointmentReason | null;
   /** 产生原因的绝对游戏日 */
   appearedAtDay: number;
   /** 过期的绝对游戏日 */
@@ -131,10 +142,37 @@ export interface CareerOpportunity {
   cancelledAtDay: number | null;
   requiresSelection: boolean;
   eligibilityConditions: ConditionExpression[];
-  finalOutcome: 'appointed' | 'continued_observation' | 'not_selected' | 'withdrawn' | null;
+  finalOutcome:
+    | 'appointed'
+    | 'continued_observation'
+    | 'not_selected'
+    | 'training_completed'
+    | 'withdrawn'
+    | null;
   /** 产生原因描述 */
   reason: string;
 }
+
+/** 需要任职结算的职业机会。 */
+export interface AppointmentCareerOpportunity extends CareerOpportunityBase {
+  type: Exclude<CareerOpportunityType, 'training'>;
+  target: CareerOpportunityTargetSnapshot;
+  appointmentType: AppointmentType;
+  appointmentReason: AppointmentReason;
+}
+
+/** 不产生任职变化的培训机会。 */
+export interface TrainingCareerOpportunity extends CareerOpportunityBase {
+  type: 'training';
+  target: null;
+  appointmentType: null;
+  appointmentReason: null;
+  trainingDefinitionId: string;
+  effects: EffectDefinition[];
+}
+
+/** 职业机会判别联合。 */
+export type CareerOpportunity = AppointmentCareerOpportunity | TrainingCareerOpportunity;
 
 /** 职业机会来源。 */
 export interface CareerOpportunitySource {

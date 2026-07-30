@@ -4,7 +4,7 @@
  * 存档外层封装和严格解码基础设施。
  * SaveEnvelope 包裹 PlayerSave，提供 schema 版本追踪和不兼容拒绝能力。
  *
- * Schema 6：当前版本，持久化同日时间轴 continuation 与行动来源快照。
+ * Schema 8：当前版本，持久化任职实例化履历和机会判别联合。
  * Schema 2：确定性迁移至 Schema 3（治理指标空对象兼容）。
  * Schema 1：拒绝并保留原始只读备份（不实现自动迁移）。
  * 未来 Schema：拒绝。
@@ -13,13 +13,13 @@
 import type { PlayerSave } from './player';
 
 /** 当前存档 Schema 版本号，每次不兼容变更递增 */
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 /** 受支持可迁移的最低 Schema 版本（低于此版本拒绝） */
 export const MIN_MIGRATABLE_SCHEMA_VERSION = 2;
 
 /** 当前内容版本号，用于标识配置/内容包的版本（格式：YYYY.MM.REVISION） */
-export const CURRENT_CONTENT_VERSION = '2026.07.5';
+export const CURRENT_CONTENT_VERSION = '2026.07.6';
 
 /**
  * 存档外层封装

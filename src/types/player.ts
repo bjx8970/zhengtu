@@ -192,6 +192,7 @@ export interface GameTimeState extends GameTime {
 
 /** 可持久化的同日时间轴节点。 */
 export type TimelineContinuationNode =
+  | { type: 'career_opportunity_expiry'; absoluteDay: number }
   | { type: 'scheduled_event_activation'; absoluteDay: number }
   | { type: 'event_deadline'; absoluteDay: number }
   | { type: 'monthly_settlement'; absoluteDay: number; month: number; year: number }
