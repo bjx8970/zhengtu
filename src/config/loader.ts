@@ -23,6 +23,7 @@ import type {
   DepartmentTemplate,
   LeadershipStyleConfig,
   CareerOpportunityDefinition,
+  CareerExperienceQualificationRules,
 } from '../types/config';
 import type { PositionConfigV2, InstitutionConfig } from '../types/position-v2';
 import type { CivilServiceRank, InstitutionLevel } from '../domain/career/types';
@@ -35,6 +36,7 @@ import {
   PolicyDefinitionArraySchema,
   CivilServiceRankConfigSchema,
   CareerOpportunityDefinitionArraySchema,
+  CareerExperienceQualificationRulesSchema,
 } from './schemas';
 import { EventDefinitionArraySchema } from '../domain/events/definition';
 import deptTemplateData from './templates/departments.json' with { type: 'json' };
@@ -51,6 +53,7 @@ import eventsData from './templates/events.json' with { type: 'json' };
 import policiesData from './templates/policies.json' with { type: 'json' };
 import civilServiceRanksData from './career/civil-service-ranks.json' with { type: 'json' };
 import careerOpportunitiesData from './career/opportunities.json' with { type: 'json' };
+import experienceQualificationData from './career/experience-qualification.json' with { type: 'json' };
 
 type RawDeptMap = Record<string, DepartmentTemplate>;
 
@@ -69,6 +72,9 @@ const parsedPolicies = PolicyDefinitionArraySchema.parse(policiesData);
 const parsedCivilServiceRanks = CivilServiceRankConfigSchema.parse(civilServiceRanksData);
 const parsedCareerOpportunities =
   CareerOpportunityDefinitionArraySchema.parse(careerOpportunitiesData);
+const parsedExperienceQualificationRules = CareerExperienceQualificationRulesSchema.parse(
+  experienceQualificationData,
+);
 const ALL_POSITIONS = parsedPositions;
 const ALL_INSTITUTIONS = parsedInstitutions;
 const ALL_EVENTS = parsedEvents;
@@ -115,6 +121,7 @@ class ConfigLoader {
   private policies: Map<string, PolicyDefinitionConfig>;
   private civilServiceRanks: typeof parsedCivilServiceRanks;
   private careerOpportunities: CareerOpportunityDefinition[];
+  private experienceQualificationRules: CareerExperienceQualificationRules;
   private regionConfig: RegionConfig;
   private universityConfig: UniversityConfig;
   private backgroundConfig: BackgroundConfig;
@@ -139,6 +146,7 @@ class ConfigLoader {
     this.policies = new Map(ALL_POLICIES.map((p) => [p.id, p]));
     this.civilServiceRanks = parsedCivilServiceRanks;
     this.careerOpportunities = parsedCareerOpportunities;
+    this.experienceQualificationRules = parsedExperienceQualificationRules;
     this.gameConfig = constantsData as unknown as GameConfig;
     this.regionConfig = regionData as unknown as RegionConfig;
     this.universityConfig = universityData as unknown as UniversityConfig;
@@ -203,6 +211,11 @@ class ConfigLoader {
   /** 获取全部职业机会定义（深拷贝）。 */
   getAllCareerOpportunityDefinitions(): CareerOpportunityDefinition[] {
     return this.careerOpportunities.map((definition) => structuredClone(definition));
+  }
+
+  /** 获取职业履历资格规则的防御性副本。 */
+  getCareerExperienceQualificationRules(): CareerExperienceQualificationRules {
+    return structuredClone(this.experienceQualificationRules);
   }
 
   /** 按领域信号查询职业机会定义（深拷贝）。 */

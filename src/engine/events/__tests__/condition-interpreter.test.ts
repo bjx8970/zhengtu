@@ -170,34 +170,6 @@ describe('条件解释器 - 职业状态', () => {
       evalCond({ careerCheck: 'days_in_civil_service_rank', value: 201, op: 'gte' }, ctx),
     ).toBe(false);
   });
-
-  it('履历条件 has_experience', () => {
-    const ctx = makeContext((c) => {
-      c.state.career.experiences = [
-        {
-          id: 'exp1',
-          appointmentId: 'appointment-exp1',
-          positionId: 'admin_l1_0',
-          positionNameSnapshot: '科员',
-          institutionId: 'inst_001',
-          institutionNameSnapshot: '某局',
-          institutionLevel: 'township',
-          regionId: 'region_001',
-          positionDomain: 'local_governance',
-          leadershipRank: 'none',
-          startedAtDay: 0,
-          endedAtDay: 100,
-          appointmentReason: 'initial_assignment',
-          appointmentType: 'substantive',
-          sourceOpportunityId: null,
-          endReason: 'promotion',
-          assessmentResults: [],
-        },
-      ];
-    });
-    expect(evalCond({ careerCheck: 'has_experience', value: 'inst_001' }, ctx)).toBe(true);
-    expect(evalCond({ careerCheck: 'has_experience', value: 'inst_999' }, ctx)).toBe(false);
-  });
 });
 
 describe('条件解释器 - 世界指标与事实', () => {
@@ -530,8 +502,24 @@ describe('条件解释器 - 政策状态', () => {
 });
 
 describe('条件解释器 - 履历条件', () => {
-  it('region_count/domain_count/level_count', () => {
+  it('region_count/institution_count/domain_count/level_count', () => {
     const ctx = makeContext((c) => {
+      const openExperience = c.state.career.experiences[0]!;
+      c.currentDay = 1000;
+      c.state.career.appointment = {
+        ...c.state.career.appointment,
+        appointmentId: 'appointment-e3',
+        positionId: 'p3',
+        institutionId: 'i2',
+        regionId: 'r2',
+        institutionLevel: 'county',
+        positionDomain: 'party_organs',
+        leadershipRank: 'none',
+        startedAtDay: 720,
+        appointmentType: 'substantive',
+        appointmentReason: 'rotation',
+        sourceOpportunityId: null,
+      };
       c.state.career.experiences = [
         {
           id: 'e1',
@@ -545,7 +533,7 @@ describe('条件解释器 - 履历条件', () => {
           positionDomain: 'local_governance',
           leadershipRank: 'none',
           startedAtDay: 0,
-          endedAtDay: 10,
+          endedAtDay: 360,
           appointmentReason: 'initial_assignment',
           appointmentType: 'substantive',
           sourceOpportunityId: null,
@@ -563,46 +551,48 @@ describe('条件解释器 - 履历条件', () => {
           regionId: 'r2',
           positionDomain: 'party_organs',
           leadershipRank: 'none',
-          startedAtDay: 10,
-          endedAtDay: 20,
+          startedAtDay: 360,
+          endedAtDay: 720,
           appointmentReason: 'rotation',
           appointmentType: 'substantive',
           sourceOpportunityId: null,
           endReason: 'rotation',
           assessmentResults: [],
         },
+        {
+          ...openExperience,
+          id: 'e3',
+          appointmentId: 'appointment-e3',
+          positionId: 'p3',
+          institutionId: 'i2',
+          institutionLevel: 'county',
+          regionId: 'r2',
+          positionDomain: 'party_organs',
+          leadershipRank: 'none',
+          startedAtDay: 720,
+          appointmentReason: 'rotation',
+          appointmentType: 'substantive',
+          sourceOpportunityId: null,
+          endedAtDay: null,
+          endReason: null,
+        },
       ];
     });
     expect(evalCond({ experience: 'region_count', op: 'gte', value: 2 }, ctx)).toBe(true);
+    expect(evalCond({ experience: 'institution_count', op: 'eq', value: 2 }, ctx)).toBe(true);
     expect(evalCond({ experience: 'domain_count', op: 'eq', value: 2 }, ctx)).toBe(true);
     expect(evalCond({ experience: 'level_count', op: 'gte', value: 2 }, ctx)).toBe(true);
   });
 
   it('has_institution', () => {
-    const ctx = makeContext((c) => {
-      c.state.career.experiences = [
-        {
-          id: 'e1',
-          appointmentId: 'appointment-e1',
-          positionId: 'p1',
-          positionNameSnapshot: '',
-          institutionId: 'i1',
-          institutionNameSnapshot: '',
-          institutionLevel: 'township',
-          regionId: 'r1',
-          positionDomain: 'local_governance',
-          leadershipRank: 'none',
-          startedAtDay: 0,
-          endedAtDay: 10,
-          appointmentReason: 'initial_assignment',
-          appointmentType: 'substantive',
-          sourceOpportunityId: null,
-          endReason: 'promotion',
-          assessmentResults: [],
-        },
-      ];
-    });
-    expect(evalCond({ experience: 'has_institution', op: 'eq', value: 'i1' }, ctx)).toBe(true);
+    const ctx = makeContext();
+    const appointment = ctx.state.career.appointment;
+    expect(
+      evalCond({ experience: 'has_institution', op: 'eq', value: appointment.institutionId }, ctx),
+    ).toBe(true);
     expect(evalCond({ experience: 'has_institution', op: 'eq', value: 'i999' }, ctx)).toBe(false);
+    expect(evalCond({ experience: 'has_region', op: 'eq', value: appointment.regionId }, ctx)).toBe(
+      true,
+    );
   });
 });

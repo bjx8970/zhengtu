@@ -223,6 +223,52 @@ export const CivilServiceRankConfigSchema = z
 export type CivilServiceRankDefinition = z.infer<typeof CivilServiceRankDefinitionSchema>;
 export type CivilServiceRankProgressionRule = z.infer<typeof CivilServiceRankProgressionRuleSchema>;
 
+/** 单类任职的履历资格规则 Schema。 */
+export const AppointmentTypeExperienceRuleSchema = z
+  .object({
+    appointmentType: z.enum(APPOINTMENT_TYPES),
+    countsTowardRegionExperience: z.boolean(),
+    minDaysForRegionExperience: z.number().int().nonnegative().nullable(),
+    countsTowardInstitutionExperience: z.boolean(),
+    minDaysForInstitutionExperience: z.number().int().nonnegative().nullable(),
+    countsTowardDomainExperience: z.boolean(),
+    minDaysForDomainExperience: z.number().int().nonnegative().nullable(),
+    countsTowardLevelExperience: z.boolean(),
+    minDaysForLevelExperience: z.number().int().nonnegative().nullable(),
+  })
+  .strict()
+  .superRefine((rule, ctx) => {
+    const pairs = [
+      [rule.countsTowardRegionExperience, rule.minDaysForRegionExperience, 'region'],
+      [rule.countsTowardInstitutionExperience, rule.minDaysForInstitutionExperience, 'institution'],
+      [rule.countsTowardDomainExperience, rule.minDaysForDomainExperience, 'domain'],
+      [rule.countsTowardLevelExperience, rule.minDaysForLevelExperience, 'level'],
+    ] as const;
+    for (const [counts, minimum, name] of pairs)
+      if (counts === (minimum === null))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${name} qualification count flag and minimum days conflict`,
+        });
+  });
+
+/** 职业履历资格规则集合 Schema。 */
+export const CareerExperienceQualificationRulesSchema = z
+  .object({ appointmentTypes: z.array(AppointmentTypeExperienceRuleSchema) })
+  .strict()
+  .superRefine((rules, ctx) => {
+    const types = rules.appointmentTypes.map((rule) => rule.appointmentType);
+    if (
+      types.length !== APPOINTMENT_TYPES.length ||
+      new Set(types).size !== types.length ||
+      APPOINTMENT_TYPES.some((type) => !types.includes(type))
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Every appointment type must have exactly one experience qualification rule',
+      });
+  });
+
 /** 任职类职业机会定义 Schema。 */
 const AppointmentCareerOpportunityDefinitionSchema = z
   .object({

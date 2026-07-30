@@ -88,8 +88,7 @@ export type CareerCondition =
       careerCheck: 'days_in_civil_service_rank';
       value: number;
       op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
-    }
-  | { careerCheck: 'has_experience'; value: string; op?: 'eq' };
+    };
 
 /** 世界指标条件 */
 export interface WorldMetricCondition {
@@ -131,11 +130,11 @@ export type PolicyStateCondition =
 /** 履历条件（按 experience 类型判别） */
 export type ExperienceCondition =
   | {
-      experience: 'region_count' | 'domain_count' | 'level_count';
+      experience: 'region_count' | 'institution_count' | 'domain_count' | 'level_count';
       op: 'gte' | 'lte' | 'eq';
       value: number;
     }
-  | { experience: 'has_institution'; op: 'eq'; value: string };
+  | { experience: 'has_institution' | 'has_region'; op: 'eq'; value: string };
 
 /** 世界事实条件（按 op 类型判别） */
 export type FactCondition =
@@ -234,13 +233,6 @@ const CareerConditionSchema = z.union([
       op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
     })
     .strict(),
-  z
-    .object({
-      careerCheck: z.literal('has_experience'),
-      value: z.string().min(1),
-      op: z.literal('eq').optional(),
-    })
-    .strict(),
 ]);
 
 /** 世界指标条件 Schema */
@@ -305,14 +297,14 @@ const PolicyStateConditionSchema = z.union([
 const ExperienceConditionSchema = z.union([
   z
     .object({
-      experience: z.enum(['region_count', 'domain_count', 'level_count']),
+      experience: z.enum(['region_count', 'institution_count', 'domain_count', 'level_count']),
       op: z.enum(['gte', 'lte', 'eq']),
       value: z.number(),
     })
     .strict(),
   z
     .object({
-      experience: z.literal('has_institution'),
+      experience: z.enum(['has_institution', 'has_region']),
       op: z.literal('eq'),
       value: z.string().min(1),
     })

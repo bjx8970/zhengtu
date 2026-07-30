@@ -21,6 +21,24 @@ import type {
   CareerOpportunityType,
 } from '../domain/career/types';
 
+/** 单类任职可计入职业履历资格的配置规则。 */
+export interface AppointmentTypeExperienceRule {
+  appointmentType: AppointmentType;
+  countsTowardRegionExperience: boolean;
+  minDaysForRegionExperience: number | null;
+  countsTowardInstitutionExperience: boolean;
+  minDaysForInstitutionExperience: number | null;
+  countsTowardDomainExperience: boolean;
+  minDaysForDomainExperience: number | null;
+  countsTowardLevelExperience: boolean;
+  minDaysForLevelExperience: number | null;
+}
+
+/** 职业履历资格规则集合，必须为每种任职类型定义且仅定义一次。 */
+export interface CareerExperienceQualificationRules {
+  appointmentTypes: AppointmentTypeExperienceRule[];
+}
+
 /** 行动分类，决定行动冷却规则 */
 export type ActionCategory = 'major' | 'minor' | 'routine';
 
