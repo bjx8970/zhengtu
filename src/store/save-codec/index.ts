@@ -173,19 +173,76 @@ const CareerOpportunitySchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    const terminalDates = [value.rejectedAtDay, value.resolvedAtDay, value.cancelledAtDay].filter(
-      (item) => item !== null,
-    );
-    if (terminalDates.length > 1)
+    const dateFields = [
+      ['acceptedAtDay', value.acceptedAtDay],
+      ['rejectedAtDay', value.rejectedAtDay],
+      ['resolvedAtDay', value.resolvedAtDay],
+      ['cancelledAtDay', value.cancelledAtDay],
+    ] as const;
+    for (const [field, date] of dateFields) {
+      if (date !== null && date < value.appearedAtDay)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: `${field} cannot predate opportunity appearance`,
+        });
+    }
+
+    const requireDate = (field: (typeof dateFields)[number][0], required: boolean) => {
+      const date = value[field];
+      if ((date !== null) !== required)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: required
+            ? `${field} is required for ${value.status} opportunities`
+            : `${field} is not allowed for ${value.status} opportunities`,
+        });
+    };
+    const requireOutcome = value.status === 'resolved';
+    if ((value.finalOutcome !== null) !== requireOutcome)
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Opportunity has multiple terminal dates',
-      });
-    if ((value.status === 'resolved') !== (value.finalOutcome !== null))
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        path: ['finalOutcome'],
         message: 'finalOutcome is required only for resolved opportunities',
       });
+
+    switch (value.status) {
+      case 'available':
+      case 'expired':
+        for (const [field] of dateFields) requireDate(field, false);
+        if (value.status === 'expired' && value.expiresAtDay === null)
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['expiresAtDay'],
+            message: 'expiresAtDay is required for expired opportunities',
+          });
+        break;
+      case 'accepted':
+      case 'in_process':
+        requireDate('acceptedAtDay', true);
+        requireDate('rejectedAtDay', false);
+        requireDate('resolvedAtDay', false);
+        requireDate('cancelledAtDay', false);
+        break;
+      case 'rejected':
+        requireDate('acceptedAtDay', false);
+        requireDate('rejectedAtDay', true);
+        requireDate('resolvedAtDay', false);
+        requireDate('cancelledAtDay', false);
+        break;
+      case 'resolved':
+        requireDate('acceptedAtDay', true);
+        requireDate('rejectedAtDay', false);
+        requireDate('resolvedAtDay', true);
+        requireDate('cancelledAtDay', false);
+        break;
+      case 'cancelled':
+        requireDate('rejectedAtDay', false);
+        requireDate('resolvedAtDay', false);
+        requireDate('cancelledAtDay', true);
+        break;
+    }
   });
 
 /** CareerProcess Schema（stageResults 使用明确结构） */
@@ -1196,6 +1253,8 @@ export function migrateSchema6To7(prev: Record<string, unknown>): Record<string,
   const migrated = structuredClone(prev);
   const state = migrated.state as Record<string, unknown> | undefined;
   const career = state?.career as Record<string, unknown> | undefined;
+  const world = state?.world as Record<string, unknown> | undefined;
+  const metrics = world?.metrics as Record<string, unknown> | undefined;
   const appointment = career?.appointment as Record<string, unknown> | undefined;
   if (
     !career ||
@@ -1221,6 +1280,12 @@ export function migrateSchema6To7(prev: Record<string, unknown>): Record<string,
   career.civilServiceRankStartedAtDay = 0;
   career.civilServiceRankHistory = [];
   career.restrictions = [];
+  if (!metrics) throw new Error('Schema 6 save is missing world metrics');
+  for (const [metricId, initialValue] of Object.entries(
+    getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
+  )) {
+    if (metrics[metricId] === undefined) metrics[metricId] = initialValue;
+  }
   migrated.schemaVersion = 7;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;

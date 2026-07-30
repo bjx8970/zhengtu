@@ -136,16 +136,9 @@ function createDefaultEventRuntimeState(): EventRuntimeState {
 
 /** 创建默认世界状态 */
 function createDefaultWorldState(): WorldState {
-  const metrics: Record<string, number> = {};
-  for (const rule of getConfigLoader().getAllCivilServiceRankProgressionRules()) {
-    const quota = rule.quotaRequirement;
-    if (!quota) continue;
-    // 职数由正式职级配置确定，且与具体岗位 vacancyCount 保持独立。
-    metrics[quota.metricId] = Math.max(metrics[quota.metricId] ?? 0, quota.requiredValue);
-  }
   return {
     facts: {},
-    metrics,
+    metrics: getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
     activeCycles: [],
   };
 }

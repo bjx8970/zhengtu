@@ -176,6 +176,14 @@ export const CivilServiceRankConfigSchema = z
       });
     if (new Set(data.definitions.map((item) => item.order)).size !== data.definitions.length)
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rank orders must be unique' });
+    for (const definition of data.definitions) {
+      const expectedOrder = CIVIL_SERVICE_RANKS.indexOf(definition.id) + 1;
+      if (definition.order !== expectedOrder)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Rank ${definition.id} must use canonical order ${expectedOrder}`,
+        });
+    }
     const ruleIds = new Set<string>();
     const sourceRanks = new Set<string>();
     for (const rule of data.progressionRules) {

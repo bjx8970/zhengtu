@@ -14,6 +14,7 @@ import { decodeCurrentSave, wrapSaveEnvelope, validatePlayerSave } from '../save
 import { CURRENT_SCHEMA_VERSION } from '../../types/save';
 import { getConfigLoader } from '../../config/loader';
 import { createActionExecutableSnapshot } from '../action-executable-snapshot';
+import type { CareerOpportunity } from '../../domain/career/state';
 import {
   INSTITUTION_LEVELS,
   POSITION_DOMAINS,
@@ -239,6 +240,10 @@ describe('Schema 2 存档', () => {
     delete career.civilServiceRankStartedAtDay;
     delete career.civilServiceRankHistory;
     delete career.restrictions;
+    const metrics = ((envelope.state as Record<string, unknown>).world as Record<string, unknown>)
+      .metrics as Record<string, unknown>;
+    delete metrics['rank_quota.clerk_1'];
+    metrics['rank_quota.section_4'] = 7;
 
     const result = decodeCurrentSave(JSON.stringify(envelope));
 
@@ -253,6 +258,63 @@ describe('Schema 2 存档', () => {
       civilServiceRankHistory: [],
       restrictions: [],
     });
+    expect(result.state?.world.metrics).toMatchObject({
+      ...getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
+      'rank_quota.section_4': 7,
+    });
+  });
+
+  it('rejects career opportunities with invalid lifecycle dates during strict decode', () => {
+    const invalidOpportunities: Array<Partial<CareerOpportunity>> = [
+      { status: 'available', acceptedAtDay: 1 },
+      { status: 'accepted' },
+      { status: 'in_process' },
+      { status: 'rejected' },
+      { status: 'resolved', resolvedAtDay: 1, finalOutcome: 'appointed' },
+      { status: 'expired', expiresAtDay: null },
+      { status: 'cancelled' },
+    ];
+    for (const patch of invalidOpportunities) {
+      const state = createInitialState();
+      const opportunity: CareerOpportunity = {
+        id: 'invalid-lifecycle',
+        type: 'leadership_vacancy',
+        status: 'available',
+        source: {
+          sourceType: 'system',
+          sourceId: 'test-source',
+          signalId: null,
+          description: 'test',
+        },
+        target: {
+          positionId: 'test-position',
+          positionName: 'test position',
+          institutionId: 'test-institution',
+          institutionName: 'test institution',
+          regionId: 'test-region',
+          institutionLevel: 'township',
+          positionDomain: 'local_governance',
+          leadershipRank: 'none',
+        },
+        appointmentType: null,
+        appointmentReason: null,
+        appearedAtDay: 0,
+        expiresAtDay: 10,
+        acceptedAtDay: null,
+        rejectedAtDay: null,
+        resolvedAtDay: null,
+        cancelledAtDay: null,
+        requiresSelection: true,
+        eligibilityConditions: [],
+        finalOutcome: null,
+        reason: 'test',
+        ...patch,
+      };
+      state.career.opportunities = [opportunity];
+      const result = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('invalid_envelope');
+    }
   });
 
   it('Schema 6→7 拒绝非空机会或进行中的职业流程并保留备份', () => {

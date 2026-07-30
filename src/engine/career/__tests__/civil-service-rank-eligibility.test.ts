@@ -145,6 +145,21 @@ describe('civil-service rank eligibility', () => {
     expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(false);
   });
 
+  it('requires each rank definition to use its canonical order', () => {
+    const definitions = getConfigLoader().getAllCivilServiceRankDefinitions();
+    const lowest = definitions.find((item) => item.id === 'clerk_2');
+    const highest = definitions.find((item) => item.id === 'inspector_1');
+    expect(lowest).toBeDefined();
+    expect(highest).toBeDefined();
+    if (!lowest || !highest) return;
+    [lowest.order, highest.order] = [highest.order, lowest.order];
+    const config = {
+      definitions,
+      progressionRules: getConfigLoader().getAllCivilServiceRankProgressionRules(),
+    };
+    expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(false);
+  });
+
   it('distinguishes the highest rank from a missing progression rule', () => {
     const state = createInitialState();
     state.career.civilServiceRank = 'inspector_1';

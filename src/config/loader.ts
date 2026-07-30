@@ -184,6 +184,18 @@ class ConfigLoader {
     return this.civilServiceRanks.progressionRules.map((item) => structuredClone(item));
   }
 
+  /** 获取新存档所需的公务员职级初始职数。 */
+  getInitialCivilServiceRankQuotaMetrics(): Record<string, number> {
+    const metrics: Record<string, number> = {};
+    for (const rule of this.civilServiceRanks.progressionRules) {
+      const quota = rule.quotaRequirement;
+      if (!quota) continue;
+      // 职数由正式职级配置确定，且与具体岗位 vacancyCount 保持独立。
+      metrics[quota.metricId] = Math.max(metrics[quota.metricId] ?? 0, quota.requiredValue);
+    }
+    return metrics;
+  }
+
   /** 获取所有正式职级定义。 */
   getAllCivilServiceRankDefinitions() {
     return this.civilServiceRanks.definitions.map((item) => structuredClone(item));
