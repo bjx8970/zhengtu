@@ -11,10 +11,12 @@ import {
   INSTITUTION_LEVELS,
   POSITION_DOMAINS,
   LEADERSHIP_RANKS,
+  APPOINTMENT_TYPES,
+  APPOINTMENT_REASONS,
 } from '../domain/career/types';
 import { ConditionExpressionSchema } from '../domain/conditions';
 import { EffectDefinitionSchema } from '../domain/conditions';
-import { PolicyCategorySchema } from '../domain/governance/types';
+import { DomainSignalSchema, PolicyCategorySchema } from '../domain/governance/types';
 
 /** 机构配置 Schema */
 export const InstitutionConfigSchema = z
@@ -220,3 +222,71 @@ export const CivilServiceRankConfigSchema = z
   });
 export type CivilServiceRankDefinition = z.infer<typeof CivilServiceRankDefinitionSchema>;
 export type CivilServiceRankProgressionRule = z.infer<typeof CivilServiceRankProgressionRuleSchema>;
+
+/** 任职类职业机会定义 Schema。 */
+const AppointmentCareerOpportunityDefinitionSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.enum([
+      'leadership_vacancy',
+      'lateral_transfer',
+      'temporary_assignment',
+      'secondment',
+      'demotion',
+      'retirement',
+    ]),
+    triggerSignals: z.array(DomainSignalSchema).min(1),
+    conditions: z.array(ConditionExpressionSchema),
+    expiresAfterDays: z.number().int().nonnegative().nullable(),
+    repeatPolicy: z.enum(['once', 'once_per_source', 'repeatable']),
+    cooldownDays: z.number().int().nonnegative(),
+    requiresSelection: z.boolean(),
+    reasonTemplate: z.string().min(1),
+    targetPositionId: z.string().min(1),
+    appointmentType: z.enum(APPOINTMENT_TYPES),
+    appointmentReason: z.enum(APPOINTMENT_REASONS),
+  })
+  .strict();
+
+/** 培训职业机会定义 Schema。 */
+const TrainingCareerOpportunityDefinitionSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.literal('training'),
+    triggerSignals: z.array(DomainSignalSchema).min(1),
+    conditions: z.array(ConditionExpressionSchema),
+    expiresAfterDays: z.number().int().nonnegative().nullable(),
+    repeatPolicy: z.enum(['once', 'once_per_source', 'repeatable']),
+    cooldownDays: z.number().int().nonnegative(),
+    requiresSelection: z.boolean(),
+    reasonTemplate: z.string().min(1),
+    targetPositionId: z.null(),
+    trainingDefinitionId: z.string().min(1),
+    effects: z.array(EffectDefinitionSchema).min(1),
+  })
+  .strict();
+
+/** 职业机会定义数组 Schema。 */
+export const CareerOpportunityDefinitionArraySchema = z
+  .array(
+    z.union([
+      AppointmentCareerOpportunityDefinitionSchema,
+      TrainingCareerOpportunityDefinitionSchema,
+    ]),
+  )
+  .superRefine((definitions, ctx) => {
+    const ids = new Set<string>();
+    for (const definition of definitions) {
+      if (ids.has(definition.id))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate career opportunity ID: ${definition.id}`,
+        });
+      ids.add(definition.id);
+      if (definition.type === 'leadership_vacancy' && !definition.requiresSelection)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Leadership vacancy ${definition.id} must require selection`,
+        });
+    }
+  });

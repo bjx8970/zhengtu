@@ -14,6 +14,12 @@ import type { SlotTierKey } from './player';
 import type { ConditionExpression } from '../domain/conditions';
 import type { EffectDefinition } from '../domain/conditions';
 import type { PolicyCategory } from '../domain/governance/types';
+import type { DomainSignal } from '../domain/governance/types';
+import type {
+  AppointmentReason,
+  AppointmentType,
+  CareerOpportunityType,
+} from '../domain/career/types';
 
 /** 行动分类，决定行动冷却规则 */
 export type ActionCategory = 'major' | 'minor' | 'routine';
@@ -421,3 +427,36 @@ export interface PolicyDefinitionConfig {
   /** 阶段列表（按顺序线性推进，至少 1 个） */
   phases: PolicyPhaseConfig[];
 }
+
+/** 职业机会配置的共同字段。 */
+export interface CareerOpportunityDefinitionBase {
+  id: string;
+  type: CareerOpportunityType;
+  triggerSignals: DomainSignal[];
+  conditions: ConditionExpression[];
+  expiresAfterDays: number | null;
+  repeatPolicy: 'once' | 'once_per_source' | 'repeatable';
+  cooldownDays: number;
+  requiresSelection: boolean;
+  reasonTemplate: string;
+}
+
+/** 任职类岗位机会定义。 */
+export interface AppointmentCareerOpportunityDefinition extends CareerOpportunityDefinitionBase {
+  type: Exclude<CareerOpportunityType, 'training'>;
+  targetPositionId: string;
+  appointmentType: AppointmentType;
+  appointmentReason: AppointmentReason;
+}
+
+/** 培训机会定义。 */
+export interface TrainingCareerOpportunityDefinition extends CareerOpportunityDefinitionBase {
+  type: 'training';
+  targetPositionId: null;
+  trainingDefinitionId: string;
+  effects: EffectDefinition[];
+}
+
+/** 由配置驱动的职业机会判别联合。 */
+export type CareerOpportunityDefinition =
+  AppointmentCareerOpportunityDefinition | TrainingCareerOpportunityDefinition;

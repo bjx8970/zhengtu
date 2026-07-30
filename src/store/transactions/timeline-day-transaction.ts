@@ -42,6 +42,7 @@ import {
   setPlayerAttrDirect,
 } from '../reducers/shared';
 import { commitPolicyTransitionInTransaction } from './policy-transition-transaction';
+import { expireCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
 
 /**
  * 结算当日行动与到期政策，再统一处理它们产生的领域信号。
@@ -129,6 +130,9 @@ export function processTimelineNodes(
     const node = nodes[index];
     if (!node) continue;
     switch (node.type) {
+      case 'career_opportunity_expiry':
+        expireCareerOpportunitiesAtDay(draft, node.absoluteDay);
+        break;
       case 'scheduled_event_activation':
         activateEventsAtDay(draft, node.absoluteDay, rng, idFactory, definitions);
         // 截止处理必须与计划激活同属一个不可分割节点；否则 blocker 会让刚刚
@@ -174,6 +178,25 @@ export function processTimelineNodes(
     }
   }
   return { interrupted: false, remainingNodes: [] };
+}
+
+function expireCareerOpportunitiesAtDay(draft: PlayerSave, currentDay: number): void {
+  const due = draft.career.opportunities
+    .filter(
+      (opportunity) =>
+        opportunity.status === 'available' &&
+        opportunity.expiresAtDay !== null &&
+        opportunity.expiresAtDay <= currentDay,
+    )
+    .sort(
+      (left, right) => left.expiresAtDay! - right.expiresAtDay! || left.id.localeCompare(right.id),
+    );
+  for (const opportunity of due) {
+    const result = expireCareerOpportunity(opportunity, currentDay);
+    if (!result.success || !result.opportunity) continue;
+    const index = draft.career.opportunities.findIndex((item) => item.id === opportunity.id);
+    if (index >= 0) draft.career.opportunities[index] = result.opportunity;
+  }
 }
 
 function processActionCompletion(

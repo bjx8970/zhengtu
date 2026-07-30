@@ -14,7 +14,8 @@ import { decodeCurrentSave, wrapSaveEnvelope, validatePlayerSave } from '../save
 import { CURRENT_SCHEMA_VERSION } from '../../types/save';
 import { getConfigLoader } from '../../config/loader';
 import { createActionExecutableSnapshot } from '../action-executable-snapshot';
-import type { CareerOpportunity } from '../../domain/career/state';
+import type { AppointmentCareerOpportunity } from '../../domain/career/state';
+import { expireCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
 import {
   INSTITUTION_LEVELS,
   POSITION_DOMAINS,
@@ -48,6 +49,58 @@ describe('Schema 2 存档', () => {
     const result = decodeCurrentSave(json);
     expect(result.success).toBe(true);
     expect(result.state?.character.characterName).toBe('测试角色');
+  });
+
+  it('expired career opportunity survives a save/load round trip', () => {
+    const state = createInitialState();
+    const opportunity: AppointmentCareerOpportunity = {
+      id: 'expired-opportunity',
+      definitionId: 'expired-definition',
+      type: 'leadership_vacancy',
+      status: 'available',
+      source: {
+        sourceType: 'system',
+        sourceId: 'test-source',
+        signalId: null,
+        description: 'test',
+      },
+      sourceSignal: null,
+      target: {
+        positionId: 'test-position',
+        positionName: 'Test position',
+        institutionId: 'test-institution',
+        institutionName: 'Test institution',
+        regionId: 'test-region',
+        institutionLevel: 'township',
+        positionDomain: 'local_governance',
+        leadershipRank: 'none',
+      },
+      appointmentType: 'substantive',
+      appointmentReason: 'promotion',
+      appearedAtDay: 0,
+      expiresAtDay: 1,
+      acceptedAtDay: null,
+      rejectedAtDay: null,
+      resolvedAtDay: null,
+      cancelledAtDay: null,
+      requiresSelection: true,
+      eligibilityConditions: [],
+      finalOutcome: null,
+      reason: 'test',
+    };
+    const expired = expireCareerOpportunity(opportunity, 1);
+    expect(expired.success).toBe(true);
+    if (!expired.opportunity) throw new Error('Expected expired opportunity');
+    state.career.opportunities = [expired.opportunity];
+
+    const result = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.career.opportunities[0]).toMatchObject({
+      status: 'expired',
+      expiresAtDay: 1,
+      resolvedAtDay: null,
+    });
   });
 
   it('Schema 6 非空时间轴 continuation 可完整往返', () => {
@@ -264,8 +317,41 @@ describe('Schema 2 存档', () => {
     });
   });
 
+  it('Schema 7 → 8 migrates every historical career experience', () => {
+    const state = createInitialState();
+    const openExperience = { ...state.career.experiences[0]! } as Record<string, unknown>;
+    delete openExperience.appointmentId;
+    delete openExperience.appointmentType;
+    delete openExperience.sourceOpportunityId;
+    delete openExperience.endReason;
+    const historicalExperience = {
+      ...openExperience,
+      id: 'historical-experience',
+      startedAtDay: 0,
+      endedAtDay: 10,
+      appointmentReason: 'temporary_assignment',
+    };
+    const envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(state))) as Record<string, unknown>;
+    envelope.schemaVersion = 7;
+    envelope.contentVersion = '2026.07.5';
+    const career = (envelope.state as Record<string, unknown>).career as Record<string, unknown>;
+    career.experiences = [historicalExperience, openExperience];
+
+    const result = decodeCurrentSave(JSON.stringify(envelope));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.career.experiences).toHaveLength(2);
+    expect(result.state?.career.experiences[0]).toMatchObject({
+      id: 'historical-experience',
+      appointmentId: 'legacy-appointment-historical-experience-0',
+      appointmentType: 'temporary',
+      sourceOpportunityId: null,
+      endReason: null,
+    });
+  });
+
   it('rejects career opportunities with invalid lifecycle dates during strict decode', () => {
-    const invalidOpportunities: Array<Partial<CareerOpportunity>> = [
+    const invalidOpportunities: Array<Partial<AppointmentCareerOpportunity>> = [
       { status: 'available', acceptedAtDay: 1 },
       { status: 'accepted' },
       { status: 'in_process' },
@@ -273,11 +359,13 @@ describe('Schema 2 存档', () => {
       { status: 'resolved', resolvedAtDay: 1, finalOutcome: 'appointed' },
       { status: 'expired', expiresAtDay: null },
       { status: 'cancelled' },
+      { status: 'cancelled', acceptedAtDay: 1, cancelledAtDay: 2 },
     ];
     for (const patch of invalidOpportunities) {
       const state = createInitialState();
-      const opportunity: CareerOpportunity = {
+      const opportunity: AppointmentCareerOpportunity = {
         id: 'invalid-lifecycle',
+        definitionId: 'invalid-lifecycle-definition',
         type: 'leadership_vacancy',
         status: 'available',
         source: {
@@ -286,6 +374,7 @@ describe('Schema 2 存档', () => {
           signalId: null,
           description: 'test',
         },
+        sourceSignal: null,
         target: {
           positionId: 'test-position',
           positionName: 'test position',
@@ -296,8 +385,8 @@ describe('Schema 2 存档', () => {
           positionDomain: 'local_governance',
           leadershipRank: 'none',
         },
-        appointmentType: null,
-        appointmentReason: null,
+        appointmentType: 'substantive',
+        appointmentReason: 'promotion',
         appearedAtDay: 0,
         expiresAtDay: 10,
         acceptedAtDay: null,
@@ -558,6 +647,7 @@ describe('NEW_GAME 隔离性', () => {
     oldState.career.experiences = [
       {
         id: 'exp_1',
+        appointmentId: 'appointment-exp_1',
         positionId: 'admin_l2_0',
         positionNameSnapshot: '副镇长',
         institutionId: 'township_govt_01',
@@ -569,6 +659,9 @@ describe('NEW_GAME 隔离性', () => {
         startedAtDay: 0,
         endedAtDay: 360,
         appointmentReason: 'promotion',
+        appointmentType: 'substantive',
+        sourceOpportunityId: null,
+        endReason: 'promotion',
         assessmentResults: [],
       },
     ];
@@ -622,8 +715,9 @@ describe('NEW_GAME 隔离性', () => {
     const state = store.getRawState();
     // 新角色名
     expect(state.character.characterName).toBe('新角色');
-    // 履历已清空
-    expect(state.career.experiences.length).toBe(0);
+    // 新建游戏立即创建唯一的初始开放履历。
+    expect(state.career.experiences).toHaveLength(1);
+    expect(state.career.experiences[0]?.appointmentId).toBe(state.career.appointment.appointmentId);
     // 政策已清空
     expect(state.governance.policies.length).toBe(0);
     // 事件已清空

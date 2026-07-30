@@ -1,9 +1,9 @@
 /**
- * 存档严格解码器（Schema 7）
+ * 存档严格解码器（Schema 8）
  *
  * 只接受当前版本（Schema 7）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -23,7 +23,6 @@ import {
   CIVIL_SERVICE_RANKS,
   APPOINTMENT_TYPES,
   APPOINTMENT_REASONS,
-  CAREER_OPPORTUNITY_TYPES,
   CAREER_OPPORTUNITY_STATUSES,
 } from '../../domain/career/types';
 import {
@@ -100,6 +99,7 @@ const CurrentAppointmentSchema = z
 const CareerExperienceSchema = z
   .object({
     id: z.string(),
+    appointmentId: z.string().min(1),
     positionId: z.string(),
     positionNameSnapshot: z.string(),
     institutionId: z.string(),
@@ -111,6 +111,19 @@ const CareerExperienceSchema = z
     startedAtDay: z.number(),
     endedAtDay: z.number().nullable(),
     appointmentReason: z.enum(APPOINTMENT_REASONS),
+    appointmentType: z.enum(APPOINTMENT_TYPES),
+    sourceOpportunityId: z.string().nullable(),
+    endReason: z
+      .enum([
+        'promotion',
+        'lateral_transfer',
+        'rotation',
+        'temporary_assignment',
+        'secondment',
+        'demotion',
+        'retirement',
+      ])
+      .nullable(),
     assessmentResults: z.array(
       z
         .object({
@@ -123,11 +136,11 @@ const CareerExperienceSchema = z
   })
   .strict();
 
-/** CareerOpportunity Schema */
-const CareerOpportunitySchema = z
+/** 职业机会共享存档 Schema。 */
+const CareerOpportunityBaseSchema = z
   .object({
     id: z.string(),
-    type: z.enum(CAREER_OPPORTUNITY_TYPES),
+    definitionId: z.string().min(1),
     status: z.enum(CAREER_OPPORTUNITY_STATUSES),
     source: z
       .object({
@@ -144,20 +157,9 @@ const CareerOpportunitySchema = z
         description: z.string(),
       })
       .strict(),
-    target: z
-      .object({
-        positionId: z.string(),
-        positionName: z.string(),
-        institutionId: z.string(),
-        institutionName: z.string(),
-        regionId: z.string(),
-        institutionLevel: z.enum(INSTITUTION_LEVELS),
-        positionDomain: z.enum(POSITION_DOMAINS),
-        leadershipRank: z.enum(LEADERSHIP_RANKS),
-      })
-      .strict(),
-    appointmentType: z.enum(APPOINTMENT_TYPES).nullable(),
-    appointmentReason: z.enum(APPOINTMENT_REASONS).nullable(),
+    // Schema 8 saves predate frozen trigger payloads. Decode them as null rather
+    // than fabricating a payload which could accidentally satisfy signal fields.
+    sourceSignal: DomainSignalSnapshotSchema.nullable().default(null),
     appearedAtDay: z.number(),
     expiresAtDay: z.number().nullable(),
     acceptedAtDay: z.number().nullable(),
@@ -167,11 +169,56 @@ const CareerOpportunitySchema = z
     requiresSelection: z.boolean(),
     eligibilityConditions: z.array(ConditionExpressionSchema),
     finalOutcome: z
-      .enum(['appointed', 'continued_observation', 'not_selected', 'withdrawn'])
+      .enum([
+        'appointed',
+        'continued_observation',
+        'not_selected',
+        'training_completed',
+        'withdrawn',
+      ])
       .nullable(),
     reason: z.string(),
   })
-  .strict()
+  .strict();
+
+const CareerOpportunityTargetSchema = z
+  .object({
+    positionId: z.string(),
+    positionName: z.string(),
+    institutionId: z.string(),
+    institutionName: z.string(),
+    regionId: z.string(),
+    institutionLevel: z.enum(INSTITUTION_LEVELS),
+    positionDomain: z.enum(POSITION_DOMAINS),
+    leadershipRank: z.enum(LEADERSHIP_RANKS),
+  })
+  .strict();
+
+/** CareerOpportunity Schema（training 使用正式判别联合）。 */
+const CareerOpportunitySchema = z
+  .union([
+    CareerOpportunityBaseSchema.extend({
+      type: z.enum([
+        'leadership_vacancy',
+        'lateral_transfer',
+        'temporary_assignment',
+        'secondment',
+        'demotion',
+        'retirement',
+      ]),
+      target: CareerOpportunityTargetSchema,
+      appointmentType: z.enum(APPOINTMENT_TYPES),
+      appointmentReason: z.enum(APPOINTMENT_REASONS),
+    }).strict(),
+    CareerOpportunityBaseSchema.extend({
+      type: z.literal('training'),
+      target: z.null(),
+      appointmentType: z.null(),
+      appointmentReason: z.null(),
+      trainingDefinitionId: z.string().min(1),
+      effects: z.array(EffectDefinitionSchema),
+    }).strict(),
+  ])
   .superRefine((value, ctx) => {
     const dateFields = [
       ['acceptedAtDay', value.acceptedAtDay],
@@ -238,6 +285,7 @@ const CareerOpportunitySchema = z
         requireDate('cancelledAtDay', false);
         break;
       case 'cancelled':
+        requireDate('acceptedAtDay', false);
         requireDate('rejectedAtDay', false);
         requireDate('resolvedAtDay', false);
         requireDate('cancelledAtDay', true);
@@ -341,6 +389,7 @@ const CareerStateSchema = z
     specialties: z.record(z.number()),
     opportunities: z.array(CareerOpportunitySchema),
     activeProcess: CareerProcessSchema.nullable(),
+    completedProcesses: z.array(CareerProcessSchema).default([]),
   })
   .strict();
 
@@ -762,6 +811,12 @@ const CharacterStateSchema = z
 const TimelineContinuationNodeSchema = z.discriminatedUnion('type', [
   z
     .object({
+      type: z.literal('career_opportunity_expiry'),
+      absoluteDay: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('scheduled_event_activation'),
       absoluteDay: z.number().int().nonnegative(),
     })
@@ -806,12 +861,13 @@ const TIMELINE_NODE_PRIORITY: Record<
   z.infer<typeof TimelineContinuationNodeSchema>['type'],
   number
 > = {
-  scheduled_event_activation: 0,
-  event_deadline: 1,
-  monthly_settlement: 2,
-  annual_assessment: 3,
-  political_cycle: 4,
-  retirement_check: 5,
+  career_opportunity_expiry: 0,
+  scheduled_event_activation: 1,
+  event_deadline: 2,
+  monthly_settlement: 3,
+  annual_assessment: 4,
+  political_cycle: 5,
+  retirement_check: 6,
 };
 
 const GameTimeStateSchema = z
@@ -1287,6 +1343,104 @@ export function migrateSchema6To7(prev: Record<string, unknown>): Record<string,
     if (metrics[metricId] === undefined) metrics[metricId] = initialValue;
   }
   migrated.schemaVersion = 7;
+  migrated.contentVersion = '2026.07.5';
+  return migrated;
+}
+
+/** 将 Schema 7 存档迁移至 Schema 8。 */
+export function migrateSchema7To8(prev: Record<string, unknown>): Record<string, unknown> {
+  const migrated = structuredClone(prev);
+  if (migrated.contentVersion !== '2026.07.5')
+    throw new Error(`Schema 7 content version "${String(migrated.contentVersion)}" is unsupported`);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const career = state?.career as Record<string, unknown> | undefined;
+  const appointment = career?.appointment as Record<string, unknown> | undefined;
+  if (!career || !appointment || typeof appointment.appointmentId !== 'string')
+    throw new Error('Schema 7 save is missing a valid appointment instance');
+  if (!Array.isArray(career.opportunities) || career.opportunities.length > 0)
+    throw new Error('Schema 7 non-empty career opportunities cannot be safely discriminated');
+  if (career.activeProcess !== null)
+    throw new Error('Schema 7 active career process cannot be safely migrated');
+  const experiences = career.experiences;
+  if (!Array.isArray(experiences)) throw new Error('Schema 7 career experiences are invalid');
+  if (
+    experiences.some(
+      (experience) => !experience || typeof experience !== 'object' || Array.isArray(experience),
+    )
+  )
+    throw new Error('Schema 7 career experiences contain an invalid entry');
+  const typedExperiences = experiences as Record<string, unknown>[];
+  const openExperiences = typedExperiences.filter((experience) => experience.endedAtDay === null);
+  if (openExperiences.length > 1) throw new Error('Schema 7 has multiple open career experiences');
+  const positionId = appointment.positionId;
+  const institutionId = appointment.institutionId;
+  if (typeof positionId !== 'string' || typeof institutionId !== 'string')
+    throw new Error('Schema 7 appointment position context is invalid');
+  const position = getConfigLoader().getPositionById(positionId);
+  const institution = getConfigLoader().getInstitutionById(institutionId);
+  if (!position || !institution)
+    throw new Error('Schema 7 appointment configuration is unavailable');
+  const fillCurrentExperience = (experience: Record<string, unknown>, id: string) => {
+    if (
+      experience.positionId !== position.id ||
+      experience.institutionId !== institution.id ||
+      experience.regionId !== appointment.regionId ||
+      experience.startedAtDay !== appointment.startedAtDay
+    )
+      throw new Error('Schema 7 open experience conflicts with current appointment');
+    experience.id = typeof experience.id === 'string' ? experience.id : id;
+    experience.appointmentId = appointment.appointmentId;
+    experience.positionNameSnapshot =
+      typeof experience.positionNameSnapshot === 'string'
+        ? experience.positionNameSnapshot
+        : position.name;
+    experience.institutionNameSnapshot =
+      typeof experience.institutionNameSnapshot === 'string'
+        ? experience.institutionNameSnapshot
+        : institution.name;
+    experience.institutionLevel = position.institutionLevel;
+    experience.positionDomain = position.positionDomain;
+    experience.leadershipRank = position.leadershipRank;
+    experience.appointmentType = appointment.appointmentType;
+    experience.appointmentReason = appointment.appointmentReason;
+    experience.sourceOpportunityId = appointment.sourceOpportunityId;
+    experience.endReason = null;
+    experience.assessmentResults = Array.isArray(experience.assessmentResults)
+      ? experience.assessmentResults
+      : [];
+  };
+  if (openExperiences.length === 0) {
+    const experience: Record<string, unknown> = {
+      id: `legacy-experience-${appointment.appointmentId}`,
+      positionId: position.id,
+      institutionId: institution.id,
+      regionId: appointment.regionId,
+      startedAtDay: appointment.startedAtDay,
+      endedAtDay: null,
+    };
+    fillCurrentExperience(experience, `legacy-experience-${appointment.appointmentId}`);
+    typedExperiences.push(experience);
+  } else {
+    fillCurrentExperience(openExperiences[0]!, `legacy-experience-${appointment.appointmentId}`);
+  }
+  for (const [index, experience] of typedExperiences.entries()) {
+    if (experience.endedAtDay === null) continue;
+    const legacyId = typeof experience.id === 'string' ? experience.id : `experience-${index}`;
+    experience.appointmentId = `legacy-appointment-${legacyId}-${index}`;
+    experience.appointmentType =
+      experience.appointmentReason === 'temporary_assignment'
+        ? 'temporary'
+        : experience.appointmentReason === 'secondment'
+          ? 'secondment'
+          : 'substantive';
+    experience.sourceOpportunityId = null;
+    // Schema 7 did not record why a tenure ended, so preserve that absence explicitly.
+    experience.endReason = null;
+    experience.assessmentResults = Array.isArray(experience.assessmentResults)
+      ? experience.assessmentResults
+      : [];
+  }
+  migrated.schemaVersion = 8;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
@@ -1341,17 +1495,23 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
   let target: unknown = data;
   try {
     if (obj.schemaVersion === 2) {
-      target = migrateSchema6To7(
-        migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj)))),
+      target = migrateSchema7To8(
+        migrateSchema6To7(
+          migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj)))),
+        ),
       );
     } else if (obj.schemaVersion === 3) {
-      target = migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(obj))));
+      target = migrateSchema7To8(
+        migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(obj)))),
+      );
     } else if (obj.schemaVersion === 4) {
-      target = migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(obj)));
+      target = migrateSchema7To8(migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(obj))));
     } else if (obj.schemaVersion === 5) {
-      target = migrateSchema6To7(migrateSchema5To6(obj));
+      target = migrateSchema7To8(migrateSchema6To7(migrateSchema5To6(obj)));
     } else if (obj.schemaVersion === 6) {
-      target = migrateSchema6To7(obj);
+      target = migrateSchema7To8(migrateSchema6To7(obj));
+    } else if (obj.schemaVersion === 7) {
+      target = migrateSchema7To8(obj);
     }
   } catch (e) {
     return {

@@ -32,6 +32,12 @@ import {
   reduceRepealPolicy,
 } from './reducers/policy-reducer';
 import { reduceAdvanceCivilServiceRank } from './reducers/career-rank-reducer';
+import {
+  reduceAcceptCareerOpportunity,
+  reduceAdvanceCareerProcess,
+  reduceCancelCareerOpportunity,
+  reduceRejectCareerOpportunity,
+} from './reducers/career-opportunity-reducer';
 
 /** 游戏动作联合类型 */
 export type GameAction =
@@ -107,6 +113,20 @@ export type GameAction =
       sourceAssessmentYear?: number | null;
       _idFactory?: () => string;
       _rng?: () => number;
+    }
+  | {
+      type: 'ACCEPT_CAREER_OPPORTUNITY';
+      opportunityId: string;
+      _idFactory?: () => string;
+      _rng?: () => number;
+    }
+  | { type: 'REJECT_CAREER_OPPORTUNITY'; opportunityId: string }
+  | { type: 'CANCEL_CAREER_OPPORTUNITY'; opportunityId: string }
+  | {
+      type: 'ADVANCE_CAREER_PROCESS';
+      opportunityId: string;
+      _idFactory?: () => string;
+      _rng?: () => number;
     };
 
 /** 创建默认治理状态 */
@@ -158,6 +178,11 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
   if (!initialPosition) {
     throw new Error(`Initial position "${cfg.initialPositionId}" not found in config`);
   }
+  const initialInstitution = loader.getInstitutionById(initialPosition.institutionId);
+  if (!initialInstitution) {
+    throw new Error(`Initial institution "${initialPosition.institutionId}" not found in config`);
+  }
+  const initialAppointmentId = `initial-appointment-${initialPosition.id}`;
 
   // 属性初始值从 constants.json.initialAttributes 读取
   const initAttrs = cfg.initialAttributes;
@@ -209,7 +234,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     },
     career: {
       appointment: {
-        appointmentId: `initial-appointment-${initialPosition.id}`,
+        appointmentId: initialAppointmentId,
         positionId: initialPosition.id,
         institutionId: initialPosition.institutionId,
         regionId: initialPosition.regionId,
@@ -226,10 +251,31 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       civilServiceRankStartedAtDay: 0,
       civilServiceRankHistory: [],
       restrictions: [],
-      experiences: [],
+      experiences: [
+        {
+          id: `initial-experience-${initialPosition.id}`,
+          appointmentId: initialAppointmentId,
+          positionId: initialPosition.id,
+          positionNameSnapshot: initialPosition.name,
+          institutionId: initialInstitution.id,
+          institutionNameSnapshot: initialInstitution.name,
+          regionId: initialPosition.regionId,
+          institutionLevel: initialPosition.institutionLevel,
+          positionDomain: initialPosition.positionDomain,
+          leadershipRank: initialPosition.leadershipRank,
+          appointmentType: 'substantive',
+          appointmentReason: 'initial_assignment',
+          sourceOpportunityId: null,
+          startedAtDay: 0,
+          endedAtDay: null,
+          endReason: null,
+          assessmentResults: [],
+        },
+      ],
       specialties: {},
       opportunities: [],
       activeProcess: null,
+      completedProcesses: [],
     },
     governance: createDefaultGovernanceState(),
     events: createDefaultEventRuntimeState(),
@@ -419,6 +465,14 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
     }
     case 'ADVANCE_CIVIL_SERVICE_RANK':
       return reduceAdvanceCivilServiceRank(draft, action, draft.time.totalDaysPlayed);
+    case 'ACCEPT_CAREER_OPPORTUNITY':
+      return reduceAcceptCareerOpportunity(draft, action, draft.time.totalDaysPlayed);
+    case 'REJECT_CAREER_OPPORTUNITY':
+      return reduceRejectCareerOpportunity(draft, action, draft.time.totalDaysPlayed);
+    case 'CANCEL_CAREER_OPPORTUNITY':
+      return reduceCancelCareerOpportunity(draft, action, draft.time.totalDaysPlayed);
+    case 'ADVANCE_CAREER_PROCESS':
+      return reduceAdvanceCareerProcess(draft, action, draft.time.totalDaysPlayed);
     default:
       return false;
   }

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "township_deputy_leadership_vacancy",
+    "type": "leadership_vacancy",
+    "triggerSignals": ["assessment.completed"],
+    "conditions": [],
+    "expiresAfterDays": 30,
+    "repeatPolicy": "once_per_source",
+    "cooldownDays": 0,
+    "requiresSelection": true,
+    "reasonTemplate": "年度考核完成后出现的乡科级副职岗位空缺",
+    "targetPositionId": "admin_l2_0",
+    "appointmentType": "substantive",
+    "appointmentReason": "promotion"
+  }
+]

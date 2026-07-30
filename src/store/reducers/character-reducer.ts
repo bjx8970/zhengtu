@@ -99,8 +99,12 @@ export function reduceNewGame(
   // 初始任职（从配置读取 initialPositionId）
   const firstPosition = cfg.getPositionById(gameCfg.initialPositionId);
   if (firstPosition) {
+    const firstInstitution = cfg.getInstitutionById(firstPosition.institutionId);
+    if (!firstInstitution)
+      throw new Error(`Initial institution "${firstPosition.institutionId}" not found`);
+    const appointmentId = `initial-appointment-${firstPosition.id}`;
     draft.career.appointment = {
-      appointmentId: `initial-appointment-${firstPosition.id}`,
+      appointmentId,
       positionId: firstPosition.id,
       institutionId: firstPosition.institutionId,
       regionId: firstPosition.regionId,
@@ -113,6 +117,27 @@ export function reduceNewGame(
       sourceOpportunityId: null,
       probationEndsAtDay: 360,
     };
+    draft.career.experiences = [
+      {
+        id: `initial-experience-${firstPosition.id}`,
+        appointmentId,
+        positionId: firstPosition.id,
+        positionNameSnapshot: firstPosition.name,
+        institutionId: firstInstitution.id,
+        institutionNameSnapshot: firstInstitution.name,
+        regionId: firstPosition.regionId,
+        institutionLevel: firstPosition.institutionLevel,
+        positionDomain: firstPosition.positionDomain,
+        leadershipRank: firstPosition.leadershipRank,
+        appointmentType: 'substantive',
+        appointmentReason: 'initial_assignment',
+        sourceOpportunityId: null,
+        startedAtDay: 0,
+        endedAtDay: null,
+        endReason: null,
+        assessmentResults: [],
+      },
+    ];
     draft.remainingBudget = firstPosition.annualBudget;
 
     // 初始化部门状态

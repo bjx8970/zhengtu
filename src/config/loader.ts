@@ -22,6 +22,7 @@ import type {
   PromotionPathItem,
   DepartmentTemplate,
   LeadershipStyleConfig,
+  CareerOpportunityDefinition,
 } from '../types/config';
 import type { PositionConfigV2, InstitutionConfig } from '../types/position-v2';
 import type { CivilServiceRank, InstitutionLevel } from '../domain/career/types';
@@ -33,6 +34,7 @@ import {
   InstitutionConfigMapSchema,
   PolicyDefinitionArraySchema,
   CivilServiceRankConfigSchema,
+  CareerOpportunityDefinitionArraySchema,
 } from './schemas';
 import { EventDefinitionArraySchema } from '../domain/events/definition';
 import deptTemplateData from './templates/departments.json' with { type: 'json' };
@@ -48,6 +50,7 @@ import leadershipStyleData from './templates/leadership-styles.json' with { type
 import eventsData from './templates/events.json' with { type: 'json' };
 import policiesData from './templates/policies.json' with { type: 'json' };
 import civilServiceRanksData from './career/civil-service-ranks.json' with { type: 'json' };
+import careerOpportunitiesData from './career/opportunities.json' with { type: 'json' };
 
 type RawDeptMap = Record<string, DepartmentTemplate>;
 
@@ -64,10 +67,38 @@ const parsedInstitutions = InstitutionConfigMapSchema.parse(institutionsData);
 const parsedEvents = EventDefinitionArraySchema.parse(eventsData);
 const parsedPolicies = PolicyDefinitionArraySchema.parse(policiesData);
 const parsedCivilServiceRanks = CivilServiceRankConfigSchema.parse(civilServiceRanksData);
+const parsedCareerOpportunities =
+  CareerOpportunityDefinitionArraySchema.parse(careerOpportunitiesData);
 const ALL_POSITIONS = parsedPositions;
 const ALL_INSTITUTIONS = parsedInstitutions;
 const ALL_EVENTS = parsedEvents;
 const ALL_POLICIES = parsedPolicies;
+
+function validateCareerOpportunityReferences(
+  definitions: readonly CareerOpportunityDefinition[],
+): void {
+  for (const definition of definitions) {
+    if (definition.type === 'training') continue;
+    const position = ALL_POSITIONS.find((item) => item.id === definition.targetPositionId);
+    if (!position) throw new Error(`Career opportunity ${definition.id} targets unknown position`);
+    const institution = ALL_INSTITUTIONS[position.institutionId];
+    if (!institution)
+      throw new Error(`Career opportunity ${definition.id} targets unknown institution`);
+    if (
+      institution.level !== position.institutionLevel ||
+      institution.regionId !== position.regionId
+    )
+      throw new Error(
+        `Career opportunity ${definition.id} target position and institution conflict`,
+      );
+    if (definition.type === 'leadership_vacancy' && position.leadershipRank === 'none')
+      throw new Error(
+        `Career opportunity ${definition.id} leadership target has no leadership rank`,
+      );
+  }
+}
+
+validateCareerOpportunityReferences(parsedCareerOpportunities);
 
 /**
  * ConfigLoader 单例（Schema 2）
@@ -83,6 +114,7 @@ class ConfigLoader {
   private eventsBySignal: Map<DomainSignal, EventDefinition[]>;
   private policies: Map<string, PolicyDefinitionConfig>;
   private civilServiceRanks: typeof parsedCivilServiceRanks;
+  private careerOpportunities: CareerOpportunityDefinition[];
   private regionConfig: RegionConfig;
   private universityConfig: UniversityConfig;
   private backgroundConfig: BackgroundConfig;
@@ -106,6 +138,7 @@ class ConfigLoader {
     }
     this.policies = new Map(ALL_POLICIES.map((p) => [p.id, p]));
     this.civilServiceRanks = parsedCivilServiceRanks;
+    this.careerOpportunities = parsedCareerOpportunities;
     this.gameConfig = constantsData as unknown as GameConfig;
     this.regionConfig = regionData as unknown as RegionConfig;
     this.universityConfig = universityData as unknown as UniversityConfig;
@@ -165,6 +198,18 @@ class ConfigLoader {
   /** 获取全部政策定义（深拷贝） */
   getAllPolicyDefinitions(): PolicyDefinitionConfig[] {
     return ALL_POLICIES.map((p) => structuredClone(p));
+  }
+
+  /** 获取全部职业机会定义（深拷贝）。 */
+  getAllCareerOpportunityDefinitions(): CareerOpportunityDefinition[] {
+    return this.careerOpportunities.map((definition) => structuredClone(definition));
+  }
+
+  /** 按领域信号查询职业机会定义（深拷贝）。 */
+  getCareerOpportunityDefinitionsBySignal(signal: DomainSignal): CareerOpportunityDefinition[] {
+    return this.careerOpportunities
+      .filter((definition) => definition.triggerSignals.includes(signal))
+      .map((definition) => structuredClone(definition));
   }
 
   /** 查询公务员职级定义，未知职级不回退。 */

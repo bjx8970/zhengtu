@@ -28,6 +28,8 @@ export * from './governance/policy-lifecycle';
 export * from './governance/policy-milestone-selector';
 export * from './career/civil-service-rank-eligibility';
 export * from './career/civil-service-rank-progression';
+export * from './career/career-opportunity-lifecycle';
+export * from './career/opportunity-orchestrator';
 export * from './career/philosophy-imbalance';
 export * from './career/spectrum-constraint';
 export * from './career/style-derivation';

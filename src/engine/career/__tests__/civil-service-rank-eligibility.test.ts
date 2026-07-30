@@ -33,6 +33,7 @@ describe('civil-service rank eligibility', () => {
     state.career.experiences = [
       {
         id: 'past',
+        appointmentId: 'past-appointment',
         positionId: 'p',
         positionNameSnapshot: 'p',
         institutionId: 'i',
@@ -44,6 +45,9 @@ describe('civil-service rank eligibility', () => {
         startedAtDay: 0,
         endedAtDay: 20,
         appointmentReason: 'initial_assignment',
+        appointmentType: 'substantive',
+        sourceOpportunityId: null,
+        endReason: 'promotion',
         assessmentResults: [],
       },
     ];
