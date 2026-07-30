@@ -16,6 +16,7 @@ import {
   LEADERSHIP_RANK_LABELS,
 } from '../../domain/career/types';
 import {
+  calculateCareerServiceDays,
   evaluateCivilServiceRankEligibility,
   getActiveCareerRestrictions,
 } from '../../engine/career/civil-service-rank-eligibility';
@@ -201,6 +202,9 @@ export function CareerPage() {
   const activeRestrictions = createMemo(() =>
     getActiveCareerRestrictions(state.career.restrictions, currentDay()),
   );
+  const serviceDays = createMemo(() =>
+    calculateCareerServiceDays(state.career.appointment, state.career.experiences, currentDay()),
+  );
   const quotaState = createMemo(() => {
     const quota = rankRule()?.quotaRequirement;
     if (!quota) return '不适用';
@@ -288,10 +292,7 @@ export function CareerPage() {
               label="任职级天数"
               value={`${currentDay() - state.career.civilServiceRankStartedAtDay} 天`}
             />
-            <CareerFact
-              label="总服务天数"
-              value={`${currentDay() - state.career.appointment.startedAtDay} 天`}
-            />
+            <CareerFact label="总服务天数" value={`${serviceDays()} 天`} />
             <CareerFact label="考核要求" value={formatAssessmentRequirement(rankRule())} />
             <CareerFact label="职数状态" value={quotaState()} />
           </div>
