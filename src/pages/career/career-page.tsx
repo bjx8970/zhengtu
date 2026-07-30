@@ -8,8 +8,6 @@
 import { createMemo, For, Show } from 'solid-js';
 import { getConfigLoader } from '../../config/loader';
 import type { CivilServiceRankProgressionRule } from '../../config/schemas';
-import type { ConditionExpression } from '../../domain/conditions';
-import type { CareerOpportunity } from '../../domain/career/state';
 import {
   CIVIL_SERVICE_RANK_LABELS,
   INSTITUTION_LEVEL_LABELS,
@@ -20,15 +18,18 @@ import {
   evaluateCivilServiceRankEligibility,
   getActiveCareerRestrictions,
 } from '../../engine/career/civil-service-rank-eligibility';
-import { evaluateCondition } from '../../engine/events/condition-interpreter';
+import {
+  evaluateCareerOpportunityAcceptanceEligibility,
+  type CareerOpportunityEligibilityFailure,
+} from '../../engine/career/career-opportunity-eligibility';
 import { useGameStore } from '../../store/game-store';
-import type { PlayerSave } from '../../types/player';
 import { AppShell } from '../../components/app-shell';
 import { PageHeader } from '../../components/page-header';
 import {
   formatCareerProcessStage,
   formatCareerRegion,
   formatCareerRestriction,
+  formatOpportunityEligibilityFailure,
   formatOpportunitySource,
   formatOpportunityStatus,
   formatRankFailure,
@@ -42,10 +43,9 @@ const SELECTION_STAGES = [
   'collective_decision',
   'public_notice',
   'appointment',
+  'probation',
   'finalization',
 ] as const;
-
-type OpportunityEligibility = { eligible: boolean; detail: string };
 
 const neutralButtonStyle = {
   padding: '7px 11px',
@@ -66,87 +66,11 @@ const primaryButtonStyle = {
 };
 
 /**
- * @param condition 配置条件表达式
- * @returns 条件是否依赖一次性信号载荷。
+ * @param failure 共享职业机会资格判定失败原因
+ * @returns 用于界面展示的资格状态文本
  */
-function containsSignalFieldCondition(condition: ConditionExpression): boolean {
-  if ('signalField' in condition) return true;
-  if ('all' in condition) return condition.all.some(containsSignalFieldCondition);
-  if ('any' in condition) return condition.any.some(containsSignalFieldCondition);
-  return 'not' in condition && containsSignalFieldCondition(condition.not);
-}
-
-/**
- * @param conditions 待检查的条件集合
- * @param state 当前存档
- * @param currentDay 当前绝对日
- * @param opportunity 冻结机会快照
- * @returns 条件集合是否满足。
- */
-function satisfiesOpportunityConditions(
-  conditions: readonly ConditionExpression[],
-  state: Readonly<PlayerSave>,
-  currentDay: number,
-  opportunity: CareerOpportunity,
-): boolean {
-  if (opportunity.sourceSignal === null && conditions.some(containsSignalFieldCondition))
-    return false;
-  const config = getConfigLoader().getGameConfig();
-  const fallbackSignal = {
-    signalId: 'career-page-eligibility',
-    signalType: 'assessment.completed' as const,
-    occurredAtDay: currentDay,
-    data: { year: 0, score: 0, tier: '' },
-  };
-  return conditions.every((condition) =>
-    evaluateCondition(condition, {
-      state,
-      signal: opportunity.sourceSignal ?? fallbackSignal,
-      currentDay,
-      daysPerYear: config.daysPerMonth * config.monthsPerYear,
-    }),
-  );
-}
-
-/**
- * 与 Store 接受操作保持同一组持久化资格判断，用于展示而非修改状态。
- *
- * @param opportunity 待展示的职业机会
- * @param state 当前存档
- * @param currentDay 当前绝对日
- * @returns 当前是否可接受及不可接受原因。
- */
-function evaluateOpportunityEligibility(
-  opportunity: CareerOpportunity,
-  state: Readonly<PlayerSave>,
-  currentDay: number,
-): OpportunityEligibility {
-  if (opportunity.status !== 'available')
-    return { eligible: false, detail: formatOpportunityStatus(opportunity.status) };
-  if (opportunity.expiresAtDay !== null && opportunity.expiresAtDay <= currentDay)
-    return { eligible: false, detail: '机会已到期' };
-  if (
-    !satisfiesOpportunityConditions(
-      opportunity.eligibilityConditions,
-      state,
-      currentDay,
-      opportunity,
-    )
-  )
-    return { eligible: false, detail: '未满足机会资格条件' };
-  if (opportunity.type === 'training') return { eligible: true, detail: '符合资格' };
-  const target = getConfigLoader().getPositionById(opportunity.target.positionId);
-  const restriction = getActiveCareerRestrictions(state.career.restrictions, currentDay).find(
-    (item) => item.type === 'appointment_selection_freeze' || item.type === 'disciplinary_action',
-  );
-  if (!target) return { eligible: false, detail: '目标岗位配置不存在' };
-  if (target.vacancyCount <= 0) return { eligible: false, detail: '目标岗位暂无空缺' };
-  if (state.career.appointment.positionId === target.id)
-    return { eligible: false, detail: '当前已在目标岗位' };
-  if (restriction) return { eligible: false, detail: formatCareerRestriction(restriction.type) };
-  if (!satisfiesOpportunityConditions(target.requirements, state, currentDay, opportunity))
-    return { eligible: false, detail: '未满足目标岗位任职条件' };
-  return { eligible: true, detail: '符合资格' };
+function formatOpportunityEligibility(failure: CareerOpportunityEligibilityFailure | null): string {
+  return failure === null ? '符合资格' : formatOpportunityEligibilityFailure(failure);
 }
 
 /**
@@ -368,7 +292,20 @@ export function CareerPage() {
               <For each={state.career.opportunities}>
                 {(opportunity) => {
                   const eligibility = createMemo(() =>
-                    evaluateOpportunityEligibility(opportunity, state, currentDay()),
+                    evaluateCareerOpportunityAcceptanceEligibility({
+                      opportunity,
+                      state,
+                      currentDay: currentDay(),
+                      daysPerYear:
+                        getConfigLoader().getGameConfig().daysPerMonth *
+                        getConfigLoader().getGameConfig().monthsPerYear,
+                      targetPosition:
+                        opportunity.type === 'training'
+                          ? null
+                          : getConfigLoader().getPositionById(opportunity.target.positionId),
+                      careerExperienceQualificationRules:
+                        getConfigLoader().getCareerExperienceQualificationRules(),
+                    }),
                   );
                   const target = () =>
                     opportunity.type === 'training' ? null : opportunity.target;
@@ -449,7 +386,10 @@ export function CareerPage() {
                               : `第 ${opportunity.expiresAtDay} 天`
                           }
                         />
-                        <OpportunityFact label="资格状态" value={eligibility().detail} />
+                        <OpportunityFact
+                          label="资格状态"
+                          value={formatOpportunityEligibility(eligibility().failure)}
+                        />
                       </div>
                       <Show when={opportunity.status === 'available'}>
                         <div

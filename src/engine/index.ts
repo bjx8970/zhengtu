@@ -29,6 +29,7 @@ export * from './governance/policy-milestone-selector';
 export * from './career/civil-service-rank-eligibility';
 export * from './career/civil-service-rank-progression';
 export * from './career/career-opportunity-lifecycle';
+export * from './career/career-opportunity-eligibility';
 export * from './career/career-experience-analysis';
 export * from './career/opportunity-orchestrator';
 export * from './career/philosophy-imbalance';

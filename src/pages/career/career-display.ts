@@ -8,6 +8,7 @@
 import type { CareerProcessStage } from '../../domain/career/state';
 import type { CareerOpportunityStatus, CareerRestrictionType } from '../../domain/career/types';
 import type { RankEligibilityFailure } from '../../engine/career/civil-service-rank-eligibility';
+import type { CareerOpportunityEligibilityFailure } from '../../engine/career/career-opportunity-eligibility';
 
 /** 机构配置中使用的虚构地区标识的显示名称。 */
 const REGION_LABELS: Record<string, string> = {
@@ -71,6 +72,22 @@ const RANK_FAILURE_LABELS: Record<RankEligibilityFailure, string> = {
   additional_condition_failed: '未满足附加晋升条件',
 };
 
+const OPPORTUNITY_ELIGIBILITY_FAILURE_LABELS: Record<CareerOpportunityEligibilityFailure, string> =
+  {
+    opportunity_unavailable: '机会当前不可接受',
+    opportunity_expired: '机会已到期',
+    active_process: '已有进行中的职业流程',
+    blocking_event: '存在待处理的阻塞事件',
+    pending_continuation: '请先完成当前时间推进',
+    opportunity_conditions: '未满足机会资格条件',
+    target_missing: '目标岗位配置不存在',
+    target_snapshot_mismatch: '目标岗位信息已变更',
+    target_vacant: '目标岗位暂无空缺',
+    same_position: '当前已在目标岗位',
+    appointment_restriction: '存在任职选拔限制',
+    target_conditions: '未满足目标岗位任职条件',
+  };
+
 /**
  * @param regionId 稳定地区标识
  * @returns 适合界面显示的地区名称；未知标识保留原值以便排查配置。
@@ -119,4 +136,14 @@ export function formatCareerRestriction(type: CareerRestrictionType): string {
  */
 export function formatRankFailure(reason: RankEligibilityFailure): string {
   return RANK_FAILURE_LABELS[reason];
+}
+
+/**
+ * @param reason 职业机会资格未满足原因
+ * @returns 用于界面展示的中文原因
+ */
+export function formatOpportunityEligibilityFailure(
+  reason: CareerOpportunityEligibilityFailure,
+): string {
+  return OPPORTUNITY_ELIGIBILITY_FAILURE_LABELS[reason];
 }
