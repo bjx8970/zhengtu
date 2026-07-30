@@ -22,6 +22,126 @@ function makeSignal(signalId: string, occurredAtDay = 0): DomainSignalSnapshot {
 }
 
 describe('event timeline integration', () => {
+  it('preserves blocking, inbox and scheduled event runtime records across a refresh', () => {
+    const state = createInitialState();
+    const blockingSnapshot = createEventSnapshot({
+      id: 'refresh_blocking',
+      chainId: null,
+      nodeId: null,
+      title: 'Refresh blocking',
+      description: '',
+      category: 'governance',
+      priority: 'urgent',
+      presentation: 'blocking',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: { deadlineDays: 3 },
+      options: [{ id: 'resolve', label: '处理', description: '', effects: [] }],
+    });
+    const inboxSnapshot = createEventSnapshot({
+      id: 'refresh_inbox',
+      chainId: null,
+      nodeId: null,
+      title: 'Refresh inbox',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: { deadlineDays: 5 },
+      options: [{ id: 'ack', label: '知悉', description: '', effects: [] }],
+    });
+    const blocking: EventInstance = {
+      instanceId: 'refresh-blocking-instance',
+      eventId: blockingSnapshot.eventId,
+      status: 'active',
+      triggeredAtDay: 0,
+      activatedAtDay: 0,
+      deadlineDay: 3,
+      triggerContext: makeSignal('refresh-blocking-signal'),
+      sourceKey: 'refresh-blocking-source',
+      chainInstanceId: null,
+      snapshot: blockingSnapshot,
+    };
+    const inbox: EventInstance = {
+      instanceId: 'refresh-inbox-instance',
+      eventId: inboxSnapshot.eventId,
+      status: 'pending',
+      triggeredAtDay: 0,
+      activatedAtDay: 0,
+      deadlineDay: 5,
+      triggerContext: makeSignal('refresh-inbox-signal'),
+      sourceKey: 'refresh-inbox-source',
+      chainInstanceId: null,
+      snapshot: inboxSnapshot,
+    };
+    state.events.activeBlockingEventId = blocking.instanceId;
+    state.events.pending = [blocking, inbox];
+    state.events.scheduled.push({
+      instanceId: 'refresh-scheduled-instance',
+      eventId: inboxSnapshot.eventId,
+      scheduledAtDay: 0,
+      activateAtDay: 17,
+      triggerContext: makeSignal('refresh-scheduled-signal'),
+      sourceKey: 'refresh-scheduled-source',
+      chainInstanceId: null,
+      snapshot: inboxSnapshot,
+    });
+
+    const decoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+    expect(decoded.success).toBe(true);
+    expect(decoded.state?.events.activeBlockingEventId).toBe(blocking.instanceId);
+    expect(decoded.state?.events.pending.map((event) => event.instanceId)).toEqual([
+      blocking.instanceId,
+      inbox.instanceId,
+    ]);
+    expect(decoded.state?.events.scheduled[0]?.activateAtDay).toBe(17);
+  });
+
+  it('does not resolve a restored event option twice', () => {
+    const state = createInitialState();
+    const snapshot = createEventSnapshot({
+      id: 'refresh-single-choice',
+      chainId: null,
+      nodeId: null,
+      title: 'Single choice',
+      description: '',
+      category: 'governance',
+      priority: 'normal',
+      presentation: 'inbox',
+      trigger: { sources: ['world.metric_changed'] },
+      repeatPolicy: { mode: 'once' },
+      activation: {},
+      options: [{ id: 'resolve', label: '处理', description: '', effects: [] }],
+    });
+    state.events.pending.push({
+      instanceId: 'refresh-single-choice-instance',
+      eventId: snapshot.eventId,
+      status: 'pending',
+      triggeredAtDay: 0,
+      activatedAtDay: 0,
+      deadlineDay: null,
+      triggerContext: makeSignal('refresh-single-choice-signal'),
+      sourceKey: 'refresh-single-choice-source',
+      chainInstanceId: null,
+      snapshot,
+    });
+    const decoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+    expect(decoded.success).toBe(true);
+    if (!decoded.state) return;
+    const store = createTestStore(decoded.state);
+    const action = {
+      type: 'CHOOSE_EVENT_OPTION' as const,
+      eventInstanceId: 'refresh-single-choice-instance',
+      optionId: 'resolve',
+    };
+    store.dispatch(action);
+    store.dispatch(action);
+    expect(store.getRawState().events.history).toHaveLength(1);
+    expect(store.getRawState().events.pending).toHaveLength(0);
+  });
+
   it('自动激活政策、推进里程碑，并在存档恢复后补做同日月结', () => {
     const loader = getConfigLoader();
     const state = createInitialState();

@@ -27,4 +27,15 @@ describe('App routes', () => {
     expect(screen.getByText('职务与职级')).toBeInTheDocument();
     expect(screen.getByText('公务员职级')).toBeInTheDocument();
   });
+
+  it('exposes the policy and event interaction routes', () => {
+    window.location.hash = '#/policies';
+    const policies = render(() => <App />);
+    expect(screen.getByText('政策治理')).toBeInTheDocument();
+    policies.unmount();
+
+    window.location.hash = '#/events';
+    render(() => <App />);
+    expect(screen.getByText('事件中心')).toBeInTheDocument();
+  });
 });

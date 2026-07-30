@@ -17,6 +17,9 @@ import { HomePage } from './pages/home/home-page';
 import { DepartmentsPage } from './pages/departments/departments-page';
 import { AssessmentPage } from './pages/assessment/assessment-page';
 import { CareerPage } from './pages/career/career-page';
+import { PoliciesPage } from './pages/policies/policies-page';
+import { EventsPage } from './pages/events/events-page';
+import { BlockingEventModal } from './components/blocking-event-modal';
 
 /** 全局路由表 */
 const routes: Route[] = [
@@ -26,6 +29,8 @@ const routes: Route[] = [
   { path: '/departments', component: DepartmentsPage },
   { path: '/assessment', component: AssessmentPage },
   { path: '/career', component: CareerPage },
+  { path: '/policies', component: PoliciesPage },
+  { path: '/events', component: EventsPage },
 ];
 
 /**
@@ -54,6 +59,7 @@ export function App(): JSX.Element {
         const Component = result.route.component;
         return <Component {...result.params} />;
       })()}
+      <BlockingEventModal />
     </div>
   );
 }
