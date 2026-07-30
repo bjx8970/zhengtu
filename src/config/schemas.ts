@@ -173,15 +173,16 @@ export const CivilServiceRankConfigSchema = z
       });
     if (new Set(data.definitions.map((item) => item.order)).size !== data.definitions.length)
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rank orders must be unique' });
-    const rules = new Set<string>();
+    const ruleIds = new Set<string>();
+    const sourceRanks = new Set<string>();
     for (const rule of data.progressionRules) {
-      if (rules.has(rule.fromRank) || rules.has(rule.id))
+      if (sourceRanks.has(rule.fromRank) || ruleIds.has(rule.id))
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Progression rule IDs and source ranks must be unique',
         });
-      rules.add(rule.fromRank);
-      rules.add(rule.id);
+      sourceRanks.add(rule.fromRank);
+      ruleIds.add(rule.id);
       if (
         CIVIL_SERVICE_RANKS.indexOf(rule.toRank) !==
         CIVIL_SERVICE_RANKS.indexOf(rule.fromRank) + 1

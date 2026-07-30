@@ -121,4 +121,37 @@ describe('civil-service rank eligibility', () => {
     };
     expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(false);
   });
+
+  it('allows a rule ID equal to a distinct source rank', () => {
+    const config = {
+      definitions: getConfigLoader().getAllCivilServiceRankDefinitions(),
+      progressionRules: [
+        {
+          id: 'clerk-rule',
+          fromRank: 'clerk_2',
+          toRank: 'clerk_1',
+          minDaysInRank: 0,
+          minServiceDays: 0,
+          minAssessmentCount: 0,
+          minQualifiedAssessmentCount: 0,
+          minExcellentAssessmentCount: 0,
+          quotaRequirement: null,
+          additionalConditions: [],
+        },
+        {
+          id: 'clerk_2',
+          fromRank: 'clerk_1',
+          toRank: 'section_member_4',
+          minDaysInRank: 0,
+          minServiceDays: 0,
+          minAssessmentCount: 0,
+          minQualifiedAssessmentCount: 0,
+          minExcellentAssessmentCount: 0,
+          quotaRequirement: null,
+          additionalConditions: [],
+        },
+      ],
+    };
+    expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(true);
+  });
 });

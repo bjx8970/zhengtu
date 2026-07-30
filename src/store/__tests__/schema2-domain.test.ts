@@ -255,6 +255,32 @@ describe('Schema 2 存档', () => {
     });
   });
 
+  it('Schema 6→7 拒绝非空机会或进行中的职业流程并保留备份', () => {
+    const cases: Array<{ careerField: 'opportunities' | 'activeProcess'; value: unknown }> = [
+      { careerField: 'opportunities', value: [{}] },
+      { careerField: 'activeProcess', value: {} },
+    ];
+    for (const { careerField, value } of cases) {
+      const envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(createInitialState()))) as Record<
+        string,
+        unknown
+      >;
+      envelope.schemaVersion = 6;
+      envelope.contentVersion = '2026.07.4';
+      const career = (envelope.state as Record<string, unknown>).career as Record<string, unknown>;
+      career[careerField] = value;
+      const json = JSON.stringify(envelope);
+
+      const result = decodeCurrentSave(json);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('migration_failed');
+      expect(result.backupKey).toBeDefined();
+      if (!result.backupKey) continue;
+      expect(localStorage.getItem(result.backupKey)).toBe(json);
+    }
+  });
+
   it('Schema 1 存档被拒绝并创建备份', () => {
     const schema1Envelope = {
       schemaVersion: 1,
