@@ -26,6 +26,7 @@ import { buildEventCooldownRecord } from '../../engine/events/event-cooldown';
 import { processDomainSignal } from '../../engine/events/event-orchestrator';
 import type { EventOrchestrationResult } from '../../engine/events/event-orchestrator';
 import { planEventFollowups } from '../../engine/events/event-followup-planner';
+import { processCareerOpportunitySignal } from '../../engine/career/opportunity-orchestrator';
 import { getConfigLoader } from '../../config/loader';
 import { createRuntimeIdFactory } from '../runtime-id';
 
@@ -766,6 +767,11 @@ function processEventContinuationsInternal(
       );
     }
 
+    // Domain signals have two independent consumers. Keeping opportunity generation
+    // in this shared transaction ensures every producer (policy, rank, events and
+    // timeline) observes the same contract instead of relying on ad-hoc callers.
+    dispatchCareerOpportunitiesForSignal(draft, continuation.signal, currentDay, idFactory);
+
     const orchestration = processDomainSignal({
       state: draft as Readonly<PlayerSave>,
       signal: continuation.signal,
@@ -802,6 +808,26 @@ function processEventContinuationsInternal(
       })),
     );
   }
+}
+
+function dispatchCareerOpportunitiesForSignal(
+  draft: PlayerSave,
+  signal: DomainSignalSnapshot,
+  currentDay: number,
+  idFactory: () => string,
+): void {
+  const loader = getConfigLoader();
+  const result = processCareerOpportunitySignal({
+    state: draft,
+    signal,
+    currentDay,
+    idFactory,
+    definitions: loader.getCareerOpportunityDefinitionsBySignal(signal.signalType),
+    positions: loader.getAllPositions(),
+    institutions: loader.getAllInstitutions(),
+    daysPerYear: loader.getGameConfig().daysPerMonth * loader.getGameConfig().monthsPerYear,
+  });
+  draft.career.opportunities.push(...result.created);
 }
 
 /**

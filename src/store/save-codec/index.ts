@@ -385,6 +385,7 @@ const CareerStateSchema = z
     specialties: z.record(z.number()),
     opportunities: z.array(CareerOpportunitySchema),
     activeProcess: CareerProcessSchema.nullable(),
+    completedProcesses: z.array(CareerProcessSchema).default([]),
   })
   .strict();
 
@@ -1358,10 +1359,14 @@ export function migrateSchema7To8(prev: Record<string, unknown>): Record<string,
     throw new Error('Schema 7 active career process cannot be safely migrated');
   const experiences = career.experiences;
   if (!Array.isArray(experiences)) throw new Error('Schema 7 career experiences are invalid');
-  const openExperiences = experiences.filter(
-    (experience): experience is Record<string, unknown> =>
-      !!experience && typeof experience === 'object' && experience.endedAtDay === null,
-  );
+  if (
+    experiences.some(
+      (experience) => !experience || typeof experience !== 'object' || Array.isArray(experience),
+    )
+  )
+    throw new Error('Schema 7 career experiences contain an invalid entry');
+  const typedExperiences = experiences as Record<string, unknown>[];
+  const openExperiences = typedExperiences.filter((experience) => experience.endedAtDay === null);
   if (openExperiences.length > 1) throw new Error('Schema 7 has multiple open career experiences');
   const positionId = appointment.positionId;
   const institutionId = appointment.institutionId;
@@ -1371,7 +1376,7 @@ export function migrateSchema7To8(prev: Record<string, unknown>): Record<string,
   const institution = getConfigLoader().getInstitutionById(institutionId);
   if (!position || !institution)
     throw new Error('Schema 7 appointment configuration is unavailable');
-  const fillExperience = (experience: Record<string, unknown>, id: string) => {
+  const fillCurrentExperience = (experience: Record<string, unknown>, id: string) => {
     if (
       experience.positionId !== position.id ||
       experience.institutionId !== institution.id ||
@@ -1409,10 +1414,27 @@ export function migrateSchema7To8(prev: Record<string, unknown>): Record<string,
       startedAtDay: appointment.startedAtDay,
       endedAtDay: null,
     };
-    fillExperience(experience, `legacy-experience-${appointment.appointmentId}`);
-    experiences.push(experience);
+    fillCurrentExperience(experience, `legacy-experience-${appointment.appointmentId}`);
+    typedExperiences.push(experience);
   } else {
-    fillExperience(openExperiences[0]!, `legacy-experience-${appointment.appointmentId}`);
+    fillCurrentExperience(openExperiences[0]!, `legacy-experience-${appointment.appointmentId}`);
+  }
+  for (const [index, experience] of typedExperiences.entries()) {
+    if (experience.endedAtDay === null) continue;
+    const legacyId = typeof experience.id === 'string' ? experience.id : `experience-${index}`;
+    experience.appointmentId = `legacy-appointment-${legacyId}-${index}`;
+    experience.appointmentType =
+      experience.appointmentReason === 'temporary_assignment'
+        ? 'temporary'
+        : experience.appointmentReason === 'secondment'
+          ? 'secondment'
+          : 'substantive';
+    experience.sourceOpportunityId = null;
+    // Schema 7 did not record why a tenure ended, so preserve that absence explicitly.
+    experience.endReason = null;
+    experience.assessmentResults = Array.isArray(experience.assessmentResults)
+      ? experience.assessmentResults
+      : [];
   }
   migrated.schemaVersion = 8;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;

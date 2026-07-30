@@ -29,6 +29,37 @@ export interface CareerOpportunityGenerationResult {
   skipped: { definitionId: string; reason: string }[];
 }
 
+/**
+ * 派生机会去重所用的稳定来源实体键。
+ *
+ * signalId 仅标识一次投递；存档恢复或同一实体后续信号会得到新的 signalId，
+ * 因此不能用于 once_per_source。对没有实例 ID 的世界指标，指标本身是最稳定的实体。
+ *
+ * @param signal 触发机会生成的领域信号
+ * @returns 稳定的来源实体键
+ */
+export function deriveCareerOpportunitySourceKey(signal: DomainSignalSnapshot): string {
+  switch (signal.signalType) {
+    case 'action.completed':
+      return `action:${signal.data.actionInstanceId}`;
+    case 'assessment.completed':
+      return `assessment:${signal.data.year}`;
+    case 'policy.approved':
+    case 'policy.phase_changed':
+    case 'policy.metric_changed':
+    case 'policy.status_changed':
+      return `policy:${signal.data.policyInstanceId}`;
+    case 'event.resolved':
+      return `event:${signal.data.eventInstanceId}`;
+    case 'appointment.changed':
+      return `appointment:${signal.data.experienceId}`;
+    case 'civil_service_rank.changed':
+      return `rank:${signal.data.rankChangeId}`;
+    case 'world.metric_changed':
+      return `world_metric:${signal.data.metricId}`;
+  }
+}
+
 function sourceFor(signal: DomainSignalSnapshot): CareerOpportunitySource {
   const sourceType = signal.signalType.startsWith('assessment')
     ? 'assessment'
@@ -39,22 +70,19 @@ function sourceFor(signal: DomainSignalSnapshot): CareerOpportunitySource {
         : 'system';
   return {
     sourceType,
-    sourceId: signal.signalId,
+    sourceId: deriveCareerOpportunitySourceKey(signal),
     signalId: signal.signalId,
     description: signal.signalType,
   };
 }
 
-function hasOpenDuplicate(
+function hasOpportunity(
   state: Readonly<PlayerSave>,
   definitionId: string,
-  sourceId: string,
+  predicate: (opportunity: CareerOpportunity) => boolean,
 ): boolean {
   return state.career.opportunities.some(
-    (opportunity) =>
-      opportunity.definitionId === definitionId &&
-      opportunity.source.sourceId === sourceId &&
-      !['rejected', 'expired', 'resolved', 'cancelled'].includes(opportunity.status),
+    (opportunity) => opportunity.definitionId === definitionId && predicate(opportunity),
   );
 }
 
@@ -71,6 +99,7 @@ export function processCareerOpportunitySignal(
   const skipped: CareerOpportunityGenerationResult['skipped'] = [];
   for (const definition of params.definitions) {
     if (!definition.triggerSignals.includes(params.signal.signalType)) continue;
+    const source = sourceFor(params.signal);
     if (
       !definition.conditions.every((condition) =>
         evaluateCondition(condition, {
@@ -86,16 +115,38 @@ export function processCareerOpportunitySignal(
     }
     if (
       definition.repeatPolicy === 'once' &&
-      params.state.career.opportunities.some((item) => item.definitionId === definition.id)
+      hasOpportunity(params.state, definition.id, () => true)
     ) {
       skipped.push({ definitionId: definition.id, reason: 'duplicate' });
       continue;
     }
-    if (hasOpenDuplicate(params.state, definition.id, params.signal.signalId)) {
+    if (
+      definition.repeatPolicy === 'once_per_source' &&
+      hasOpportunity(
+        params.state,
+        definition.id,
+        (opportunity) => opportunity.source.sourceId === source.sourceId,
+      )
+    ) {
       skipped.push({ definitionId: definition.id, reason: 'duplicate' });
       continue;
     }
-    const source = sourceFor(params.signal);
+    if (definition.repeatPolicy === 'repeatable' && definition.cooldownDays > 0) {
+      const latestAppearance = params.state.career.opportunities
+        .filter((opportunity) => opportunity.definitionId === definition.id)
+        .reduce<number | null>(
+          (latest, opportunity) =>
+            Math.max(latest ?? opportunity.appearedAtDay, opportunity.appearedAtDay),
+          null,
+        );
+      if (
+        latestAppearance !== null &&
+        params.currentDay < latestAppearance + definition.cooldownDays
+      ) {
+        skipped.push({ definitionId: definition.id, reason: 'cooldown' });
+        continue;
+      }
+    }
     const base = {
       id: params.idFactory(),
       definitionId: definition.id,

@@ -29,7 +29,6 @@ function transition(
   next.status = status;
   if (status === 'accepted') next.acceptedAtDay = currentDay;
   if (status === 'rejected') next.rejectedAtDay = currentDay;
-  if (status === 'expired') next.resolvedAtDay = currentDay;
   if (status === 'cancelled') next.cancelledAtDay = currentDay;
   return { success: true, opportunity: next };
 }

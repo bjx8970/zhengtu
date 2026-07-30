@@ -43,7 +43,6 @@ import {
 } from '../reducers/shared';
 import { commitPolicyTransitionInTransaction } from './policy-transition-transaction';
 import { expireCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
-import { processCareerOpportunitySignal } from '../../engine/career/opportunity-orchestrator';
 
 /**
  * 结算当日行动与到期政策，再统一处理它们产生的领域信号。
@@ -107,7 +106,6 @@ export function processDailyFacts(
 
   if (signals.length > 0) {
     processCascadeSignalsInTransaction(draft, signals, currentDay, rng, idFactory, definitions);
-    generateCareerOpportunities(draft, signals, currentDay, idFactory);
   }
 }
 
@@ -168,7 +166,6 @@ export function processTimelineNodes(
           idFactory,
           definitions,
         );
-        generateCareerOpportunities(draft, [signal], node.absoluteDay, idFactory);
         if (draft.events.activeBlockingEventId !== null) {
           return { interrupted: true, remainingNodes: nodes.slice(index + 1) };
         }
@@ -181,28 +178,6 @@ export function processTimelineNodes(
     }
   }
   return { interrupted: false, remainingNodes: [] };
-}
-
-function generateCareerOpportunities(
-  draft: PlayerSave,
-  signals: readonly DomainSignalSnapshot[],
-  currentDay: number,
-  idFactory: () => string,
-): void {
-  const loader = getConfigLoader();
-  for (const signal of signals) {
-    const result = processCareerOpportunitySignal({
-      state: draft,
-      signal,
-      currentDay,
-      idFactory,
-      definitions: loader.getCareerOpportunityDefinitionsBySignal(signal.signalType),
-      positions: loader.getAllPositions(),
-      institutions: loader.getAllInstitutions(),
-      daysPerYear: loader.getGameConfig().daysPerMonth * loader.getGameConfig().monthsPerYear,
-    });
-    draft.career.opportunities.push(...result.created);
-  }
 }
 
 function expireCareerOpportunitiesAtDay(draft: PlayerSave, currentDay: number): void {

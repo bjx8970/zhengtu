@@ -248,4 +248,6 @@ export interface CareerState {
   opportunities: CareerOpportunity[];
   /** 进行中的职业流程 */
   activeProcess: CareerProcess | null;
+  /** 已完成、落选或继续观察的流程，用于保存阶段审计记录。 */
+  completedProcesses: CareerProcess[];
 }

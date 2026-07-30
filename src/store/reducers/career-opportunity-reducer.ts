@@ -15,8 +15,10 @@ import {
   rejectCareerOpportunity,
   resolveCareerOpportunity,
 } from '../../engine/career/career-opportunity-lifecycle';
-import { processCareerOpportunitySignal } from '../../engine/career/opportunity-orchestrator';
+import { evaluateCondition } from '../../engine/events/condition-interpreter';
 import { applyEffects } from '../../engine/events/effect-executor';
+import { deriveMetricSignalsFromEffects } from '../../engine/events/metric-signal-bridge';
+import { settleCareerSelectionStage } from '../../engine/career/selection-settlement';
 import { processCascadeSignalsInTransaction } from './event-reducer';
 import { createRuntimeIdFactory } from '../runtime-id';
 
@@ -25,9 +27,7 @@ export interface CareerOpportunityPayload {
   _idFactory?: () => string;
   _rng?: () => number;
 }
-export interface AdvanceCareerProcessPayload extends CareerOpportunityPayload {
-  outcome?: 'passed' | 'failed' | 'continued';
-}
+export type AdvanceCareerProcessPayload = CareerOpportunityPayload;
 
 function replaceOpportunity(draft: PlayerSave, next: CareerOpportunity): void {
   const index = draft.career.opportunities.findIndex((item) => item.id === next.id);
@@ -37,6 +37,77 @@ function replaceOpportunity(draft: PlayerSave, next: CareerOpportunity): void {
 
 function hasRunningAction(state: Readonly<PlayerSave>): boolean {
   return Object.values(state.actions.slots).some((tier) => tier.occupants.some(Boolean));
+}
+
+function hasActiveAppointmentRestriction(state: Readonly<PlayerSave>, currentDay: number): boolean {
+  return state.career.restrictions.some(
+    (restriction) =>
+      (restriction.type === 'appointment_selection_freeze' ||
+        restriction.type === 'disciplinary_action') &&
+      restriction.startedAtDay <= currentDay &&
+      (restriction.endsAtDay === null || currentDay < restriction.endsAtDay),
+  );
+}
+
+function satisfiesConditions(
+  conditions: CareerOpportunity['eligibilityConditions'],
+  state: Readonly<PlayerSave>,
+  currentDay: number,
+): boolean {
+  const config = getConfigLoader().getGameConfig();
+  // Opportunity snapshots do not retain arbitrary source payloads. Reject
+  // signal-dependent requirements rather than inventing data that could bypass one.
+  if (conditions.some(containsSignalFieldCondition)) return false;
+  const signal: DomainSignalSnapshot = {
+    signalId: 'career-eligibility-recheck',
+    signalType: 'assessment.completed',
+    occurredAtDay: currentDay,
+    data: { year: 0, score: 0, tier: '' },
+  };
+  return conditions.every((condition) =>
+    evaluateCondition(condition, {
+      state,
+      signal,
+      currentDay,
+      daysPerYear: config.daysPerMonth * config.monthsPerYear,
+    }),
+  );
+}
+
+function containsSignalFieldCondition(
+  condition: CareerOpportunity['eligibilityConditions'][number],
+): boolean {
+  if ('signalField' in condition) return true;
+  if ('all' in condition) return condition.all.some(containsSignalFieldCondition);
+  if ('any' in condition) return condition.any.some(containsSignalFieldCondition);
+  return 'not' in condition && containsSignalFieldCondition(condition.not);
+}
+
+function isEligibleForAppointment(
+  state: Readonly<PlayerSave>,
+  opportunity: Exclude<CareerOpportunity, { type: 'training' }>,
+  currentDay: number,
+): boolean {
+  const loader = getConfigLoader();
+  const target = loader.getPositionById(opportunity.target.positionId);
+  if (
+    !target ||
+    target.vacancyCount <= 0 ||
+    state.career.appointment.positionId === target.id ||
+    hasActiveAppointmentRestriction(state, currentDay) ||
+    !satisfiesConditions(opportunity.eligibilityConditions, state, currentDay) ||
+    !satisfiesConditions(target.requirements, state, currentDay)
+  )
+    return false;
+  return (
+    target.institutionId === opportunity.target.institutionId &&
+    target.regionId === opportunity.target.regionId
+  );
+}
+
+function archiveCompletedProcess(transaction: PlayerSave, process: CareerProcess): void {
+  transaction.career.completedProcesses.push(structuredClone(process));
+  transaction.career.activeProcess = null;
 }
 
 function orchestrateSignal(
@@ -55,17 +126,6 @@ function orchestrateSignal(
     idFactory,
     loader.getAllEventDefinitions(),
   );
-  const result = processCareerOpportunitySignal({
-    state: draft,
-    signal,
-    currentDay,
-    idFactory,
-    definitions: loader.getCareerOpportunityDefinitionsBySignal(signal.signalType),
-    positions: loader.getAllPositions(),
-    institutions: loader.getAllInstitutions(),
-    daysPerYear: loader.getGameConfig().daysPerMonth * loader.getGameConfig().monthsPerYear,
-  });
-  draft.career.opportunities.push(...result.created);
 }
 
 /** @param draft 状态草稿 @param payload 机会标识 @param currentDay 当前日 @returns 是否已接受。 */
@@ -82,13 +142,11 @@ export function reduceAcceptCareerOpportunity(
     draft.time.pendingContinuation
   )
     return false;
+  if (original.type !== 'training' && !isEligibleForAppointment(draft, original, currentDay))
+    return false;
   if (
-    original.type !== 'training' &&
-    draft.career.restrictions.some(
-      (item) =>
-        item.type === 'appointment_selection_freeze' &&
-        (item.endsAtDay === null || item.endsAtDay > currentDay),
-    )
+    original.type === 'training' &&
+    !satisfiesConditions(original.eligibilityConditions, draft, currentDay)
   )
     return false;
   const result = acceptCareerOpportunity(original, currentDay);
@@ -177,6 +235,7 @@ function appointmentTransition(
     target.regionId !== opportunity.target.regionId
   )
     return false;
+  if (!isEligibleForAppointment(transaction, opportunity, currentDay)) return false;
   const openExperiences = transaction.career.experiences.filter((item) => item.endedAtDay === null);
   if (
     openExperiences.length !== 1 ||
@@ -244,7 +303,7 @@ function appointmentTransition(
   replaceOpportunity(transaction, resolved);
   process.status = 'completed';
   process.completedAtDay = currentDay;
-  transaction.career.activeProcess = null;
+  archiveCompletedProcess(transaction, process);
   orchestrateSignal(
     transaction,
     {
@@ -281,7 +340,16 @@ export function reduceAdvanceCareerProcess(
     original.status !== 'in_process'
   )
     return false;
-  const outcome = payload.outcome ?? 'passed';
+  const settlement =
+    original.type !== 'training' && original.requiresSelection
+      ? settleCareerSelectionStage(
+          process.currentStage,
+          draft,
+          getConfigLoader().getGameConfig().promotion,
+          payload._rng ?? Math.random,
+        )
+      : { outcome: 'passed' as const, score: null, detail: 'Career process stage settled' };
+  const outcome = settlement.outcome;
   // An appointment cannot progress while another action or blocking event is active.
   // Check before recording a selection-stage result so a rejected advance is a true no-op.
   if (
@@ -299,8 +367,8 @@ export function reduceAdvanceCareerProcess(
     stage: txProcess.currentStage,
     resolvedAtDay: currentDay,
     outcome,
-    score: null,
-    detail: 'Career process stage settled',
+    score: settlement.score,
+    detail: settlement.detail,
   });
   if (outcome !== 'passed') {
     const resolved = resolveCareerOpportunity(
@@ -312,7 +380,7 @@ export function reduceAdvanceCareerProcess(
     replaceOpportunity(transaction, resolved);
     txProcess.status = outcome === 'continued' ? 'completed' : 'failed';
     txProcess.completedAtDay = currentDay;
-    transaction.career.activeProcess = null;
+    archiveCompletedProcess(transaction, txProcess);
   } else if (opportunity.type === 'training' && txProcess.currentStage === 'eligibility_review') {
     txProcess.currentStage = 'finalization';
   } else if (opportunity.type === 'training') {
@@ -321,7 +389,7 @@ export function reduceAdvanceCareerProcess(
         transaction.assessments.annualAssessments.length - 1
       ];
     if (!assessment) return false;
-    applyEffects(transaction, opportunity.effects, {
+    const applied = applyEffects(transaction, opportunity.effects, {
       signal: {
         signalId: opportunity.source.signalId ?? opportunity.id,
         signalType: 'assessment.completed',
@@ -344,7 +412,7 @@ export function reduceAdvanceCareerProcess(
           .getAllInstitutions()
           .map((item) => item.regionId),
       ),
-    });
+    }).applied;
     const resolved = resolveCareerOpportunity(
       opportunity,
       currentDay,
@@ -354,7 +422,22 @@ export function reduceAdvanceCareerProcess(
     replaceOpportunity(transaction, resolved);
     txProcess.status = 'completed';
     txProcess.completedAtDay = currentDay;
-    transaction.career.activeProcess = null;
+    archiveCompletedProcess(transaction, txProcess);
+    const metricSignals = deriveMetricSignalsFromEffects(
+      applied,
+      { currentDay, policies: transaction.governance.policies },
+      idFactory,
+    );
+    if (metricSignals.length > 0) {
+      processCascadeSignalsInTransaction(
+        transaction,
+        metricSignals,
+        currentDay,
+        rng,
+        idFactory,
+        getConfigLoader().getAllEventDefinitions(),
+      );
+    }
   } else if (opportunity.requiresSelection) {
     const index = SELECTION_STAGES.indexOf(
       txProcess.currentStage as (typeof SELECTION_STAGES)[number],

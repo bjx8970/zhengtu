@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialState, createTestStore } from '../game-store';
+import { getConfigLoader } from '../../config/loader';
 import type {
   AppointmentCareerOpportunity,
   TrainingCareerOpportunity,
@@ -135,6 +136,10 @@ describe('career opportunity reducer', () => {
     expect(state.career.experiences.filter((item) => item.endedAtDay === null)).toHaveLength(1);
     expect(state.career.experiences[0]?.endedAtDay).toBe(0);
     expect(state.career.opportunities[0]?.finalOutcome).toBe('appointed');
+    expect(state.career.completedProcesses).toMatchObject([
+      { status: 'completed', opportunityId: opportunity.id },
+    ]);
+    expect(state.career.completedProcesses[0]?.stageResults).toHaveLength(6);
   });
 
   it('rejects an available opportunity through store dispatch', () => {
@@ -185,6 +190,19 @@ describe('career opportunity reducer', () => {
     expect(state.career.experiences).toEqual(experiencesBefore);
   });
 
+  it('rejects acceptance when an opportunity eligibility condition is no longer met', () => {
+    const initial = createInitialState();
+    const opportunity = createAvailableOpportunity();
+    opportunity.eligibilityConditions = [{ worldMetric: 'missing_metric', op: 'gte', value: 1 }];
+    initial.career.opportunities = [opportunity];
+    const store = createTestStore({ career: initial.career });
+    const before = structuredClone(store.getRawState());
+
+    store.dispatch({ type: 'ACCEPT_CAREER_OPPORTUNITY', opportunityId: opportunity.id });
+
+    expect(store.getRawState()).toEqual(before);
+  });
+
   it('does not advance an appointment selection while a blocking event is active', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();
@@ -208,6 +226,60 @@ describe('career opportunity reducer', () => {
       }),
     ).not.toThrow();
     expect(blockedStore.getRawState()).toEqual(before);
+  });
+
+  it('does not appoint when target-position requirements are no longer met', () => {
+    const initial = createInitialState();
+    const opportunity = createAvailableOpportunity();
+    initial.career.opportunities = [opportunity];
+    const store = createTestStore({ career: initial.career });
+    store.dispatch({
+      type: 'ACCEPT_CAREER_OPPORTUNITY',
+      opportunityId: opportunity.id,
+      _idFactory: () => 'process-1',
+    });
+    const loader = getConfigLoader();
+    const target = loader.getPositionById(opportunity.target.positionId);
+    if (!target) throw new Error('Expected target position');
+    const positionSpy = vi.spyOn(loader, 'getPositionById').mockReturnValue({
+      ...target,
+      requirements: [{ worldMetric: 'missing_metric', op: 'gte', value: 1 }],
+    });
+    for (let step = 0; step < 5; step++)
+      store.dispatch({
+        type: 'ADVANCE_CAREER_PROCESS',
+        opportunityId: opportunity.id,
+        _rng: () => 0,
+      });
+    const beforeAppointment = structuredClone(store.getRawState());
+
+    store.dispatch({
+      type: 'ADVANCE_CAREER_PROCESS',
+      opportunityId: opportunity.id,
+      _rng: () => 0,
+    });
+
+    expect(store.getRawState()).toEqual(beforeAppointment);
+    positionSpy.mockRestore();
+  });
+
+  it('ignores a public outcome property when advancing a career process', () => {
+    const initial = createInitialState();
+    const opportunity = createAvailableOpportunity();
+    initial.career.opportunities = [opportunity];
+    const store = createTestStore({ career: initial.career });
+    store.dispatch({ type: 'ACCEPT_CAREER_OPPORTUNITY', opportunityId: opportunity.id });
+
+    store.dispatch({
+      type: 'ADVANCE_CAREER_PROCESS',
+      opportunityId: opportunity.id,
+      outcome: 'failed',
+    } as never);
+
+    expect(store.getRawState().career.activeProcess).toMatchObject({
+      currentStage: 'democratic_recommendation',
+      status: 'active',
+    });
   });
 
   it('passes the latest annual assessment tier to training effects', () => {

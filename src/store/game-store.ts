@@ -125,7 +125,6 @@ export type GameAction =
   | {
       type: 'ADVANCE_CAREER_PROCESS';
       opportunityId: string;
-      outcome?: 'passed' | 'failed' | 'continued';
       _idFactory?: () => string;
       _rng?: () => number;
     };
@@ -276,6 +275,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       specialties: {},
       opportunities: [],
       activeProcess: null,
+      completedProcesses: [],
     },
     governance: createDefaultGovernanceState(),
     events: createDefaultEventRuntimeState(),

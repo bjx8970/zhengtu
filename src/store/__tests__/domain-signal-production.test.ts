@@ -7,7 +7,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EventDefinition } from '../../domain/events/definition';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
+import type { CareerOpportunityDefinition } from '../../types/config';
 import { createEventSnapshot } from '../../engine/events/event-orchestrator';
+import { processCascadeSignals } from '../reducers/event-reducer';
 import { getConfigLoader } from '../../config/loader';
 import { createInitialState, createTestStore } from '../game-store';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
@@ -51,6 +53,51 @@ afterEach(() => {
 });
 
 describe('domain signal production', () => {
+  it('dispatches civil-service rank signals to career opportunities through the shared signal transaction', () => {
+    const loader = getConfigLoader();
+    const definition: CareerOpportunityDefinition = {
+      id: 'rank-training-opportunity',
+      type: 'training',
+      triggerSignals: ['civil_service_rank.changed'],
+      conditions: [],
+      expiresAfterDays: null,
+      repeatPolicy: 'once_per_source',
+      cooldownDays: 0,
+      requiresSelection: false,
+      reasonTemplate: '',
+      targetPositionId: null,
+      trainingDefinitionId: 'rank-training',
+      effects: [],
+    };
+    vi.spyOn(loader, 'getCareerOpportunityDefinitionsBySignal').mockReturnValue([definition]);
+    const state = createInitialState();
+    processCascadeSignals(
+      state,
+      [
+        {
+          signalId: 'rank-signal-delivery',
+          signalType: 'civil_service_rank.changed',
+          occurredAtDay: 0,
+          data: {
+            rankChangeId: 'rank-change-1',
+            previousRank: 'clerk_2',
+            currentRank: 'section_member_4',
+            reason: 'regular_advancement',
+            sourceType: 'system',
+            sourceId: null,
+          },
+        },
+      ],
+      0,
+      () => 0,
+      () => 'rank-opportunity-1',
+      loader.getAllEventDefinitions(),
+    );
+    expect(state.career.opportunities).toMatchObject([
+      { definitionId: definition.id, source: { sourceId: 'rank:rank-change-1' } },
+    ]);
+  });
+
   it('START_ACTION 冻结完整执行快照，配置移除和边界漂移后仍按原语义完成', () => {
     const loader = getConfigLoader();
     const actionEvent = eventDefinition('action-completed-test', 'action.completed');
