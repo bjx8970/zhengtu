@@ -263,4 +263,32 @@ describe('planEventFollowups', () => {
       automatic.id,
     ]);
   });
+
+  it('preserves the original policy signal for scheduled content-chain effects', () => {
+    const policySignal: DomainSignalSnapshot = {
+      signalId: 'policy-approved',
+      signalType: 'policy.approved',
+      occurredAtDay: 8,
+      data: {
+        policyInstanceId: 'park-instance',
+        policyId: 'industrial_park_support',
+        regionId: 'region_qingyun_town',
+        institutionId: 'township_govt_01',
+        originPositionId: 'admin_l2_0',
+      },
+    };
+    const parentInstance = { ...parent('chain_instance'), triggerContext: policySignal };
+    const result = planEventFollowups({
+      schedules: [{ eventId: 'target', delayDays: 1 }],
+      parentInstance,
+      resolvedSignal: signal(),
+      state: createInitialState(),
+      currentDay: 10,
+      definitions: [definition({ trigger: { sources: ['policy.approved'], scheduledOnly: true } })],
+      rng: () => 0,
+      idFactory: () => 'generated',
+    });
+
+    expect(result.scheduledInstances[0]?.triggerContext).toEqual(policySignal);
+  });
 });

@@ -18,7 +18,7 @@ describe('ConfigLoader 事件加载', () => {
   it('按 ID 查询事件', () => {
     const event = loader.getEventDefinition('flood_emergency');
     expect(event).not.toBeNull();
-    expect(event?.title).toBe('防汛抗洪');
+    expect(event?.title).toBe('防汛抗洪（准备不足）');
     expect(event?.options.length).toBe(3);
   });
 
@@ -45,7 +45,7 @@ describe('ConfigLoader 事件加载', () => {
 
     // 再次查询应得到原始数据
     const event2 = loader.getEventDefinition('flood_emergency');
-    expect(event2?.title).toBe('防汛抗洪');
+    expect(event2?.title).toBe('防汛抗洪（准备不足）');
     expect(event2?.options.length).toBe(3);
   });
 
@@ -56,6 +56,14 @@ describe('ConfigLoader 事件加载', () => {
 
     const events2 = loader.getEventDefinitionsBySignal('world.metric_changed');
     const flood2 = events2.find((e) => e.id === 'flood_emergency');
-    expect(flood2?.title).toBe('防汛抗洪');
+    expect(flood2?.title).toBe('防汛抗洪（准备不足）');
+  });
+
+  it('loads the phase-two content chains', () => {
+    expect(loader.getEventDefinition('industrial_park_landing_review')?.presentation).toBe(
+      'blocking',
+    );
+    expect(loader.getEventDefinition('flood_prepared_emergency')?.options).toHaveLength(3);
+    expect(loader.getEventDefinition('report_shelved')?.automaticOutcome?.schedule).toHaveLength(3);
   });
 });

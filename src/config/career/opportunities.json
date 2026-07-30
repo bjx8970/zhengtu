@@ -12,5 +12,24 @@
     "targetPositionId": "admin_l2_0",
     "appointmentType": "substantive",
     "appointmentReason": "promotion"
+  },
+  {
+    "id": "township_chief_leadership_vacancy",
+    "type": "leadership_vacancy",
+    "triggerSignals": ["assessment.completed"],
+    "conditions": [
+      { "careerCheck": "leadership_rank", "value": "township_deputy", "op": "eq" },
+      { "careerCheck": "years_in_position", "value": 2, "op": "gte" },
+      { "signalField": "score", "op": "gte", "value": 60 },
+      { "signalField": "tier", "op": "neq", "value": "不称职" }
+    ],
+    "expiresAfterDays": 30,
+    "repeatPolicy": "once_per_source",
+    "cooldownDays": 0,
+    "requiresSelection": true,
+    "reasonTemplate": "年度考核达标且已在乡科级副职岗位任职满两年，现出现镇长岗位选拔机会。选拔冻结和处分期间不得进入任职程序。",
+    "targetPositionId": "admin_l3_0",
+    "appointmentType": "substantive",
+    "appointmentReason": "promotion"
   }
 ]

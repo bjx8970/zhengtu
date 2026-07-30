@@ -144,6 +144,19 @@
           { "target": "dept.kpi.safety", "operation": "add", "value": 12 },
           { "target": "player.stability", "operation": "add", "value": 2 }
         ]
+      },
+      {
+        "id": "flood_preparation",
+        "name": "防汛准备",
+        "description": "排查堤防隐患、补充抢险物资并组织预警值守，为汛情处置建立准备指标。",
+        "durationDays": 4,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 60,
+        "effects": [
+          { "target": "dept.kpi.safety", "operation": "add", "value": 10 },
+          { "target": "player.competence", "operation": "add", "value": 2 }
+        ]
       }
     ],
     "kpiTemplateIds": ["safety", "resident_satisfaction"]
