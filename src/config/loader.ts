@@ -179,6 +179,11 @@ class ConfigLoader {
     return rule ? structuredClone(rule) : null;
   }
 
+  /** 获取全部公务员职级晋升规则（深拷贝）。 */
+  getAllCivilServiceRankProgressionRules() {
+    return this.civilServiceRanks.progressionRules.map((item) => structuredClone(item));
+  }
+
   /** 获取所有正式职级定义。 */
   getAllCivilServiceRankDefinitions() {
     return this.civilServiceRanks.definitions.map((item) => structuredClone(item));

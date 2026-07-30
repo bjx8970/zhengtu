@@ -123,35 +123,32 @@ describe('civil-service rank eligibility', () => {
   });
 
   it('allows a rule ID equal to a distinct source rank', () => {
+    const progressionRules = getConfigLoader().getAllCivilServiceRankProgressionRules();
+    const firstRule = progressionRules[0];
+    const secondRule = progressionRules[1];
+    expect(firstRule).toBeDefined();
+    expect(secondRule).toBeDefined();
+    if (!firstRule || !secondRule) return;
+    secondRule.id = firstRule.fromRank;
     const config = {
       definitions: getConfigLoader().getAllCivilServiceRankDefinitions(),
-      progressionRules: [
-        {
-          id: 'clerk-rule',
-          fromRank: 'clerk_2',
-          toRank: 'clerk_1',
-          minDaysInRank: 0,
-          minServiceDays: 0,
-          minAssessmentCount: 0,
-          minQualifiedAssessmentCount: 0,
-          minExcellentAssessmentCount: 0,
-          quotaRequirement: null,
-          additionalConditions: [],
-        },
-        {
-          id: 'clerk_2',
-          fromRank: 'clerk_1',
-          toRank: 'section_member_4',
-          minDaysInRank: 0,
-          minServiceDays: 0,
-          minAssessmentCount: 0,
-          minQualifiedAssessmentCount: 0,
-          minExcellentAssessmentCount: 0,
-          quotaRequirement: null,
-          additionalConditions: [],
-        },
-      ],
+      progressionRules,
     };
     expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(true);
+  });
+
+  it('requires a progression rule for every non-highest rank', () => {
+    const config = {
+      definitions: getConfigLoader().getAllCivilServiceRankDefinitions(),
+      progressionRules: getConfigLoader().getAllCivilServiceRankProgressionRules().slice(0, -1),
+    };
+    expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('distinguishes the highest rank from a missing progression rule', () => {
+    const state = createInitialState();
+    state.career.civilServiceRank = 'inspector_1';
+    const result = evaluateCivilServiceRankEligibility(state, 0, 360, null);
+    expect(result.failures[0]?.reason).toBe('already_highest_rank');
   });
 });

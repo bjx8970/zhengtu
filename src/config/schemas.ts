@@ -133,7 +133,10 @@ export const RankQuotaRequirementSchema = z
     requiredValue: z.number().nonnegative(),
     consumeValue: z.number().nonnegative(),
   })
-  .strict();
+  .strict()
+  .refine((quota) => quota.consumeValue <= quota.requiredValue, {
+    message: 'Quota consume value cannot exceed its required value',
+  });
 export const CivilServiceRankProgressionRuleSchema = z
   .object({
     id: z.string().min(1),
@@ -197,6 +200,15 @@ export const CivilServiceRankConfigSchema = z
           message: 'Rank progression additional conditions cannot depend on an event signal',
         });
     }
+    const nonHighestRanks = CIVIL_SERVICE_RANKS.slice(0, -1);
+    if (
+      sourceRanks.size !== nonHighestRanks.length ||
+      nonHighestRanks.some((rank) => !sourceRanks.has(rank))
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Every non-highest civil-service rank must have one progression rule',
+      });
   });
 export type CivilServiceRankDefinition = z.infer<typeof CivilServiceRankDefinitionSchema>;
 export type CivilServiceRankProgressionRule = z.infer<typeof CivilServiceRankProgressionRuleSchema>;

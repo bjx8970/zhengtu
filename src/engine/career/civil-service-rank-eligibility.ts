@@ -6,6 +6,7 @@ import type {
   CurrentAppointment,
 } from '../../domain/career/state';
 import type { CivilServiceRank } from '../../domain/career/types';
+import { CIVIL_SERVICE_RANKS } from '../../domain/career/types';
 import { evaluateCondition } from '../events/condition-interpreter';
 import type { PlayerSave } from '../../types/player';
 import type { CivilServiceRankProgressionRule } from '../../config/schemas';
@@ -13,6 +14,7 @@ import type { CivilServiceRankProgressionRule } from '../../config/schemas';
 export type RankEligibilityFailure =
   | 'no_progression_rule'
   | 'already_highest_rank'
+  | 'rule_source_mismatch'
   | 'insufficient_days_in_rank'
   | 'insufficient_service_days'
   | 'insufficient_assessments'
@@ -98,7 +100,25 @@ export function evaluateCivilServiceRankEligibility(
       eligible: false,
       fromRank,
       toRank: null,
-      failures: [{ reason: 'no_progression_rule', detail: 'No configured progression rule' }],
+      failures: [
+        {
+          reason:
+            fromRank === CIVIL_SERVICE_RANKS[CIVIL_SERVICE_RANKS.length - 1]
+              ? 'already_highest_rank'
+              : 'no_progression_rule',
+          detail: 'No configured progression rule',
+        },
+      ],
+      evaluatedAtDay: currentDay,
+    };
+  if (rule.fromRank !== fromRank)
+    return {
+      eligible: false,
+      fromRank,
+      toRank: null,
+      failures: [
+        { reason: 'rule_source_mismatch', detail: 'Rule source rank does not match state' },
+      ],
       evaluatedAtDay: currentDay,
     };
   const add = (reason: RankEligibilityFailure, detail: string) => failures.push({ reason, detail });

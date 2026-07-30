@@ -45,6 +45,150 @@
         "consumeValue": 1
       },
       "additionalConditions": []
+    },
+    {
+      "id": "section_member_4_to_section_member_3",
+      "fromRank": "section_member_4",
+      "toRank": "section_member_3",
+      "minDaysInRank": 720,
+      "minServiceDays": 1800,
+      "minAssessmentCount": 3,
+      "minQualifiedAssessmentCount": 3,
+      "minExcellentAssessmentCount": 0,
+      "quotaRequirement": {
+        "metricId": "rank_quota.section_member_3",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "section_member_3_to_section_member_2",
+      "fromRank": "section_member_3",
+      "toRank": "section_member_2",
+      "minDaysInRank": 1080,
+      "minServiceDays": 2880,
+      "minAssessmentCount": 5,
+      "minQualifiedAssessmentCount": 5,
+      "minExcellentAssessmentCount": 1,
+      "quotaRequirement": {
+        "metricId": "rank_quota.section_member_2",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "section_member_2_to_section_member_1",
+      "fromRank": "section_member_2",
+      "toRank": "section_member_1",
+      "minDaysInRank": 1080,
+      "minServiceDays": 3960,
+      "minAssessmentCount": 7,
+      "minQualifiedAssessmentCount": 7,
+      "minExcellentAssessmentCount": 1,
+      "quotaRequirement": {
+        "metricId": "rank_quota.section_member_1",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "section_member_1_to_researcher_4",
+      "fromRank": "section_member_1",
+      "toRank": "researcher_4",
+      "minDaysInRank": 1440,
+      "minServiceDays": 5400,
+      "minAssessmentCount": 10,
+      "minQualifiedAssessmentCount": 9,
+      "minExcellentAssessmentCount": 2,
+      "quotaRequirement": {
+        "metricId": "rank_quota.researcher_4",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "researcher_4_to_researcher_3",
+      "fromRank": "researcher_4",
+      "toRank": "researcher_3",
+      "minDaysInRank": 1440,
+      "minServiceDays": 7200,
+      "minAssessmentCount": 14,
+      "minQualifiedAssessmentCount": 13,
+      "minExcellentAssessmentCount": 3,
+      "quotaRequirement": {
+        "metricId": "rank_quota.researcher_3",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "researcher_3_to_researcher_2",
+      "fromRank": "researcher_3",
+      "toRank": "researcher_2",
+      "minDaysInRank": 1800,
+      "minServiceDays": 9000,
+      "minAssessmentCount": 18,
+      "minQualifiedAssessmentCount": 16,
+      "minExcellentAssessmentCount": 4,
+      "quotaRequirement": {
+        "metricId": "rank_quota.researcher_2",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "researcher_2_to_researcher_1",
+      "fromRank": "researcher_2",
+      "toRank": "researcher_1",
+      "minDaysInRank": 1800,
+      "minServiceDays": 10800,
+      "minAssessmentCount": 22,
+      "minQualifiedAssessmentCount": 20,
+      "minExcellentAssessmentCount": 5,
+      "quotaRequirement": {
+        "metricId": "rank_quota.researcher_1",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "researcher_1_to_inspector_2",
+      "fromRank": "researcher_1",
+      "toRank": "inspector_2",
+      "minDaysInRank": 2160,
+      "minServiceDays": 12600,
+      "minAssessmentCount": 26,
+      "minQualifiedAssessmentCount": 23,
+      "minExcellentAssessmentCount": 6,
+      "quotaRequirement": {
+        "metricId": "rank_quota.inspector_2",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
+    },
+    {
+      "id": "inspector_2_to_inspector_1",
+      "fromRank": "inspector_2",
+      "toRank": "inspector_1",
+      "minDaysInRank": 2160,
+      "minServiceDays": 14400,
+      "minAssessmentCount": 30,
+      "minQualifiedAssessmentCount": 27,
+      "minExcellentAssessmentCount": 7,
+      "quotaRequirement": {
+        "metricId": "rank_quota.inspector_1",
+        "requiredValue": 1,
+        "consumeValue": 1
+      },
+      "additionalConditions": []
     }
   ]
 }
