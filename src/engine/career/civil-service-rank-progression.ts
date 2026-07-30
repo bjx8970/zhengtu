@@ -3,6 +3,7 @@ import type { CivilServiceRankChangeRecord } from '../../domain/career/state';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { CivilServiceRankProgressionRule } from '../../config/schemas';
 import type { PlayerSave } from '../../types/player';
+import type { CareerExperienceQualificationRules } from '../../types/config';
 import {
   evaluateCivilServiceRankEligibility,
   type RankEligibilityFailure,
@@ -13,6 +14,7 @@ export interface AdvanceCivilServiceRankParams {
   state: Readonly<PlayerSave>;
   currentDay: number;
   daysPerYear: number;
+  careerExperienceQualificationRules?: Readonly<CareerExperienceQualificationRules>;
   rule: CivilServiceRankProgressionRule;
   idFactory: () => string;
   sourceType: 'assessment' | 'event' | 'policy' | 'system';
@@ -42,6 +44,7 @@ export function advanceCivilServiceRank(
     params.currentDay,
     params.daysPerYear,
     params.rule,
+    params.careerExperienceQualificationRules,
   );
   if (!eligibility.eligible || eligibility.toRank === null)
     return {

@@ -10,6 +10,7 @@ import type { ConditionEvaluationContext } from '../condition-interpreter';
 import { createInitialState } from '../../../store/game-store';
 import type { ConditionExpression } from '../../../domain/conditions';
 import type { DomainSignalSnapshot } from '../../../domain/governance/types';
+import { getConfigLoader } from '../../../config/loader';
 
 /** 构造一个 world.metric_changed 信号快照 */
 function makeSignal(overrides?: Partial<DomainSignalSnapshot>): DomainSignalSnapshot {
@@ -31,6 +32,7 @@ function makeContext(
     state,
     currentDay: 1000,
     daysPerYear: 360,
+    careerExperienceQualificationRules: getConfigLoader().getCareerExperienceQualificationRules(),
   };
   if (mutate) mutate(ctx);
   return ctx;

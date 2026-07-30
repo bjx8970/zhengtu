@@ -14,12 +14,12 @@
 import type { ConditionExpression } from '../../domain/conditions';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { PlayerSave } from '../../types/player';
+import type { CareerExperienceQualificationRules } from '../../types/config';
 import {
   INSTITUTION_LEVELS,
   LEADERSHIP_RANKS,
   CIVIL_SERVICE_RANKS,
 } from '../../domain/career/types';
-import { getConfigLoader } from '../../config/loader';
 import { analyzeCareerExperiences } from '../career/career-experience-analysis';
 
 /** 条件评估上下文 */
@@ -32,6 +32,8 @@ export interface ConditionEvaluationContext {
   currentDay: number;
   /** 每年游戏日数（由调用方从配置 daysPerMonth × monthsPerYear 提供，项目为 360） */
   daysPerYear: number;
+  /** 履历资格规则，由调用方注入以保持解释器纯函数。缺失时履历条件不成立。 */
+  careerExperienceQualificationRules?: Readonly<CareerExperienceQualificationRules>;
 }
 
 /**
@@ -240,11 +242,12 @@ function evaluateExperience(
   cond: Extract<ConditionExpression, { experience: string }>,
   ctx: ConditionEvaluationContext,
 ): boolean {
+  if (!ctx.careerExperienceQualificationRules) return false;
   const analysis = analyzeCareerExperiences({
     experiences: ctx.state.career.experiences,
     currentAppointment: ctx.state.career.appointment,
     currentDay: ctx.currentDay,
-    rules: getConfigLoader().getCareerExperienceQualificationRules(),
+    rules: ctx.careerExperienceQualificationRules,
   });
   if (!analysis.valid) return false;
   switch (cond.experience) {

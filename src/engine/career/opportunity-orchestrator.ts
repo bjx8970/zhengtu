@@ -7,7 +7,10 @@
 import type { CareerOpportunity, CareerOpportunitySource } from '../../domain/career/state';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { PlayerSave } from '../../types/player';
-import type { CareerOpportunityDefinition } from '../../types/config';
+import type {
+  CareerExperienceQualificationRules,
+  CareerOpportunityDefinition,
+} from '../../types/config';
 import type { InstitutionConfig, PositionConfigV2 } from '../../types/position-v2';
 import { evaluateCondition } from '../events/condition-interpreter';
 
@@ -20,6 +23,7 @@ export interface ProcessCareerOpportunitySignalParams {
   positions: readonly PositionConfigV2[];
   institutions: readonly InstitutionConfig[];
   daysPerYear: number;
+  careerExperienceQualificationRules?: Readonly<CareerExperienceQualificationRules>;
   idFactory: () => string;
 }
 
@@ -118,6 +122,7 @@ export function processCareerOpportunitySignal(
           signal: params.signal,
           currentDay: params.currentDay,
           daysPerYear: params.daysPerYear,
+          careerExperienceQualificationRules: params.careerExperienceQualificationRules,
         }),
       )
     ) {

@@ -133,6 +133,7 @@ export function reduceProposePolicy(
         state: draft as Readonly<PlayerSave>,
         currentDay,
         daysPerYear: 360,
+        careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
       });
     },
   });

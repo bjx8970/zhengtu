@@ -44,9 +44,16 @@ export function analyzeCareerExperienceRecords(
 ): AnalyzedCareerExperience[] {
   return experiences.map((experience) => {
     const effectiveEndedAtDay = experience.endedAtDay ?? currentDay;
-    const invalidInterval = effectiveEndedAtDay < experience.startedAtDay;
+    const futureStartedAtDay = experience.startedAtDay > currentDay;
+    const futureEndedAtDay = experience.endedAtDay !== null && experience.endedAtDay > currentDay;
+    const invalidInterval =
+      effectiveEndedAtDay < experience.startedAtDay || futureStartedAtDay || futureEndedAtDay;
     if (invalidInterval)
       diagnostics.push({ code: 'negative_duration', experienceIds: [experience.id] });
+    if (futureStartedAtDay)
+      diagnostics.push({ code: 'future_started_at_day', experienceIds: [experience.id] });
+    if (futureEndedAtDay)
+      diagnostics.push({ code: 'future_ended_at_day', experienceIds: [experience.id] });
     if (experience.endedAtDay === null && experience.endReason !== null)
       diagnostics.push({ code: 'open_experience_has_end_reason', experienceIds: [experience.id] });
     if (experience.endedAtDay !== null && experience.endReason === null)

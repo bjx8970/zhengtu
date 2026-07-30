@@ -13,6 +13,8 @@ export type CareerExperienceDiagnosticCode =
   | 'overlapping_experiences'
   | 'closed_experience_missing_end_reason'
   | 'open_experience_has_end_reason'
+  | 'future_started_at_day'
+  | 'future_ended_at_day'
   | 'unknown_appointment_type_rule';
 
 export type CareerExperienceExclusionReason =

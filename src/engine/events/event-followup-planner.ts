@@ -7,6 +7,7 @@
 import type { PlayerSave } from '../../types/player';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { EventDefinition, ScheduledFollowupDefinition } from '../../domain/events/definition';
+import type { CareerExperienceQualificationRules } from '../../types/config';
 import type {
   EventChainInstance,
   EventInstance,
@@ -34,6 +35,8 @@ export interface PlanEventFollowupsInput {
   definitions: readonly EventDefinition[];
   rng: () => number;
   idFactory: () => string;
+  /** 履历资格规则由外层配置加载器注入，供后续事件条件复用。 */
+  careerExperienceQualificationRules?: Readonly<CareerExperienceQualificationRules>;
   /** 当前事务中已排队但尚未消费的实例（例如同一信号生成的兄弟实例）。 */
   transactionInstances?: readonly EventInstance[];
 }
@@ -153,6 +156,7 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
           state: input.state,
           currentDay: input.currentDay,
           daysPerYear: 360,
+          careerExperienceQualificationRules: input.careerExperienceQualificationRules,
         });
         if (!matches) return false;
       } catch {

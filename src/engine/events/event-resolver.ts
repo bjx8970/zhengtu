@@ -14,6 +14,7 @@ import type { EffectDefinition } from '../../domain/conditions';
 import type { EventInstance, EventHistoryRecord } from '../../domain/events/state';
 import type { EventCooldownRecord, ScheduledEventCancellation } from '../../domain/events/types';
 import type { EventOptionDefinition, EventDefinition } from '../../domain/events/definition';
+import type { CareerExperienceQualificationRules } from '../../types/config';
 import { planEventFollowups } from './event-followup-planner';
 import { buildEventCooldownRecord } from './event-cooldown';
 
@@ -28,6 +29,8 @@ export interface ResolveEventOptionInput {
   definitions: readonly EventDefinition[];
   /** 已应用当前选项效果的只读状态，仅用于后续条件评估 */
   conditionState?: Readonly<PlayerSave>;
+  /** 履历资格规则由外层配置加载器注入，供后续事件条件复用。 */
+  careerExperienceQualificationRules?: Readonly<CareerExperienceQualificationRules>;
 }
 
 /** 选项结算结果 */
@@ -143,6 +146,7 @@ export function resolveEventOption(input: ResolveEventOptionInput): ResolveEvent
     definitions,
     rng,
     idFactory,
+    careerExperienceQualificationRules: input.careerExperienceQualificationRules,
   });
 
   // 历史记录

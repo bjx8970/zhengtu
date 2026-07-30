@@ -182,4 +182,39 @@ describe('career experience analysis', () => {
       ]),
     );
   });
+
+  it('rejects future-dated records from qualification', () => {
+    const current = makeAppointment({ startedAtDay: 1080 });
+    const future = makeAppointment({
+      appointmentId: 'future',
+      regionId: 'region-future',
+      startedAtDay: 1200,
+    });
+    const result = analyze(
+      [
+        makeExperience(future, { endedAtDay: 1560, endReason: 'rotation' }),
+        makeExperience(current),
+      ],
+      current,
+    );
+    expect(result.qualifiedRegionIds).not.toContain('region-future');
+    expect(result.diagnostics.map((item) => item.code)).toEqual(
+      expect.arrayContaining(['future_started_at_day', 'future_ended_at_day']),
+    );
+  });
+
+  it('reports overlap between two closed intervals', () => {
+    const current = makeAppointment({ startedAtDay: 1080 });
+    const first = makeAppointment({ appointmentId: 'first', startedAtDay: 0 });
+    const second = makeAppointment({ appointmentId: 'second', startedAtDay: 180 });
+    const result = analyze(
+      [
+        makeExperience(first, { endedAtDay: 360, endReason: 'rotation' }),
+        makeExperience(second, { endedAtDay: 540, endReason: 'rotation' }),
+        makeExperience(current),
+      ],
+      current,
+    );
+    expect(result.diagnostics.map((item) => item.code)).toContain('overlapping_experiences');
+  });
 });
