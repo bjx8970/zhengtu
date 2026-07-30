@@ -86,6 +86,17 @@ function hasOpportunity(
   );
 }
 
+function hasNonTerminalOpportunity(state: Readonly<PlayerSave>, definitionId: string): boolean {
+  return hasOpportunity(
+    state,
+    definitionId,
+    (opportunity) =>
+      opportunity.status === 'available' ||
+      opportunity.status === 'accepted' ||
+      opportunity.status === 'in_process',
+  );
+}
+
 /**
  * 根据单个领域信号生成可用机会。
  *
@@ -111,6 +122,13 @@ export function processCareerOpportunitySignal(
       )
     ) {
       skipped.push({ definitionId: definition.id, reason: 'condition_failed' });
+      continue;
+    }
+    // A definition represents one actionable process at a time. This remains true
+    // for repeatable definitions with a zero-day cooldown, which may recur only
+    // after the prior opportunity reaches a terminal state.
+    if (hasNonTerminalOpportunity(params.state, definition.id)) {
+      skipped.push({ definitionId: definition.id, reason: 'duplicate' });
       continue;
     }
     if (
@@ -152,6 +170,7 @@ export function processCareerOpportunitySignal(
       definitionId: definition.id,
       status: 'available' as const,
       source,
+      sourceSignal: structuredClone(params.signal),
       appearedAtDay: params.currentDay,
       expiresAtDay:
         definition.expiresAfterDays === null

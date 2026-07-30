@@ -38,6 +38,7 @@ function cloneOpportunity(opportunity: CareerOpportunity): CareerOpportunity {
     return {
       ...opportunity,
       source: { ...opportunity.source },
+      sourceSignal: opportunity.sourceSignal,
       eligibilityConditions: [...opportunity.eligibilityConditions],
       effects: [...opportunity.effects],
     };
@@ -45,6 +46,7 @@ function cloneOpportunity(opportunity: CareerOpportunity): CareerOpportunity {
   return {
     ...opportunity,
     source: { ...opportunity.source },
+    sourceSignal: opportunity.sourceSignal,
     eligibilityConditions: [...opportunity.eligibilityConditions],
     target: { ...opportunity.target },
   };

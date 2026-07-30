@@ -53,12 +53,13 @@ function satisfiesConditions(
   conditions: CareerOpportunity['eligibilityConditions'],
   state: Readonly<PlayerSave>,
   currentDay: number,
+  sourceSignal: DomainSignalSnapshot | null,
 ): boolean {
   const config = getConfigLoader().getGameConfig();
-  // Opportunity snapshots do not retain arbitrary source payloads. Reject
-  // signal-dependent requirements rather than inventing data that could bypass one.
-  if (conditions.some(containsSignalFieldCondition)) return false;
-  const signal: DomainSignalSnapshot = {
+  // Legacy opportunities can have no recoverable payload. Do not invent one for
+  // signal-dependent requirements, because that would let an unknown trigger pass.
+  if (sourceSignal === null && conditions.some(containsSignalFieldCondition)) return false;
+  const fallbackSignal: DomainSignalSnapshot = {
     signalId: 'career-eligibility-recheck',
     signalType: 'assessment.completed',
     occurredAtDay: currentDay,
@@ -67,7 +68,7 @@ function satisfiesConditions(
   return conditions.every((condition) =>
     evaluateCondition(condition, {
       state,
-      signal,
+      signal: sourceSignal ?? fallbackSignal,
       currentDay,
       daysPerYear: config.daysPerMonth * config.monthsPerYear,
     }),
@@ -95,8 +96,13 @@ function isEligibleForAppointment(
     target.vacancyCount <= 0 ||
     state.career.appointment.positionId === target.id ||
     hasActiveAppointmentRestriction(state, currentDay) ||
-    !satisfiesConditions(opportunity.eligibilityConditions, state, currentDay) ||
-    !satisfiesConditions(target.requirements, state, currentDay)
+    !satisfiesConditions(
+      opportunity.eligibilityConditions,
+      state,
+      currentDay,
+      opportunity.sourceSignal,
+    ) ||
+    !satisfiesConditions(target.requirements, state, currentDay, opportunity.sourceSignal)
   )
     return false;
   return (
@@ -146,7 +152,7 @@ export function reduceAcceptCareerOpportunity(
     return false;
   if (
     original.type === 'training' &&
-    !satisfiesConditions(original.eligibilityConditions, draft, currentDay)
+    !satisfiesConditions(original.eligibilityConditions, draft, currentDay, original.sourceSignal)
   )
     return false;
   const result = acceptCareerOpportunity(original, currentDay);
@@ -385,22 +391,11 @@ export function reduceAdvanceCareerProcess(
   } else if (opportunity.type === 'training' && txProcess.currentStage === 'eligibility_review') {
     txProcess.currentStage = 'finalization';
   } else if (opportunity.type === 'training') {
-    const assessment =
-      transaction.assessments.annualAssessments[
-        transaction.assessments.annualAssessments.length - 1
-      ];
-    if (!assessment) return false;
+    // Effects are evaluated against the event that created the opportunity, not a
+    // later assessment (and not an invented assessment for non-assessment sources).
+    if (!opportunity.sourceSignal) return false;
     const applied = applyEffects(transaction, opportunity.effects, {
-      signal: {
-        signalId: opportunity.source.signalId ?? opportunity.id,
-        signalType: 'assessment.completed',
-        occurredAtDay: currentDay,
-        data: {
-          year: assessment.year,
-          score: assessment.score,
-          tier: assessment.tier,
-        },
-      },
+      signal: structuredClone(unwrap(opportunity.sourceSignal)),
       currentDay,
       attributeBounds: getConfigLoader().getGameConfig().attributeBounds,
       knownInstitutionIds: new Set(

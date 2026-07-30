@@ -157,6 +157,9 @@ const CareerOpportunityBaseSchema = z
         description: z.string(),
       })
       .strict(),
+    // Schema 8 saves predate frozen trigger payloads. Decode them as null rather
+    // than fabricating a payload which could accidentally satisfy signal fields.
+    sourceSignal: DomainSignalSnapshotSchema.nullable().default(null),
     appearedAtDay: z.number(),
     expiresAtDay: z.number().nullable(),
     acceptedAtDay: z.number().nullable(),

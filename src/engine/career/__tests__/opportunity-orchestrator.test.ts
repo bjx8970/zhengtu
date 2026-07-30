@@ -28,6 +28,7 @@ describe('career opportunity orchestrator', () => {
       daysPerYear: 360,
     });
     expect(first.created).toHaveLength(1);
+    expect(first.created[0]?.sourceSignal).toEqual(signal);
     state.career.opportunities.push(...first.created);
     const replay = processCareerOpportunitySignal({
       state,
@@ -203,5 +204,152 @@ describe('career opportunity orchestrator', () => {
       daysPerYear: 360,
     });
     expect(boundary.created).toHaveLength(1);
+  });
+
+  it('allows repeatable zero-cooldown history but never concurrent opportunities', () => {
+    const state = createInitialState();
+    const definition: CareerOpportunityDefinition = {
+      id: 'repeatable-zero-cooldown-training',
+      type: 'training',
+      triggerSignals: ['action.completed'],
+      conditions: [],
+      expiresAfterDays: null,
+      repeatPolicy: 'repeatable',
+      cooldownDays: 0,
+      requiresSelection: false,
+      reasonTemplate: '',
+      targetPositionId: null,
+      trainingDefinitionId: 'training-1',
+      effects: [],
+    };
+    const firstSignal = {
+      signalId: 'action-delivery-1',
+      signalType: 'action.completed' as const,
+      occurredAtDay: 10,
+      data: {
+        actionInstanceId: 'action-1',
+        actionId: 'action-definition-1',
+        deptId: 'dept-1',
+        regionId: 'region-1',
+        institutionId: 'institution-1',
+      },
+    };
+    const first = processCareerOpportunitySignal({
+      state,
+      signal: firstSignal,
+      currentDay: 10,
+      idFactory: () => 'repeatable-zero-cooldown-1',
+      definitions: [definition],
+      positions: [],
+      institutions: [],
+      daysPerYear: 360,
+    });
+    const firstOpportunity = first.created[0];
+    if (!firstOpportunity) throw new Error('Expected first opportunity');
+    state.career.opportunities.push(firstOpportunity);
+
+    const concurrent = processCareerOpportunitySignal({
+      state,
+      signal: {
+        ...firstSignal,
+        signalId: 'action-delivery-2',
+        data: { ...firstSignal.data, actionInstanceId: 'action-2' },
+      },
+      currentDay: 10,
+      idFactory: () => 'repeatable-zero-cooldown-2',
+      definitions: [definition],
+      positions: [],
+      institutions: [],
+      daysPerYear: 360,
+    });
+    expect(concurrent.created).toHaveLength(0);
+    expect(concurrent.skipped[0]?.reason).toBe('duplicate');
+
+    state.career.opportunities[0] = {
+      ...firstOpportunity,
+      status: 'rejected',
+      rejectedAtDay: 10,
+    };
+    const afterTerminal = processCareerOpportunitySignal({
+      state,
+      signal: {
+        ...firstSignal,
+        signalId: 'action-delivery-3',
+        data: { ...firstSignal.data, actionInstanceId: 'action-3' },
+      },
+      currentDay: 10,
+      idFactory: () => 'repeatable-zero-cooldown-3',
+      definitions: [definition],
+      positions: [],
+      institutions: [],
+      daysPerYear: 360,
+    });
+    expect(afterTerminal.created).toHaveLength(1);
+  });
+
+  it('blocks every repeat policy while its prior opportunity is in process', () => {
+    for (const repeatPolicy of ['once', 'once_per_source', 'repeatable'] as const) {
+      const state = createInitialState();
+      const definition: CareerOpportunityDefinition = {
+        id: `in-process-${repeatPolicy}-training`,
+        type: 'training',
+        triggerSignals: ['action.completed'],
+        conditions: [],
+        expiresAfterDays: null,
+        repeatPolicy,
+        cooldownDays: 0,
+        requiresSelection: false,
+        reasonTemplate: '',
+        targetPositionId: null,
+        trainingDefinitionId: 'training-1',
+        effects: [],
+      };
+      const signal = {
+        signalId: `in-process-${repeatPolicy}-1`,
+        signalType: 'action.completed' as const,
+        occurredAtDay: 10,
+        data: {
+          actionInstanceId: 'action-1',
+          actionId: 'action-definition-1',
+          deptId: 'dept-1',
+          regionId: 'region-1',
+          institutionId: 'institution-1',
+        },
+      };
+      const first = processCareerOpportunitySignal({
+        state,
+        signal,
+        currentDay: 10,
+        idFactory: () => `in-process-${repeatPolicy}-1`,
+        definitions: [definition],
+        positions: [],
+        institutions: [],
+        daysPerYear: 360,
+      });
+      const firstOpportunity = first.created[0];
+      if (!firstOpportunity) throw new Error('Expected first opportunity');
+      state.career.opportunities.push({
+        ...firstOpportunity,
+        status: 'in_process',
+        acceptedAtDay: 10,
+      });
+
+      const result = processCareerOpportunitySignal({
+        state,
+        signal: {
+          ...signal,
+          signalId: `in-process-${repeatPolicy}-2`,
+          data: { ...signal.data, actionInstanceId: 'action-2' },
+        },
+        currentDay: 10,
+        idFactory: () => `in-process-${repeatPolicy}-2`,
+        definitions: [definition],
+        positions: [],
+        institutions: [],
+        daysPerYear: 360,
+      });
+      expect(result.created).toHaveLength(0);
+      expect(result.skipped[0]?.reason).toBe('duplicate');
+    }
   });
 });

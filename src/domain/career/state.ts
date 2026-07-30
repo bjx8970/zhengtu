@@ -21,6 +21,7 @@ import type {
 } from './types';
 import type { ConditionExpression } from '../conditions';
 import type { EffectDefinition } from '../conditions';
+import type { DomainSignalSnapshot } from '../governance/types';
 
 /** 当前任职状态 */
 export interface CurrentAppointment {
@@ -132,6 +133,13 @@ export interface CareerOpportunityBase {
   /** 机会状态 */
   status: CareerOpportunityStatus;
   source: CareerOpportunitySource;
+  /**
+   * 创建机会时冻结的完整触发信号。后续资格复核和培训效果必须使用此快照，
+   * 而不能从可变的当前状态推断一个信号。
+   *
+   * 旧存档在该字段加入前创建的机会没有可恢复的载荷，因此保留 null。
+   */
+  sourceSignal: DomainSignalSnapshot | null;
   /** 产生原因的绝对游戏日 */
   appearedAtDay: number;
   /** 过期的绝对游戏日 */

@@ -21,6 +21,12 @@ function createAvailableOpportunity(id = 'opportunity-1'): AppointmentCareerOppo
       signalId: 'assessment-1',
       description: 'assessment.completed',
     },
+    sourceSignal: {
+      signalId: 'assessment-1',
+      signalType: 'assessment.completed',
+      occurredAtDay: 0,
+      data: { year: 2026, score: 80, tier: '称职' },
+    },
     target: {
       positionId: 'admin_l2_0',
       positionName: 'test position',
@@ -58,6 +64,12 @@ function createTrainingOpportunity(id = 'training-opportunity-1'): TrainingCaree
       signalId: 'assessment-1',
       description: 'assessment.completed',
     },
+    sourceSignal: {
+      signalId: 'assessment-1',
+      signalType: 'assessment.completed',
+      occurredAtDay: 0,
+      data: { year: 2026, score: 80, tier: '称职' },
+    },
     target: null,
     appointmentType: null,
     appointmentReason: null,
@@ -89,6 +101,12 @@ describe('career opportunity reducer', () => {
         sourceId: 'assessment-1',
         signalId: 'assessment-1',
         description: 'assessment.completed',
+      },
+      sourceSignal: {
+        signalId: 'assessment-1',
+        signalType: 'assessment.completed',
+        occurredAtDay: 0,
+        data: { year: 2026, score: 80, tier: '称职' },
       },
       target: {
         positionId: 'admin_l2_0',
@@ -203,6 +221,21 @@ describe('career opportunity reducer', () => {
     expect(store.getRawState()).toEqual(before);
   });
 
+  it('accepts an opportunity whose frozen trigger signal satisfies a signal field condition', () => {
+    const initial = createInitialState();
+    const opportunity = createAvailableOpportunity();
+    opportunity.eligibilityConditions = [{ signalField: 'tier', op: 'eq', value: '称职' }];
+    initial.career.opportunities = [opportunity];
+    const store = createTestStore({ career: initial.career });
+
+    store.dispatch({ type: 'ACCEPT_CAREER_OPPORTUNITY', opportunityId: opportunity.id });
+
+    expect(store.getRawState().career.activeProcess).toMatchObject({
+      opportunityId: opportunity.id,
+      status: 'active',
+    });
+  });
+
   it('allows selection stages but not final appointment while a blocking event is active', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();
@@ -291,9 +324,26 @@ describe('career opportunity reducer', () => {
     });
   });
 
-  it('passes the latest annual assessment tier to training effects', () => {
+  it('passes the frozen source signal to training effects instead of a later assessment', () => {
     const initial = createInitialState();
     const opportunity = createTrainingOpportunity();
+    opportunity.source = {
+      sourceType: 'event',
+      sourceId: 'event:instance-1',
+      signalId: 'event-signal-1',
+      description: 'event.resolved',
+    };
+    opportunity.sourceSignal = {
+      signalId: 'event-signal-1',
+      signalType: 'event.resolved',
+      occurredAtDay: 5,
+      data: {
+        eventInstanceId: 'instance-1',
+        eventId: 'event-1',
+        optionId: 'option-1',
+        occurredAtDay: 5,
+      },
+    };
     initial.career.opportunities = [opportunity];
     initial.assessments.annualAssessments = [{ year: 2027, score: 90, tier: '优秀' }];
     const applyEffectsSpy = vi.spyOn(effectExecutor, 'applyEffects');
@@ -312,8 +362,9 @@ describe('career opportunity reducer', () => {
 
     const effectContext = applyEffectsSpy.mock.calls[0]?.[2];
     expect(effectContext?.signal).toMatchObject({
-      signalType: 'assessment.completed',
-      data: { year: 2027, score: 90, tier: '优秀' },
+      signalType: 'event.resolved',
+      occurredAtDay: 5,
+      data: { eventId: 'event-1', optionId: 'option-1' },
     });
     expect(store.getRawState().assessments.comprehensiveScore).toBe(1);
     applyEffectsSpy.mockRestore();

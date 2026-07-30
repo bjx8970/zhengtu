@@ -64,6 +64,7 @@ describe('Schema 2 存档', () => {
         signalId: null,
         description: 'test',
       },
+      sourceSignal: null,
       target: {
         positionId: 'test-position',
         positionName: 'Test position',
@@ -373,6 +374,7 @@ describe('Schema 2 存档', () => {
           signalId: null,
           description: 'test',
         },
+        sourceSignal: null,
         target: {
           positionId: 'test-position',
           positionName: 'test position',
