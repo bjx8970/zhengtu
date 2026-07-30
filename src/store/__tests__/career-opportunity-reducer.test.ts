@@ -203,7 +203,7 @@ describe('career opportunity reducer', () => {
     expect(store.getRawState()).toEqual(before);
   });
 
-  it('does not advance an appointment selection while a blocking event is active', () => {
+  it('allows selection stages but not final appointment while a blocking event is active', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();
     initial.career.opportunities = [opportunity];
@@ -216,6 +216,14 @@ describe('career opportunity reducer', () => {
     const blockedState = structuredClone(store.getRawState());
     blockedState.events.activeBlockingEventId = 'blocking-event-1';
     const blockedStore = createTestStore(blockedState);
+    for (let step = 0; step < 5; step++)
+      blockedStore.dispatch({
+        type: 'ADVANCE_CAREER_PROCESS',
+        opportunityId: opportunity.id,
+        _idFactory: () => 'unused-id',
+        _rng: () => 0,
+      });
+    expect(blockedStore.getRawState().career.activeProcess?.currentStage).toBe('appointment');
     const before = structuredClone(blockedStore.getRawState());
 
     expect(() =>
@@ -223,6 +231,7 @@ describe('career opportunity reducer', () => {
         type: 'ADVANCE_CAREER_PROCESS',
         opportunityId: opportunity.id,
         _idFactory: () => 'unused-id',
+        _rng: () => 0,
       }),
     ).not.toThrow();
     expect(blockedStore.getRawState()).toEqual(before);

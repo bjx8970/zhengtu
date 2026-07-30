@@ -282,6 +282,7 @@ const CareerOpportunitySchema = z
         requireDate('cancelledAtDay', false);
         break;
       case 'cancelled':
+        requireDate('acceptedAtDay', false);
         requireDate('rejectedAtDay', false);
         requireDate('resolvedAtDay', false);
         requireDate('cancelledAtDay', true);

@@ -358,6 +358,7 @@ describe('Schema 2 存档', () => {
       { status: 'resolved', resolvedAtDay: 1, finalOutcome: 'appointed' },
       { status: 'expired', expiresAtDay: null },
       { status: 'cancelled' },
+      { status: 'cancelled', acceptedAtDay: 1, cancelledAtDay: 2 },
     ];
     for (const patch of invalidOpportunities) {
       const state = createInitialState();

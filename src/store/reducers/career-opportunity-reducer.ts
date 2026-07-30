@@ -350,11 +350,12 @@ export function reduceAdvanceCareerProcess(
         )
       : { outcome: 'passed' as const, score: null, detail: 'Career process stage settled' };
   const outcome = settlement.outcome;
-  // An appointment cannot progress while another action or blocking event is active.
-  // Check before recording a selection-stage result so a rejected advance is a true no-op.
+  // Only the final appointment commits a job change. Selection stages can run while
+  // ordinary actions or blocking events are active; the final transition rechecks it.
   if (
     outcome === 'passed' &&
     original.type !== 'training' &&
+    (!original.requiresSelection || process.currentStage === 'appointment') &&
     (hasRunningAction(draft) || draft.events.activeBlockingEventId)
   )
     return false;
