@@ -18,4 +18,13 @@ describe('App routes', () => {
 
     expect(screen.getByRole('heading', { name: '404' })).toBeInTheDocument();
   });
+
+  it('注册职务与职级页面路由', () => {
+    window.location.hash = '#/career';
+
+    render(() => <App />);
+
+    expect(screen.getByText('职务与职级')).toBeInTheDocument();
+    expect(screen.getByText('公务员职级')).toBeInTheDocument();
+  });
 });

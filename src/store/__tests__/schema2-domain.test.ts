@@ -103,6 +103,85 @@ describe('Schema 2 存档', () => {
     });
   });
 
+  it('active career opportunity and selection process survive a save/load round trip', () => {
+    const state = createInitialState();
+    state.time.totalDaysPlayed = 12;
+    state.career.opportunities = [
+      {
+        id: 'selection-opportunity',
+        definitionId: 'township_deputy_leadership_vacancy',
+        type: 'leadership_vacancy',
+        status: 'in_process',
+        source: {
+          sourceType: 'assessment',
+          sourceId: 'assessment-2026',
+          signalId: 'assessment-2026',
+          description: '年度考核',
+        },
+        sourceSignal: {
+          signalId: 'assessment-2026',
+          signalType: 'assessment.completed',
+          occurredAtDay: 10,
+          data: { year: 2026, score: 85, tier: '称职' },
+        },
+        target: {
+          positionId: 'admin_l2_0',
+          positionName: '副镇长',
+          institutionId: 'township_govt_01',
+          institutionName: '青云镇人民政府',
+          regionId: 'region_qingyun_town',
+          institutionLevel: 'township',
+          positionDomain: 'local_governance',
+          leadershipRank: 'township_deputy',
+        },
+        appointmentType: 'substantive',
+        appointmentReason: 'promotion',
+        appearedAtDay: 10,
+        expiresAtDay: 40,
+        acceptedAtDay: 10,
+        rejectedAtDay: null,
+        resolvedAtDay: null,
+        cancelledAtDay: null,
+        requiresSelection: true,
+        eligibilityConditions: [],
+        finalOutcome: null,
+        reason: '年度考核完成后出现的乡科级副职岗位空缺',
+      },
+    ];
+    state.career.activeProcess = {
+      id: 'selection-process',
+      type: 'leadership_selection',
+      status: 'active',
+      opportunityId: 'selection-opportunity',
+      currentStage: 'democratic_recommendation',
+      startedAtDay: 10,
+      completedAtDay: null,
+      stageResults: [
+        {
+          stage: 'eligibility_review',
+          resolvedAtDay: 11,
+          outcome: 'passed',
+          score: 90,
+          detail: '资格审查通过',
+        },
+      ],
+    };
+
+    const result = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.career.opportunities[0]).toMatchObject({
+      id: 'selection-opportunity',
+      status: 'in_process',
+      acceptedAtDay: 10,
+    });
+    expect(result.state?.career.activeProcess).toMatchObject({
+      id: 'selection-process',
+      currentStage: 'democratic_recommendation',
+      stageResults: [{ stage: 'eligibility_review', outcome: 'passed' }],
+    });
+  });
+
   it('Schema 6 非空时间轴 continuation 可完整往返', () => {
     const state = createInitialState();
     state.time.totalDaysPlayed = 30;
