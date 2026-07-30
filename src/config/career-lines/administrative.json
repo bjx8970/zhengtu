@@ -355,7 +355,7 @@
         "minYearsInService": 4,
         "minAssessmentPasses": 4,
         "politicalConditions": ["无党纪处分记录", "人事档案合规"],
-        "specialConditions": ["grassroots", "multi_region"]
+        "specialConditions": ["grassroots"]
       }
     },
     {
@@ -422,7 +422,7 @@
         "minYearsInService": 5,
         "minAssessmentPasses": 4,
         "politicalConditions": ["无党纪处分记录", "人事档案合规", "基层主官经历"],
-        "specialConditions": ["grassroots", "multi_region"]
+        "specialConditions": ["grassroots"]
       }
     },
     {
@@ -491,7 +491,7 @@
         "minYearsInService": 5,
         "minAssessmentPasses": 5,
         "politicalConditions": ["无党纪处分记录", "人事档案合规", "基层主官经历", "多岗位历练"],
-        "specialConditions": ["grassroots", "multi_region"]
+        "specialConditions": ["grassroots"]
       }
     },
     {
@@ -564,7 +564,7 @@
           "多岗位历练",
           "正厅级任职经历"
         ],
-        "specialConditions": ["grassroots", "multi_region"]
+        "specialConditions": ["grassroots"]
       }
     },
     {
@@ -639,7 +639,7 @@
           "多岗位历练",
           "副省级任职经历"
         ],
-        "specialConditions": ["grassroots", "multi_region"]
+        "specialConditions": ["grassroots"]
       }
     },
     {
@@ -714,7 +714,7 @@
           "多岗位历练",
           "正省级任职经历"
         ],
-        "specialConditions": ["grassroots", "multi_region"]
+        "specialConditions": ["grassroots"]
       }
     },
     {
@@ -789,7 +789,7 @@
           "多岗位历练",
           "副部级任职经历"
         ],
-        "specialConditions": ["grassroots", "multi_region"]
+        "specialConditions": ["grassroots"]
       }
     }
   ]

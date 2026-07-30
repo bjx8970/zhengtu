@@ -10,6 +10,7 @@ import { CIVIL_SERVICE_RANKS } from '../../domain/career/types';
 import { evaluateCondition } from '../events/condition-interpreter';
 import type { PlayerSave } from '../../types/player';
 import type { CivilServiceRankProgressionRule } from '../../config/schemas';
+import type { CareerExperienceQualificationRules } from '../../types/config';
 
 export type RankEligibilityFailure =
   | 'no_progression_rule'
@@ -92,6 +93,7 @@ export function evaluateCivilServiceRankEligibility(
   currentDay: number,
   daysPerYear: number,
   rule: CivilServiceRankProgressionRule | null,
+  careerExperienceQualificationRules?: Readonly<CareerExperienceQualificationRules>,
 ): RankEligibilityResult {
   const fromRank = state.career.civilServiceRank;
   const failures: RankEligibilityResult['failures'] = [];
@@ -162,7 +164,13 @@ export function evaluateCivilServiceRankEligibility(
   };
   if (
     !rule.additionalConditions.every((condition) =>
-      evaluateCondition(condition, { state, currentDay, daysPerYear, signal }),
+      evaluateCondition(condition, {
+        state,
+        currentDay,
+        daysPerYear,
+        signal,
+        careerExperienceQualificationRules,
+      }),
     )
   )
     add('additional_condition_failed', 'Additional conditions failed');

@@ -112,7 +112,7 @@ describe('proposePolicy', () => {
   });
 
   it('不同区域可同时提议同一政策', () => {
-    const def = makeDefinition({ id: 'policy_multi_region' });
+    const def = makeDefinition({ id: 'policy_cross_region' });
     const ctx1 = makeOriginContext({ regionId: 'region_001', institutionId: 'inst_001' });
     const ctx2 = makeOriginContext({ regionId: 'region_002', institutionId: 'inst_002' });
 

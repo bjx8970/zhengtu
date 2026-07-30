@@ -113,6 +113,7 @@ function reduceChooseEventOptionInternal(
     idFactory,
     definitions,
     conditionState,
+    careerExperienceQualificationRules: getConfigLoader().getCareerExperienceQualificationRules(),
   });
 
   if (!plan.success) {
@@ -298,6 +299,7 @@ export function handleAutoEventInstance(
     definitions,
     rng,
     idFactory,
+    careerExperienceQualificationRules: getConfigLoader().getCareerExperienceQualificationRules(),
     transactionInstances: [
       ...(inFlightContinuations ?? []).flatMap((continuation) =>
         continuation.kind === 'instance' ? [continuation.instance] : [],
@@ -782,6 +784,7 @@ function processEventContinuationsInternal(
       transactionInstances: queue.flatMap((item) =>
         item.kind === 'instance' ? [item.instance] : [],
       ),
+      careerExperienceQualificationRules: getConfigLoader().getCareerExperienceQualificationRules(),
     });
     const { cascadeSignals } = applyEventOrchestrationPlan(
       draft,
@@ -826,6 +829,7 @@ function dispatchCareerOpportunitiesForSignal(
     positions: loader.getAllPositions(),
     institutions: loader.getAllInstitutions(),
     daysPerYear: loader.getGameConfig().daysPerMonth * loader.getGameConfig().monthsPerYear,
+    careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
   });
   draft.career.opportunities.push(...result.created);
 }

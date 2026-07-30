@@ -14,11 +14,13 @@
 import type { ConditionExpression } from '../../domain/conditions';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { PlayerSave } from '../../types/player';
+import type { CareerExperienceQualificationRules } from '../../types/config';
 import {
   INSTITUTION_LEVELS,
   LEADERSHIP_RANKS,
   CIVIL_SERVICE_RANKS,
 } from '../../domain/career/types';
+import { analyzeCareerExperiences } from '../career/career-experience-analysis';
 
 /** 条件评估上下文 */
 export interface ConditionEvaluationContext {
@@ -30,6 +32,8 @@ export interface ConditionEvaluationContext {
   currentDay: number;
   /** 每年游戏日数（由调用方从配置 daysPerMonth × monthsPerYear 提供，项目为 360） */
   daysPerYear: number;
+  /** 履历资格规则，由调用方注入以保持解释器纯函数。缺失时履历条件不成立。 */
+  careerExperienceQualificationRules?: Readonly<CareerExperienceQualificationRules>;
 }
 
 /**
@@ -154,12 +158,6 @@ function evaluateCareer(
         cond.value,
         cond.op,
       );
-    case 'has_experience': {
-      // 履历中存在匹配机构 ID 或职位 ID 的记录
-      return career.experiences.some(
-        (exp) => exp.institutionId === cond.value || exp.positionId === cond.value,
-      );
-    }
     default:
       return false;
   }
@@ -244,22 +242,31 @@ function evaluateExperience(
   cond: Extract<ConditionExpression, { experience: string }>,
   ctx: ConditionEvaluationContext,
 ): boolean {
-  const experiences = ctx.state.career.experiences;
+  if (!ctx.careerExperienceQualificationRules) return false;
+  const analysis = analyzeCareerExperiences({
+    experiences: ctx.state.career.experiences,
+    currentAppointment: ctx.state.career.appointment,
+    currentDay: ctx.currentDay,
+    rules: ctx.careerExperienceQualificationRules,
+  });
+  if (!analysis.valid) return false;
   switch (cond.experience) {
     case 'region_count': {
-      const count = new Set(experiences.map((e) => e.regionId)).size;
-      return compareNumber(count, cond.value, cond.op);
+      return compareNumber(analysis.regionCount, cond.value, cond.op);
+    }
+    case 'institution_count': {
+      return compareNumber(analysis.institutionCount, cond.value, cond.op);
     }
     case 'domain_count': {
-      const count = new Set(experiences.map((e) => e.positionDomain)).size;
-      return compareNumber(count, cond.value, cond.op);
+      return compareNumber(analysis.domainCount, cond.value, cond.op);
     }
     case 'level_count': {
-      const count = new Set(experiences.map((e) => e.institutionLevel)).size;
-      return compareNumber(count, cond.value, cond.op);
+      return compareNumber(analysis.levelCount, cond.value, cond.op);
     }
     case 'has_institution':
-      return experiences.some((e) => e.institutionId === cond.value);
+      return analysis.qualifiedInstitutionIds.includes(cond.value);
+    case 'has_region':
+      return analysis.qualifiedRegionIds.includes(cond.value);
     default:
       return false;
   }

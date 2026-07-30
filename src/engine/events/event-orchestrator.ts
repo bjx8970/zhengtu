@@ -21,6 +21,7 @@ import type {
   EventExecutableSnapshot,
 } from '../../domain/events/state';
 import type { EventCooldownRecord, EventOrchestrationDiagnostic } from '../../domain/events/types';
+import type { CareerExperienceQualificationRules } from '../../types/config';
 import { evaluateCondition } from './condition-interpreter';
 import { deriveEventSourceKey } from './source-key';
 import { CURRENT_CONTENT_VERSION } from '../../types/save';
@@ -38,6 +39,8 @@ export interface EventOrchestrationInput {
   definitions: readonly EventDefinition[];
   rng: () => number;
   idFactory: () => string;
+  /** 履历资格规则由外层配置加载器注入，供事件条件复用。 */
+  careerExperienceQualificationRules?: Readonly<CareerExperienceQualificationRules>;
   /** 同一 reducer 事务中已排队但尚未消费的实例。 */
   transactionInstances?: readonly EventInstance[];
 }
@@ -90,8 +93,9 @@ function buildEventEvalContext(
   state: Readonly<PlayerSave>,
   signal: DomainSignalSnapshot,
   currentDay: number,
+  careerExperienceQualificationRules: Readonly<CareerExperienceQualificationRules> | undefined,
 ) {
-  return { signal, state, currentDay, daysPerYear: 360 };
+  return { signal, state, currentDay, daysPerYear: 360, careerExperienceQualificationRules };
 }
 
 /**
@@ -276,6 +280,7 @@ function resolveSingleSignal(
   allDiagnostics: EventOrchestrationDiagnostic[],
   processedIds: Set<string>,
   transactionInstances: readonly EventInstance[],
+  careerExperienceQualificationRules: Readonly<CareerExperienceQualificationRules> | undefined,
 ): DomainSignalSnapshot[] {
   const nextSignals: DomainSignalSnapshot[] = [];
 
@@ -334,7 +339,7 @@ function resolveSingleSignal(
     }
 
     if (def.trigger.condition) {
-      const ctx = buildEventEvalContext(state, sig, currentDay);
+      const ctx = buildEventEvalContext(state, sig, currentDay, careerExperienceQualificationRules);
       try {
         if (!evaluateCondition(def.trigger.condition, ctx)) {
           allDiagnostics.push({ type: 'condition_failed', eventId: def.id });
@@ -482,6 +487,7 @@ export function processDomainSignal(input: EventOrchestrationInput): EventOrches
     rng,
     idFactory,
     transactionInstances = [],
+    careerExperienceQualificationRules,
   } = input;
 
   const allNewInstances: EventInstance[] = [];
@@ -520,6 +526,7 @@ export function processDomainSignal(input: EventOrchestrationInput): EventOrches
         allDiagnostics,
         processedIds,
         transactionInstances,
+        careerExperienceQualificationRules,
       );
       nextQueue.push(...cascaded);
     }

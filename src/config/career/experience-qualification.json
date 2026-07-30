@@ -1,0 +1,48 @@
+{
+  "appointmentTypes": [
+    {
+      "appointmentType": "substantive",
+      "countsTowardRegionExperience": true,
+      "minDaysForRegionExperience": 360,
+      "countsTowardInstitutionExperience": true,
+      "minDaysForInstitutionExperience": 180,
+      "countsTowardDomainExperience": true,
+      "minDaysForDomainExperience": 180,
+      "countsTowardLevelExperience": true,
+      "minDaysForLevelExperience": 180
+    },
+    {
+      "appointmentType": "secondment",
+      "countsTowardRegionExperience": true,
+      "minDaysForRegionExperience": 180,
+      "countsTowardInstitutionExperience": true,
+      "minDaysForInstitutionExperience": 90,
+      "countsTowardDomainExperience": true,
+      "minDaysForDomainExperience": 90,
+      "countsTowardLevelExperience": true,
+      "minDaysForLevelExperience": 90
+    },
+    {
+      "appointmentType": "temporary",
+      "countsTowardRegionExperience": false,
+      "minDaysForRegionExperience": null,
+      "countsTowardInstitutionExperience": true,
+      "minDaysForInstitutionExperience": 90,
+      "countsTowardDomainExperience": true,
+      "minDaysForDomainExperience": 90,
+      "countsTowardLevelExperience": false,
+      "minDaysForLevelExperience": null
+    },
+    {
+      "appointmentType": "acting",
+      "countsTowardRegionExperience": false,
+      "minDaysForRegionExperience": null,
+      "countsTowardInstitutionExperience": true,
+      "minDaysForInstitutionExperience": 180,
+      "countsTowardDomainExperience": true,
+      "minDaysForDomainExperience": 180,
+      "countsTowardLevelExperience": false,
+      "minDaysForLevelExperience": null
+    }
+  ]
+}

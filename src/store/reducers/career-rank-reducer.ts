@@ -30,6 +30,7 @@ export function reduceAdvanceCivilServiceRank(
     state: transaction,
     currentDay,
     daysPerYear: config.daysPerMonth * config.monthsPerYear,
+    careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
     rule,
     idFactory,
     sourceType: payload.sourceType ?? 'system',

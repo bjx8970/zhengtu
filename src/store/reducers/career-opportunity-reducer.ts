@@ -71,6 +71,7 @@ function satisfiesConditions(
       signal: sourceSignal ?? fallbackSignal,
       currentDay,
       daysPerYear: config.daysPerMonth * config.monthsPerYear,
+      careerExperienceQualificationRules: getConfigLoader().getCareerExperienceQualificationRules(),
     }),
   );
 }
