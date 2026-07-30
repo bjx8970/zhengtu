@@ -8,7 +8,7 @@ main 是受保护分支。任何变更必须:
   2. 编写代码 + 测试
   3. git push + 创建 PR
   4. CI 全部通过 + OpenCode review 通过
-  5. Squash Merge 到 main
+  5. Merge pull request 到 main
 
 分支命名: feat/<name> | fix/<name> | refactor/<name> | docs/<name> | chore/<name>
 ```
