@@ -15,7 +15,11 @@ import {
   rejectCareerOpportunity,
   resolveCareerOpportunity,
 } from '../../engine/career/career-opportunity-lifecycle';
-import { evaluateCondition } from '../../engine/events/condition-interpreter';
+import {
+  evaluateCareerOpportunityAcceptanceEligibility,
+  evaluateCareerOpportunityAppointmentEligibility,
+  hasRunningCareerAction,
+} from '../../engine/career/career-opportunity-eligibility';
 import { applyEffects } from '../../engine/events/effect-executor';
 import { deriveMetricSignalsFromEffects } from '../../engine/events/metric-signal-bridge';
 import { settleCareerSelectionStage } from '../../engine/career/selection-settlement';
@@ -33,83 +37,6 @@ function replaceOpportunity(draft: PlayerSave, next: CareerOpportunity): void {
   const index = draft.career.opportunities.findIndex((item) => item.id === next.id);
   if (index < 0) throw new Error(`Career opportunity ${next.id} disappeared`);
   draft.career.opportunities[index] = next;
-}
-
-function hasRunningAction(state: Readonly<PlayerSave>): boolean {
-  return Object.values(state.actions.slots).some((tier) => tier.occupants.some(Boolean));
-}
-
-function hasActiveAppointmentRestriction(state: Readonly<PlayerSave>, currentDay: number): boolean {
-  return state.career.restrictions.some(
-    (restriction) =>
-      (restriction.type === 'appointment_selection_freeze' ||
-        restriction.type === 'disciplinary_action') &&
-      restriction.startedAtDay <= currentDay &&
-      (restriction.endsAtDay === null || currentDay < restriction.endsAtDay),
-  );
-}
-
-function satisfiesConditions(
-  conditions: CareerOpportunity['eligibilityConditions'],
-  state: Readonly<PlayerSave>,
-  currentDay: number,
-  sourceSignal: DomainSignalSnapshot | null,
-): boolean {
-  const config = getConfigLoader().getGameConfig();
-  // Legacy opportunities can have no recoverable payload. Do not invent one for
-  // signal-dependent requirements, because that would let an unknown trigger pass.
-  if (sourceSignal === null && conditions.some(containsSignalFieldCondition)) return false;
-  const fallbackSignal: DomainSignalSnapshot = {
-    signalId: 'career-eligibility-recheck',
-    signalType: 'assessment.completed',
-    occurredAtDay: currentDay,
-    data: { year: 0, score: 0, tier: '' },
-  };
-  return conditions.every((condition) =>
-    evaluateCondition(condition, {
-      state,
-      signal: sourceSignal ?? fallbackSignal,
-      currentDay,
-      daysPerYear: config.daysPerMonth * config.monthsPerYear,
-      careerExperienceQualificationRules: getConfigLoader().getCareerExperienceQualificationRules(),
-    }),
-  );
-}
-
-function containsSignalFieldCondition(
-  condition: CareerOpportunity['eligibilityConditions'][number],
-): boolean {
-  if ('signalField' in condition) return true;
-  if ('all' in condition) return condition.all.some(containsSignalFieldCondition);
-  if ('any' in condition) return condition.any.some(containsSignalFieldCondition);
-  return 'not' in condition && containsSignalFieldCondition(condition.not);
-}
-
-function isEligibleForAppointment(
-  state: Readonly<PlayerSave>,
-  opportunity: Exclude<CareerOpportunity, { type: 'training' }>,
-  currentDay: number,
-): boolean {
-  const loader = getConfigLoader();
-  const target = loader.getPositionById(opportunity.target.positionId);
-  if (
-    !target ||
-    target.vacancyCount <= 0 ||
-    state.career.appointment.positionId === target.id ||
-    hasActiveAppointmentRestriction(state, currentDay) ||
-    !satisfiesConditions(
-      opportunity.eligibilityConditions,
-      state,
-      currentDay,
-      opportunity.sourceSignal,
-    ) ||
-    !satisfiesConditions(target.requirements, state, currentDay, opportunity.sourceSignal)
-  )
-    return false;
-  return (
-    target.institutionId === opportunity.target.institutionId &&
-    target.regionId === opportunity.target.regionId
-  );
 }
 
 function archiveCompletedProcess(transaction: PlayerSave, process: CareerProcess): void {
@@ -142,20 +69,19 @@ export function reduceAcceptCareerOpportunity(
   currentDay: number,
 ): boolean {
   const original = draft.career.opportunities.find((item) => item.id === payload.opportunityId);
-  if (
-    !original ||
-    draft.career.activeProcess ||
-    draft.events.activeBlockingEventId ||
-    draft.time.pendingContinuation
-  )
-    return false;
-  if (original.type !== 'training' && !isEligibleForAppointment(draft, original, currentDay))
-    return false;
-  if (
-    original.type === 'training' &&
-    !satisfiesConditions(original.eligibilityConditions, draft, currentDay, original.sourceSignal)
-  )
-    return false;
+  if (!original) return false;
+  const loader = getConfigLoader();
+  const config = loader.getGameConfig();
+  const eligibility = evaluateCareerOpportunityAcceptanceEligibility({
+    opportunity: original,
+    state: draft,
+    currentDay,
+    daysPerYear: config.daysPerMonth * config.monthsPerYear,
+    targetPosition:
+      original.type === 'training' ? null : loader.getPositionById(original.target.positionId),
+    careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
+  });
+  if (!eligibility.eligible) return false;
   const result = acceptCareerOpportunity(original, currentDay);
   if (!result.success || !result.opportunity) return false;
   const transaction = structuredClone(unwrap(draft));
@@ -232,17 +158,20 @@ function appointmentTransition(
   if (
     !target ||
     !institution ||
-    hasRunningAction(transaction) ||
+    hasRunningCareerAction(transaction) ||
     transaction.events.activeBlockingEventId
   )
     return false;
-  if (
-    target.id !== opportunity.target.positionId ||
-    target.institutionId !== opportunity.target.institutionId ||
-    target.regionId !== opportunity.target.regionId
-  )
-    return false;
-  if (!isEligibleForAppointment(transaction, opportunity, currentDay)) return false;
+  const config = loader.getGameConfig();
+  const eligibility = evaluateCareerOpportunityAppointmentEligibility({
+    opportunity,
+    state: transaction,
+    currentDay,
+    daysPerYear: config.daysPerMonth * config.monthsPerYear,
+    targetPosition: target,
+    careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
+  });
+  if (!eligibility.eligible) return false;
   const openExperiences = transaction.career.experiences.filter((item) => item.endedAtDay === null);
   if (
     openExperiences.length !== 1 ||
@@ -363,7 +292,7 @@ export function reduceAdvanceCareerProcess(
     outcome === 'passed' &&
     original.type !== 'training' &&
     (!original.requiresSelection || process.currentStage === 'appointment') &&
-    (hasRunningAction(draft) || draft.events.activeBlockingEventId)
+    (hasRunningCareerAction(draft) || draft.events.activeBlockingEventId)
   )
     return false;
   const transaction = structuredClone(unwrap(draft));

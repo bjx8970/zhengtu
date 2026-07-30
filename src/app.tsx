@@ -16,6 +16,7 @@ import { CharacterCreation } from './pages/character/character-creation';
 import { HomePage } from './pages/home/home-page';
 import { DepartmentsPage } from './pages/departments/departments-page';
 import { AssessmentPage } from './pages/assessment/assessment-page';
+import { CareerPage } from './pages/career/career-page';
 
 /** 全局路由表 */
 const routes: Route[] = [
@@ -24,6 +25,7 @@ const routes: Route[] = [
   { path: '/main', component: HomePage },
   { path: '/departments', component: DepartmentsPage },
   { path: '/assessment', component: AssessmentPage },
+  { path: '/career', component: CareerPage },
 ];
 
 /**

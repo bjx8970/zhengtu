@@ -16,7 +16,16 @@ import { AlertBanner, type AlertItem } from '../../components/alert-banner';
 import { calculateKPI } from '../../engine/governance/kpi';
 import { getConfigLoader } from '../../config/loader';
 import { formatDate } from '../../utils/format';
-import { LEADERSHIP_RANK_LABELS } from '../../domain/career/types';
+import {
+  CIVIL_SERVICE_RANK_LABELS,
+  INSTITUTION_LEVEL_LABELS,
+  LEADERSHIP_RANK_LABELS,
+} from '../../domain/career/types';
+import {
+  evaluateCivilServiceRankEligibility,
+  getActiveCareerRestrictions,
+} from '../../engine/career/civil-service-rank-eligibility';
+import { formatCareerRegion } from '../career/career-display';
 import type { SlotOccupant, SlotTierKey } from '../../types/player';
 import { colors, font } from '../../utils/theme';
 
@@ -58,8 +67,8 @@ const WORK_CARDS: {
   },
   {
     icon: '晋',
-    label: '晋升任命',
-    desc: '民主推荐、组织考察、常委会票决',
+    label: '职务与职级',
+    desc: '查看职级晋升条件、岗位机会与选拔流程',
     route: '/career',
     color: colors.cyan,
   },
@@ -102,6 +111,24 @@ export function HomePage() {
 
   const dateStr = createMemo(() => formatDate(state.time.year, state.time.month, state.time.day));
 
+  const institutionConfig = createMemo(() =>
+    getConfigLoader().getInstitutionById(state.career.appointment.institutionId),
+  );
+
+  const careerRankEligibility = createMemo(() => {
+    const config = getConfigLoader().getGameConfig();
+    return evaluateCivilServiceRankEligibility(
+      state,
+      state.time.totalDaysPlayed,
+      config.daysPerMonth * config.monthsPerYear,
+      getConfigLoader().getCivilServiceRankProgressionRule(state.career.civilServiceRank),
+    );
+  });
+
+  const activeCareerRestrictions = createMemo(() =>
+    getActiveCareerRestrictions(state.career.restrictions, state.time.totalDaysPlayed),
+  );
+
   const kpiResult = createMemo(() => {
     const pos = positionConfig();
     if (!pos) return null;
@@ -121,6 +148,54 @@ export function HomePage() {
         level: 'warning',
         message: '有 KPI 指标完成度低于 50%，建议安排对应行动提升。',
         action: { label: '查看考核', route: '/assessment' },
+      });
+    }
+    const availableOpportunities = state.career.opportunities.filter(
+      (opportunity) => opportunity.status === 'available',
+    );
+    if (availableOpportunities.length > 0) {
+      items.push({
+        id: 'career-opportunity',
+        level: 'info',
+        message: `有 ${availableOpportunities.length} 个可处理的岗位机会。`,
+        action: { label: '查看机会', route: '/career' },
+      });
+    }
+    const expiringOpportunities = availableOpportunities.filter(
+      (opportunity) =>
+        opportunity.expiresAtDay !== null &&
+        opportunity.expiresAtDay - state.time.totalDaysPlayed <= 7,
+    );
+    if (expiringOpportunities.length > 0) {
+      items.push({
+        id: 'career-expiring',
+        level: 'warning',
+        message: '有岗位机会将在 7 天内到期，请及时处理。',
+        action: { label: '前往处理', route: '/career' },
+      });
+    }
+    if (state.career.activeProcess) {
+      items.push({
+        id: 'career-process',
+        level: 'info',
+        message: '有正在进行的岗位选拔流程。',
+        action: { label: '查看流程', route: '/career' },
+      });
+    }
+    if (careerRankEligibility().eligible) {
+      items.push({
+        id: 'career-rank-ready',
+        level: 'info',
+        message: '已满足公务员职级晋升条件。',
+        action: { label: '办理晋升', route: '/career' },
+      });
+    }
+    if (activeCareerRestrictions().length > 0) {
+      items.push({
+        id: 'career-restriction',
+        level: 'danger',
+        message: '存在生效中的职业限制，可能影响职级晋升或岗位选拔。',
+        action: { label: '查看限制', route: '/career' },
       });
     }
     return items;
@@ -186,18 +261,24 @@ export function HomePage() {
             </div>
             <div
               style={{
-                display: 'flex',
-                gap: '8px',
-                'margin-top': '3px',
-                'font-size': '12px',
+                display: 'grid',
+                'grid-template-columns': 'repeat(3, max-content)',
+                gap: '3px 10px',
+                'margin-top': '4px',
+                'font-size': '11px',
                 color: 'rgba(255,255,255,0.72)',
               }}
             >
-              <Show when={positionConfig()}>
-                <span>{positionConfig()?.name}</span>
-                <span>·</span>
-              </Show>
-              <span>{LEADERSHIP_RANK_LABELS[state.career.appointment.leadershipRank]}</span>
+              <span>职位：{positionConfig()?.name ?? '未分配'}</span>
+              <span>机构：{institutionConfig()?.name ?? '未知机构'}</span>
+              <span>地区：{formatCareerRegion(state.career.appointment.regionId)}</span>
+              <span>
+                层级：{INSTITUTION_LEVEL_LABELS[state.career.appointment.institutionLevel]}
+              </span>
+              <span>
+                领导职务：{LEADERSHIP_RANK_LABELS[state.career.appointment.leadershipRank]}
+              </span>
+              <span>公务员职级：{CIVIL_SERVICE_RANK_LABELS[state.career.civilServiceRank]}</span>
             </div>
           </div>
         </div>
@@ -209,11 +290,8 @@ export function HomePage() {
             <div
               style={{ 'font-size': '11px', color: 'rgba(255,255,255,0.55)', 'margin-top': '2px' }}
             >
-              任职第{' '}
-              {Math.floor(
-                (state.time.totalDaysPlayed - state.career.appointment.startedAtDay) / 360,
-              ) + 1}{' '}
-              年 · 累计 {state.time.totalDaysPlayed} 天
+              当前任职 {state.time.totalDaysPlayed - state.career.appointment.startedAtDay} 天 ·
+              当前职级 {state.time.totalDaysPlayed - state.career.civilServiceRankStartedAtDay} 天
             </div>
           </div>
           <button
