@@ -8,7 +8,7 @@
  * - 工作台卡片区：按功能分类的政务操作入口
  */
 
-import { createMemo, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { navigate } from '../../router';
 import { AppShell } from '../../components/app-shell';
@@ -66,6 +66,20 @@ const WORK_CARDS: {
     color: colors.gold,
   },
   {
+    icon: '策',
+    label: '政策治理',
+    desc: '提议政策、跟踪阶段与处理生命周期操作',
+    route: '/policies',
+    color: colors.primary,
+  },
+  {
+    icon: '事',
+    label: '事件中心',
+    desc: '处理收件箱事件并查看计划与历史记录',
+    route: '/events',
+    color: colors.purple,
+  },
+  {
     icon: '晋',
     label: '职务与职级',
     desc: '查看职级晋升条件、岗位机会与选拔流程',
@@ -102,6 +116,7 @@ const WORK_CARDS: {
  */
 export function HomePage() {
   const { state, dispatch } = useGameStore();
+  const [lastAdvance, setLastAdvance] = createSignal(false);
 
   const positionConfig = createMemo(() => {
     const posId = state.career.appointment.positionId;
@@ -110,6 +125,16 @@ export function HomePage() {
   });
 
   const dateStr = createMemo(() => formatDate(state.time.year, state.time.month, state.time.day));
+  const timeFeedback = createMemo(() => {
+    const date = dateStr();
+    if (state.events.activeBlockingEventId) {
+      return `推进因阻塞事件中断，当前停留在 ${date}。处理事件后将继续本日剩余节点。`;
+    }
+    if (state.time.pendingContinuation) {
+      return `当前停留在 ${date}，仍有同日 continuation 等待结算。处理事件后将继续剩余节点。`;
+    }
+    return lastAdvance() ? `推进完整完成，当前停留在 ${date}。` : `当前停留在 ${date}。`;
+  });
 
   const institutionConfig = createMemo(() =>
     getConfigLoader().getInstitutionById(state.career.appointment.institutionId),
@@ -337,7 +362,10 @@ export function HomePage() {
           <For each={GRANULARITIES}>
             {(g, i) => (
               <button
-                onClick={() => dispatch({ type: 'ADVANCE_TIME', granularity: g.granularity })}
+                onClick={() => {
+                  setLastAdvance(true);
+                  dispatch({ type: 'ADVANCE_TIME', granularity: g.granularity });
+                }}
                 style={{
                   padding: '14px 12px',
                   border: i() === 2 ? 'none' : `1px solid ${colors.border}`,
@@ -364,6 +392,20 @@ export function HomePage() {
             )}
           </For>
         </div>
+        <p
+          role="status"
+          style={{
+            'margin-top': '12px',
+            padding: '9px 11px',
+            'border-left': `3px solid ${state.events.activeBlockingEventId ? colors.danger : colors.secondary}`,
+            background: colors.bgSoft,
+            color: colors.textSecondary,
+            'font-size': '12px',
+            'line-height': '1.6',
+          }}
+        >
+          {timeFeedback()}
+        </p>
       </section>
 
       {/* ═══ 日程规划 ═══ */}
