@@ -160,7 +160,7 @@ function appointmentTransition(
   currentDay: number,
   idFactory: () => string,
   rng: () => number,
-): void {
+): boolean {
   const loader = getConfigLoader();
   const target = loader.getPositionById(opportunity.target.positionId);
   const institution = target ? loader.getInstitutionById(target.institutionId) : null;
@@ -170,19 +170,19 @@ function appointmentTransition(
     hasRunningAction(transaction) ||
     transaction.events.activeBlockingEventId
   )
-    throw new Error('Appointment requirements are no longer valid');
+    return false;
   if (
     target.id !== opportunity.target.positionId ||
     target.institutionId !== opportunity.target.institutionId ||
     target.regionId !== opportunity.target.regionId
   )
-    throw new Error('Appointment target snapshot conflicts with configuration');
+    return false;
   const openExperiences = transaction.career.experiences.filter((item) => item.endedAtDay === null);
   if (
     openExperiences.length !== 1 ||
     openExperiences[0]?.appointmentId !== transaction.career.appointment.appointmentId
   )
-    throw new Error('Current appointment has no unique open experience');
+    return false;
   const previous = transaction.career.appointment;
   const oldExperience = openExperiences[0]!;
   oldExperience.endedAtDay = currentDay;
@@ -240,7 +240,7 @@ function appointmentTransition(
   );
   transaction.remainingBudget = target.annualBudget;
   const resolved = resolveCareerOpportunity(opportunity, currentDay, 'appointed').opportunity;
-  if (!resolved) throw new Error('Opportunity cannot be resolved');
+  if (!resolved) return false;
   replaceOpportunity(transaction, resolved);
   process.status = 'completed';
   process.completedAtDay = currentDay;
@@ -263,6 +263,7 @@ function appointmentTransition(
     rng,
     idFactory,
   );
+  return true;
 }
 
 /** @param draft 状态草稿 @param payload 流程推进参数 @param currentDay 当前日 @returns 是否推进成功。 */
@@ -280,12 +281,20 @@ export function reduceAdvanceCareerProcess(
     original.status !== 'in_process'
   )
     return false;
+  const outcome = payload.outcome ?? 'passed';
+  // An appointment cannot progress while another action or blocking event is active.
+  // Check before recording a selection-stage result so a rejected advance is a true no-op.
+  if (
+    outcome === 'passed' &&
+    original.type !== 'training' &&
+    (hasRunningAction(draft) || draft.events.activeBlockingEventId)
+  )
+    return false;
   const transaction = structuredClone(unwrap(draft));
   const txProcess = transaction.career.activeProcess!;
   const opportunity = transaction.career.opportunities.find((item) => item.id === original.id)!;
   const idFactory = payload._idFactory ?? createRuntimeIdFactory('career');
   const rng = payload._rng ?? Math.random;
-  const outcome = payload.outcome ?? 'passed';
   txProcess.stageResults.push({
     stage: txProcess.currentStage,
     resolvedAtDay: currentDay,
@@ -307,15 +316,20 @@ export function reduceAdvanceCareerProcess(
   } else if (opportunity.type === 'training' && txProcess.currentStage === 'eligibility_review') {
     txProcess.currentStage = 'finalization';
   } else if (opportunity.type === 'training') {
+    const assessment =
+      transaction.assessments.annualAssessments[
+        transaction.assessments.annualAssessments.length - 1
+      ];
+    if (!assessment) return false;
     applyEffects(transaction, opportunity.effects, {
       signal: {
         signalId: opportunity.source.signalId ?? opportunity.id,
         signalType: 'assessment.completed',
         occurredAtDay: currentDay,
         data: {
-          year: transaction.time.year,
-          score: transaction.assessments.comprehensiveScore,
-          tier: 'training',
+          year: assessment.year,
+          score: assessment.score,
+          tier: assessment.tier,
         },
       },
       currentDay,
@@ -346,11 +360,13 @@ export function reduceAdvanceCareerProcess(
       txProcess.currentStage as (typeof SELECTION_STAGES)[number],
     );
     if (index < 0) return false;
-    if (txProcess.currentStage === 'appointment')
-      appointmentTransition(transaction, opportunity, txProcess, currentDay, idFactory, rng);
-    else txProcess.currentStage = SELECTION_STAGES[index + 1]!;
+    if (txProcess.currentStage === 'appointment') {
+      if (!appointmentTransition(transaction, opportunity, txProcess, currentDay, idFactory, rng))
+        return false;
+    } else txProcess.currentStage = SELECTION_STAGES[index + 1]!;
   } else {
-    appointmentTransition(transaction, opportunity, txProcess, currentDay, idFactory, rng);
+    if (!appointmentTransition(transaction, opportunity, txProcess, currentDay, idFactory, rng))
+      return false;
   }
   Object.assign(draft, transaction);
   return true;
