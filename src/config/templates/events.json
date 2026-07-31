@@ -430,7 +430,7 @@
         {
           "eventId": "flood_prepared_emergency",
           "delayDays": 14,
-          "condition": { "worldMetric": "flood_risk", "op": "gte", "value": 30 }
+          "condition": { "worldMetric": "flood_risk", "op": "gt", "value": 30 }
         }
       ]
     }

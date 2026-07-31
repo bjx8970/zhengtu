@@ -1405,4 +1405,50 @@ describe('月度/年度钩子端到端回归', () => {
     expect(result.world.metrics.flood_risk).toBe(75);
     expect(result.world.facts.flood_prepared).toBeFalsy();
   });
+
+  it('边界值: risk=30（等于门槛）不排期 flood_prepared_emergency', () => {
+    const loader = getConfigLoader();
+    const state = createInitialState();
+    state.remainingBudget = 10_000;
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.actions.some((a) => a.id === 'flood_preparation'));
+    expect(department).toBeDefined();
+    if (!department) return;
+    state.actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+    // risk=30 等于 gt 门槛，不应排期（14 天 delay 后激活时已衰减至 <30）
+    state.world.metrics.flood_risk = 30;
+
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `boundary30-${sequence++}`;
+
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: department.id,
+      actionId: 'flood_preparation',
+      tierKey: 'primary',
+      _idFactory: nextId,
+    });
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const result = store.getRawState();
+    expect(result.world.facts.flood_prepared).toBe(true);
+    const scheduled = result.events.scheduled.find(
+      (item) => item.eventId === 'flood_prepared_emergency',
+    );
+    expect(scheduled).toBeUndefined();
+  });
 });
