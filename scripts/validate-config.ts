@@ -63,18 +63,18 @@ const ActionSchema = z
     unlockLevel: z.number().optional(),
   })
   .superRefine((action, ctx) => {
-    if (action.category === 'major' && action.cooldownDays !== 14) {
+    if (action.category === 'major' && action.cooldownDays < 14) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['cooldownDays'],
-        message: '重大行动的冷却天数必须为 14',
+        message: '重大行动的冷却天数不得少于 14 天',
       });
     }
-    if (action.category === 'minor' && action.cooldownDays !== 7) {
+    if (action.category === 'minor' && action.cooldownDays < 7) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['cooldownDays'],
-        message: '次要行动的冷却天数必须为 7',
+        message: '次要行动的冷却天数不得少于 7 天',
       });
     }
     if (action.category === 'routine' && action.cooldownDays !== 0) {
