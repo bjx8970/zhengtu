@@ -20,7 +20,7 @@
     },
     "repeatPolicy": {
       "mode": "repeatable",
-      "cooldownDays": 90
+      "cooldownDays": 120
     },
     "activation": {
       "deadlineDays": 3
@@ -426,7 +426,13 @@
           "value": 20
         }
       ],
-      "schedule": [{ "eventId": "flood_prepared_emergency", "delayDays": 14 }]
+      "schedule": [
+        {
+          "eventId": "flood_prepared_emergency",
+          "delayDays": 14,
+          "condition": { "worldMetric": "flood_risk", "op": "gte", "value": 30 }
+        }
+      ]
     }
   },
   {

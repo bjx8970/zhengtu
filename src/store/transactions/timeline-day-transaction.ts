@@ -336,16 +336,11 @@ function processMonthlySettlement(
     cfg.monthlyRise,
     cfg.monthlyFall,
   );
-  const rainyMonths = cfg.rainyMonths;
-  const lastRainyMonth = Math.max(...rainyMonths);
-  // 清除准备标记的时机：
-  //   A) 风险从 ≥80 降回 <80（危险已过），或
-  //   B) 雨季结束后且风险 <80（仅雨后非雨季月份，即 endedMonth > lastRainyMonth，
-  //      排除旱季早期月份 1-4 的误清）
+  // 清除准备标记的时机：仅当风险从 ≥80 降回 <80（确有汛情才消耗准备）。
+  // 不再按月份清除——旱季提前准备应延续至首次真正汛情，而非被日历清零。
   if (draft.world.facts.flood_prepared === true) {
     const crossedDown = previous >= 80 && delta.next < 80;
-    const seasonOver = endedMonth > lastRainyMonth && delta.next < 80;
-    if (crossedDown || seasonOver) {
+    if (crossedDown) {
       draft.world.facts.flood_prepared = false;
     }
   }

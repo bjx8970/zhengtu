@@ -745,6 +745,9 @@ describe('event timeline integration', () => {
       actionCooldownUntilDays: {},
     };
 
+    // flood_prepared_emergency 需 risk≥30 才调度（旱季准备不虚假触发）
+    state.world.metrics.flood_risk = 50;
+
     const store = createTestStore(state);
     let sequence = 0;
     const nextId = () => `flood-chain-${sequence++}`;
@@ -839,6 +842,9 @@ describe('event timeline integration', () => {
       lastActionDay: 0,
       actionCooldownUntilDays: {},
     };
+
+    // flood_prepared_emergency 需 risk≥30 才调度（旱季准备不虚假触发）
+    state.world.metrics.flood_risk = 50;
 
     const store = createTestStore(state);
     let sequence = 0;
@@ -1211,5 +1217,37 @@ describe('月度/年度钩子端到端回归', () => {
     expect(
       result.events.pending.filter((event) => event.eventId === 'flood_emergency').length,
     ).toBe(0);
+  });
+
+  it('洪水钩子端到端: 月度结算推进 flood_risk 突破 80 → 触发 flood_emergency', () => {
+    const state = createInitialState();
+    state.remainingBudget = 10_000;
+    // 开局 year=2012 month=7，推进跨年到达雨季次年 8 月：
+    // 结算 endMonth 顺序：7→8(旱)→9→10→11→12→1→2→3→4→5(雨:+25)→6(+25)→7(+25)→8(+25→100)
+    // 第 13 次月度结算（endMonth=8）后 risk=100≥80
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `flood-hook-e2e-${sequence++}`;
+
+    for (let i = 0; i < 15; i++) {
+      store.dispatch({
+        type: 'ADVANCE_TIME',
+        granularity: 'month',
+        _rng: () => 0,
+        _idFactory: nextId,
+      });
+      if (store.getRawState().events.activeBlockingEventId) break;
+    }
+
+    const result = store.getRawState();
+    expect(result.world.metrics.flood_risk).toBeGreaterThanOrEqual(80);
+    const emergency = result.events.pending.find((event) => event.eventId === 'flood_emergency');
+    expect(emergency).toBeDefined();
+    expect(result.events.activeBlockingEventId).toBe(emergency?.instanceId);
+    // cooldownDays=120 确保单汛季仅 1 次
+    const emergencyCount = result.events.pending.filter(
+      (event) => event.eventId === 'flood_emergency',
+    ).length;
+    expect(emergencyCount).toBe(1);
   });
 });
