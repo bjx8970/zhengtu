@@ -908,6 +908,7 @@ describe('event timeline integration', () => {
 
     // ===== 冷却期内二次启动应被拒绝 =====
     // cooldownUntilDay = 0 + 4 + 35 = 39, 当前 day 约 29-35, 仍在冷却期内
+    const actionsBeforeReject = store.getRawState().actions.totalActions;
     store.dispatch({
       type: 'START_ACTION',
       deptId: department.id,
@@ -915,14 +916,14 @@ describe('event timeline integration', () => {
       tierKey: 'primary',
       _idFactory: nextId,
     });
-    // 冷却期内操作被拒绝：准备标志保持 true（由第一轮设置，且风险尚未突破 80 门槛）
+    // 冷却期内操作被拒绝：totalActions 不变，因为 startAction 返回 false
     store.dispatch({
       type: 'ADVANCE_TIME',
       granularity: 'week',
       _rng: () => 0,
       _idFactory: nextId,
     });
-    expect(store.getRawState().world.facts.flood_prepared).toBe(true);
+    expect(store.getRawState().actions.totalActions).toBe(actionsBeforeReject);
 
     // ===== 第二轮：等冷却期过期 =====
     // cooldownUntilDay = startedAtDay + durationDays + cooldownDays = 0 + 4 + 35 = 39

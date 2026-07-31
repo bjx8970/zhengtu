@@ -20,7 +20,7 @@
     },
     "repeatPolicy": {
       "mode": "repeatable",
-      "cooldownDays": 30
+      "cooldownDays": 90
     },
     "activation": {
       "deadlineDays": 3

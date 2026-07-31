@@ -337,13 +337,14 @@ function processMonthlySettlement(
     cfg.monthlyFall,
   );
   const rainyMonths = cfg.rainyMonths;
-  const isRainy = rainyMonths.includes(endedMonth);
+  const lastRainyMonth = Math.max(...rainyMonths);
   // 清除准备标记的时机：
   //   A) 风险从 ≥80 降回 <80（危险已过），或
-  //   B) 非雨季且风险 <80（汛季结束，即使风险从未达到 80 也应重置）
+  //   B) 雨季结束后且风险 <80（仅雨后非雨季月份，即 endedMonth > lastRainyMonth，
+  //      排除旱季早期月份 1-4 的误清）
   if (draft.world.facts.flood_prepared === true) {
     const crossedDown = previous >= 80 && delta.next < 80;
-    const seasonOver = !isRainy && delta.next < 80;
+    const seasonOver = endedMonth > lastRainyMonth && delta.next < 80;
     if (crossedDown || seasonOver) {
       draft.world.facts.flood_prepared = false;
     }
@@ -365,7 +366,7 @@ function processMonthlySettlement(
  * @param year       考核年份
  * @param absoluteDay 当前绝对日
  * @param idFactory   事务共享 ID 工厂
- * @returns 包含 assessment.completed 和（若变化）world.metric_changed 的信号数组
+ * @returns 包含 assessment.completed 和 world.metric_changed 的信号数组
  */
 function processAnnualAssessment(
   draft: PlayerSave,
@@ -421,21 +422,20 @@ function processAnnualAssessment(
     },
   ];
 
-  const previousReport = draft.world.metrics.corruption_report ?? 0;
   const newReport = computeCorruptionReport({
     integrity: draft.character.integrity,
     corruptionRisk: draft.character.corruptionRisk,
     stability: draft.character.stability,
   });
-  if (newReport !== previousReport) {
-    draft.world.metrics.corruption_report = newReport;
-    signals.push({
-      signalId: idFactory(),
-      signalType: 'world.metric_changed',
-      occurredAtDay: absoluteDay,
-      data: { metricId: 'corruption_report', value: newReport },
-    });
-  }
+  // 即使值未变也每年发出信号，确保惰性玩家（属性长期不变）的举报链每年可达。
+  // investigation_start 的 once_per_source 以 signalId 为 key，每年新信号可触发一次。
+  draft.world.metrics.corruption_report = newReport;
+  signals.push({
+    signalId: idFactory(),
+    signalType: 'world.metric_changed',
+    occurredAtDay: absoluteDay,
+    data: { metricId: 'corruption_report', value: newReport },
+  });
 
   return signals;
 }
