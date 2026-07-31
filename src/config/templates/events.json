@@ -100,7 +100,13 @@
         "description": "全力配合纪委调查，主动提供相关材料并接受正式核查。",
         "effects": [
           { "target": "character", "field": "integrity", "operation": "add", "value": 5 },
-          { "target": "character", "field": "stability", "operation": "add", "value": -3 }
+          { "target": "character", "field": "stability", "operation": "add", "value": -3 },
+          {
+            "target": "world_metric",
+            "metricId": "corruption_report",
+            "operation": "set",
+            "value": 0
+          }
         ],
         "schedule": [{ "eventId": "formal_investigation", "delayDays": 3, "probability": 1 }]
       },
@@ -249,6 +255,12 @@
           "factId": "formal_investigation_ongoing",
           "operation": "set",
           "value": false
+        },
+        {
+          "target": "world_metric",
+          "metricId": "corruption_report",
+          "operation": "set",
+          "value": 0
         }
       ]
     }
@@ -892,7 +904,15 @@
     "activation": {},
     "options": [],
     "automaticOutcome": {
-      "effects": [{ "target": "character", "field": "stability", "operation": "add", "value": 1 }],
+      "effects": [
+        { "target": "character", "field": "stability", "operation": "add", "value": 1 },
+        {
+          "target": "world_metric",
+          "metricId": "corruption_report",
+          "operation": "set",
+          "value": 0
+        }
+      ],
       "schedule": [
         {
           "eventId": "formal_investigation",

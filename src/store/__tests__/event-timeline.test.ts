@@ -905,6 +905,24 @@ describe('event timeline integration', () => {
       true,
     );
 
+    // ===== 冷却期内二次启动应被拒绝 =====
+    // cooldownUntilDay = 0 + 4 + 35 = 39, 当前 day 约 29-35, 仍在冷却期内
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: department.id,
+      actionId: 'flood_preparation',
+      tierKey: 'primary',
+      _idFactory: nextId,
+    });
+    // 冷却期内操作被拒绝，推进一周后也不会有 action 完成从而设置 flood_prepared
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    expect(store.getRawState().world.facts.flood_prepared).toBe(false);
+
     // ===== 第二轮：等冷却期过期 =====
     // cooldownUntilDay = startedAtDay + durationDays + cooldownDays = 0 + 4 + 35 = 39
     const cooldownEndDay = firstActionStartedAtDay + 4 + 35; // 39

@@ -275,6 +275,8 @@ export interface GameConfig {
   };
   /** 晋升引擎阈值配置 */
   promotion: PromotionConfig;
+  /** 月度防汛风险自动变化参数 */
+  floodRiskByMonth: { rainyMonths: number[]; monthlyRise: number; monthlyFall: number };
 }
 
 /** 省份/地区配置（regions.json） */

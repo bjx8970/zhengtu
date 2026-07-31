@@ -87,7 +87,7 @@ Tests use `createTestStore()` for isolation. Never import the module-level `disp
 
 - Slots: primary=3, secondary=2, reserve=1 (configurable in `src/config/constants.json`).
 - Each action has `durationDays`（执行所需天数）and `category`（major/minor/routine）。
-- Category rules: major=僅主要槽位,冷却14天; minor=任意槽位,冷却7天; routine=任意槽位,无冷却,可并行。
+- Category rules: major=僅主要槽位,冷却至少14天; minor=任意槽位,冷却至少7天; routine=任意槽位,无冷却,可并行。
 - Player selects tier in UI; system uses first empty slot in that tier.
 - Cooldown is recorded per-department by absolute day (startedAt+duration+cooldown).
 - `startAction()` validates category/slot alignment, budget, duplicates, and cooldown.
