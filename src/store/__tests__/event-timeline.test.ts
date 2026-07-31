@@ -1219,7 +1219,7 @@ describe('月度/年度钩子端到端回归', () => {
     ).toBe(0);
   });
 
-  it('洪水钩子端到端: 月度结算推进 flood_risk 突破 80 → 触发 flood_emergency', () => {
+  it('洪水钩子端到端: 月度结算推进 flood_risk 突破 80 → 触发 flood_emergency，冷却抑制同季第二次', () => {
     const state = createInitialState();
     state.remainingBudget = 10_000;
     // 开局 year=2012 month=7，推进跨年到达雨季次年 8 月：
@@ -1229,6 +1229,7 @@ describe('月度/年度钩子端到端回归', () => {
     let sequence = 0;
     const nextId = () => `flood-hook-e2e-${sequence++}`;
 
+    // 推进到第一个 flood_emergency 出现
     for (let i = 0; i < 15; i++) {
       store.dispatch({
         type: 'ADVANCE_TIME',
@@ -1239,15 +1240,169 @@ describe('月度/年度钩子端到端回归', () => {
       if (store.getRawState().events.activeBlockingEventId) break;
     }
 
-    const result = store.getRawState();
-    expect(result.world.metrics.flood_risk).toBeGreaterThanOrEqual(80);
-    const emergency = result.events.pending.find((event) => event.eventId === 'flood_emergency');
+    const first = store.getRawState();
+    expect(first.world.metrics.flood_risk).toBeGreaterThanOrEqual(80);
+    const emergency = first.events.pending.find((event) => event.eventId === 'flood_emergency');
     expect(emergency).toBeDefined();
-    expect(result.events.activeBlockingEventId).toBe(emergency?.instanceId);
-    // cooldownDays=120 确保单汛季仅 1 次
-    const emergencyCount = result.events.pending.filter(
+    expect(first.events.activeBlockingEventId).toBe(emergency?.instanceId);
+    expect(first.events.pending.filter((event) => event.eventId === 'flood_emergency').length).toBe(
+      1,
+    );
+
+    // 解析 blocker 并推进 2 个月（risk 仍 ≥80），验证 cooldown=120 抑制第二次触发
+    if (!emergency) return;
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: emergency.instanceId,
+      optionId: 'coordinate_rescue',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    // 推进 2 个月：endMonth 9 risk=90, endMonth 10 risk=80——cooldown 120 天仍在生效
+    for (let i = 0; i < 2; i++) {
+      store.dispatch({
+        type: 'ADVANCE_TIME',
+        granularity: 'month',
+        _rng: () => 0,
+        _idFactory: nextId,
+      });
+    }
+
+    const afterSeason = store.getRawState();
+    // cooldown 仍有效，不应有第二个 flood_emergency
+    const secondEmergency = afterSeason.events.pending.find(
       (event) => event.eventId === 'flood_emergency',
+    );
+    expect(secondEmergency).toBeUndefined();
+    // history 中恰好一次 flood_emergency
+    const historyCount = afterSeason.events.history.filter(
+      (record) => record.eventId === 'flood_emergency',
     ).length;
-    expect(emergencyCount).toBe(1);
+    expect(historyCount).toBe(1);
+  });
+
+  it('旱季防汛准备 (risk<30) 不调度 flood_prepared_emergency', () => {
+    const loader = getConfigLoader();
+    const state = createInitialState();
+    state.remainingBudget = 10_000;
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.actions.some((a) => a.id === 'flood_preparation'));
+    expect(department).toBeDefined();
+    if (!department) return;
+    state.actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+    // 旱季风险=0，低于 schedule condition 的 30 门槛
+    state.world.metrics.flood_risk = 0;
+
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `dry-prep-${sequence++}`;
+
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: department.id,
+      actionId: 'flood_preparation',
+      tierKey: 'primary',
+      _idFactory: nextId,
+    });
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const result = store.getRawState();
+    // 准备完成，但不应排期 flood_prepared_emergency（risk<30）
+    expect(result.world.facts.flood_prepared).toBe(true);
+    const scheduled = result.events.scheduled.find(
+      (item) => item.eventId === 'flood_prepared_emergency',
+    );
+    expect(scheduled).toBeUndefined();
+  });
+
+  it('汛中防汛准备 (risk≥30) 正常调度 flood_prepared_emergency', () => {
+    const loader = getConfigLoader();
+    const state = createInitialState();
+    state.remainingBudget = 10_000;
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.actions.some((a) => a.id === 'flood_preparation'));
+    expect(department).toBeDefined();
+    if (!department) return;
+    state.actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+    // risk=50≥30，应满足 schedule condition
+    state.world.metrics.flood_risk = 50;
+
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `rainy-prep-${sequence++}`;
+
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: department.id,
+      actionId: 'flood_preparation',
+      tierKey: 'primary',
+      _idFactory: nextId,
+    });
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const result = store.getRawState();
+    expect(result.world.facts.flood_prepared).toBe(true);
+    const scheduled = result.events.scheduled.find(
+      (item) => item.eventId === 'flood_prepared_emergency',
+    );
+    expect(scheduled).toBeDefined();
+  });
+
+  it('准备标志在风险穿越 80→79 下沿时被清除', () => {
+    const state = createInitialState();
+    state.remainingBudget = 10_000;
+    // 设置 risk=85 且已处于非雨季 month 10（结束月份=10，结算用 -10=75）
+    state.time = {
+      ...state.time,
+      year: 2012,
+      month: 10,
+      day: state.time.day,
+      totalDaysPlayed: 90,
+    };
+    state.world.metrics.flood_risk = 85;
+    state.world.facts.flood_prepared = true;
+
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `cross-down-${sequence++}`;
+
+    // 推进 1 个月：endedMonth=11（非雨季），risk 85→75，crossedDown=true
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'month',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const result = store.getRawState();
+    // 风险已降至 75，下穿 80 线，准备标志应被清除
+    expect(result.world.metrics.flood_risk).toBe(75);
+    expect(result.world.facts.flood_prepared).toBeFalsy();
   });
 });
