@@ -264,6 +264,12 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
 
     const instanceId = input.idFactory();
     const snapshot = createEventSnapshot(definition);
+    // 仅 scheduledOnly 的内容链可声明原始信号类型，以保留政策等领域上下文；其余目标保持既有 event.resolved 语义。
+    const triggerContext =
+      definition.trigger.scheduledOnly &&
+      definition.trigger.sources.includes(input.parentInstance.triggerContext.signalType)
+        ? input.parentInstance.triggerContext
+        : input.resolvedSignal;
     if (schedule.delayDays === 0) {
       immediateInstances.push({
         instanceId,
@@ -273,7 +279,7 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
         activatedAtDay: input.currentDay,
         deadlineDay:
           snapshot.deadlineDays == null ? null : input.currentDay + snapshot.deadlineDays,
-        triggerContext: input.resolvedSignal,
+        triggerContext,
         sourceKey: input.parentInstance.sourceKey,
         chainInstanceId: chain?.instanceId ?? null,
         snapshot,
@@ -284,7 +290,7 @@ export function planEventFollowups(input: PlanEventFollowupsInput): EventFollowu
         eventId: definition.id,
         scheduledAtDay: input.currentDay,
         activateAtDay: input.currentDay + schedule.delayDays,
-        triggerContext: input.resolvedSignal,
+        triggerContext,
         sourceKey: input.parentInstance.sourceKey,
         chainInstanceId: chain?.instanceId ?? null,
         snapshot,

@@ -145,6 +145,7 @@ describe('event timeline integration', () => {
   it('自动激活政策、推进里程碑，并在存档恢复后补做同日月结', () => {
     const loader = getConfigLoader();
     const state = createInitialState();
+    state.world.facts.industrial_park_policy_proposed = true;
     const department = loader
       .resolvePositionDepartments(state.career.appointment.positionId)
       .find((item) => item.baseConsumption * item.consumptionCoefficient > 0);
@@ -724,5 +725,358 @@ describe('event timeline integration', () => {
       ...after.events.processedSignalIds,
     ].filter((id) => id.startsWith('transaction_'));
     expect(new Set(generatedIds).size).toBe(generatedIds.length);
+  });
+
+  it('防汛准备完整链条: 行动完成 → 指标形成 → 汛情应对 → 灾后重建 → 准备状态重置', () => {
+    const loader = getConfigLoader();
+    const state = createInitialState();
+    state.remainingBudget = 10_000;
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.actions.some((a) => a.id === 'flood_preparation'));
+    expect(department).toBeDefined();
+    if (!department) return;
+    state.actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `flood-chain-${sequence++}`;
+
+    // 启动防汛准备行动（durationDays=4）
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: department.id,
+      actionId: 'flood_preparation',
+      tierKey: 'primary',
+      _idFactory: nextId,
+    });
+
+    // 推进一周（5天），行动在第4天完成
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterAction = store.getRawState();
+    // flood_preparation_metrics 自动触发：设置 world.facts.flood_prepared = true
+    expect(afterAction.world.facts.flood_prepared).toBe(true);
+    // flood_prepared_emergency 已排期（delay 14 天，约在 day 18 激活）
+    const emergencyScheduled = afterAction.events.scheduled.find(
+      (item) => item.eventId === 'flood_prepared_emergency',
+    );
+    expect(emergencyScheduled).toBeDefined();
+
+    // 推进一个月，在 flood_prepared_emergency 激活日停止（blocking）
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'month',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterEmergency = store.getRawState();
+    const pendingEmergency = afterEmergency.events.pending.find(
+      (item) => item.eventId === 'flood_prepared_emergency',
+    );
+    expect(pendingEmergency).toBeDefined();
+    expect(afterEmergency.events.activeBlockingEventId).toBe(pendingEmergency!.instanceId);
+
+    // 选择"前置加固堤防"选项应对汛情
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: pendingEmergency!.instanceId,
+      optionId: 'reinforce_dikes',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    // 先清除 pendingContinuation（同一日的剩余节点）
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    // 再推进一周，让 flood_reconstruction 在 delay 4 天后激活并自动解析
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterReconstruction = store.getRawState();
+    // flood_reconstruction 的自动结果重置准备标志
+    expect(afterReconstruction.world.facts.flood_prepared).toBe(false);
+    expect(
+      afterReconstruction.events.history.some((item) => item.eventId === 'flood_reconstruction'),
+    ).toBe(true);
+  });
+
+  it('两轮防汛准备不会因冷却期不足而互相覆盖准备状态', () => {
+    const loader = getConfigLoader();
+    const state = createInitialState();
+    state.remainingBudget = 10_000;
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.actions.some((a) => a.id === 'flood_preparation'));
+    expect(department).toBeDefined();
+    if (!department) return;
+    state.actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `flood-two-round-${sequence++}`;
+
+    // ===== 第一轮 =====
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: department.id,
+      actionId: 'flood_preparation',
+      tierKey: 'primary',
+      _idFactory: nextId,
+    });
+    const firstActionStartedAtDay = 0; // day 0
+
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterRound1Action = store.getRawState();
+    expect(afterRound1Action.world.facts.flood_prepared).toBe(true);
+
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'month',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const round1Blocked = store.getRawState();
+    const round1Blocker = round1Blocked.events.pending.find(
+      (item) => item.eventId === 'flood_prepared_emergency',
+    );
+    expect(round1Blocker).toBeDefined();
+    if (!round1Blocker) return;
+
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: round1Blocker.instanceId,
+      optionId: 'reinforce_dikes',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterRound1 = store.getRawState();
+    expect(afterRound1.world.facts.flood_prepared).toBe(false);
+    expect(afterRound1.events.history.some((item) => item.eventId === 'flood_reconstruction')).toBe(
+      true,
+    );
+
+    // ===== 第二轮：等冷却期过期 =====
+    // cooldownUntilDay = startedAtDay + durationDays + cooldownDays = 0 + 4 + 35 = 39
+    const cooldownEndDay = firstActionStartedAtDay + 4 + 35; // 39
+
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'month',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterCooldown = store.getRawState();
+    expect(afterCooldown.time.totalDaysPlayed).toBeGreaterThanOrEqual(cooldownEndDay);
+
+    // 再次启动防汛准备
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: department.id,
+      actionId: 'flood_preparation',
+      tierKey: 'primary',
+      _idFactory: nextId,
+    });
+
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterRound2Action = store.getRawState();
+    // 第二轮独立设置准备标志，未被第一轮的残留清除覆盖
+    expect(afterRound2Action.world.facts.flood_prepared).toBe(true);
+
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'month',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterRound2Emergency = store.getRawState();
+    const round2Blocker = afterRound2Emergency.events.pending.find(
+      (item) => item.eventId === 'flood_prepared_emergency',
+    );
+    expect(round2Blocker).toBeDefined();
+    expect(afterRound2Emergency.events.activeBlockingEventId).toBe(round2Blocker!.instanceId);
+  });
+
+  it('产业园政策链: 招商完成 → 提交提议 → 同日提案审批 → 政策审批事件触发并保留上下文', () => {
+    const state = createInitialState();
+    // 切换到包含 economic_development 部门的职位（admin_l1_0 不含该部门）
+    state.career.appointment.positionId = 'admin_l6_0';
+
+    const loader = getConfigLoader();
+    const department = loader
+      .resolvePositionDepartments(state.career.appointment.positionId)
+      .find((item) => item.actions.some((a) => a.id === 'investment_promotion'));
+    expect(department).toBeDefined();
+    if (!department) return;
+
+    state.remainingBudget = 10_000;
+    state.actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `park-chain-${sequence++}`;
+
+    // 启动招商引资行动（durationDays=5）
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: department.id,
+      actionId: 'investment_promotion',
+      tierKey: 'primary',
+      _idFactory: nextId,
+    });
+
+    // 推进一周让行动完成
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    // 行动完成时 investment_promotion_completed 自动触发，排期 industrial_park_policy_proposal (delay 0)
+    // delay 0 的排期在同日 step 之后创建，因此提案尚未激活
+    const afterCompletion = store.getRawState();
+    expect(afterCompletion.world.facts.industrial_park_policy_proposed).toBeFalsy();
+
+    // 再次推进一天让上一步排期的提案激活
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterProposalActivated = store.getRawState();
+    const proposal = afterProposalActivated.events.pending.find(
+      (item) => item.eventId === 'industrial_park_policy_proposal',
+    );
+    expect(proposal).toBeDefined();
+    expect(proposal?.snapshot.presentation).toBe('inbox');
+
+    // 选择"提交政策提议"
+    store.dispatch({
+      type: 'CHOOSE_EVENT_OPTION',
+      eventInstanceId: proposal!.instanceId,
+      optionId: 'submit_proposal',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterChoice = store.getRawState();
+    expect(afterChoice.world.facts.industrial_park_policy_proposed).toBe(true);
+
+    // 同日: 提案并审批政策
+    store.dispatch({
+      type: 'PROPOSE_POLICY',
+      policyId: 'industrial_park_support',
+      _idFactory: nextId,
+    });
+    const policy = store.getRawState().governance.policies[0];
+    expect(policy).toBeDefined();
+    if (!policy) return;
+
+    store.dispatch({
+      type: 'APPROVE_POLICY',
+      policyInstanceId: policy.instanceId,
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterApproval = store.getRawState();
+    expect(afterApproval.governance.policies[0]?.status).toBe('approved');
+
+    // 推进一天：policy.approved 信号触发 industrial_park_policy_approved
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const afterSignal = store.getRawState();
+
+    // 验证政策已进入实施阶段
+    const activatedPolicy = afterSignal.governance.policies[0];
+    expect(activatedPolicy?.status).toBe('implementing');
+
+    // 验证工业园政策获批事件已记录在历史中
+    const approvedEvent = afterSignal.events.history.find(
+      (item) => item.eventId === 'industrial_park_policy_approved',
+    );
+    expect(approvedEvent).toBeDefined();
+
+    // 验证工业园准备阶段启动事件已排期或已记录
+    const preparationStarted =
+      afterSignal.events.scheduled.find(
+        (item) => item.eventId === 'industrial_park_preparation_started',
+      ) ??
+      afterSignal.events.history.find(
+        (item) => item.eventId === 'industrial_park_preparation_started',
+      );
+    expect(preparationStarted).toBeDefined();
   });
 });

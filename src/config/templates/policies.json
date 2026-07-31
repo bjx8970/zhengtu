@@ -7,7 +7,8 @@
     "tags": ["产业", "园区", "招商引资", "经济"],
     "effectiveDelayDays": 0,
     "availabilityCondition": {
-      "all": []
+      "fact": "industrial_park_policy_proposed",
+      "op": "is_true"
     },
     "approvalEffects": [
       {

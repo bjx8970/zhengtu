@@ -1,19 +1,20 @@
 [
   {
     "id": "flood_emergency",
-    "chainId": null,
-    "nodeId": null,
-    "title": "防汛抗洪",
-    "description": "暴雨导致辖区发生严重内涝，群众生命财产受到威胁，需要立即组织抢险救灾。",
+    "chainId": "flood_response_chain",
+    "nodeId": "unprepared_emergency",
+    "title": "防汛抗洪（准备不足）",
+    "description": "暴雨导致辖区发生严重内涝。由于前期准备不足，物资、预警和值守均存在缺口，必须立即组织抢险救灾。",
     "category": "emergency",
     "priority": "urgent",
     "presentation": "blocking",
     "trigger": {
       "sources": ["world.metric_changed"],
       "condition": {
-        "worldMetric": "flood_risk",
-        "op": "gte",
-        "value": 80
+        "all": [
+          { "worldMetric": "flood_risk", "op": "gte", "value": 80 },
+          { "fact": "flood_prepared", "op": "is_false" }
+        ]
       },
       "probability": 1
     },
@@ -38,7 +39,8 @@
             "operation": "set",
             "value": true
           }
-        ]
+        ],
+        "schedule": [{ "eventId": "flood_reconstruction", "delayDays": 5 }]
       },
       {
         "id": "coordinate_rescue",
@@ -47,7 +49,8 @@
         "effects": [
           { "target": "character", "field": "performance", "operation": "add", "value": 5 },
           { "target": "character", "field": "competence", "operation": "add", "value": 2 }
-        ]
+        ],
+        "schedule": [{ "eventId": "flood_accountability", "delayDays": 2 }]
       },
       {
         "id": "request_support",
@@ -56,7 +59,8 @@
         "effects": [
           { "target": "character", "field": "performance", "operation": "add", "value": 2 },
           { "target": "character", "field": "network", "operation": "add", "value": -3 }
-        ]
+        ],
+        "schedule": [{ "eventId": "flood_accountability", "delayDays": 2 }]
       }
     ]
   },
@@ -92,8 +96,8 @@
     "options": [
       {
         "id": "cooperate",
-        "label": "配合调查",
-        "description": "全力配合纪委调查，主动提供相关材料。",
+        "label": "正式调查",
+        "description": "全力配合纪委调查，主动提供相关材料并接受正式核查。",
         "effects": [
           { "target": "character", "field": "integrity", "operation": "add", "value": 5 },
           { "target": "character", "field": "stability", "operation": "add", "value": -3 }
@@ -102,14 +106,24 @@
       },
       {
         "id": "suppress",
-        "label": "压制举报",
-        "description": "私下联系相关人员，试图平息此事。",
+        "label": "私下处理",
+        "description": "私下联系相关人员，试图先行平息此事。",
         "effects": [
           { "target": "character", "field": "corruptionRisk", "operation": "add", "value": 15 },
           { "target": "character", "field": "stability", "operation": "add", "value": 5 },
           { "target": "character", "field": "integrity", "operation": "add", "value": -10 }
         ],
         "schedule": [{ "eventId": "suppress_investigation", "delayDays": 1, "probability": 1 }]
+      },
+      {
+        "id": "shelve",
+        "label": "搁置举报",
+        "description": "暂不启动处理程序，等待更多线索或外部动向。",
+        "effects": [
+          { "target": "character", "field": "stability", "operation": "add", "value": 1 },
+          { "target": "character", "field": "integrity", "operation": "add", "value": -3 }
+        ],
+        "schedule": [{ "eventId": "report_shelved", "delayDays": 1, "probability": 1 }]
       }
     ]
   },
@@ -268,7 +282,10 @@
           { "target": "character", "field": "stability", "operation": "add", "value": 5 },
           { "target": "character", "field": "corruptionRisk", "operation": "add", "value": -5 }
         ],
-        "schedule": [{ "eventId": "later_exposure", "delayDays": 30, "probability": 0.5 }]
+        "schedule": [
+          { "eventId": "later_exposure", "delayDays": 30, "probability": 0.5 },
+          { "eventId": "inspection_exposure", "delayDays": 30, "probability": 0.35 }
+        ]
       },
       {
         "id": "do_nothing",
@@ -276,7 +293,8 @@
         "description": "不采取额外行动，等待事态自然平息。",
         "effects": [
           { "target": "character", "field": "stability", "operation": "add", "value": -3 }
-        ]
+        ],
+        "schedule": [{ "eventId": "inspection_exposure", "delayDays": 14, "probability": 0.4 }]
       }
     ]
   },
@@ -360,5 +378,562 @@
         ]
       }
     ]
+  },
+  {
+    "id": "flood_preparation_metrics",
+    "chainId": "flood_prepared_chain",
+    "nodeId": "preparation",
+    "title": "防汛准备指标形成",
+    "description": "堤防排查、物资补库和预警值守已完成，辖区防汛准备度显著提升。",
+    "category": "emergency",
+    "priority": "normal",
+    "presentation": "automatic",
+    "trigger": {
+      "sources": ["action.completed"],
+      "condition": { "signalField": "actionId", "op": "eq", "value": "flood_preparation" },
+      "probability": 1
+    },
+    "repeatPolicy": { "mode": "once_per_source" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        { "target": "world_fact", "factId": "flood_prepared", "operation": "set", "value": true },
+        {
+          "target": "institution_metric",
+          "institutionRef": { "source": "signal", "field": "institutionId" },
+          "metricId": "flood_preparedness",
+          "operation": "add",
+          "value": 20
+        },
+        {
+          "target": "region_metric",
+          "regionRef": { "source": "signal", "field": "regionId" },
+          "metricId": "flood_preparedness",
+          "operation": "add",
+          "value": 20
+        }
+      ],
+      "schedule": [{ "eventId": "flood_prepared_emergency", "delayDays": 14 }]
+    }
+  },
+  {
+    "id": "flood_prepared_emergency",
+    "chainId": "flood_prepared_chain",
+    "nodeId": "rainfall_emergency",
+    "title": "强降雨来袭（准备充足）",
+    "description": "强降雨引发汛情，但前期预警、物资和值守已到位。现在可将资源集中于精准转移和抢险。",
+    "category": "emergency",
+    "priority": "urgent",
+    "presentation": "blocking",
+    "trigger": { "sources": ["event.resolved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": { "deadlineDays": 3 },
+    "options": [
+      {
+        "id": "precise_evacuation",
+        "label": "精准转移群众",
+        "description": "按预案分区转移风险点群众，保留机动力量处置险情。",
+        "effects": [
+          { "target": "character", "field": "performance", "operation": "add", "value": 10 },
+          { "target": "character", "field": "competence", "operation": "add", "value": 4 }
+        ],
+        "schedule": [{ "eventId": "flood_commendation", "delayDays": 3 }]
+      },
+      {
+        "id": "reinforce_dikes",
+        "label": "前置加固堤防",
+        "description": "依托已到位物资对薄弱堤段实施抢护。",
+        "effects": [
+          { "target": "character", "field": "performance", "operation": "add", "value": 7 },
+          { "target": "character", "field": "stability", "operation": "add", "value": 3 }
+        ],
+        "schedule": [{ "eventId": "flood_reconstruction", "delayDays": 4 }]
+      },
+      {
+        "id": "request_specialists",
+        "label": "请求专业支援",
+        "description": "调集专业队伍，对重点险情实施技术处置。",
+        "effects": [
+          { "target": "character", "field": "performance", "operation": "add", "value": 5 },
+          { "target": "character", "field": "network", "operation": "add", "value": 2 }
+        ],
+        "schedule": [{ "eventId": "flood_reconstruction", "delayDays": 4 }]
+      }
+    ]
+  },
+  {
+    "id": "flood_commendation",
+    "chainId": "flood_prepared_chain",
+    "nodeId": "commendation",
+    "title": "防汛处置获表彰",
+    "description": "因准备充分、处置有序，上级通报表扬本次防汛工作。",
+    "category": "emergency",
+    "priority": "normal",
+    "presentation": "automatic",
+    "trigger": { "sources": ["event.resolved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        { "target": "character", "field": "performance", "operation": "add", "value": 6 },
+        { "target": "character", "field": "charisma", "operation": "add", "value": 2 }
+      ],
+      "schedule": [{ "eventId": "flood_reconstruction", "delayDays": 10 }]
+    }
+  },
+  {
+    "id": "flood_accountability",
+    "chainId": null,
+    "nodeId": null,
+    "title": "防汛问责复盘",
+    "description": "汛情暴露出准备和协同短板，需要说明责任并提交整改方案。",
+    "category": "governance",
+    "priority": "high",
+    "presentation": "inbox",
+    "trigger": { "sources": ["event.resolved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_source" },
+    "activation": { "deadlineDays": 5 },
+    "options": [
+      {
+        "id": "accept_accountability",
+        "label": "承担责任并整改",
+        "description": "公开复盘，明确整改时限。",
+        "effects": [
+          { "target": "character", "field": "integrity", "operation": "add", "value": 3 },
+          { "target": "character", "field": "performance", "operation": "add", "value": -3 }
+        ],
+        "schedule": [{ "eventId": "flood_reconstruction", "delayDays": 5 }]
+      },
+      {
+        "id": "explain_constraints",
+        "label": "说明客观困难",
+        "description": "强调资源与时间约束，争取上级支持。",
+        "effects": [
+          { "target": "character", "field": "network", "operation": "add", "value": -2 },
+          { "target": "character", "field": "stability", "operation": "add", "value": -2 }
+        ],
+        "schedule": [{ "eventId": "flood_reconstruction", "delayDays": 5 }]
+      }
+    ]
+  },
+  {
+    "id": "flood_reconstruction",
+    "chainId": null,
+    "nodeId": null,
+    "title": "灾后重建启动",
+    "description": "抢险告一段落，转入受损设施修复、群众安置和风险点复盘。",
+    "category": "emergency",
+    "priority": "normal",
+    "presentation": "automatic",
+    "trigger": { "sources": ["event.resolved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_source" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        { "target": "character", "field": "stability", "operation": "add", "value": 4 },
+        { "target": "world_fact", "factId": "flood_prepared", "operation": "set", "value": false }
+      ]
+    }
+  },
+  {
+    "id": "investment_promotion_completed",
+    "chainId": "investment_action_chain",
+    "nodeId": "investment_completed",
+    "title": "招商行动完成",
+    "description": "招商活动形成了项目线索和园区诉求，可据此提出产业园扶持政策。",
+    "category": "governance",
+    "priority": "normal",
+    "presentation": "automatic",
+    "trigger": {
+      "sources": ["action.completed"],
+      "condition": { "signalField": "actionId", "op": "eq", "value": "investment_promotion" },
+      "probability": 1
+    },
+    "repeatPolicy": { "mode": "once_per_source" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        {
+          "target": "institution_metric",
+          "institutionRef": { "source": "signal", "field": "institutionId" },
+          "metricId": "investment_pipeline",
+          "operation": "add",
+          "value": 10
+        },
+        {
+          "target": "region_metric",
+          "regionRef": { "source": "signal", "field": "regionId" },
+          "metricId": "investment_attention",
+          "operation": "add",
+          "value": 5
+        }
+      ],
+      "schedule": [{ "eventId": "industrial_park_policy_proposal", "delayDays": 0 }]
+    }
+  },
+  {
+    "id": "industrial_park_policy_proposal",
+    "chainId": "investment_action_chain",
+    "nodeId": "policy_proposal",
+    "title": "提出产业园扶持政策",
+    "description": "招商线索已足以支持政策提议。提交后可在政策页面审批“产业园区扶持政策”。",
+    "category": "governance",
+    "priority": "high",
+    "presentation": "inbox",
+    "trigger": { "sources": ["event.resolved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": { "deadlineDays": 14 },
+    "options": [
+      {
+        "id": "submit_proposal",
+        "label": "提交政策提议",
+        "description": "将园区扶持方案送审，并转入政策审批流程。",
+        "effects": [
+          { "target": "character", "field": "competence", "operation": "add", "value": 2 },
+          {
+            "target": "world_fact",
+            "factId": "industrial_park_policy_proposed",
+            "operation": "set",
+            "value": true
+          }
+        ],
+        "schedule": [{ "eventId": "industrial_park_approval_guidance", "delayDays": 0 }]
+      },
+      {
+        "id": "revise_proposal",
+        "label": "补充论证后再提议",
+        "description": "先完善招商测算和风险评估。",
+        "effects": [{ "target": "character", "field": "diligence", "operation": "add", "value": 2 }]
+      }
+    ]
+  },
+  {
+    "id": "industrial_park_approval_guidance",
+    "chainId": "investment_action_chain",
+    "nodeId": "approval_guidance",
+    "title": "政策进入审批",
+    "description": "产业园扶持方案已完成提议；审批通过后将自动进入准备阶段并启动园区内容链。",
+    "category": "governance",
+    "priority": "normal",
+    "presentation": "automatic",
+    "trigger": { "sources": ["event.resolved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": []
+    }
+  },
+  {
+    "id": "industrial_park_policy_approved",
+    "chainId": "industrial_park_policy_chain",
+    "nodeId": "approved",
+    "title": "产业园扶持政策获批",
+    "description": "政策审批完成，原政策实例正式进入准备阶段；后续内容将持续绑定该实例及其来源机构、地区和职位。",
+    "category": "governance",
+    "priority": "high",
+    "presentation": "automatic",
+    "trigger": {
+      "sources": ["policy.approved"],
+      "condition": {
+        "all": [
+          { "signalField": "policyId", "op": "eq", "value": "industrial_park_support" },
+          { "fact": "industrial_park_policy_proposed", "op": "is_true" }
+        ]
+      },
+      "probability": 1
+    },
+    "repeatPolicy": { "mode": "once_per_source" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        {
+          "target": "policy_metric",
+          "policyRef": { "source": "signal", "field": "policyInstanceId" },
+          "metricId": "implementation_readiness",
+          "operation": "add",
+          "value": 10
+        }
+      ],
+      "schedule": [{ "eventId": "industrial_park_preparation_started", "delayDays": 0 }]
+    }
+  },
+  {
+    "id": "industrial_park_preparation_started",
+    "chainId": "industrial_park_policy_chain",
+    "nodeId": "preparation",
+    "title": "园区准备阶段启动",
+    "description": "规划、资金和审批手续正在并行准备，项目落地节奏仍需持续跟踪。",
+    "category": "governance",
+    "priority": "normal",
+    "presentation": "automatic",
+    "trigger": { "sources": ["policy.approved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        {
+          "target": "policy_metric",
+          "policyRef": { "source": "signal", "field": "policyInstanceId" },
+          "metricId": "implementation_readiness",
+          "operation": "add",
+          "value": 10
+        }
+      ],
+      "schedule": [{ "eventId": "industrial_park_landing_review", "delayDays": 35 }]
+    }
+  },
+  {
+    "id": "industrial_park_landing_review",
+    "chainId": "industrial_park_policy_chain",
+    "nodeId": "landing_review",
+    "title": "园区项目延迟落地检查",
+    "description": "准备期接近完成，部分项目仍未按计划落地。请确定后续推进策略。",
+    "category": "governance",
+    "priority": "urgent",
+    "presentation": "blocking",
+    "trigger": { "sources": ["policy.approved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": { "deadlineDays": 5 },
+    "options": [
+      {
+        "id": "keep_schedule",
+        "label": "按既定方案推进",
+        "description": "保持审批和建设节奏，等待项目集中落地。",
+        "effects": [
+          {
+            "target": "policy_metric",
+            "policyRef": { "source": "signal", "field": "policyInstanceId" },
+            "metricId": "implementation_progress",
+            "operation": "add",
+            "value": 15
+          }
+        ],
+        "schedule": [{ "eventId": "industrial_park_implementation_smooth", "delayDays": 0 }]
+      },
+      {
+        "id": "add_incentives",
+        "label": "追加落地优惠",
+        "description": "以额外优惠换取项目加快签约和建设。",
+        "effects": [
+          {
+            "target": "policy_metric",
+            "policyRef": { "source": "signal", "field": "policyInstanceId" },
+            "metricId": "concession_cost",
+            "operation": "add",
+            "value": 12
+          },
+          { "target": "character", "field": "performance", "operation": "add", "value": 3 }
+        ],
+        "schedule": [{ "eventId": "industrial_park_implementation_incentives", "delayDays": 0 }]
+      },
+      {
+        "id": "prioritize_environment",
+        "label": "先处置环保风险",
+        "description": "暂停高风险项目衔接，补齐环评和污染防控措施。",
+        "effects": [
+          {
+            "target": "policy_metric",
+            "policyRef": { "source": "signal", "field": "policyInstanceId" },
+            "metricId": "environmental_risk",
+            "operation": "add",
+            "value": 20
+          },
+          { "target": "character", "field": "integrity", "operation": "add", "value": 3 }
+        ],
+        "schedule": [{ "eventId": "industrial_park_implementation_environment", "delayDays": 0 }]
+      }
+    ]
+  },
+  {
+    "id": "industrial_park_implementation_smooth",
+    "chainId": "industrial_park_policy_chain",
+    "nodeId": "implementation_smooth",
+    "title": "园区实施顺利推进",
+    "description": "项目按计划衔接，基础设施和企业入驻同步推进。",
+    "category": "economic",
+    "priority": "normal",
+    "presentation": "automatic",
+    "trigger": { "sources": ["policy.approved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        {
+          "target": "policy_metric",
+          "policyRef": { "source": "signal", "field": "policyInstanceId" },
+          "metricId": "implementation_progress",
+          "operation": "add",
+          "value": 25
+        },
+        {
+          "target": "region_metric",
+          "regionRef": { "source": "signal", "field": "regionId" },
+          "metricId": "investment_progress",
+          "operation": "add",
+          "value": 12
+        }
+      ],
+      "schedule": [{ "eventId": "industrial_park_evaluation_followup", "delayDays": 30 }]
+    }
+  },
+  {
+    "id": "industrial_park_implementation_incentives",
+    "chainId": "industrial_park_policy_chain",
+    "nodeId": "implementation_incentives",
+    "title": "追加优惠后项目落地",
+    "description": "优惠政策带动项目加快落地，但财政承压和兑现风险同步上升。",
+    "category": "economic",
+    "priority": "high",
+    "presentation": "automatic",
+    "trigger": { "sources": ["policy.approved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        {
+          "target": "policy_metric",
+          "policyRef": { "source": "signal", "field": "policyInstanceId" },
+          "metricId": "implementation_progress",
+          "operation": "add",
+          "value": 18
+        },
+        {
+          "target": "region_metric",
+          "regionRef": { "source": "signal", "field": "regionId" },
+          "metricId": "investment_progress",
+          "operation": "add",
+          "value": 8
+        },
+        { "target": "character", "field": "stability", "operation": "add", "value": -2 }
+      ],
+      "schedule": [{ "eventId": "industrial_park_evaluation_followup", "delayDays": 30 }]
+    }
+  },
+  {
+    "id": "industrial_park_implementation_environment",
+    "chainId": "industrial_park_policy_chain",
+    "nodeId": "implementation_environment",
+    "title": "园区环保风险处置",
+    "description": "环评和污染防控被前置处理，项目节奏放缓，但避免了后续环境事件。",
+    "category": "economic",
+    "priority": "high",
+    "presentation": "automatic",
+    "trigger": { "sources": ["policy.approved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        {
+          "target": "policy_metric",
+          "policyRef": { "source": "signal", "field": "policyInstanceId" },
+          "metricId": "environmental_risk",
+          "operation": "add",
+          "value": -15
+        },
+        {
+          "target": "region_metric",
+          "regionRef": { "source": "signal", "field": "regionId" },
+          "metricId": "environment_score",
+          "operation": "add",
+          "value": 10
+        },
+        { "target": "character", "field": "performance", "operation": "add", "value": -2 }
+      ],
+      "schedule": [{ "eventId": "industrial_park_evaluation_followup", "delayDays": 30 }]
+    }
+  },
+  {
+    "id": "industrial_park_evaluation_followup",
+    "chainId": "industrial_park_policy_chain",
+    "nodeId": "evaluation_followup",
+    "title": "产业园政策评估与后续影响",
+    "description": "围绕落地进度、优惠成本和环境影响形成评估结论，并沉淀为后续施政履历。",
+    "category": "governance",
+    "priority": "normal",
+    "presentation": "automatic",
+    "trigger": { "sources": ["policy.approved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        {
+          "target": "policy_metric",
+          "policyRef": { "source": "signal", "field": "policyInstanceId" },
+          "metricId": "evaluation_completed",
+          "operation": "set",
+          "value": 1
+        },
+        { "target": "character", "field": "diligence", "operation": "add", "value": 3 }
+      ]
+    }
+  },
+  {
+    "id": "report_shelved",
+    "chainId": "shelved_report_chain",
+    "nodeId": "shelved",
+    "title": "举报被暂时搁置",
+    "description": "线索未被立即处理，但材料和相关人员仍可能在巡视或媒体关注中再次出现。",
+    "category": "governance",
+    "priority": "normal",
+    "presentation": "automatic",
+    "trigger": { "sources": ["event.resolved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [{ "target": "character", "field": "stability", "operation": "add", "value": 1 }],
+      "schedule": [
+        {
+          "eventId": "formal_investigation",
+          "delayDays": 14,
+          "probability": 0.3,
+          "mutexGroup": "shelved_report_outcome"
+        },
+        {
+          "eventId": "inspection_exposure",
+          "delayDays": 14,
+          "probability": 0.4,
+          "mutexGroup": "shelved_report_outcome"
+        },
+        {
+          "eventId": "later_exposure",
+          "delayDays": 14,
+          "probability": 0.3,
+          "mutexGroup": "shelved_report_outcome"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inspection_exposure",
+    "chainId": "inspection_exposure_chain",
+    "nodeId": "inspection_exposure",
+    "title": "巡视暴露问题线索",
+    "description": "巡视组在例行检查中发现此前举报涉及的材料和异常流程，要求转入正式核查。",
+    "category": "governance",
+    "priority": "urgent",
+    "presentation": "automatic",
+    "trigger": { "sources": ["event.resolved"], "scheduledOnly": true, "probability": 1 },
+    "repeatPolicy": { "mode": "once_per_chain" },
+    "activation": {},
+    "options": [],
+    "automaticOutcome": {
+      "effects": [
+        { "target": "character", "field": "stability", "operation": "add", "value": -10 },
+        { "target": "character", "field": "corruptionRisk", "operation": "add", "value": 8 }
+      ],
+      "schedule": [{ "eventId": "formal_investigation", "delayDays": 1 }]
+    }
   }
 ]

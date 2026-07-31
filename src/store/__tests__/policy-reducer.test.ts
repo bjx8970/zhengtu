@@ -22,7 +22,9 @@ function propose(store: ReturnType<typeof createTestStore>) {
 
 describe('policy-reducer dispatch', () => {
   it('PROPOSE → APPROVE 应用冻结的 signal 引用效果', () => {
-    const store = createTestStore();
+    const initial = createInitialState();
+    initial.world.facts.industrial_park_policy_proposed = true;
+    const store = createTestStore(initial);
     const proposed = propose(store);
 
     // 调用方对配置查询结果的篡改不能影响已经冻结的实例快照。
@@ -65,7 +67,9 @@ describe('policy-reducer dispatch', () => {
   });
 
   it('仅提供有效 institutionId 会自动使用其所属地区', () => {
-    const store = createTestStore();
+    const state = createInitialState();
+    state.world.facts.industrial_park_policy_proposed = true;
+    const store = createTestStore(state);
     store.dispatch({
       type: 'PROPOSE_POLICY',
       policyId,
@@ -78,7 +82,9 @@ describe('policy-reducer dispatch', () => {
   });
 
   it('县级实例的阶段效果只写入其实例地区', () => {
-    const store = createTestStore();
+    const state = createInitialState();
+    state.world.facts.industrial_park_policy_proposed = true;
+    const store = createTestStore(state);
     store.dispatch({
       type: 'PROPOSE_POLICY',
       policyId,
@@ -104,6 +110,7 @@ describe('policy-reducer dispatch', () => {
 
   it('blocker 存在时将政策信号作为 continuation 延后处理', () => {
     const base = createInitialState();
+    base.world.facts.industrial_park_policy_proposed = true;
     base.events.activeBlockingEventId = 'blocking_event';
     const store = createTestStore(base);
 
@@ -120,7 +127,9 @@ describe('policy-reducer dispatch', () => {
   });
 
   it('七个 dispatch 分支的合法及非法状态转换都保持状态机约束', () => {
-    const store = createTestStore();
+    const state = createInitialState();
+    state.world.facts.industrial_park_policy_proposed = true;
+    const store = createTestStore(state);
     store.dispatch({ type: 'APPROVE_POLICY', policyInstanceId: 'missing' });
     expect(store.getRawState().governance.policies).toHaveLength(0);
 
