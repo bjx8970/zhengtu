@@ -532,7 +532,10 @@
     "activation": {},
     "options": [],
     "automaticOutcome": {
-      "effects": [{ "target": "character", "field": "stability", "operation": "add", "value": 4 }]
+      "effects": [
+        { "target": "character", "field": "stability", "operation": "add", "value": 4 },
+        { "target": "world_fact", "factId": "flood_prepared", "operation": "set", "value": false }
+      ]
     }
   },
   {
@@ -590,9 +593,15 @@
         "label": "提交政策提议",
         "description": "将园区扶持方案送审，并转入政策审批流程。",
         "effects": [
-          { "target": "character", "field": "competence", "operation": "add", "value": 2 }
+          { "target": "character", "field": "competence", "operation": "add", "value": 2 },
+          {
+            "target": "world_fact",
+            "factId": "industrial_park_policy_proposed",
+            "operation": "set",
+            "value": true
+          }
         ],
-        "schedule": [{ "eventId": "industrial_park_approval_guidance", "delayDays": 1 }]
+        "schedule": [{ "eventId": "industrial_park_approval_guidance", "delayDays": 0 }]
       },
       {
         "id": "revise_proposal",
@@ -616,14 +625,7 @@
     "activation": {},
     "options": [],
     "automaticOutcome": {
-      "effects": [
-        {
-          "target": "world_fact",
-          "factId": "industrial_park_policy_proposed",
-          "operation": "set",
-          "value": true
-        }
-      ]
+      "effects": []
     }
   },
   {
@@ -684,7 +686,7 @@
           "value": 10
         }
       ],
-      "schedule": [{ "eventId": "industrial_park_landing_review", "delayDays": 30 }]
+      "schedule": [{ "eventId": "industrial_park_landing_review", "delayDays": 35 }]
     }
   },
   {

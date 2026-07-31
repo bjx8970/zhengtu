@@ -145,6 +145,7 @@ describe('event timeline integration', () => {
   it('自动激活政策、推进里程碑，并在存档恢复后补做同日月结', () => {
     const loader = getConfigLoader();
     const state = createInitialState();
+    state.world.facts.industrial_park_policy_proposed = true;
     const department = loader
       .resolvePositionDepartments(state.career.appointment.positionId)
       .find((item) => item.baseConsumption * item.consumptionCoefficient > 0);
