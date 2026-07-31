@@ -815,8 +815,8 @@ describe('event timeline integration', () => {
     });
 
     const afterReconstruction = store.getRawState();
-    // flood_reconstruction 的自动结果重置准备标志
-    expect(afterReconstruction.world.facts.flood_prepared).toBe(false);
+    // flood_reconstruction 不再立即重置准备标志；准备标志持续到洪水风险降至 80 以下
+    expect(afterReconstruction.world.facts.flood_prepared).toBe(true);
     expect(
       afterReconstruction.events.history.some((item) => item.eventId === 'flood_reconstruction'),
     ).toBe(true);
@@ -900,7 +900,8 @@ describe('event timeline integration', () => {
     });
 
     const afterRound1 = store.getRawState();
-    expect(afterRound1.world.facts.flood_prepared).toBe(false);
+    // 准备标志不再由 flood_reconstruction 重置，存续到洪水风险自然降至 80 以下
+    expect(afterRound1.world.facts.flood_prepared).toBe(true);
     expect(afterRound1.events.history.some((item) => item.eventId === 'flood_reconstruction')).toBe(
       true,
     );
@@ -914,14 +915,14 @@ describe('event timeline integration', () => {
       tierKey: 'primary',
       _idFactory: nextId,
     });
-    // 冷却期内操作被拒绝，推进一周后也不会有 action 完成从而设置 flood_prepared
+    // 冷却期内操作被拒绝：准备标志保持 true（由第一轮设置，且风险尚未突破 80 门槛）
     store.dispatch({
       type: 'ADVANCE_TIME',
       granularity: 'week',
       _rng: () => 0,
       _idFactory: nextId,
     });
-    expect(store.getRawState().world.facts.flood_prepared).toBe(false);
+    expect(store.getRawState().world.facts.flood_prepared).toBe(true);
 
     // ===== 第二轮：等冷却期过期 =====
     // cooldownUntilDay = startedAtDay + durationDays + cooldownDays = 0 + 4 + 35 = 39
@@ -1096,5 +1097,118 @@ describe('event timeline integration', () => {
         (item) => item.eventId === 'industrial_park_preparation_started',
       );
     expect(preparationStarted).toBeDefined();
+  });
+});
+
+describe('月度/年度钩子端到端回归', () => {
+  it('flood_risk 月度钩子在汛季第 2 年触发 flood_emergency blocking 事件', () => {
+    // 初始 month=7 day=1 yr=2012, totalDaysPlayed=0
+    const state = createInitialState();
+    state.remainingBudget = 50_000;
+    // 确保有部门状态可供月度结算
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `flood-hoof-${sequence++}`;
+
+    // 推进 13 个月到达 year 2 month 7: flood_risk 75 (尚未 ≥80)
+    for (let i = 0; i < 13; i++) {
+      store.dispatch({
+        type: 'ADVANCE_TIME',
+        granularity: 'month',
+        _rng: () => 0,
+        _idFactory: nextId,
+      });
+    }
+
+    // 再推进 1 个月: year 2 month 8, flood_risk 75→100, 应该触发 flood_emergency
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'month',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const result = store.getRawState();
+    const floodEmergency = result.events.pending.find(
+      (event) => event.eventId === 'flood_emergency',
+    );
+    expect(floodEmergency).toBeDefined();
+    expect(result.events.activeBlockingEventId).toBe(floodEmergency?.instanceId);
+    // flood_prepared 初始为 false，未经准备行动不得变为 true
+    expect(result.world.facts.flood_prepared).toBeUndefined();
+  });
+
+  it('flood_risk 信号不会误触发 investigation_start（跨污染防护）', () => {
+    // 设置 corruption_report 已达标，但 flood_risk 信号不应触发调查
+    const state = createInitialState();
+    state.remainingBudget = 50_000;
+    state.world.metrics.corruption_report = 65;
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `flood-xcont-${sequence++}`;
+
+    // 推进 1 个月: flood_risk 0→25，发出 world.metric_changed(flood_risk)
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'month',
+      _rng: () => 0,
+      _idFactory: nextId,
+    });
+
+    const result = store.getRawState();
+    // flood_risk 确已更新
+    expect(result.world.metrics.flood_risk).toBe(25);
+    // 但 investigation_start 不应出现（信号 metricId 不匹配）
+    const investigation = result.events.pending.find(
+      (event) => event.eventId === 'investigation_start',
+    );
+    const investigationScheduled = result.events.scheduled.find(
+      (item) => item.eventId === 'investigation_start',
+    );
+    expect(investigation).toBeUndefined();
+    expect(investigationScheduled).toBeUndefined();
+  });
+
+  it('年度考核钩子触发 investigation_start 且仅触发一次', () => {
+    // 设置腐败角色，推进一整年，验证调查事件仅触发一次
+    const state = createInitialState();
+    state.remainingBudget = 50_000;
+    // 低 integrity + 高 corruptionRisk → 高 corruption_report
+    state.character.integrity = 20;
+    state.character.corruptionRisk = 60;
+    state.character.stability = 50;
+    // computeCorruptionReport: (100-20)*0.5 + 60*0.3 + (100-50)*0.2 = 40+18+10 = 68
+    const store = createTestStore(state);
+    let sequence = 0;
+    const nextId = () => `annual-invest-${sequence++}`;
+
+    // 推进 6 个月，到达年底 (month 12)，年度考核触发
+    // 逐月推进。汛期 (7-8 月) flood_risk 信号不会触发调查 (跨污染防护)
+    for (let i = 0; i < 6; i++) {
+      store.dispatch({
+        type: 'ADVANCE_TIME',
+        granularity: 'month',
+        _rng: () => 0,
+        _idFactory: nextId,
+      });
+    }
+
+    const result = store.getRawState();
+    // corruption_report 已被年度钩子计算并写入
+    expect(result.world.metrics.corruption_report).toBeGreaterThanOrEqual(60);
+    // investigation_start 应出现（来自 annual assessment 的 corruption_report 信号）
+    const investigation = result.events.pending.find(
+      (event) => event.eventId === 'investigation_start',
+    );
+    expect(investigation).toBeDefined();
+    // 应只触发一次
+    const investigationCount = result.events.pending.filter(
+      (event) => event.eventId === 'investigation_start',
+    ).length;
+    expect(investigationCount).toBe(1);
+    // flood_risk 信号不应同时触发（跨污染：flood_risk 未达 80 时不应触发 flood_emergency）
+    expect(
+      result.events.pending.filter((event) => event.eventId === 'flood_emergency').length,
+    ).toBe(0);
   });
 });

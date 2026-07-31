@@ -176,13 +176,33 @@ describe('条件解释器 - 职业状态', () => {
 
 describe('条件解释器 - 世界指标与事实', () => {
   it('世界指标缺失默认为 0', () => {
-    const ctx = makeContext();
+    // 使用非 world.metric_changed 信号，避免 metricId 过滤干扰默认值测试
+    const ctx = makeContext((c) => {
+      c.signal = {
+        signalType: 'action.completed',
+        signalId: 's1',
+        occurredAtDay: 100,
+        data: {
+          actionInstanceId: 'a1',
+          actionId: 'test',
+          deptId: 'd1',
+          regionId: 'r1',
+          institutionId: 'i1',
+        },
+      } as DomainSignalSnapshot;
+    });
     expect(evalCond({ worldMetric: 'nonexistent', op: 'eq', value: 0 }, ctx)).toBe(true);
   });
 
   it('世界指标比较', () => {
     const ctx = makeContext((c) => {
       c.state.world.metrics['gdp'] = 100;
+      c.signal = {
+        signalType: 'world.metric_changed',
+        signalId: 's2',
+        occurredAtDay: 100,
+        data: { metricId: 'gdp', value: 100 },
+      } as DomainSignalSnapshot;
     });
     expect(evalCond({ worldMetric: 'gdp', op: 'gte', value: 100 }, ctx)).toBe(true);
   });

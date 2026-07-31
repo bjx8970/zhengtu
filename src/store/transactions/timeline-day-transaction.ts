@@ -336,6 +336,18 @@ function processMonthlySettlement(
     cfg.monthlyRise,
     cfg.monthlyFall,
   );
+  const rainyMonths = cfg.rainyMonths;
+  const isRainy = rainyMonths.includes(endedMonth);
+  // 清除准备标记的时机：
+  //   A) 风险从 ≥80 降回 <80（危险已过），或
+  //   B) 非雨季且风险 <80（汛季结束，即使风险从未达到 80 也应重置）
+  if (draft.world.facts.flood_prepared === true) {
+    const crossedDown = previous >= 80 && delta.next < 80;
+    const seasonOver = !isRainy && delta.next < 80;
+    if (crossedDown || seasonOver) {
+      draft.world.facts.flood_prepared = false;
+    }
+  }
   if (delta.next === delta.previous) return null;
   draft.world.metrics.flood_risk = delta.next;
   return {

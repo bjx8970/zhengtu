@@ -546,7 +546,7 @@
     "automaticOutcome": {
       "effects": [
         { "target": "character", "field": "stability", "operation": "add", "value": 4 },
-        { "target": "world_fact", "factId": "flood_prepared", "operation": "set", "value": false }
+        { "target": "character", "field": "diligence", "operation": "add", "value": 2 }
       ]
     }
   },
