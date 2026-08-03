@@ -360,6 +360,11 @@ const ConstantsSchema = z.object({
         Math.abs(w.virtue + w.capacity + w.diligenceScore + w.achievement + w.honesty - 1) < 0.001,
       { message: 'comprehensiveScoreWeights 总和必须为 1.0' },
     ),
+  floodRiskByMonth: z.object({
+    rainyMonths: z.array(z.number().min(1).max(12)),
+    monthlyRise: z.number().min(0),
+    monthlyFall: z.number().min(0),
+  }),
   promotion: z.object({
     democraticVote: z.object({
       passThreshold: z.number(),

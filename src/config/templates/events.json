@@ -12,6 +12,7 @@
       "sources": ["world.metric_changed"],
       "condition": {
         "all": [
+          { "signalField": "metricId", "op": "eq", "value": "flood_risk" },
           { "worldMetric": "flood_risk", "op": "gte", "value": 80 },
           { "fact": "flood_prepared", "op": "is_false" }
         ]
@@ -20,7 +21,7 @@
     },
     "repeatPolicy": {
       "mode": "repeatable",
-      "cooldownDays": 30
+      "cooldownDays": 120
     },
     "activation": {
       "deadlineDays": 3
@@ -78,6 +79,11 @@
       "condition": {
         "all": [
           {
+            "signalField": "metricId",
+            "op": "eq",
+            "value": "corruption_report"
+          },
+          {
             "worldMetric": "corruption_report",
             "op": "gte",
             "value": 60
@@ -100,7 +106,13 @@
         "description": "全力配合纪委调查，主动提供相关材料并接受正式核查。",
         "effects": [
           { "target": "character", "field": "integrity", "operation": "add", "value": 5 },
-          { "target": "character", "field": "stability", "operation": "add", "value": -3 }
+          { "target": "character", "field": "stability", "operation": "add", "value": -3 },
+          {
+            "target": "world_metric",
+            "metricId": "corruption_report",
+            "operation": "set",
+            "value": 0
+          }
         ],
         "schedule": [{ "eventId": "formal_investigation", "delayDays": 3, "probability": 1 }]
       },
@@ -249,6 +261,12 @@
           "factId": "formal_investigation_ongoing",
           "operation": "set",
           "value": false
+        },
+        {
+          "target": "world_metric",
+          "metricId": "corruption_report",
+          "operation": "set",
+          "value": 0
         }
       ]
     }
@@ -414,7 +432,7 @@
           "value": 20
         }
       ],
-      "schedule": [{ "eventId": "flood_prepared_emergency", "delayDays": 14 }]
+      "schedule": []
     }
   },
   {
@@ -426,8 +444,18 @@
     "category": "emergency",
     "priority": "urgent",
     "presentation": "blocking",
-    "trigger": { "sources": ["event.resolved"], "scheduledOnly": true, "probability": 1 },
-    "repeatPolicy": { "mode": "once_per_chain" },
+    "trigger": {
+      "sources": ["world.metric_changed"],
+      "condition": {
+        "all": [
+          { "signalField": "metricId", "op": "eq", "value": "flood_risk" },
+          { "worldMetric": "flood_risk", "op": "gte", "value": 80 },
+          { "fact": "flood_prepared", "op": "is_true" }
+        ]
+      },
+      "probability": 1
+    },
+    "repeatPolicy": { "mode": "repeatable", "cooldownDays": 120 },
     "activation": { "deadlineDays": 3 },
     "options": [
       {
@@ -534,7 +562,7 @@
     "automaticOutcome": {
       "effects": [
         { "target": "character", "field": "stability", "operation": "add", "value": 4 },
-        { "target": "world_fact", "factId": "flood_prepared", "operation": "set", "value": false }
+        { "target": "character", "field": "diligence", "operation": "add", "value": 2 }
       ]
     }
   },
@@ -892,7 +920,15 @@
     "activation": {},
     "options": [],
     "automaticOutcome": {
-      "effects": [{ "target": "character", "field": "stability", "operation": "add", "value": 1 }],
+      "effects": [
+        { "target": "character", "field": "stability", "operation": "add", "value": 1 },
+        {
+          "target": "world_metric",
+          "metricId": "corruption_report",
+          "operation": "set",
+          "value": 0
+        }
+      ],
       "schedule": [
         {
           "eventId": "formal_investigation",

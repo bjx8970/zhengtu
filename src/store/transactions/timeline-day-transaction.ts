@@ -21,6 +21,8 @@ import {
   computeComprehensiveScore,
 } from '../../engine/governance/dimensions';
 import { annualAssessment as runAnnualAssessment } from '../../engine/governance/assessment';
+import { computeCorruptionReport } from '../../engine/governance/corruption-report';
+import { computeFloodRiskMonthDelta } from '../../engine/world/flood-risk';
 import { decayStyleScores } from '../../engine/career/style-decay';
 import type { ActionCompletionTimelineEvent } from '../../types/game';
 import type {
@@ -153,14 +155,33 @@ export function processTimelineNodes(
       case 'event_deadline':
         expireEventsAtDay(draft, node.absoluteDay);
         break;
-      case 'monthly_settlement':
-        processMonthlySettlement(draft);
+      case 'monthly_settlement': {
+        const monthlySignal = processMonthlySettlement(
+          draft,
+          node.month,
+          node.absoluteDay,
+          idFactory,
+        );
+        if (monthlySignal) {
+          processCascadeSignalsInTransaction(
+            draft,
+            [monthlySignal],
+            node.absoluteDay,
+            rng,
+            idFactory,
+            definitions,
+          );
+          if (draft.events.activeBlockingEventId !== null) {
+            return { interrupted: true, remainingNodes: nodes.slice(index + 1) };
+          }
+        }
         break;
+      }
       case 'annual_assessment': {
-        const signal = processAnnualAssessment(draft, node.year, node.absoluteDay, idFactory);
+        const signals = processAnnualAssessment(draft, node.year, node.absoluteDay, idFactory);
         processCascadeSignalsInTransaction(
           draft,
-          [signal],
+          signals,
           node.absoluteDay,
           rng,
           idFactory,
@@ -272,7 +293,21 @@ function processActionCompletion(
   };
 }
 
-function processMonthlySettlement(draft: PlayerSave): void {
+/**
+ * 执行月度结算：预算扣除 + 风格衰减 + 防汛风险自动变化。
+ *
+ * @param draft      可变事务状态
+ * @param endedMonth 刚结束的月份 (1-12)
+ * @param absoluteDay 当前绝对日
+ * @param idFactory   事务共享 ID 工厂
+ * @returns 若 flood_risk 发生变化则返回 world.metric_changed 信号，否则 null
+ */
+function processMonthlySettlement(
+  draft: PlayerSave,
+  endedMonth: number,
+  absoluteDay: number,
+  idFactory: () => string,
+): DomainSignalSnapshot | null {
   const loader = getConfigLoader();
   const departments = loader.resolvePositionDepartments(draft.career.appointment.positionId);
   const result = monthlySettlement(
@@ -291,14 +326,49 @@ function processMonthlySettlement(draft: PlayerSave): void {
     draft.character.philosophy.scores,
     loader.getLeadershipStyleConfig(),
   );
+
+  const cfg = loader.getGameConfig().floodRiskByMonth;
+  const previous = draft.world.metrics.flood_risk ?? 0;
+  const delta = computeFloodRiskMonthDelta(
+    previous,
+    endedMonth,
+    cfg.rainyMonths,
+    cfg.monthlyRise,
+    cfg.monthlyFall,
+  );
+  // 清除准备标记的时机：仅当风险从 ≥80 降回 <80（确有汛情才消耗准备）。
+  // 不再按月份清除——旱季提前准备应延续至首次真正汛情，而非被日历清零。
+  if (draft.world.facts.flood_prepared === true) {
+    const crossedDown = previous >= 80 && delta.next < 80;
+    if (crossedDown) {
+      draft.world.facts.flood_prepared = false;
+    }
+  }
+  if (delta.next === delta.previous) return null;
+  draft.world.metrics.flood_risk = delta.next;
+  return {
+    signalId: idFactory(),
+    signalType: 'world.metric_changed',
+    occurredAtDay: absoluteDay,
+    data: { metricId: 'flood_risk', value: delta.next },
+  };
 }
 
+/**
+ * 执行年度考核：综合评分 + 等次 + 奖惩 + 腐败举报指数更新。
+ *
+ * @param draft      可变事务状态
+ * @param year       考核年份
+ * @param absoluteDay 当前绝对日
+ * @param idFactory   事务共享 ID 工厂
+ * @returns 包含 assessment.completed 和 world.metric_changed 的信号数组
+ */
 function processAnnualAssessment(
   draft: PlayerSave,
   year: number,
   absoluteDay: number,
   idFactory: () => string,
-): DomainSignalSnapshot {
+): DomainSignalSnapshot[] {
   const loader = getConfigLoader();
   const cfg = loader.getGameConfig();
   const departments = loader.resolvePositionDepartments(draft.career.appointment.positionId);
@@ -337,12 +407,32 @@ function processAnnualAssessment(
       cfg.attributeBounds,
     );
   }
-  return {
+
+  const signals: DomainSignalSnapshot[] = [
+    {
+      signalId: idFactory(),
+      signalType: 'assessment.completed',
+      occurredAtDay: absoluteDay,
+      data: { year, score, tier: annual.tier },
+    },
+  ];
+
+  const newReport = computeCorruptionReport({
+    integrity: draft.character.integrity,
+    corruptionRisk: draft.character.corruptionRisk,
+    stability: draft.character.stability,
+  });
+  // 即使值未变也每年发出信号，确保惰性玩家（属性长期不变）的举报链每年可达。
+  // investigation_start 的 once_per_source 以 signalId 为 key，每年新信号可触发一次。
+  draft.world.metrics.corruption_report = newReport;
+  signals.push({
     signalId: idFactory(),
-    signalType: 'assessment.completed',
+    signalType: 'world.metric_changed',
     occurredAtDay: absoluteDay,
-    data: { year, score, tier: annual.tier },
-  };
+    data: { metricId: 'corruption_report', value: newReport },
+  });
+
+  return signals;
 }
 
 /**
