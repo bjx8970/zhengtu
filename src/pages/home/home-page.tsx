@@ -362,6 +362,7 @@ export function HomePage() {
           <For each={GRANULARITIES}>
             {(g, i) => (
               <button
+                data-testid={`advance-${g.granularity}`}
                 onClick={() => {
                   setLastAdvance(true);
                   dispatch({ type: 'ADVANCE_TIME', granularity: g.granularity });

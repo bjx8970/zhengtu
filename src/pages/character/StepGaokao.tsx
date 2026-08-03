@@ -29,6 +29,7 @@ export function StepGaokao(props: StepGaokaoProps) {
         when={props.data.gaokaoScore > 0}
         fallback={
           <button
+            data-testid="generate-gaokao-score"
             onClick={() => props.rollGaokao(prov)}
             style={{
               padding: '1rem 2rem',

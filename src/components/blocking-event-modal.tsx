@@ -87,6 +87,7 @@ export function BlockingEventModal() {
               <For each={event().snapshot.options}>
                 {(option) => (
                   <button
+                    data-testid={`blocking-event-option-${event().instanceId}-${option.id}`}
                     onClick={() =>
                       dispatch({
                         type: 'CHOOSE_EVENT_OPTION',

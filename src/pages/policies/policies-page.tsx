@@ -111,6 +111,7 @@ export function PoliciesPage() {
                     </p>
                   </div>
                   <button
+                    data-testid={`propose-policy-${definition.id}`}
                     disabled={alreadyTracked()}
                     onClick={() => dispatch({ type: 'PROPOSE_POLICY', policyId: definition.id })}
                     style={{
@@ -240,6 +241,7 @@ export function PoliciesPage() {
                       <For each={actions()}>
                         {(action) => (
                           <button
+                            data-testid={`${action.type.toLowerCase()}-policy-${policy.instanceId}`}
                             disabled={action.disabled}
                             onClick={() =>
                               dispatch({ type: action.type, policyInstanceId: policy.instanceId })

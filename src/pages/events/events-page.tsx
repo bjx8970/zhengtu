@@ -138,6 +138,7 @@ export function EventsPage() {
                       <For each={event.snapshot.options}>
                         {(option) => (
                           <button
+                            data-testid={`event-option-${event.instanceId}-${option.id}`}
                             onClick={() =>
                               dispatch({
                                 type: 'CHOOSE_EVENT_OPTION',

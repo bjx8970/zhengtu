@@ -312,6 +312,7 @@ function DeptDetailView(props: { dept: DepartmentConfig; onBack: () => void }) {
                         const disabled = onCooldown || !hasFree || insufficientBudget;
                         return (
                           <button
+                            data-testid={`start-action-${props.dept.id}-${action.id}-${tb.key}`}
                             onClick={() =>
                               dispatch({
                                 type: 'START_ACTION',

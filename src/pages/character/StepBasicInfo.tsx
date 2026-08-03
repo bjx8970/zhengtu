@@ -30,6 +30,7 @@ export function StepBasicInfo(props: StepBasicInfoProps) {
         —— 名不正则言不顺 ——
       </div>
       <input
+        data-testid="character-name"
         type="text"
         placeholder="请输入姓名"
         value={props.data.characterName}

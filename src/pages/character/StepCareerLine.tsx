@@ -62,6 +62,7 @@ export function StepCareerLine(props: Props) {
             const selected = props.data.careerLine === line.id;
             return (
               <button
+                data-testid={`career-line-${line.id}`}
                 onClick={() => {
                   if (!line.disabled) props.updateField('careerLine', line.id);
                 }}

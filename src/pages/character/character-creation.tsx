@@ -209,6 +209,7 @@ export function CharacterCreation() {
       <div style={{ display: 'flex', gap: '0.8rem', padding: '1rem 1.5rem 1.5rem' }}>
         <Show when={step() > 0}>
           <button
+            data-testid="character-previous"
             onClick={handlePrev}
             style={{
               flex: 1,
@@ -226,6 +227,7 @@ export function CharacterCreation() {
         </Show>
         <Show when={step() < TOTAL - 1}>
           <button
+            data-testid="character-next"
             onClick={handleNext}
             disabled={!canNext()}
             style={{
@@ -244,6 +246,7 @@ export function CharacterCreation() {
         </Show>
         <Show when={step() === TOTAL - 1}>
           <button
+            data-testid="character-complete"
             onClick={handleComplete}
             disabled={!canNext()}
             style={{
