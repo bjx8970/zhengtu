@@ -21,7 +21,7 @@ export default defineConfig({
   webServer: {
     command: 'pnpm exec vite --host 127.0.0.1 --port 4173',
     url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER === 'true',
     timeout: 30_000,
   },
 });

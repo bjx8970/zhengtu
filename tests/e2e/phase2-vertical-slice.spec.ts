@@ -1,126 +1,59 @@
 /**
  * Browser acceptance coverage for the playable Phase 2 vertical slice.
  *
- * Each scenario creates a real local save through the character wizard, then
- * adjusts only the preconditions that would otherwise require many in-game years.
+ * Saves only accelerate to legal pre-trigger states. Opportunities, policy
+ * facts, blocking events and delayed follow-ups must be produced by UI actions
+ * and the production time pipeline under test.
  */
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-type JsonRecord = Record<string, unknown>;
+type JsonValue = boolean | number | string | null | JsonRecord | JsonValue[];
 
-const events = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'src/config/templates/events.json'), 'utf8'),
-) as JsonRecord[];
-const positions = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'src/config/positions/positions.json'), 'utf8'),
-) as JsonRecord[];
-
-function eventDefinition(id: string): JsonRecord {
-  const definition = events.find((item) => item.id === id);
-  if (!definition) throw new Error(`Missing event definition: ${id}`);
-  return definition;
+interface JsonRecord {
+  [key: string]: JsonValue;
 }
 
-function position(id: string): JsonRecord {
+interface PositionFixture {
+  id: string;
+  name: string;
+  institutionId: string;
+  regionId: string;
+  institutionLevel: string;
+  positionDomain: string;
+  leadershipRank: string;
+  departmentTemplateIds: string[];
+  annualBudget: number;
+}
+
+interface KpiFixture {
+  targetValue: number;
+  calcType: 'absolute' | 'inverse' | 'ratio';
+}
+
+const positions = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'src/config/positions/positions.json'), 'utf8'),
+) as PositionFixture[];
+const kpiTemplates = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'src/config/templates/kpis.json'), 'utf8'),
+) as Record<string, KpiFixture>;
+
+function asRecord(value: JsonValue | undefined, name: string): JsonRecord {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error(`Expected ${name} to be a record`);
+  return value;
+}
+
+function asRecords(value: JsonValue | undefined, name: string): JsonRecord[] {
+  if (!Array.isArray(value)) throw new Error(`Expected ${name} to be an array`);
+  return value.map((item, index) => asRecord(item, `${name}[${index}]`));
+}
+
+function position(id: string): PositionFixture {
   const target = positions.find((item) => item.id === id);
   if (!target) throw new Error(`Missing position definition: ${id}`);
   return target;
-}
-
-function signal(day: number, type = 'world.metric_changed'): JsonRecord {
-  return {
-    signalId: `e2e-signal-${day}-${type}`,
-    signalType: type,
-    occurredAtDay: day,
-    data: { metricId: 'flood_risk', value: 90 },
-  };
-}
-
-function eventSnapshot(definition: JsonRecord): JsonRecord {
-  const activation = definition.activation as JsonRecord | undefined;
-  return {
-    eventId: definition.id,
-    title: definition.title,
-    description: definition.description,
-    category: definition.category,
-    priority: definition.priority,
-    presentation: definition.presentation,
-    options: definition.options,
-    automaticOutcome: definition.automaticOutcome ?? null,
-    mutexGroup: null,
-    contentVersion: 'phase2-e2e',
-    deadlineDays: activation?.deadlineDays ?? null,
-    chainId: definition.chainId ?? null,
-    nodeId: definition.nodeId ?? null,
-    repeatPolicy: definition.repeatPolicy,
-  };
-}
-
-function pendingEvent(id: string, day: number, instanceId = `e2e-${id}`): JsonRecord {
-  const definition = eventDefinition(id);
-  const activation = definition.activation as JsonRecord | undefined;
-  const deadlineDays = activation?.deadlineDays;
-  return {
-    instanceId,
-    eventId: id,
-    status: definition.presentation === 'blocking' ? 'active' : 'pending',
-    triggeredAtDay: day,
-    activatedAtDay: day,
-    deadlineDay: typeof deadlineDays === 'number' ? day + deadlineDays : null,
-    triggerContext: signal(day),
-    sourceKey: `e2e:${id}:${day}`,
-    chainInstanceId: null,
-    snapshot: eventSnapshot(definition),
-  };
-}
-
-function opportunity(id: string, positionId: string, day: number): JsonRecord {
-  const target = position(positionId);
-  return {
-    id,
-    definitionId:
-      positionId === 'admin_l2_0'
-        ? 'township_deputy_leadership_vacancy'
-        : 'township_chief_leadership_vacancy',
-    type: 'leadership_vacancy',
-    status: 'available',
-    source: {
-      sourceType: 'assessment',
-      sourceId: `assessment-${day}`,
-      signalId: `assessment-${day}`,
-      description: '年度考核',
-    },
-    sourceSignal: {
-      signalId: `assessment-${day}`,
-      signalType: 'assessment.completed',
-      occurredAtDay: day,
-      data: { year: 2027, score: 90, tier: '优秀' },
-    },
-    target: {
-      positionId: target.id,
-      positionName: target.name,
-      institutionId: target.institutionId,
-      institutionName: '青云镇人民政府',
-      regionId: target.regionId,
-      institutionLevel: target.institutionLevel,
-      positionDomain: target.positionDomain,
-      leadershipRank: target.leadershipRank,
-    },
-    appointmentType: 'substantive',
-    appointmentReason: 'promotion',
-    appearedAtDay: day,
-    expiresAtDay: day + 30,
-    acceptedAtDay: null,
-    rejectedAtDay: null,
-    resolvedAtDay: null,
-    cancelledAtDay: null,
-    requiresSelection: true,
-    eligibilityConditions: [],
-    finalOutcome: null,
-    reason: '年度考核后出现的岗位机会',
-  };
 }
 
 async function createCharacter(page: Page): Promise<void> {
@@ -156,23 +89,136 @@ async function changeSave(page: Page, change: (state: JsonRecord) => void): Prom
     if (!raw) throw new Error('Expected character creation to write a local save');
     return JSON.parse(raw) as JsonRecord;
   });
-  const state = envelope.state as JsonRecord;
+  const state = asRecord(envelope.state, 'save state');
   change(state);
-  await page.evaluate((next) => {
-    localStorage.setItem('zhengtu_autosave', JSON.stringify(next));
-  }, envelope);
+  const serializedEnvelope = JSON.stringify(envelope);
+  await page.evaluate((next) => localStorage.setItem('zhengtu_autosave', next), serializedEnvelope);
   await page.reload();
 }
 
 async function savedState(page: Page): Promise<JsonRecord> {
-  return page.evaluate(() => {
+  const serializedState = await page.evaluate(() => {
     const raw = localStorage.getItem('zhengtu_autosave');
     if (!raw) throw new Error('Expected a local save');
-    return (JSON.parse(raw) as JsonRecord).state as JsonRecord;
+    return JSON.stringify((JSON.parse(raw) as { state: unknown }).state);
   });
+  return JSON.parse(serializedState) as JsonRecord;
 }
 
-test('职业链：建档、职级晋升与两次任职保持独立', async ({ page }) => {
+function seedYearEnd(state: JsonRecord, totalDaysPlayed = 359): void {
+  const time = asRecord(state.time, 'time');
+  time.year = 2012;
+  time.month = 12;
+  time.day = 30;
+  time.totalDaysPlayed = totalDaysPlayed;
+}
+
+function seedHighAssessmentPreconditions(state: JsonRecord): void {
+  const character = asRecord(state.character, 'character');
+  Object.assign(character, {
+    integrity: 100,
+    stability: 100,
+    ambition: 100,
+    competence: 100,
+    charisma: 100,
+    network: 100,
+    diligence: 100,
+    vigor: 100,
+    corruptionRisk: 0,
+  });
+  const departmentStates = asRecord(
+    asRecord(state.actions, 'actions').departmentStates,
+    'department states',
+  );
+  for (const departmentState of Object.values(departmentStates)) {
+    asRecord(departmentState, 'department state').kpiValues = Object.fromEntries(
+      Object.entries(kpiTemplates).map(([id, template]) => [
+        id,
+        template.calcType === 'inverse' ? 0 : template.targetValue * 1.5,
+      ]),
+    );
+  }
+}
+
+function selectOpportunityId(state: JsonRecord, targetPositionId: string): string {
+  const career = asRecord(state.career, 'career');
+  const opportunity = asRecords(career.opportunities, 'career opportunities').find(
+    (item) =>
+      asRecord(item.target, 'opportunity target').positionId === targetPositionId &&
+      item.status === 'available',
+  );
+  if (!opportunity || typeof opportunity.id !== 'string') {
+    const availableTargets = asRecords(career.opportunities, 'career opportunities')
+      .filter((item) => item.status === 'available')
+      .map((item) => asRecord(item.target, 'opportunity target').positionId)
+      .join(', ');
+    const assessment = asRecords(
+      asRecord(state.assessments, 'assessments').annualAssessments,
+      'annual assessments',
+    ).at(-1);
+    const lastScore = assessment?.score;
+    const lastTier = assessment?.tier;
+    throw new Error(
+      `Expected available opportunity for ${targetPositionId}; available targets: ${availableTargets || 'none'}; last assessment: ${String(lastScore)}/${String(lastTier)}`,
+    );
+  }
+  return opportunity.id;
+}
+
+async function advanceCareerProcess(page: Page, opportunityId: string): Promise<void> {
+  for (let step = 0; step < 6; step += 1)
+    await page.getByTestId(`advance-career-process-${opportunityId}`).click();
+}
+
+async function advanceMonthResolvingFloodBlocker(page: Page): Promise<void> {
+  await page.getByTestId('advance-month').click();
+  if (await page.getByRole('dialog').isVisible()) {
+    await page.getByTestId(/blocking-event-option-.*-coordinate_rescue/).click();
+    await page.getByTestId('advance-day').click();
+  }
+}
+
+function seedEconomicDevelopmentPost(state: JsonRecord): void {
+  const target = position('admin_l6_0');
+  const career = asRecord(state.career, 'career');
+  const appointment = asRecord(career.appointment, 'appointment');
+  Object.assign(appointment, {
+    positionId: target.id,
+    institutionId: target.institutionId,
+    regionId: target.regionId,
+    institutionLevel: target.institutionLevel,
+    positionDomain: target.positionDomain,
+    leadershipRank: target.leadershipRank,
+  });
+  const experience = asRecords(career.experiences, 'career experiences')[0];
+  if (!experience) throw new Error('Expected initial career experience');
+  Object.assign(experience, {
+    positionId: target.id,
+    positionNameSnapshot: target.name,
+    institutionId: target.institutionId,
+    institutionNameSnapshot: target.institutionId,
+    regionId: target.regionId,
+    institutionLevel: target.institutionLevel,
+    positionDomain: target.positionDomain,
+    leadershipRank: target.leadershipRank,
+  });
+  state.remainingBudget = target.annualBudget;
+  const departmentStates: JsonRecord = {};
+  for (const [index] of target.departmentTemplateIds.entries()) {
+    const departmentId = `${target.id}_dept_${index}`;
+    departmentStates[departmentId] = {
+      id: departmentId,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+  }
+  asRecord(state.actions, 'actions').departmentStates = departmentStates;
+}
+
+test('职业链：年度考核生成机会，职级与两次任职独立变化', async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -181,106 +227,143 @@ test('职业链：建档、职级晋升与两次任职保持独立', async ({ pa
 
   await createCharacter(page);
   await changeSave(page, (state) => {
-    const time = state.time as JsonRecord;
-    time.totalDaysPlayed = 360;
-    const career = state.career as JsonRecord;
-    career.civilServiceRankStartedAtDay = 0;
-    career.opportunities = [opportunity('e2e-deputy', 'admin_l2_0', 360)];
-    const assessments = state.assessments as JsonRecord;
-    assessments.annualAssessments = [{ year: 2027, score: 90, tier: '优秀' }];
-    const world = state.world as JsonRecord;
-    (world.metrics as JsonRecord)['rank_quota.clerk_1'] = 1;
+    seedYearEnd(state);
+    seedHighAssessmentPreconditions(state);
   });
-
+  await page.getByTestId('advance-day').click();
   await page.goto('/#/career');
   await expect(page.getByTestId('advance-civil-service-rank')).toBeVisible();
+  const deputyId = selectOpportunityId(await savedState(page), 'admin_l2_0');
   await page.getByTestId('advance-civil-service-rank').click();
-  await page.getByTestId('accept-opportunity-e2e-deputy').click();
-  for (let step = 0; step < 6; step += 1)
-    await page.getByTestId('advance-career-process-e2e-deputy').click();
+  await page.getByTestId(`accept-opportunity-${deputyId}`).click();
+  await advanceCareerProcess(page, deputyId);
 
   let state = await savedState(page);
-  expect((state.career as JsonRecord).civilServiceRank).toBe('clerk_1');
-  expect(((state.career as JsonRecord).appointment as JsonRecord).positionId).toBe('admin_l2_0');
+  let career = asRecord(state.career, 'career');
+  expect(career.civilServiceRank).toBe('clerk_1');
+  expect(asRecord(career.appointment, 'appointment').positionId).toBe('admin_l2_0');
 
-  await changeSave(page, (next) => {
-    const time = next.time as JsonRecord;
-    time.totalDaysPlayed = 1080;
-    const career = next.career as JsonRecord;
-    career.opportunities = [opportunity('e2e-chief', 'admin_l3_0', 1080)];
-  });
+  await changeSave(page, seedHighAssessmentPreconditions);
+  await page.goto('/#/main');
+  while (Number(asRecord((await savedState(page)).time, 'time').totalDaysPlayed) < 1080)
+    await advanceMonthResolvingFloodBlocker(page);
   await page.goto('/#/career');
-  await page.getByTestId('accept-opportunity-e2e-chief').click();
-  for (let step = 0; step < 6; step += 1)
-    await page.getByTestId('advance-career-process-e2e-chief').click();
+  const chiefId = selectOpportunityId(await savedState(page), 'admin_l3_0');
+  await page.getByTestId(`accept-opportunity-${chiefId}`).click();
+  await advanceCareerProcess(page, chiefId);
 
   state = await savedState(page);
-  const career = state.career as JsonRecord;
-  expect((career.appointment as JsonRecord).positionId).toBe('admin_l3_0');
+  career = asRecord(state.career, 'career');
+  expect(asRecord(career.appointment, 'appointment').positionId).toBe('admin_l3_0');
   expect(career.civilServiceRank).toBe('clerk_1');
   expect(consoleErrors).toEqual([]);
 });
 
-test('产业政策链：批准后触发阻塞危机，刷新不丢失事件', async ({ page }) => {
+test('产业政策链：招商行动产生提议事实并触发园区危机', async ({ page }) => {
   await createCharacter(page);
-  await changeSave(page, (state) => {
-    ((state.world as JsonRecord).facts as JsonRecord).industrial_park_policy_proposed = true;
-  });
-
+  await changeSave(page, seedEconomicDevelopmentPost);
+  await page.goto('/#/departments');
+  await page.getByTestId('department-admin_l6_0_dept_1').click();
+  await page.getByTestId('start-action-admin_l6_0_dept_1-investment_promotion-primary').click();
+  await page.goto('/#/main');
+  await page.getByTestId('advance-week').click();
+  const events = asRecord((await savedState(page)).events, 'events');
+  expect(
+    asRecords(events.history, 'event history').some(
+      (event) => event.eventId === 'investment_promotion_completed',
+    ),
+  ).toBe(true);
+  await page.getByTestId('advance-day').click();
+  await page.goto('/#/events');
+  await page.getByTestId(/event-option-.*-submit_proposal/).click();
   await page.goto('/#/policies');
   await page.getByTestId('propose-policy-industrial_park_support').click();
-  const proposed = await savedState(page);
-  const policy = ((proposed.governance as JsonRecord).policies as JsonRecord[])[0];
-  if (!policy) throw new Error('Expected proposed industrial park policy');
-  await page.getByTestId(`approve_policy-policy-${policy.instanceId}`).click();
+  const governance = asRecord((await savedState(page)).governance, 'governance');
+  const policies = asRecords(governance.policies, 'policies');
+  const industrialPolicy = policies.find((item) => item.policyId === 'industrial_park_support');
+  if (!industrialPolicy || typeof industrialPolicy.instanceId !== 'string')
+    throw new Error('Expected industrial park policy');
+  await page.getByTestId(`approve_policy-policy-${industrialPolicy.instanceId}`).click();
   await page.goto('/#/main');
   await page.getByTestId('advance-month').click();
   await expect(page.getByRole('dialog')).toBeVisible();
-
   await page.reload();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByTestId(/blocking-event-option-.*-rectification_plan/).click();
-  const state = await savedState(page);
-  expect((state.events as JsonRecord).activeBlockingEventId).toBeNull();
 });
 
-test('防汛链：阻塞中断后选择分支，并保留同日延迟事件日期', async ({ page }) => {
+test('防汛链：月度风险真实中断时间轴，刷新后延迟事件按原日期触发', async ({ page }) => {
   await createCharacter(page);
   await changeSave(page, (state) => {
-    const time = state.time as JsonRecord;
-    const event = pendingEvent('flood_emergency', time.totalDaysPlayed as number);
-    const eventsState = state.events as JsonRecord;
-    eventsState.pending = [event];
-    eventsState.activeBlockingEventId = event.instanceId;
-    time.pendingContinuation = { absoluteDay: time.totalDaysPlayed, remainingNodes: [] };
+    seedYearEnd(state);
+    const world = asRecord(state.world, 'world');
+    asRecord(world.metrics, 'world metrics').flood_risk = 90;
+    asRecord(world.facts, 'world facts').flood_prepared = false;
   });
+  await page.getByTestId('advance-day').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  let state = await savedState(page);
+  const interrupted = asRecord(state.time, 'time');
+  const continuation = asRecord(interrupted.pendingContinuation, 'continuation');
+  const remainingNodes = asRecords(continuation.remainingNodes, 'continuation nodes');
+  expect(remainingNodes.length).toBeGreaterThan(0);
+  expect(remainingNodes.some((node) => node.type === 'annual_assessment')).toBe(true);
 
-  await expect(page.getByRole('dialog')).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByTestId(/blocking-event-option-.*-coordinate_rescue/).click();
-  const state = await savedState(page);
-  const eventsState = state.events as JsonRecord;
-  expect(eventsState.activeBlockingEventId).toBeNull();
-  expect((eventsState.history as JsonRecord[])[0]?.eventId).toBe('flood_emergency');
-  expect((eventsState.scheduled as JsonRecord[])[0]?.activateAtDay).toBe(2);
+  await page.getByTestId('advance-day').click();
+  state = await savedState(page);
+  expect(asRecord(state.time, 'time').totalDaysPlayed).toBe(360);
+  await page.getByTestId('advance-day').click();
+  await page.reload();
+  await page.getByTestId('advance-day').click();
+  await page.goto('/#/events');
+  const events = asRecord((await savedState(page)).events, 'events');
+  expect(
+    asRecords(events.pending, 'pending events').some(
+      (event) => event.eventId === 'flood_accountability',
+    ),
+  ).toBe(true);
 });
 
-test('调查链：举报选择后进入历史，延迟事件可刷新且不可重复选择', async ({ page }) => {
+test('调查链：年度信号触发举报，延迟调查在刷新后仅于原日期结算', async ({ page }) => {
   await createCharacter(page);
   await changeSave(page, (state) => {
-    const time = state.time as JsonRecord;
-    const event = pendingEvent('investigation_start', time.totalDaysPlayed as number);
-    const eventsState = state.events as JsonRecord;
-    eventsState.pending = [event];
+    seedYearEnd(state);
+    const character = asRecord(state.character, 'character');
+    character.integrity = 0;
+    character.corruptionRisk = 100;
+    character.stability = 0;
   });
-
+  await page.getByTestId('advance-day').click();
+  await page.goto('/#/main');
+  await page.getByTestId('advance-day').click();
+  await page.getByTestId('advance-day').click();
   await page.goto('/#/events');
-  await page.getByTestId(/event-option-e2e-investigation_start-cooperate/).click();
-  await expect(page.getByTestId(/event-option-e2e-investigation_start-cooperate/)).toHaveCount(0);
+  await page.getByTestId(/event-option-.*-cooperate/).click();
+  const scheduledAt = asRecords(
+    asRecord((await savedState(page)).events, 'events').scheduled,
+    'scheduled',
+  )[0];
+  if (!scheduledAt || typeof scheduledAt.activateAtDay !== 'number')
+    throw new Error('Expected delayed formal investigation');
+  expect(scheduledAt.activateAtDay).toBe(365);
+
   await page.reload();
-  const state = await savedState(page);
-  const eventsState = state.events as JsonRecord;
-  expect((eventsState.history as JsonRecord[])[0]?.eventId).toBe('investigation_start');
-  expect((eventsState.scheduled as JsonRecord[])[0]?.eventId).toBe('formal_investigation');
+  await page.goto('/#/main');
+  await page.getByTestId('advance-day').click();
+  await page.getByTestId('advance-day').click();
+  let state = await savedState(page);
+  expect(
+    asRecords(asRecord(state.events, 'events').history, 'history').some(
+      (event) => event.eventId === 'formal_investigation',
+    ),
+  ).toBe(false);
+  await page.getByTestId('advance-day').click();
+  state = await savedState(page);
+  expect(
+    asRecords(asRecord(state.events, 'events').history, 'history').some(
+      (event) => event.eventId === 'formal_investigation',
+    ),
+  ).toBe(true);
 });

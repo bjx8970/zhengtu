@@ -98,6 +98,7 @@ export function DepartmentsPage() {
                 const firstValue = firstKpi.length > 0 ? Number(firstKpi[0]?.[1] ?? 0) : 0;
                 return (
                   <article
+                    data-testid={`department-${dept.id}`}
                     onClick={() => setSelectedDeptIdx(idx())}
                     style={{
                       ...darkCardStyle('16px'),
