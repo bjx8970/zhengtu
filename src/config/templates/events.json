@@ -12,6 +12,7 @@
       "sources": ["world.metric_changed"],
       "condition": {
         "all": [
+          { "signalField": "metricId", "op": "eq", "value": "flood_risk" },
           { "worldMetric": "flood_risk", "op": "gte", "value": 80 },
           { "fact": "flood_prepared", "op": "is_false" }
         ]
@@ -77,6 +78,11 @@
       "sources": ["world.metric_changed"],
       "condition": {
         "all": [
+          {
+            "signalField": "metricId",
+            "op": "eq",
+            "value": "corruption_report"
+          },
           {
             "worldMetric": "corruption_report",
             "op": "gte",
@@ -426,13 +432,7 @@
           "value": 20
         }
       ],
-      "schedule": [
-        {
-          "eventId": "flood_prepared_emergency",
-          "delayDays": 14,
-          "condition": { "worldMetric": "flood_risk", "op": "gt", "value": 30 }
-        }
-      ]
+      "schedule": []
     }
   },
   {
@@ -444,8 +444,18 @@
     "category": "emergency",
     "priority": "urgent",
     "presentation": "blocking",
-    "trigger": { "sources": ["event.resolved"], "scheduledOnly": true, "probability": 1 },
-    "repeatPolicy": { "mode": "once_per_chain" },
+    "trigger": {
+      "sources": ["world.metric_changed"],
+      "condition": {
+        "all": [
+          { "signalField": "metricId", "op": "eq", "value": "flood_risk" },
+          { "worldMetric": "flood_risk", "op": "gte", "value": 80 },
+          { "fact": "flood_prepared", "op": "is_true" }
+        ]
+      },
+      "probability": 1
+    },
+    "repeatPolicy": { "mode": "repeatable", "cooldownDays": 120 },
     "activation": { "deadlineDays": 3 },
     "options": [
       {

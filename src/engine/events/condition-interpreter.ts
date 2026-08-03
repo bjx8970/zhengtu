@@ -310,14 +310,6 @@ function evaluateWorldMetric(
   cond: Extract<ConditionExpression, { worldMetric: string }>,
   ctx: ConditionEvaluationContext,
 ): boolean {
-  // 仅当触发信号为 world.metric_changed 时，需校验信号的 metricId 与条件引用的指标一致；
-  // 其他信号类型（如 action.completed）无需此校验，因为出发时不涉及世界指标信号。
-  if (
-    ctx.signal.signalType === 'world.metric_changed' &&
-    ctx.signal.data.metricId !== cond.worldMetric
-  ) {
-    return false;
-  }
   // 缺失指标统一默认为 0
   const actual = ctx.state.world.metrics[cond.worldMetric] ?? 0;
   return compareNumber(actual, cond.value, cond.op);

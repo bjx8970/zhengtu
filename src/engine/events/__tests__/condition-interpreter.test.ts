@@ -176,7 +176,7 @@ describe('条件解释器 - 职业状态', () => {
 
 describe('条件解释器 - 世界指标与事实', () => {
   it('世界指标缺失默认为 0', () => {
-    // 使用非 world.metric_changed 信号，避免 metricId 过滤干扰默认值测试
+    // 使用 action.completed 信号，worldMetric 条件为纯状态判断
     const ctx = makeContext((c) => {
       c.signal = {
         signalType: 'action.completed',
