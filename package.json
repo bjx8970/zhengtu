@@ -10,7 +10,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src/ tests/ playwright.config.ts --ext .ts,.tsx",
-    "lint:fix": "eslint src/ --ext .ts,.tsx --fix",
+    "lint:fix": "eslint src/ tests/ playwright.config.ts --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,json}\" \"scripts/**/*.ts\" \"tests/e2e/**/*.ts\" playwright.config.ts tsconfig.e2e.json",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\" \"scripts/**/*.ts\" \"tests/e2e/**/*.ts\" playwright.config.ts tsconfig.e2e.json",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json",

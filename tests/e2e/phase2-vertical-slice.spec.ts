@@ -340,7 +340,17 @@ test('调查链：年度信号触发举报，延迟调查在刷新后仅于原�
   await page.getByTestId('advance-day').click();
   await page.getByTestId('advance-day').click();
   await page.goto('/#/events');
-  await page.getByTestId(/event-option-.*-cooperate/).click();
+  const cooperateOption = page.getByTestId(/event-option-.*-cooperate/);
+  await expect(cooperateOption).toHaveCount(1);
+  await cooperateOption.click();
+  await page.goto('/#/events');
+  await expect(page.getByTestId(/event-option-.*-cooperate/)).toHaveCount(0);
+  const afterResolution = asRecord((await savedState(page)).events, 'events');
+  expect(
+    asRecords(afterResolution.history, 'event history').some(
+      (event) => event.eventId === 'investigation_start' && event.chosenOptionId === 'cooperate',
+    ),
+  ).toBe(true);
   const scheduledAt = asRecords(
     asRecord((await savedState(page)).events, 'events').scheduled,
     'scheduled',
