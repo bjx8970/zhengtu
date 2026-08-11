@@ -226,6 +226,9 @@ test('职业链：年度考核生成机会，职级与两次任职独立变化',
   page.on('pageerror', (error) => consoleErrors.push(error.message));
 
   await createCharacter(page);
+  await page.goto('/#/career');
+  await expect(page.getByTestId('advance-civil-service-rank')).toHaveCount(0);
+  await page.goto('/#/main');
   await changeSave(page, (state) => {
     seedYearEnd(state);
     seedHighAssessmentPreconditions(state);
@@ -315,15 +318,36 @@ test('防汛链：月度风险真实中断时间轴，刷新后延迟事件按�
   state = await savedState(page);
   expect(asRecord(state.time, 'time').totalDaysPlayed).toBe(360);
   await page.getByTestId('advance-day').click();
+  state = await savedState(page);
+  expect(asRecord(state.time, 'time').totalDaysPlayed).toBe(361);
+  let events = asRecord(state.events, 'events');
+  expect(
+    asRecords(events.pending, 'pending events').filter(
+      (event) => event.eventId === 'flood_accountability',
+    ),
+  ).toHaveLength(0);
+  const scheduledAccountability = asRecords(events.scheduled, 'scheduled events').filter(
+    (event) => event.eventId === 'flood_accountability',
+  );
+  expect(scheduledAccountability).toHaveLength(1);
+  expect(scheduledAccountability[0]?.activateAtDay).toBe(362);
+
   await page.reload();
   await page.getByTestId('advance-day').click();
   await page.goto('/#/events');
-  const events = asRecord((await savedState(page)).events, 'events');
+  state = await savedState(page);
+  expect(asRecord(state.time, 'time').totalDaysPlayed).toBe(362);
+  events = asRecord(state.events, 'events');
   expect(
-    asRecords(events.pending, 'pending events').some(
+    asRecords(events.pending, 'pending events').filter(
       (event) => event.eventId === 'flood_accountability',
     ),
-  ).toBe(true);
+  ).toHaveLength(1);
+  expect(
+    asRecords(events.scheduled, 'scheduled events').filter(
+      (event) => event.eventId === 'flood_accountability',
+    ),
+  ).toHaveLength(0);
 });
 
 test('调查链：年度信号触发举报，延迟调查在刷新后仅于原日期结算', async ({ page }) => {
