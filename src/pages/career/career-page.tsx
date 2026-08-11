@@ -192,6 +192,7 @@ export function CareerPage() {
             </div>
             <Show when={rankEligibility().eligible}>
               <button
+                data-testid="advance-civil-service-rank"
                 onClick={() => dispatch({ type: 'ADVANCE_CIVIL_SERVICE_RANK' })}
                 style={primaryButtonStyle}
               >
@@ -401,6 +402,7 @@ export function CareerPage() {
                           }}
                         >
                           <button
+                            data-testid={`accept-opportunity-${opportunity.id}`}
                             disabled={!eligibility().eligible}
                             onClick={() =>
                               dispatch({
@@ -479,6 +481,7 @@ export function CareerPage() {
                     </p>
                   </div>
                   <button
+                    data-testid={`advance-career-process-${process().opportunityId}`}
                     onClick={() =>
                       dispatch({
                         type: 'ADVANCE_CAREER_PROCESS',

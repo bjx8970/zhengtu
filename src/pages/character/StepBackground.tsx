@@ -50,6 +50,7 @@ export function StepBackground(props: StepBackgroundProps) {
           <For each={props.backgrounds}>
             {(bg) => (
               <div
+                data-testid={`family-background-${bg.id}`}
                 onClick={() => props.updateField('familyBackground', bg.id)}
                 style={{
                   padding: '0.6rem',
@@ -85,6 +86,7 @@ export function StepBackground(props: StepBackgroundProps) {
           <For each={props.paths}>
             {(p) => (
               <div
+                data-testid={`promotion-path-${p.id}`}
                 onClick={() => props.updateField('promotionPath', p.id)}
                 style={{
                   padding: '0.6rem',

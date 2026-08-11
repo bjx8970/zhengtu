@@ -54,6 +54,7 @@ export function StepSchool(props: StepSchoolProps) {
           <For each={getAvailableTiers(props.data.gaokaoTier)}>
             {(tier) => (
               <div
+                data-testid={`university-tier-${tier}`}
                 onClick={() => {
                   props.updateField('universityTier', tier);
                   props.updateField('university', '');
@@ -121,6 +122,7 @@ export function StepSchool(props: StepSchoolProps) {
             <For each={schools()!}>
               {(school) => (
                 <div
+                  data-testid={`university-${school}`}
                   onClick={() => props.updateField('university', school)}
                   style={{
                     padding: '0.6rem 1rem',

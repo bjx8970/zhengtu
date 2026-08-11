@@ -47,6 +47,7 @@ export function StepBirthplace(props: StepBirthplaceProps) {
           <For each={props.provinces()}>
             {(p) => (
               <div
+                data-testid={`birthplace-province-${p.name}`}
                 onClick={() => {
                   props.updateField('province', p.name);
                   props.updateField('city', '');
@@ -115,6 +116,7 @@ export function StepBirthplace(props: StepBirthplaceProps) {
               <For each={prov().cities}>
                 {(c) => (
                   <div
+                    data-testid={`birthplace-city-${c}`}
                     onClick={() => props.updateField('city', c)}
                     style={{
                       padding: '0.6rem 1rem',
