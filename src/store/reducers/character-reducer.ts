@@ -116,6 +116,9 @@ export function reduceNewGame(
       appointmentType: 'substantive',
       appointmentReason: 'initial_assignment',
       sourceOpportunityId: null,
+      status: 'active',
+      endedAtDay: null,
+      endReason: null,
       probation: createAppointmentProbation(0, gameCfg.probation),
     };
     draft.career.experiences = [

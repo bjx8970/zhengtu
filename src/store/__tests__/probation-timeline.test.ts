@@ -97,7 +97,7 @@ describe('probation timeline', () => {
     });
   });
 
-  it('persists extension and closes the appointment experience on final failure', () => {
+  it('stops a large advance on final failure and persists a coherent career terminal', () => {
     const state = createInitialState();
     setDay(state, 359);
     const store = createTestStore(state);
@@ -115,16 +115,48 @@ describe('probation timeline', () => {
     if (!decoded.state) return;
     const resumedStore = createTestStore(decoded.state);
     setDay(resumedStore.getRawState(), 449);
-    resumedStore.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
+    const department = getConfigLoader()
+      .resolvePositionDepartments(resumedStore.getRawState().career.appointment.positionId)
+      .find((item) => item.actions.some((action) => action.durationDays > 1));
+    const action = department?.actions.find((item) => item.durationDays > 1);
+    expect(department).toBeDefined();
+    expect(action).toBeDefined();
+    if (!department || !action) return;
+    resumedStore.getRawState().actions.departmentStates[department.id] = {
+      id: department.id,
+      kpiValues: {},
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+    resumedStore.dispatch({
+      type: 'START_ACTION',
+      deptId: department.id,
+      actionId: action.id,
+      tierKey: 'primary',
+      _idFactory: () => 'post-failure-action',
+    });
+    expect(resumedStore.getRawState().actions.slots.primary.occupants[0]).not.toBeNull();
+    resumedStore.dispatch({ type: 'ADVANCE_TIME', granularity: 'month' });
     const failed = resumedStore.getRawState();
+    expect(failed.time.totalDaysPlayed).toBe(450);
     expect(failed.career.appointment.probation).toMatchObject({
       status: 'failed',
       resolvedAtDay: 450,
+    });
+    expect(failed.career.appointment).toMatchObject({
+      status: 'ended',
+      endedAtDay: 450,
+      endReason: 'probation_failed',
     });
     expect(failed.career.experiences[0]).toMatchObject({
       endedAtDay: 450,
       endReason: 'probation_failed',
     });
+    expect(failed.actions.slots.primary.occupants[0]?.instanceId).toBe('post-failure-action');
+    const failedDecoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(failed)));
+    expect(failedDecoded.success).toBe(true);
     resumedStore.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
     expect(resumedStore.getRawState().time.totalDaysPlayed).toBe(450);
   });
@@ -179,7 +211,7 @@ describe('probation timeline', () => {
     expect(store.getRawState().career.appointment.probation?.evaluations).toHaveLength(1);
   });
 
-  it('round-trips the terminal probation audit through save decoding', () => {
+  it('round-trips the passed probation audit through save decoding', () => {
     const state = createInitialState();
     fulfillMinimum(state);
     setDay(state, 359);
@@ -190,5 +222,30 @@ describe('probation timeline', () => {
     expect(decoded.state?.career.appointment.probation).toEqual(
       store.getRawState().career.appointment.probation,
     );
+  });
+
+  it('rejects an ended appointment whose experience is still open', () => {
+    const state = createInitialState();
+    state.career.appointment.status = 'ended';
+    state.career.appointment.endedAtDay = 360;
+    state.career.appointment.endReason = 'probation_failed';
+    const probation = state.career.appointment.probation;
+    if (!probation) throw new Error('Expected initial probation');
+    probation.status = 'failed';
+    probation.resolvedAtDay = 360;
+    probation.outcomeReason = '试用期未通过';
+    probation.evaluations.push({
+      evaluatedAtDay: 360,
+      outcome: 'failed',
+      score: 0,
+      completedActionCount: 0,
+      unmetRequirements: ['未达到转正标准'],
+      previousEndsAtDay: 360,
+      nextEndsAtDay: null,
+    });
+    const decoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+    expect(decoded.success).toBe(false);
+    expect(decoded.error).toBe('invalid_envelope');
+    expect(decoded.detail).toContain('Ended appointment must match its closed career experience');
   });
 });

@@ -282,7 +282,7 @@ export function HomePage() {
                 <button
                   data-testid={`advance-${g.granularity}`}
                   class={i() === 2 ? 'btn btn-primary flex-1' : 'btn flex-1'}
-                  disabled={state.career.appointment.probation?.status === 'failed'}
+                  disabled={state.career.appointment.status === 'ended'}
                   onClick={() => {
                     setLastAdvance(true);
                     dispatch({ type: 'ADVANCE_TIME', granularity: g.granularity });

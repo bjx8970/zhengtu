@@ -2,7 +2,7 @@
  * 职业持久化状态
  *
  * 定义 CareerState 及其子结构：
- * - CurrentAppointment：当前任职
+ * - CurrentAppointment：当前或刚结束的任职事实
  * - CareerExperience：职业履历
  * - CareerOpportunity：职业机会
  * - CareerProcess：进行中的职业流程
@@ -23,7 +23,7 @@ import type { ConditionExpression } from '../conditions';
 import type { EffectDefinition } from '../conditions';
 import type { DomainSignalSnapshot } from '../governance/types';
 
-/** 当前任职状态 */
+/** 当前或刚结束的任职事实。 */
 export interface CurrentAppointment {
   /** 任职实例的稳定身份，不能用职位 ID 代替。 */
   appointmentId: string;
@@ -47,6 +47,12 @@ export interface CurrentAppointment {
   appointmentReason: AppointmentReason;
   /** 产生本次任职的机会，初始任职为 null。 */
   sourceOpportunityId: string | null;
+  /** 任职是否仍在持续；ended 是职业阶段终局，不再存在开放履历。 */
+  status: 'active' | 'ended';
+  /** 任职结束的绝对游戏日；仅 ended 状态有值。 */
+  endedAtDay: number | null;
+  /** 任职结束原因；仅 ended 状态有值。 */
+  endReason: AppointmentEndReason | null;
   /** 本次任职的试用期事实；非试用任职为 null。 */
   probation: AppointmentProbation | null;
 }
@@ -264,7 +270,7 @@ export interface CareerProcess {
 
 /** 职业状态（PlayerSave 子状态） */
 export interface CareerState {
-  /** 当前任职 */
+  /** 当前或刚结束的任职事实；status=ended 时表示职业阶段终局。 */
   appointment: CurrentAppointment;
   /** 公务员职级（属于人物，不随职位变化） */
   civilServiceRank: CivilServiceRank;

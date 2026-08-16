@@ -144,11 +144,11 @@ export function CareerPage() {
       />
 
       <div class="flex-col gap-lg">
-        {/* 当前任职 */}
+        {/* 任职事实 */}
         <section class="card">
           <div class="card-title">
             <span class="card-title-mark" aria-hidden="true" />
-            当前任职
+            {state.career.appointment.status === 'active' ? '当前任职' : '已结束任职'}
           </div>
           <div class="card-pad">
             <div class="stat-grid">
@@ -167,8 +167,12 @@ export function CareerPage() {
                 value={LEADERSHIP_RANK_LABELS[state.career.appointment.leadershipRank]}
               />
               <CareerFact
-                label="当前任职时长"
-                value={formatTenureDays(state.career.appointment.startedAtDay, null, currentDay())}
+                label="任职时长"
+                value={formatTenureDays(
+                  state.career.appointment.startedAtDay,
+                  state.career.appointment.endedAtDay,
+                  currentDay(),
+                )}
               />
             </div>
           </div>

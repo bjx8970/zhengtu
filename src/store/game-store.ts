@@ -246,6 +246,9 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
         appointmentType: 'substantive',
         appointmentReason: 'initial_assignment',
         sourceOpportunityId: null,
+        status: 'active',
+        endedAtDay: null,
+        endReason: null,
         probation: createAppointmentProbation(0, cfg.probation),
       },
       civilServiceRank: 'clerk_2',
@@ -331,9 +334,8 @@ export function useGameStore() {
  * 返回是否发生了实际状态变化。
  */
 function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
-  const probationEndedCareer = draft.career.appointment.probation?.status === 'failed';
-  if (probationEndedCareer && action.type !== 'NEW_GAME' && action.type !== 'LOAD_SAVE')
-    return false;
+  const careerStageEnded = draft.career.appointment.status === 'ended';
+  if (careerStageEnded && action.type !== 'NEW_GAME' && action.type !== 'LOAD_SAVE') return false;
   switch (action.type) {
     case 'START_ACTION': {
       const before = draft.actions.totalActions;

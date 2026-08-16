@@ -144,6 +144,20 @@ const CurrentAppointmentSchema = z
     appointmentType: z.enum(APPOINTMENT_TYPES),
     appointmentReason: z.enum(APPOINTMENT_REASONS),
     sourceOpportunityId: z.string().nullable(),
+    status: z.enum(['active', 'ended']),
+    endedAtDay: z.number().int().nonnegative().nullable(),
+    endReason: z
+      .enum([
+        'promotion',
+        'lateral_transfer',
+        'rotation',
+        'temporary_assignment',
+        'secondment',
+        'demotion',
+        'retirement',
+        'probation_failed',
+      ])
+      .nullable(),
     probation: AppointmentProbationSchema.nullable(),
   })
   .strict()
@@ -153,6 +167,33 @@ const CurrentAppointmentSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Probation start must match appointment start',
       });
+    const ended = appointment.status === 'ended';
+    if (ended !== (appointment.endedAtDay !== null && appointment.endReason !== null))
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Appointment end facts must match appointment status',
+      });
+    if (appointment.endedAtDay !== null && appointment.endedAtDay < appointment.startedAtDay)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Appointment cannot end before it starts',
+      });
+    if (appointment.probation?.status === 'failed') {
+      if (
+        appointment.status !== 'ended' ||
+        appointment.endReason !== 'probation_failed' ||
+        appointment.endedAtDay !== appointment.probation.resolvedAtDay
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Failed probation must terminate its appointment on the resolution day',
+        });
+    } else if (appointment.endReason === 'probation_failed') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Probation failure end reason requires a failed probation',
+      });
+    }
   });
 
 /** CareerExperience Schema */
@@ -452,7 +493,45 @@ const CareerStateSchema = z
     activeProcess: CareerProcessSchema.nullable(),
     completedProcesses: z.array(CareerProcessSchema).default([]),
   })
-  .strict();
+  .strict()
+  .superRefine((career, ctx) => {
+    const matchingExperiences = career.experiences.filter(
+      (experience) => experience.appointmentId === career.appointment.appointmentId,
+    );
+    const openExperiences = career.experiences.filter(
+      (experience) => experience.endedAtDay === null,
+    );
+    if (matchingExperiences.length !== 1)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['experiences'],
+        message: 'Appointment must have exactly one matching career experience',
+      });
+    const matching = matchingExperiences[0];
+    if (career.appointment.status === 'active') {
+      if (
+        openExperiences.length !== 1 ||
+        openExperiences[0]?.appointmentId !== career.appointment.appointmentId ||
+        matching?.endReason !== null
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['experiences'],
+          message: 'Active appointment must be represented by the only open experience',
+        });
+      return;
+    }
+    if (
+      openExperiences.length !== 0 ||
+      matching?.endedAtDay !== career.appointment.endedAtDay ||
+      matching?.endReason !== career.appointment.endReason
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['experiences'],
+        message: 'Ended appointment must match its closed career experience',
+      });
+  });
 
 /** PolicyPhaseDefinition Schema */
 const PolicyPhaseDefinitionSchema = z
@@ -1556,6 +1635,9 @@ export function migrateSchema8To9(prev: Record<string, unknown>): Record<string,
             evaluations: [],
           };
   delete appointment.probationEndsAtDay;
+  appointment.status = 'active';
+  appointment.endedAtDay = null;
+  appointment.endReason = null;
   migrated.schemaVersion = 9;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
