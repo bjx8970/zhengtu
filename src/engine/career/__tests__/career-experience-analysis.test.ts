@@ -18,7 +18,7 @@ function makeAppointment(overrides: Partial<CurrentAppointment> = {}): CurrentAp
     appointmentType: 'substantive',
     appointmentReason: 'rotation',
     sourceOpportunityId: null,
-    probationEndsAtDay: null,
+    probation: null,
     ...overrides,
   };
 }

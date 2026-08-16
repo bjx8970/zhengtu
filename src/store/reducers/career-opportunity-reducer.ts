@@ -199,7 +199,7 @@ function appointmentTransition(
     appointmentType: opportunity.appointmentType,
     appointmentReason: opportunity.appointmentReason,
     sourceOpportunityId: opportunity.id,
-    probationEndsAtDay: null,
+    probation: null,
   };
   transaction.career.experiences.push({
     id: experienceId,

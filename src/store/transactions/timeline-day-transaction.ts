@@ -45,6 +45,7 @@ import {
 } from '../reducers/shared';
 import { commitPolicyTransitionInTransaction } from './policy-transition-transaction';
 import { expireCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
+import { evaluateProbation } from '../../engine/career/probation-evaluation';
 
 /**
  * 结算当日行动与到期政策，再统一处理它们产生的领域信号。
@@ -132,6 +133,11 @@ export function processTimelineNodes(
     const node = nodes[index];
     if (!node) continue;
     switch (node.type) {
+      case 'probation_evaluation':
+        processProbationEvaluation(draft, node.absoluteDay);
+        if (draft.career.appointment.probation?.status === 'failed')
+          return { interrupted: false, remainingNodes: [] };
+        break;
       case 'career_opportunity_expiry':
         expireCareerOpportunitiesAtDay(draft, node.absoluteDay);
         break;
@@ -199,6 +205,38 @@ export function processTimelineNodes(
     }
   }
   return { interrupted: false, remainingNodes: [] };
+}
+
+function processProbationEvaluation(draft: PlayerSave, currentDay: number): void {
+  const probation = draft.career.appointment.probation;
+  const result = evaluateProbation({
+    currentDay,
+    probation,
+    attributes: {
+      competence: draft.character.competence,
+      diligence: draft.character.diligence,
+      integrity: draft.character.integrity,
+      stability: draft.character.stability,
+    },
+    restrictions: draft.career.restrictions,
+    config: getConfigLoader().getGameConfig().probation,
+  });
+  if (!result.success) {
+    if (result.failure === 'not_active' || result.failure === 'not_due') return;
+    throw new Error(`Probation evaluation failed safely: ${result.failure}`);
+  }
+  draft.career.appointment.probation = result.probation;
+  if (result.outcome !== 'failed') return;
+  const openExperiences = draft.career.experiences.filter(
+    (experience) => experience.endedAtDay === null,
+  );
+  if (
+    openExperiences.length !== 1 ||
+    openExperiences[0]?.appointmentId !== draft.career.appointment.appointmentId
+  )
+    throw new Error('Probation failure cannot close an inconsistent appointment experience');
+  openExperiences[0].endedAtDay = currentDay;
+  openExperiences[0].endReason = 'probation_failed';
 }
 
 function expireCareerOpportunitiesAtDay(draft: PlayerSave, currentDay: number): void {
@@ -272,6 +310,13 @@ function processActionCompletion(
     effects: labels,
     completedAtDay: event.absoluteDay,
   });
+  const probation = draft.career.appointment.probation;
+  if (
+    probation?.status === 'active' &&
+    event.occupant.startedAtDay >= probation.startedAtDay &&
+    event.absoluteDay <= probation.endsAtDay
+  )
+    probation.completedActionCount += 1;
   draft.actions.slots[event.tierKey].occupants[event.slotIndex] = null;
   if (event.occupant.cooldownDays > 0) {
     const state = draft.actions.departmentStates[event.occupant.deptId];

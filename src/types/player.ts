@@ -1,5 +1,5 @@
 /**
- * 玩家存档类型定义（Schema 6）
+ * 玩家存档类型定义（Schema 9）
  *
  * PlayerSave 重构为正式子状态结构：
  * - character：角色基础信息和属性
@@ -192,6 +192,7 @@ export interface GameTimeState extends GameTime {
 
 /** 可持久化的同日时间轴节点。 */
 export type TimelineContinuationNode =
+  | { type: 'probation_evaluation'; absoluteDay: number }
   | { type: 'career_opportunity_expiry'; absoluteDay: number }
   | { type: 'scheduled_event_activation'; absoluteDay: number }
   | { type: 'event_deadline'; absoluteDay: number }
@@ -211,7 +212,7 @@ export interface TimelineContinuation {
 // ===== 新版 PlayerSave =====
 
 /**
- * 玩家存档（Schema 6）
+ * 玩家存档（Schema 9）
  *
  * 重构为正式子状态结构，删除旧职业事实来源。
  */

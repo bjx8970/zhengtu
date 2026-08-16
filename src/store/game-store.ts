@@ -1,12 +1,12 @@
 /**
- * 游戏状态管理（Schema 7）
+ * 游戏状态管理（Schema 9）
  *
  * 核心设计：
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 仅在实际状态变化时写入 localStorage
  *
- * 当前持久化结构为 Schema 7，包含政策/事件运行时、同日时间轴 continuation 与职级履历。
+ * 当前持久化结构为 Schema 9，包含政策/事件运行时、时间轴 continuation、职级履历与试用期审计。
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
@@ -16,6 +16,7 @@ import type { EventRuntimeState } from '../domain/events/state';
 import type { WorldState } from '../domain/world-state';
 import { getConfigLoader } from '../config/loader';
 import { writeLocalSave } from '../services/save-repo';
+import { createAppointmentProbation } from '../engine/career/probation-evaluation';
 
 // Reducer 模块
 import { reduceStartAction } from './reducers/action-reducer';
@@ -245,7 +246,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
         appointmentType: 'substantive',
         appointmentReason: 'initial_assignment',
         sourceOpportunityId: null,
-        probationEndsAtDay: 360,
+        probation: createAppointmentProbation(0, cfg.probation),
       },
       civilServiceRank: 'clerk_2',
       civilServiceRankStartedAtDay: 0,
@@ -330,6 +331,9 @@ export function useGameStore() {
  * 返回是否发生了实际状态变化。
  */
 function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
+  const probationEndedCareer = draft.career.appointment.probation?.status === 'failed';
+  if (probationEndedCareer && action.type !== 'NEW_GAME' && action.type !== 'LOAD_SAVE')
+    return false;
   switch (action.type) {
     case 'START_ACTION': {
       const before = draft.actions.totalActions;

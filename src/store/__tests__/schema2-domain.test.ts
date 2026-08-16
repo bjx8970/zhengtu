@@ -429,6 +429,31 @@ describe('Schema 2 存档', () => {
     });
   });
 
+  it('Schema 8 → 9 expands the legacy probation end into an auditable lifecycle', () => {
+    const state = createInitialState();
+    const envelope = JSON.parse(JSON.stringify(wrapSaveEnvelope(state))) as Record<string, unknown>;
+    envelope.schemaVersion = 8;
+    envelope.contentVersion = '2026.07.8';
+    const career = (envelope.state as Record<string, unknown>).career as Record<string, unknown>;
+    const appointment = career.appointment as Record<string, unknown>;
+    delete appointment.probation;
+    appointment.probationEndsAtDay = 360;
+
+    const result = decodeCurrentSave(JSON.stringify(envelope));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.career.appointment.probation).toEqual({
+      status: 'active',
+      startedAtDay: 0,
+      endsAtDay: 360,
+      extensionCount: 0,
+      completedActionCount: 0,
+      resolvedAtDay: null,
+      outcomeReason: null,
+      evaluations: [],
+    });
+  });
+
   it('rejects career opportunities with invalid lifecycle dates during strict decode', () => {
     const invalidOpportunities: Array<Partial<AppointmentCareerOpportunity>> = [
       { status: 'available', acceptedAtDay: 1 },

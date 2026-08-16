@@ -47,8 +47,31 @@ export interface CurrentAppointment {
   appointmentReason: AppointmentReason;
   /** 产生本次任职的机会，初始任职为 null。 */
   sourceOpportunityId: string | null;
-  /** 试用期结束的绝对游戏日（null 表示无试用期） */
-  probationEndsAtDay: number | null;
+  /** 本次任职的试用期事实；非试用任职为 null。 */
+  probation: AppointmentProbation | null;
+}
+
+/** 试用期评估的可审计结果。 */
+export interface ProbationEvaluationRecord {
+  evaluatedAtDay: number;
+  outcome: 'passed' | 'extended' | 'failed';
+  score: number;
+  completedActionCount: number;
+  unmetRequirements: string[];
+  previousEndsAtDay: number;
+  nextEndsAtDay: number | null;
+}
+
+/** 当前任职的试用期生命周期。 */
+export interface AppointmentProbation {
+  status: 'active' | 'passed' | 'failed';
+  startedAtDay: number;
+  endsAtDay: number;
+  extensionCount: number;
+  completedActionCount: number;
+  resolvedAtDay: number | null;
+  outcomeReason: string | null;
+  evaluations: ProbationEvaluationRecord[];
 }
 
 /** 公务员职级变化历史。 */
@@ -120,7 +143,8 @@ export interface CareerExperience {
 }
 
 /** 任职区间结束原因。 */
-export type AppointmentEndReason = Exclude<AppointmentReason, 'initial_assignment'> | 'retirement';
+export type AppointmentEndReason =
+  Exclude<AppointmentReason, 'initial_assignment'> | 'retirement' | 'probation_failed';
 
 /** 职业机会共享字段。 */
 export interface CareerOpportunityBase {

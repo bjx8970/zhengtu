@@ -18,6 +18,7 @@ import {
   evaluateCivilServiceRankEligibility,
   getActiveCareerRestrictions,
 } from '../../engine/career/civil-service-rank-eligibility';
+import { inspectProbationProgress } from '../../engine/career/probation-progress';
 import {
   evaluateCareerOpportunityAcceptanceEligibility,
   type CareerOpportunityEligibilityFailure,
@@ -117,6 +118,22 @@ export function CareerPage() {
   const sortedExperiences = createMemo(() =>
     [...state.career.experiences].sort((left, right) => right.startedAtDay - left.startedAtDay),
   );
+  const probationProgress = createMemo(() => {
+    const probation = state.career.appointment.probation;
+    if (!probation) return null;
+    return inspectProbationProgress({
+      currentDay: currentDay(),
+      probation,
+      attributes: {
+        competence: state.character.competence,
+        diligence: state.character.diligence,
+        integrity: state.character.integrity,
+        stability: state.character.stability,
+      },
+      restrictions: state.career.restrictions,
+      config: getConfigLoader().getGameConfig().probation,
+    });
+  });
 
   return (
     <>
@@ -156,6 +173,88 @@ export function CareerPage() {
             </div>
           </div>
         </section>
+
+        <Show when={state.career.appointment.probation}>
+          {(probation) => (
+            <section class="card" data-testid="probation-status-card">
+              <div class="card-title">
+                <span class="card-title-mark" aria-hidden="true" />
+                录用试用期
+                <span class="flex-1" />
+                <span
+                  class={
+                    probation().status === 'passed'
+                      ? 'tag tag-green'
+                      : probation().status === 'failed'
+                        ? 'tag tag-red'
+                        : 'tag tag-blue'
+                  }
+                  data-testid="probation-status"
+                >
+                  {probation().status === 'passed'
+                    ? '已转正'
+                    : probation().status === 'failed'
+                      ? '不予转正'
+                      : probation().extensionCount > 0
+                        ? '延期考察中'
+                        : '试用中'}
+                </span>
+              </div>
+              <div class="card-pad flex-col gap-md">
+                <div class="stat-grid">
+                  <CareerFact
+                    label="距评估"
+                    value={
+                      probation().status === 'active'
+                        ? `${probationProgress()?.remainingDays ?? 0} 天`
+                        : `第 ${probation().resolvedAtDay ?? probation().endsAtDay} 天已结算`
+                    }
+                  />
+                  <CareerFact
+                    label="完成行动"
+                    value={`${probation().completedActionCount}/${probationProgress()?.minimumCompletedActions ?? 0}`}
+                  />
+                  <CareerFact label="当前评价分" value={`${probationProgress()?.score ?? 0}`} />
+                  <CareerFact
+                    label="延期次数"
+                    value={`${probation().extensionCount}/${probationProgress()?.maxExtensions ?? 0}`}
+                  />
+                </div>
+                <Show when={probation().status === 'active'}>
+                  <div class="flex-col gap-sm">
+                    <h3 class="text-sm">转正条件</h3>
+                    <For each={probationProgress()?.requirements ?? []}>
+                      {(requirement) => (
+                        <p class="text-sm secondary-text">
+                          {requirement.satisfied ? '✓' : '○'} {requirement.detail}
+                        </p>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+                <Show when={probation().outcomeReason}>
+                  <p
+                    class={
+                      probation().status === 'failed'
+                        ? 'banner banner-danger'
+                        : probation().status === 'passed'
+                          ? 'banner banner-success'
+                          : 'banner banner-warning'
+                    }
+                    data-testid="probation-feedback"
+                  >
+                    {probation().outcomeReason}
+                  </p>
+                </Show>
+                <Show when={probation().evaluations.length > 0}>
+                  <p class="text-xs secondary-text">
+                    已保存 {probation().evaluations.length} 次评估记录，刷新或读档后仍可审计。
+                  </p>
+                </Show>
+              </div>
+            </section>
+          )}
+        </Show>
 
         {/* 公务员职级 */}
         <section class="card">

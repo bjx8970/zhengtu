@@ -152,6 +152,21 @@
       "politicalCapitalBonusOnSuccess": 10
     }
   },
+  "probation": {
+    "durationDays": 360,
+    "minimumCompletedActions": 1,
+    "passScoreThreshold": 50,
+    "extensionScoreThreshold": 35,
+    "extensionDays": 90,
+    "maxExtensions": 1,
+    "attributeWeights": {
+      "competence": 0.3,
+      "diligence": 0.3,
+      "integrity": 0.25,
+      "stability": 0.15
+    },
+    "disqualifyingRestrictionTypes": ["disciplinary_action"]
+  },
   "initialPositionId": "admin_l1_0",
   "floodRiskByMonth": {
     "rainyMonths": [5, 6, 7, 8],

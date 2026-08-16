@@ -9,13 +9,14 @@ import type { TimelineEvent } from '../../types/game';
 import type { TimelineContinuationNode } from '../../types/player';
 
 const NODE_PRIORITY: Record<TimelineContinuationNode['type'], number> = {
-  career_opportunity_expiry: 0,
-  scheduled_event_activation: 1,
-  event_deadline: 2,
-  monthly_settlement: 3,
-  annual_assessment: 4,
-  political_cycle: 5,
-  retirement_check: 6,
+  probation_evaluation: 0,
+  career_opportunity_expiry: 1,
+  scheduled_event_activation: 2,
+  event_deadline: 3,
+  monthly_settlement: 4,
+  annual_assessment: 5,
+  political_cycle: 6,
+  retirement_check: 7,
 };
 
 /**
@@ -40,6 +41,7 @@ export function buildDailyTimelinePlan(
   events: readonly TimelineEvent[],
 ): TimelineContinuationNode[] {
   const nodes: TimelineContinuationNode[] = [
+    { type: 'probation_evaluation', absoluteDay },
     { type: 'career_opportunity_expiry', absoluteDay },
     { type: 'scheduled_event_activation', absoluteDay },
     { type: 'event_deadline', absoluteDay },
