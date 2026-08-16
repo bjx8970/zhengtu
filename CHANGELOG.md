@@ -21,7 +21,7 @@
 
 ### Save compatibility
 
-- 存档 Schema 保持 8、内容版本 `2026.07.8`；`0.1.0-alpha.1` 存档可直接加载。
+- 存档 Schema 保持 8、内容版本 `2026.07.8`；可迁移存档范围为 Schema 2–8（确定性链式迁移）。已发布的 `0.1.0-alpha.1` 使用 Schema 1，低于迁移下限（`MIN_MIGRATABLE_SCHEMA_VERSION = 2`），此类存档按不兼容存档处理并保留只读备份。
 
 ### 本版本合入的实施批次
 
