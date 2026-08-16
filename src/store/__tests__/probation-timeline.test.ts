@@ -248,4 +248,22 @@ describe('probation timeline', () => {
     expect(decoded.error).toBe('invalid_envelope');
     expect(decoded.detail).toContain('Ended appointment must match its closed career experience');
   });
+
+  it('rejects an active appointment with only an end date', () => {
+    const state = createInitialState();
+    state.career.appointment.endedAtDay = 360;
+    const decoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+    expect(decoded.success).toBe(false);
+    expect(decoded.error).toBe('invalid_envelope');
+    expect(decoded.detail).toContain('Appointment end facts must match appointment status');
+  });
+
+  it('rejects an active appointment with only an end reason', () => {
+    const state = createInitialState();
+    state.career.appointment.endReason = 'rotation';
+    const decoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
+    expect(decoded.success).toBe(false);
+    expect(decoded.error).toBe('invalid_envelope');
+    expect(decoded.detail).toContain('Appointment end facts must match appointment status');
+  });
 });

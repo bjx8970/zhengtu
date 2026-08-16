@@ -167,8 +167,13 @@ const CurrentAppointmentSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Probation start must match appointment start',
       });
-    const ended = appointment.status === 'ended';
-    if (ended !== (appointment.endedAtDay !== null && appointment.endReason !== null))
+    const activeHasEndFacts =
+      appointment.status === 'active' &&
+      (appointment.endedAtDay !== null || appointment.endReason !== null);
+    const endedMissingEndFacts =
+      appointment.status === 'ended' &&
+      (appointment.endedAtDay === null || appointment.endReason === null);
+    if (activeHasEndFacts || endedMissingEndFacts)
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Appointment end facts must match appointment status',
