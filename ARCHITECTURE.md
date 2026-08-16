@@ -1,16 +1,16 @@
 # 政途人生 — 架构文档
 
-> 当前版本：0.1.0-alpha.1 | 存档 Schema：8 | 内容版本：2026.07.7
+> 当前版本：0.2.0-alpha.1 | 存档 Schema：8 | 内容版本：2026.07.8
 
 ## 当前范围
 
-当前版本是可运行的单机原型。职业、治理、事件与世界状态已使用新版领域骨架；政策生命周期、事件编排、真实领域信号和可中断统一时间轴已经闭环。
+当前版本是可运行的单机原型，最小可玩纵向切片（#98）已交付并通过 Playwright 端到端验收。职业、治理、事件与世界状态已使用新版领域骨架；政策生命周期、事件编排、真实领域信号和可中断统一时间轴已经闭环，职业仪表盘、政策列表、事件收件箱与阻塞弹窗 UI 均已接入。
 
 ## 岗位机会与任职事务
 
-职业机会由领域信号驱动并冻结目标快照；生成、接受及最终任职前都复查配置和硬性条件。职业经历资格统一从 `career.experiences` 的单条 `[startedAtDay, endedAtDay)` 记录派生：正式、挂职、临时与代理分别遵循配置化最小时长，地区与机构经历独立统计，当前开放履历按当前绝对日实时计算。领导岗位走最小选拔状态机，training 使用独立判别联合且不改变任职。任职事务在完整状态副本中原子关闭旧履历、创建新任职和开放履历、重建部门运行时并产生 `appointment.changed`；执行中行动会阻止最终任职。机会过期是可恢复统一时间轴节点。当前不包含职业 UI 或 NPC 候选池。
+职业机会由领域信号驱动并冻结目标快照；生成、接受及最终任职前都复查配置和硬性条件。职业经历资格统一从 `career.experiences` 的单条 `[startedAtDay, endedAtDay)` 记录派生：正式、挂职、临时与代理分别遵循配置化最小时长，地区与机构经历独立统计，当前开放履历按当前绝对日实时计算。领导岗位走最小选拔状态机，training 使用独立判别联合且不改变任职。任职事务在完整状态副本中原子关闭旧履历、创建新任职和开放履历、重建部门运行时并产生 `appointment.changed`；执行中行动会阻止最终任职。机会过期是可恢复统一时间轴节点。职业仪表盘（`/career`）已随 #98 接入；NPC 候选池竞争仍属 Phase 4。
 
-当前仍没有政策列表、事件收件箱或 blocking 弹窗 UI；本阶段通过 Store 与无 UI 集成测试验证运行时。
+政策列表、事件收件箱与 blocking 弹窗 UI 已随 #98 交付，配合 Store 集成测试与 Playwright 端到端验收共同验证运行时。
 
 ## 技术栈
 
@@ -41,7 +41,9 @@ src/
 │   ├── home/home-page.tsx       # 综合 Dashboard（日程概览 + 跳转入口）
 │   ├── departments/             # 部门治理（行动安排与槽位管理）
 │   ├── assessment/              # 考核详情页面
-│   └── career/                  # 晋升任命（完整晋升状态机）
+│   ├── career/                  # 晋升任命（职级晋升 + 岗位机会任职）
+│   ├── policies/                # 政策列表与政策状态
+│   └── events/                  # 事件收件箱、事件历史与阻塞弹窗
 ├── styles/                      # 全局 CSS 与设计令牌
 ├── types/
 │   ├── player.ts                # PlayerSave、SlotOccupant 等
@@ -312,7 +314,7 @@ interface ActionExecutableSnapshot {
 - `activateScheduledEvents`：按 `activateAtDay` → 优先级 → `instanceId` 稳定排序激活。
 - `expireEventInstances`：`currentDay > deadlineDay` 时过期（截止日当天仍可处理），记录 `finalStatus: 'expired'`。
 
-计划事件和过期处理已经接入可中断时间轴；UI 仍留给 #98。
+计划事件和过期处理已接入可中断时间轴；收件箱、事件历史与阻塞弹窗 UI 由 #98 交付并经 Playwright 验收。
 
 ## 政策时间轴与领域信号
 
@@ -321,7 +323,7 @@ interface ActionExecutableSnapshot {
 - 显式政策 Action 和自动时间轴共用 `policy-transition-transaction.ts`，统一应用效果、更新实例、派生指标信号并交给事件 continuation。
 - `deriveMetricSignalsFromEffects()` 只为实际发生的 `world_metric` / `policy_metric` 变化发出信号；同一事务同一指标折叠为最终值并保持首次出现顺序。政策指标上下文来自实例冻结的 `originContext`。
 - 年度记录和属性影响提交后发出 `assessment.completed`；行动实例完成后发出 `action.completed`。
-- 当前正式最小事件 `industrial_park_progress_crisis` 验证政策阶段变化触发 urgent blocking 与同日月结恢复；政策和事件 UI 尚未实现。
+- 当前正式最小事件 `industrial_park_progress_crisis` 验证政策阶段变化触发 urgent blocking 与同日月结恢复；政策与事件 UI 已随 #98 交付。
 
 ## 配置模型
 
