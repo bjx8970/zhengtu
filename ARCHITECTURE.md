@@ -88,7 +88,7 @@ src/
 │   │   ├── timeline-day-transaction.ts
 │   │   └── policy-transition-transaction.ts
 │   └── save-codec/
-│       └── index.ts             # 严格存档解码器（Zod Schema 6）
+│       └── index.ts             # 严格存档解码器（Zod Schema 8，支持 Schema 2→8 迁移）
 └── services/
     ├── save-repo.ts             # 本地/远程存档读写
     ├── startup-save-state.ts    # 启动存档状态服务
@@ -140,8 +140,8 @@ UI（页面/组件） → Store（dispatch/reducer） → Engine（纯函数） 
 
 ```typescript
 interface SaveEnvelope {
-  schemaVersion: number; // 存档结构版本（当前：6）
-  contentVersion: string; // 内容配置版本（当前：2026.07.4）
+  schemaVersion: number; // 存档结构版本（当前：8）
+  contentVersion: string; // 内容配置版本（当前：2026.07.8）
   revision: number; // 同一存档的逻辑修订号
   savedAt: number; // 保存时间戳
   state: PlayerSave; // 实际游戏状态
@@ -150,8 +150,8 @@ interface SaveEnvelope {
 
 ### 严格解码行为
 
-- 只接受当前 `schemaVersion` 的完整 SaveEnvelope
-- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → 4 → 5 → 6
+- 当前 Schema 8 的完整 SaveEnvelope 直接进入严格结构解码
+- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → 4 → 5 → 6 → 7 → 8
 - `schemaVersion < 2` → 拒绝（`legacy_save_unsupported`）
 - `schemaVersion > CURRENT` → 拒绝（`future_version`）
 - 结构验证失败 → 拒绝（`invalid_envelope`）
@@ -161,7 +161,7 @@ interface SaveEnvelope {
 
 ### 兼容性说明
 
-解码器以 `schemaVersion` 决定结构兼容性，不以 `contentVersion` 拒绝存档。Schema 2–5 通过确定性迁移链升级；Schema 1 和缺少 Envelope 的裸 PlayerSave 被拒绝并保留只读备份。
+解码器以 `schemaVersion` 决定结构兼容性；迁移步骤会在需要可靠重建运行时快照时校验对应的历史 `contentVersion`。Schema 2–7 通过确定性迁移链升级至 Schema 8；Schema 1 和缺少 Envelope 的裸 PlayerSave 被拒绝并保留只读备份。
 
 ### revision 和 updatedAt
 
