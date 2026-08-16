@@ -13,3 +13,4 @@ blob-report/
 .workbuddy/
 test_ui/
 .qoder/
+.pnpm-store/
