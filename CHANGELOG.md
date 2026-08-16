@@ -4,6 +4,25 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/)，版本号遵循语义化版本。分类：Added / Changed / Fixed / Deprecated / Removed / Save compatibility。
 
+## [Unreleased] — UI 全面重做（政务公文风）
+
+### Added
+
+- 全新「政务 · 案牍」设计系统：红头文件式总栏、宋体标题、宣纸/墨夜双主题（亮暗切换持久化）。
+- 全局导航条：工作台 / 部门治理 / 年度考核 / 职务职级 / 政策 / 事件，事件与岗位机会数量角标。
+- 干部档案卡、公文式页面标题、统一卡片/标签/进度条/弹窗组件体系。
+- 建档向导重做为「干部履历表」版面。
+
+### Changed
+
+- 全部 8 个页面与启动页按新设计系统重写，移除内联配色。
+- 删除与功能不符的占位入口（公文处理、廉政风险、人脉关系卡片）与孤儿组件（login、feature-roadmap）。
+- 事件阻塞弹窗与提醒横幅统一为新视觉，交互语义与测试契约保持不变。
+
+### Removed
+
+- 旧主题令牌 TS 镜像（colors/radius/space/font）与配套一致性测试，改为 CSS 变量驱动的主题服务。
+
 ## [0.2.0-alpha.1] - 2026-08-16
 
 完成 Phase 2 最小可玩纵向切片（#98）：职业仪表盘、政策与事件 UI、三条完整事件链与 Playwright 端到端验收。

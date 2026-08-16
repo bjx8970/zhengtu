@@ -2,7 +2,7 @@
  * Step 5 — 家庭背景 × 晋升通道（双列选择 + 加成预览）
  */
 import { For, createMemo } from 'solid-js';
-import { colors, radius, font, cardStyle, ATTR_LABELS } from '../../utils/theme';
+import { ATTR_LABELS } from '../../utils/theme';
 import type { CharacterData } from '../../types/character';
 import type { FamilyBackgroundItem, PromotionPathItem } from '../../types/config';
 
@@ -13,6 +13,15 @@ interface StepBackgroundProps {
   updateField: <K extends keyof CharacterData>(field: K, value: CharacterData[K]) => void;
 }
 
+/**
+ * 家庭背景与晋升通道步骤组件。
+ *
+ * @param props.data        当前建档数据
+ * @param props.backgrounds 家庭背景配置
+ * @param props.paths       晋升通道配置
+ * @param props.updateField 字段更新回调
+ * @returns 双列选择面板 + 属性加成预览
+ */
 export function StepBackground(props: StepBackgroundProps) {
   const totalBonuses = createMemo(() => {
     const b: Record<string, number> = {};
@@ -24,136 +33,59 @@ export function StepBackground(props: StepBackgroundProps) {
   });
 
   return (
-    <div
-      style={{
-        ...cardStyle('1.5rem'),
-        width: '100%',
-        'max-width': '500px',
-        'text-align': 'center',
-      }}
-    >
-      <h2 style={{ 'font-size': '1.2rem', 'font-weight': 'normal', 'margin-bottom': '1rem' }}>
-        家庭背景 × 晋升通道
-      </h2>
-      <div style={{ display: 'flex', gap: '1rem', 'margin-bottom': '1rem' }}>
-        {/* 家庭背景 */}
-        <div style={{ flex: 1 }}>
-          <div
-            style={{
-              'font-size': '0.85rem',
-              color: colors.textSecondary,
-              'margin-bottom': '0.5rem',
-            }}
-          >
-            家庭背景
+    <div class="flex-col gap-md" style={{ 'max-width': '560px', margin: '0 auto' }}>
+      <div class="flex gap-md responsive-col">
+        <div class="flex-1 flex-col gap-sm">
+          <span class="form-label">家庭背景</span>
+          <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
+            <For each={props.backgrounds}>
+              {(bg) => (
+                <button
+                  data-testid={`family-background-${bg.id}`}
+                  class={
+                    props.data.familyBackground === bg.id ? 'choice-card selected' : 'choice-card'
+                  }
+                  onClick={() => props.updateField('familyBackground', bg.id)}
+                >
+                  <span class="choice-card-title">{bg.name}</span>
+                </button>
+              )}
+            </For>
           </div>
-          <For each={props.backgrounds}>
-            {(bg) => (
-              <div
-                data-testid={`family-background-${bg.id}`}
-                onClick={() => props.updateField('familyBackground', bg.id)}
-                style={{
-                  padding: '0.6rem',
-                  'font-size': '0.9rem',
-                  'margin-bottom': '0.3rem',
-                  cursor: 'pointer',
-                  'background-color':
-                    props.data.familyBackground === bg.id ? colors.primaryLight : colors.bgInput,
-                  color: props.data.familyBackground === bg.id ? colors.primary : colors.textDark,
-                  border:
-                    props.data.familyBackground === bg.id
-                      ? `1px solid ${colors.primary}`
-                      : `1px solid ${colors.borderLight}`,
-                  'border-radius': radius.md,
-                }}
-              >
-                {bg.name}
-              </div>
-            )}
-          </For>
         </div>
-        {/* 晋升通道 */}
-        <div style={{ flex: 1 }}>
-          <div
-            style={{
-              'font-size': '0.85rem',
-              color: colors.textSecondary,
-              'margin-bottom': '0.5rem',
-            }}
-          >
-            晋升通道
+        <div class="flex-1 flex-col gap-sm">
+          <span class="form-label">晋升通道</span>
+          <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
+            <For each={props.paths}>
+              {(p) => (
+                <button
+                  data-testid={`promotion-path-${p.id}`}
+                  class={props.data.promotionPath === p.id ? 'choice-card selected' : 'choice-card'}
+                  onClick={() => props.updateField('promotionPath', p.id)}
+                >
+                  <span class="choice-card-title">{p.name}</span>
+                </button>
+              )}
+            </For>
           </div>
-          <For each={props.paths}>
-            {(p) => (
-              <div
-                data-testid={`promotion-path-${p.id}`}
-                onClick={() => props.updateField('promotionPath', p.id)}
-                style={{
-                  padding: '0.6rem',
-                  'font-size': '0.9rem',
-                  'margin-bottom': '0.3rem',
-                  cursor: 'pointer',
-                  'background-color':
-                    props.data.promotionPath === p.id ? colors.primaryLight : colors.bgInput,
-                  color: props.data.promotionPath === p.id ? colors.primary : colors.textDark,
-                  border:
-                    props.data.promotionPath === p.id
-                      ? `1px solid ${colors.primary}`
-                      : `1px solid ${colors.borderLight}`,
-                  'border-radius': radius.md,
-                }}
-              >
-                {p.name}
-              </div>
-            )}
-          </For>
         </div>
       </div>
-      {/* 加成预览 */}
       <div
-        style={{
-          'font-size': '0.85rem',
-          'border-top': `1px solid ${colors.borderLight}`,
-          'padding-top': '0.8rem',
-        }}
+        class="flex-col gap-sm"
+        style={{ 'border-top': '1px solid var(--border-color)', 'padding-top': 'var(--space-md)' }}
       >
-        <div style={{ color: colors.textSecondary, 'margin-bottom': '0.5rem' }}>加成预览</div>
-        <div
-          style={{
-            display: 'flex',
-            'flex-wrap': 'wrap',
-            gap: '0.5rem',
-            'justify-content': 'center',
-          }}
-        >
+        <span class="form-label">加成预览</span>
+        <div class="flex gap-sm" style={{ 'flex-wrap': 'wrap' }}>
           <For each={Object.entries(totalBonuses())}>
             {([key, val]) => (
-              <span
-                style={{
-                  padding: '0.2rem 0.6rem',
-                  'background-color': colors.primaryLight,
-                  color: colors.primary,
-                  'border-radius': radius.md,
-                  'font-size': '0.8rem',
-                }}
-              >
+              <span class="tag tag-red">
                 {ATTR_LABELS[key] ?? key} +{val}
               </span>
             )}
           </For>
         </div>
       </div>
-      <div
-        style={{
-          'font-family': font.title,
-          color: colors.primary,
-          opacity: 0.7,
-          'margin-top': '0.8rem',
-          'font-size': '0.85rem',
-        }}
-      >
-        —— 朝中有人好做官 ——
-      </div>
+      <p class="serif secondary-text text-sm center">—— 朝中有人好做官 ——</p>
     </div>
   );
 }

@@ -1,17 +1,17 @@
 /**
- * Event center page.
+ * 事件中心页面。
  *
- * Keeps inbox, scheduled and history records separate so the player can inspect
- * persisted event runtime state without treating scheduled records as active work.
+ * 收件箱、计划中与历史记录分页展示，让玩家区分待处理事件、
+ * 已计划事件与已结算记录；阻塞事件不在此处展示（由全局弹窗处理）。
  */
 
 import { createSignal, For, Show } from 'solid-js';
-import { AppShell } from '../../components/app-shell';
 import { PageHeader } from '../../components/page-header';
 import { useGameStore } from '../../store/game-store';
-import { colors, darkCardStyle, pillStyle } from '../../utils/theme';
 
 type EventTab = 'pending' | 'scheduled' | 'history';
+
+const TABS: EventTab[] = ['pending', 'scheduled', 'history'];
 
 const tabLabels: Record<EventTab, string> = {
   pending: '待处理',
@@ -19,6 +19,10 @@ const tabLabels: Record<EventTab, string> = {
   history: '历史',
 };
 
+/**
+ * @param signalType 领域信号类型
+ * @returns 信号类型的中文来源标签
+ */
 function sourceLabel(signalType: string): string {
   switch (signalType) {
     case 'policy.approved':
@@ -38,6 +42,10 @@ function sourceLabel(signalType: string): string {
   }
 }
 
+/**
+ * @param status 历史记录最终状态
+ * @returns 状态中文标签
+ */
 function statusLabel(status: 'resolved' | 'expired' | 'cancelled'): string {
   switch (status) {
     case 'resolved':
@@ -50,9 +58,9 @@ function statusLabel(status: 'resolved' | 'expired' | 'cancelled'): string {
 }
 
 /**
- * Renders the persisted event inbox, schedule and resolution history.
+ * 事件中心页面组件。
  *
- * @returns The events route content.
+ * @returns 事件收件箱、计划与历史三页签
  */
 export function EventsPage() {
   const { state, dispatch } = useGameStore();
@@ -61,228 +69,159 @@ export function EventsPage() {
     state.events.pending.filter((event) => event.snapshot.presentation === 'inbox');
 
   return (
-    <AppShell>
-      <PageHeader title="事件中心" desc="处理非阻塞事件，并查看计划与结算记录" />
-      <section style={{ ...darkCardStyle('18px'), 'margin-top': '16px' }}>
-        <div style={{ display: 'flex', gap: '8px', 'border-bottom': `1px solid ${colors.border}` }}>
-          <For each={['pending', 'scheduled', 'history'] as EventTab[]}>
+    <>
+      <PageHeader
+        eyebrow="事件 · EVENTS"
+        title="事件中心"
+        desc="处理非阻塞事件，并查看计划与结算记录"
+      />
+
+      <section class="card">
+        <nav class="navbar-inner" style={{ padding: '0 var(--space-md)' }} aria-label="事件分页">
+          <For each={TABS}>
             {(item) => (
               <button
+                class={tab() === item ? 'nav-link active' : 'nav-link'}
                 onClick={() => setTab(item)}
-                style={{
-                  padding: '9px 12px',
-                  border: 'none',
-                  'border-bottom':
-                    tab() === item ? `2px solid ${colors.primary}` : '2px solid transparent',
-                  background: 'transparent',
-                  color: tab() === item ? colors.primary : colors.textSecondary,
-                  cursor: 'pointer',
-                  'font-weight': tab() === item ? 800 : 500,
-                }}
+                aria-current={tab() === item ? 'page' : undefined}
               >
                 {tabLabels[item]}
               </button>
             )}
           </For>
-        </div>
+        </nav>
 
-        <Show when={tab() === 'pending'}>
-          <div style={{ display: 'grid', gap: '12px', 'margin-top': '16px' }}>
+        <div class="card-pad">
+          {/* 待处理 */}
+          <Show when={tab() === 'pending'}>
             <Show
               when={inboxEvents().length > 0}
-              fallback={<p style={{ color: colors.textMuted }}>没有待处理的非阻塞事件。</p>}
+              fallback={<p class="text-sm muted">没有待处理的非阻塞事件。</p>}
             >
-              <For each={inboxEvents()}>
-                {(event) => (
-                  <article
-                    style={{
-                      padding: '14px',
-                      border: `1px solid ${colors.borderLight}`,
-                      'border-radius': '7px',
-                      background: '#fff',
-                    }}
-                  >
-                    <div
-                      style={{ display: 'flex', 'justify-content': 'space-between', gap: '10px' }}
-                    >
-                      <b>{event.snapshot.title}</b>
-                      <span style={pillStyle(colors.secondaryLight, colors.secondary)}>待处理</span>
-                    </div>
-                    <p
-                      style={{
-                        'margin-top': '7px',
-                        color: colors.textSecondary,
-                        'font-size': '13px',
-                        'line-height': '1.6',
-                      }}
-                    >
-                      {event.snapshot.description}
-                    </p>
-                    <div
-                      style={{
-                        display: 'flex',
-                        'flex-wrap': 'wrap',
-                        gap: '10px',
-                        'margin-top': '10px',
-                        color: colors.textMuted,
-                        'font-size': '12px',
-                      }}
-                    >
-                      <span>
-                        截止：{event.deadlineDay === null ? '无' : `第 ${event.deadlineDay} 日`}
-                      </span>
-                      <span>来源：{sourceLabel(event.triggerContext.signalType)}</span>
-                      <span>上下文：{event.sourceKey}</span>
-                    </div>
-                    <div style={{ display: 'grid', gap: '7px', 'margin-top': '14px' }}>
-                      <For each={event.snapshot.options}>
-                        {(option) => (
-                          <button
-                            data-testid={`event-option-${event.instanceId}-${option.id}`}
-                            onClick={() =>
-                              dispatch({
-                                type: 'CHOOSE_EVENT_OPTION',
-                                eventInstanceId: event.instanceId,
-                                optionId: option.id,
-                              })
-                            }
-                            style={{
-                              padding: '10px 12px',
-                              border: `1px solid ${colors.border}`,
-                              'border-radius': '5px',
-                              background: colors.bgCard,
-                              color: colors.textPrimary,
-                              cursor: 'pointer',
-                              'text-align': 'left',
-                            }}
-                          >
-                            <b>{option.label}</b>
-                            <Show when={option.description}>
-                              <span
+              <div class="flex-col gap-md">
+                <For each={inboxEvents()}>
+                  {(event) => (
+                    <article class="card">
+                      <div class="card-pad flex-col gap-sm">
+                        <div class="flex between gap-md">
+                          <b class="serif" style={{ 'font-size': '1.05rem' }}>
+                            {event.snapshot.title}
+                          </b>
+                          <span class="tag tag-blue">待处理</span>
+                        </div>
+                        <p class="text-sm secondary-text" style={{ 'line-height': '1.7' }}>
+                          {event.snapshot.description}
+                        </p>
+                        <div class="flex gap-md text-xs muted" style={{ 'flex-wrap': 'wrap' }}>
+                          <span>
+                            截止：{event.deadlineDay === null ? '无' : `第 ${event.deadlineDay} 日`}
+                          </span>
+                          <span>来源：{sourceLabel(event.triggerContext.signalType)}</span>
+                          <span>上下文：{event.sourceKey}</span>
+                        </div>
+                        <div class="flex-col gap-sm">
+                          <For each={event.snapshot.options}>
+                            {(option) => (
+                              <button
+                                class="btn"
+                                data-testid={`event-option-${event.instanceId}-${option.id}`}
+                                onClick={() =>
+                                  dispatch({
+                                    type: 'CHOOSE_EVENT_OPTION',
+                                    eventInstanceId: event.instanceId,
+                                    optionId: option.id,
+                                  })
+                                }
                                 style={{
-                                  display: 'block',
-                                  'margin-top': '3px',
-                                  color: colors.textMuted,
-                                  'font-size': '12px',
+                                  'flex-direction': 'column',
+                                  'align-items': 'flex-start',
+                                  gap: '0.2rem',
                                 }}
                               >
-                                {option.description}
-                              </span>
-                            </Show>
-                          </button>
-                        )}
-                      </For>
-                    </div>
-                  </article>
-                )}
-              </For>
+                                <b>{option.label}</b>
+                                <Show when={option.description}>
+                                  <span class="text-xs muted" style={{ 'font-weight': 400 }}>
+                                    {option.description}
+                                  </span>
+                                </Show>
+                              </button>
+                            )}
+                          </For>
+                        </div>
+                      </div>
+                    </article>
+                  )}
+                </For>
+              </div>
             </Show>
-          </div>
-        </Show>
+          </Show>
 
-        <Show when={tab() === 'scheduled'}>
-          <div style={{ display: 'grid', gap: '10px', 'margin-top': '16px' }}>
+          {/* 计划中 */}
+          <Show when={tab() === 'scheduled'}>
             <Show
               when={state.events.scheduled.length > 0}
-              fallback={<p style={{ color: colors.textMuted }}>没有计划中的事件。</p>}
+              fallback={<p class="text-sm muted">没有计划中的事件。</p>}
             >
-              <For each={state.events.scheduled}>
-                {(event) => (
-                  <article
-                    style={{
-                      padding: '13px',
-                      border: `1px solid ${colors.borderLight}`,
-                      'border-radius': '7px',
-                      background: '#fff',
-                    }}
-                  >
-                    <b>{event.snapshot.title}</b>
-                    <div
-                      style={{
-                        display: 'grid',
-                        'grid-template-columns': 'repeat(auto-fit, minmax(150px, 1fr))',
-                        gap: '8px',
-                        'margin-top': '9px',
-                        color: colors.textSecondary,
-                        'font-size': '12px',
-                      }}
-                    >
-                      <span>激活日：第 {event.activateAtDay} 日</span>
-                      <span>事件链：{event.chainInstanceId ?? '独立事件'}</span>
-                      <span>来源：{sourceLabel(event.triggerContext.signalType)}</span>
-                      <span>上下文：{event.sourceKey}</span>
-                    </div>
-                  </article>
-                )}
-              </For>
+              <div class="flex-col gap-sm">
+                <For each={state.events.scheduled}>
+                  {(event) => (
+                    <article class="card">
+                      <div class="card-pad flex-col gap-sm">
+                        <b class="serif">{event.snapshot.title}</b>
+                        <div
+                          class="flex gap-md text-xs secondary-text"
+                          style={{ 'flex-wrap': 'wrap' }}
+                        >
+                          <span>激活日：第 {event.activateAtDay} 日</span>
+                          <span>事件链：{event.chainInstanceId ?? '独立事件'}</span>
+                          <span>来源：{sourceLabel(event.triggerContext.signalType)}</span>
+                          <span>上下文：{event.sourceKey}</span>
+                        </div>
+                      </div>
+                    </article>
+                  )}
+                </For>
+              </div>
             </Show>
-          </div>
-        </Show>
+          </Show>
 
-        <Show when={tab() === 'history'}>
-          <div style={{ display: 'grid', gap: '10px', 'margin-top': '16px' }}>
+          {/* 历史 */}
+          <Show when={tab() === 'history'}>
             <Show
               when={state.events.history.length > 0}
-              fallback={<p style={{ color: colors.textMuted }}>尚无事件历史。</p>}
+              fallback={<p class="text-sm muted">尚无事件历史。</p>}
             >
-              <For each={state.events.history}>
-                {(event) => (
-                  <article
-                    style={{
-                      padding: '13px',
-                      border: `1px solid ${colors.borderLight}`,
-                      'border-radius': '7px',
-                      background: '#fff',
-                    }}
-                  >
-                    <div
-                      style={{ display: 'flex', 'justify-content': 'space-between', gap: '10px' }}
-                    >
-                      <b>{event.titleSnapshot}</b>
-                      <span style={pillStyle(colors.bgSoft, colors.textSecondary)}>
-                        {statusLabel(event.finalStatus)}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: 'grid',
-                        gap: '5px',
-                        'margin-top': '9px',
-                        color: colors.textSecondary,
-                        'font-size': '12px',
-                      }}
-                    >
-                      <span>选择：{event.chosenOptionLabel ?? '未选择（自动结束）'}</span>
-                      <span>完成日：第 {event.completedAtDay} 日</span>
-                      <span>事件链：{event.chainInstanceId ?? '独立事件'}</span>
-                      <span>来源：{event.sourceKey}</span>
-                    </div>
-                    <Show when={event.appliedEffects.length > 0}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          'flex-wrap': 'wrap',
-                          gap: '6px',
-                          'margin-top': '10px',
-                        }}
-                      >
-                        <For each={event.appliedEffects}>
-                          {(effect) => (
-                            <span style={pillStyle(colors.successLight, '#27752a')}>
-                              {effect.label}
-                            </span>
-                          )}
-                        </For>
+              <div class="flex-col gap-sm">
+                <For each={state.events.history}>
+                  {(event) => (
+                    <article class="card">
+                      <div class="card-pad flex-col gap-sm">
+                        <div class="flex between gap-md">
+                          <b class="serif">{event.titleSnapshot}</b>
+                          <span class="tag tag-gray">{statusLabel(event.finalStatus)}</span>
+                        </div>
+                        <div class="flex-col gap-xs text-xs secondary-text">
+                          <span>选择：{event.chosenOptionLabel ?? '未选择（自动结束）'}</span>
+                          <span>完成日：第 {event.completedAtDay} 日</span>
+                          <span>事件链：{event.chainInstanceId ?? '独立事件'}</span>
+                          <span>来源：{event.sourceKey}</span>
+                        </div>
+                        <Show when={event.appliedEffects.length > 0}>
+                          <div class="flex gap-sm" style={{ 'flex-wrap': 'wrap' }}>
+                            <For each={event.appliedEffects}>
+                              {(effect) => <span class="tag tag-green">{effect.label}</span>}
+                            </For>
+                          </div>
+                        </Show>
                       </div>
-                    </Show>
-                  </article>
-                )}
-              </For>
+                    </article>
+                  )}
+                </For>
+              </div>
             </Show>
-          </div>
-        </Show>
+          </Show>
+        </div>
       </section>
-      <div style={{ height: '24px' }} />
-    </AppShell>
+    </>
   );
 }

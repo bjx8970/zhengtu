@@ -1,5 +1,5 @@
 /**
- * 建档页面（6 步向导）
+ * 建档页面（6 步向导）— 「干部履历表」公文版面
  *
  * 创建游戏角色的向导流程：
  * 1. 基本信息 — 姓名 + 性别
@@ -9,7 +9,7 @@
  * 5. 家庭背景 + 晋升通道 — 双列选择 + 加成预览
  * 6. 职业线选择 — 行政/党群/纪检/群团四选一
  *
- * 完成后 dispatch(NEW_GAME) 并跳转仪表盘。
+ * 完成后 dispatch(NEW_GAME) 并跳转工作台。
  */
 import { createSignal, createMemo, Show, For } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
@@ -19,7 +19,6 @@ import { consumeForceNewGame } from '../../services/startup-save-state';
 import { CareerLine } from '../../types/enums';
 import type { CharacterData } from '../../types/character';
 import { generateGaokaoScore } from '../../utils/gaokao';
-import { colors, radius, font, pageBase } from '../../utils/theme';
 import type { ProvinceConfig } from '../../types/config';
 import { StepBasicInfo } from './StepBasicInfo';
 import { StepBirthplace } from './StepBirthplace';
@@ -43,6 +42,14 @@ const INITIAL_DATA: CharacterData = {
   careerLine: CareerLine.Administrative,
 };
 
+/** 各步骤眉题 */
+const STEP_NAMES = ['基本信息', '出生地', '高考成绩', '院校选择', '家庭背景', '职业线'] as const;
+
+/**
+ * 建档向导组件。
+ *
+ * @returns 干部履历表式 6 步建档向导
+ */
 export function CharacterCreation() {
   const { state, dispatch } = useGameStore();
 
@@ -133,137 +140,114 @@ export function CharacterCreation() {
   const selectedProvince = createMemo(() => provinces().find((p) => p.name === data().province));
 
   return (
-    <div style={pageBase}>
-      {/* 进度条 */}
-      <div style={{ padding: '1.5rem 1.5rem 0' }}>
-        <div style={{ display: 'flex', gap: '0.3rem', 'margin-bottom': '0.5rem' }}>
-          <For each={Array.from({ length: TOTAL }, (_, i) => i)}>
-            {(i) => (
-              <div
-                style={{
-                  flex: 1,
-                  height: '3px',
-                  'background-color': i <= step() ? colors.primary : colors.border,
-                  'border-radius': radius.sm,
-                  transition: 'background 0.3s',
-                }}
-              />
-            )}
-          </For>
+    <div class="doc-scroll">
+      <header class="masthead">
+        <div class="masthead-inner">
+          <a class="btn btn-ghost btn-sm" href="#/">
+            {'\u2190'} 返回
+          </a>
+          <div class="masthead-seal" aria-hidden="true">
+            政
+          </div>
+          <div>
+            <div class="masthead-title">干部履历表</div>
+            <div class="masthead-sub">新录用公务员建档 · 六步</div>
+          </div>
+          <div class="masthead-spacer" />
+          <div class="masthead-date">
+            {STEP_NAMES[step()]} · 第 {step() + 1}/{TOTAL} 步
+          </div>
         </div>
-        <div style={{ 'font-size': '0.8rem', color: colors.textSecondary }}>
-          第 {step() + 1}/{TOTAL} 步
+      </header>
+
+      <div class="doc-page">
+        <div class="doc-shell" style={{ 'max-width': '720px' }}>
+          <section class="card">
+            <div class="card-pad">
+              <div class="wizard-steps" aria-label="建档进度">
+                <For each={Array.from({ length: TOTAL }, (_, i) => i)}>
+                  {(i) => <div class={i <= step() ? 'wizard-step done' : 'wizard-step'} />}
+                </For>
+              </div>
+              <div class="wizard-caption">
+                <span>
+                  第 {step() + 1} 步 · {STEP_NAMES[step()]}
+                </span>
+                <span>共 {TOTAL} 步</span>
+              </div>
+            </div>
+
+            <div class="card-pad" style={{ 'min-height': '340px' }}>
+              <Show when={step() === 0}>
+                <StepBasicInfo data={data()} updateField={updateField} />
+              </Show>
+              <Show when={step() === 1}>
+                <StepBirthplace
+                  data={data()}
+                  provinces={provinces}
+                  selectedProvince={selectedProvince}
+                  updateField={updateField}
+                />
+              </Show>
+              <Show when={step() === 2 && selectedProvince()}>
+                {(prov) => (
+                  <StepGaokao
+                    data={data()}
+                    province={prov()}
+                    gaokaoYear={gaokaoYear()}
+                    rollGaokao={rollGaokao}
+                  />
+                )}
+              </Show>
+              <Show when={step() === 3}>
+                <StepSchool data={data()} universities={universities()} updateField={updateField} />
+              </Show>
+              <Show when={step() === 4}>
+                <StepBackground
+                  data={data()}
+                  backgrounds={backgrounds()}
+                  paths={paths()}
+                  updateField={updateField}
+                />
+              </Show>
+              <Show when={step() === 5}>
+                <StepCareerLine data={data()} updateField={updateField} />
+              </Show>
+            </div>
+
+            <div
+              class="card-pad flex gap-md"
+              style={{ 'border-top': '1px solid var(--border-color)' }}
+            >
+              <Show when={step() > 0}>
+                <button data-testid="character-previous" class="btn" onClick={handlePrev}>
+                  {'\u2190'} 上一步
+                </button>
+              </Show>
+              <div class="flex-1" />
+              <Show when={step() < TOTAL - 1}>
+                <button
+                  data-testid="character-next"
+                  class="btn btn-primary btn-lg"
+                  onClick={handleNext}
+                  disabled={!canNext()}
+                >
+                  下一步 {'\u2192'}
+                </button>
+              </Show>
+              <Show when={step() === TOTAL - 1}>
+                <button
+                  data-testid="character-complete"
+                  class="btn btn-primary btn-lg serif"
+                  onClick={handleComplete}
+                  disabled={!canNext()}
+                >
+                  开始仕途
+                </button>
+              </Show>
+            </div>
+          </section>
         </div>
-      </div>
-
-      {/* 内容区 */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          'flex-direction': 'column',
-          'align-items': 'center',
-          'justify-content': 'center',
-          padding: '1rem 1.5rem',
-          overflow: 'hidden',
-        }}
-      >
-        <Show when={step() === 0}>
-          <StepBasicInfo data={data()} updateField={updateField} />
-        </Show>
-        <Show when={step() === 1}>
-          <StepBirthplace
-            data={data()}
-            provinces={provinces}
-            selectedProvince={selectedProvince}
-            updateField={updateField}
-          />
-        </Show>
-        <Show when={step() === 2 && selectedProvince()}>
-          {(prov) => (
-            <StepGaokao
-              data={data()}
-              province={prov()}
-              gaokaoYear={gaokaoYear()}
-              rollGaokao={rollGaokao}
-            />
-          )}
-        </Show>
-        <Show when={step() === 3}>
-          <StepSchool data={data()} universities={universities()} updateField={updateField} />
-        </Show>
-        <Show when={step() === 4}>
-          <StepBackground
-            data={data()}
-            backgrounds={backgrounds()}
-            paths={paths()}
-            updateField={updateField}
-          />
-        </Show>
-        <Show when={step() === 5}>
-          <StepCareerLine data={data()} updateField={updateField} />
-        </Show>
-      </div>
-
-      {/* 底部导航 */}
-      <div style={{ display: 'flex', gap: '0.8rem', padding: '1rem 1.5rem 1.5rem' }}>
-        <Show when={step() > 0}>
-          <button
-            data-testid="character-previous"
-            onClick={handlePrev}
-            style={{
-              flex: 1,
-              padding: '0.8rem',
-              'font-size': '1rem',
-              'background-color': colors.bgCard,
-              color: colors.textSecondary,
-              border: `1px solid ${colors.border}`,
-              'border-radius': radius.md,
-              cursor: 'pointer',
-            }}
-          >
-            上一步
-          </button>
-        </Show>
-        <Show when={step() < TOTAL - 1}>
-          <button
-            data-testid="character-next"
-            onClick={handleNext}
-            disabled={!canNext()}
-            style={{
-              flex: 1,
-              padding: '0.8rem',
-              'font-size': '1rem',
-              'background-color': canNext() ? colors.primary : colors.border,
-              color: canNext() ? colors.primaryText : colors.textMuted,
-              border: 'none',
-              'border-radius': radius.md,
-              cursor: canNext() ? 'pointer' : 'not-allowed',
-            }}
-          >
-            下一步
-          </button>
-        </Show>
-        <Show when={step() === TOTAL - 1}>
-          <button
-            data-testid="character-complete"
-            onClick={handleComplete}
-            disabled={!canNext()}
-            style={{
-              flex: 1,
-              padding: '0.8rem',
-              'font-size': '1rem',
-              'background-color': canNext() ? colors.primary : colors.border,
-              color: canNext() ? colors.primaryText : colors.textMuted,
-              border: 'none',
-              'border-radius': radius.md,
-              cursor: canNext() ? 'pointer' : 'not-allowed',
-              'font-family': font.title,
-            }}
-          >
-            开始仕途
-          </button>
-        </Show>
       </div>
     </div>
   );

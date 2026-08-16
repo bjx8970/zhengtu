@@ -23,6 +23,8 @@ export interface Route {
   component: (props: PageProps) => JSX.Element;
   auth?: boolean;
   characterCreated?: boolean;
+  /** 是否渲染在机关工作台外壳（红头总栏 + 全局导航）内 */
+  shell?: boolean;
 }
 
 import { createSignal } from 'solid-js';
