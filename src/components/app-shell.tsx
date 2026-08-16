@@ -49,15 +49,15 @@ export function AppShell(props: { children: JSX.Element }) {
   const path = useHashPath();
   const [theme, setTheme] = createSignal(getCurrentTheme());
 
-  const pendingEvents = () =>
-    state.events.pending.filter((event) => event.instanceId !== state.events.activeBlockingEventId)
-      .length;
+  /** 收件箱待处理事件数（与事件页「待处理」页签口径一致，不含阻断弹窗事件） */
+  const pendingInboxCount = () =>
+    state.events.pending.filter((event) => event.snapshot.presentation === 'inbox').length;
   const opportunityCount = () =>
     state.career.opportunities.filter((opportunity) => opportunity.status === 'available').length;
 
   function badgeFor(itemPath: string): number | null {
     if (itemPath === '/events') {
-      const count = pendingEvents() + (state.events.activeBlockingEventId ? 1 : 0);
+      const count = pendingInboxCount();
       return count > 0 ? count : null;
     }
     if (itemPath === '/career') return opportunityCount() > 0 ? opportunityCount() : null;

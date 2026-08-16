@@ -912,7 +912,9 @@ a:focus-visible {
     padding: var(--space-md);
   }
 
+  /* 同时支持 grid 与 flex 容器的单列折叠 */
   .responsive-col {
     grid-template-columns: 1fr !important;
+    flex-direction: column !important;
   }
 }
