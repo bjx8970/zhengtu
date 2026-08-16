@@ -7,7 +7,7 @@ main 是受保护分支。任何变更必须:
   1. git checkout -b <type>/<desc>  从 main 新建分支
   2. 编写代码 + 测试
   3. git push + 创建 PR
-  4. CI 全部通过 + OpenCode review 通过
+  4. CI 全部通过 + 人工 review 通过
   5. Merge pull request 到 main
 
 分支命名: feat/<name> | fix/<name> | refactor/<name> | docs/<name> | chore/<name>
@@ -109,9 +109,9 @@ Tests use `createTestStore()` for isolation. Never import the module-level `disp
 
 ## CI + deployment
 
-- On PR: `ci.yml` (quality gates) + `opencode-review.yml` (AI review).
+- On PR: `ci.yml`（质量门禁：format / lint / typecheck / test+coverage / validate:config / build / e2e）。
+- 自动 AI 审查已停用（原 `opencode-review.yml` 已移除）。如需按需审查，可在 PR 评论中用 `/oc` 或 `/opencode` 触发手动会话（`opencode.yml`，仅协作者可触发）。
 - On push to main: `deploy.yml` → GitHub Pages at `https://bjx8970.github.io/zhengtu/`.
-- OpenCode review needs `use_github_token: true` for `pull_request` events — omit it = `p.rest undefined` crash.
 - `vite.config.ts` has `base: '/zhengtu/'` for GitHub Pages path. Don't change without syncing the repo name.
 
 ## Enums: English keys internally, Chinese values for display
