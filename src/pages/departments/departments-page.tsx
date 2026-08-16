@@ -1,18 +1,16 @@
 /**
  * 部门治理页
  *
- * 展示当前职位的所有部门，点击部门可查看行动列表并安排日程。
- * 交互流程：部门列表 → 点击部门 → 行动列表 + 日程选择按钮。
+ * 展示当前职位的所有部门，点击部门进入行动列表并安排日程。
+ * 交互流程：部门列表 → 点击部门 → 行动列表 + 槽位选择按钮。
  */
 
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
-import { AppShell } from '../../components/app-shell';
 import { PageHeader } from '../../components/page-header';
 import { getConfigLoader } from '../../config/loader';
 import type { SlotTierKey, SlotOccupant } from '../../types/player';
 import type { DepartmentConfig } from '../../types/config';
-import { colors, font, meterContainer, darkCardStyle } from '../../utils/theme';
 import { formatEffectLabel } from '../../utils/effect-labels';
 
 /** 日程等级按钮配置 */
@@ -21,6 +19,13 @@ const TIER_BUTTONS: { key: SlotTierKey; label: string }[] = [
   { key: 'secondary', label: '次要' },
   { key: 'reserve', label: '紧急' },
 ];
+
+/** 行动类别标签 */
+const CATEGORY_LABELS: Record<string, string> = {
+  major: '重大',
+  minor: '次要',
+  routine: '日常',
+};
 
 /**
  * 部门治理页组件。
@@ -49,8 +54,13 @@ export function DepartmentsPage() {
   });
 
   return (
-    <AppShell>
-      <PageHeader title="部门治理" desc="查看部门状态、安排日程、管理冷却" />
+    <>
+      <PageHeader
+        eyebrow="治理 · GOVERNANCE"
+        title="部门治理"
+        meta={positionConfig()?.name ?? ''}
+        desc="查看部门状态、安排行动、管理槽位与冷却"
+      />
 
       <Show
         when={selectedDept() === null}
@@ -59,36 +69,17 @@ export function DepartmentsPage() {
           <DeptDetailView dept={selectedDept()!} onBack={() => setSelectedDeptIdx(null)} />
         }
       >
-        {/* 部门列表视图 */}
-        <div style={{ ...darkCardStyle('18px'), 'margin-bottom': '16px', 'margin-top': '16px' }}>
-          <h2 style={{ 'font-size': '25px', 'font-family': font.title }}>部门治理</h2>
-          <p
-            style={{
-              'margin-top': '6px',
-              color: colors.textMuted,
-              'font-size': '14px',
-              'line-height': '1.6',
-            }}
-          >
-            点击部门查看可执行行动并安排日程。
-          </p>
-        </div>
-
         <Show
           when={allDepts().length > 0}
           fallback={
-            <div style={{ color: colors.textMuted, 'text-align': 'center', 'margin-top': '3rem' }}>
+            <div class="card center muted" style={{ padding: '3rem 0' }}>
               暂无部门数据
             </div>
           }
         >
           <div
-            class="responsive-dept-grid"
-            style={{
-              display: 'grid',
-              'grid-template-columns': 'repeat(3, minmax(0, 1fr))',
-              gap: '14px',
-            }}
+            class="choice-grid"
+            style={{ 'grid-template-columns': 'repeat(auto-fill, minmax(230px, 1fr))' }}
           >
             <For each={allDepts()}>
               {(dept, idx) => {
@@ -97,75 +88,45 @@ export function DepartmentsPage() {
                 const firstKpi = Object.entries(kpiValues).slice(0, 2);
                 const firstValue = firstKpi.length > 0 ? Number(firstKpi[0]?.[1] ?? 0) : 0;
                 return (
-                  <article
+                  <button
                     data-testid={`department-${dept.id}`}
+                    class="choice-card"
                     onClick={() => setSelectedDeptIdx(idx())}
-                    style={{
-                      ...darkCardStyle('16px'),
-                      'min-height': '156px',
-                      cursor: 'pointer',
-                      transition: 'border-color 0.15s, box-shadow 0.15s',
-                    }}
+                    style={{ 'min-height': '150px' }}
                   >
-                    <h3 style={{ 'font-size': '16px' }}>{dept.name}</h3>
-                    <p
-                      style={{
-                        'margin-top': '8px',
-                        color: colors.textMuted,
-                        'font-size': '13px',
-                        'line-height': '1.6',
-                      }}
-                    >
+                    <span class="choice-card-title serif" style={{ 'font-size': '1.05rem' }}>
+                      {dept.name}
+                    </span>
+                    <span class="choice-card-desc">
                       {dept.actions.length > 0
                         ? `可执行 ${dept.actions.length} 个行动`
                         : '暂无可用行动'}
-                    </p>
-                    <div style={{ ...meterContainer(), 'margin-top': '12px' }}>
-                      <div
-                        style={{
-                          height: '100%',
-                          'border-radius': 'inherit',
-                          background: colors.success,
-                          width: `${Math.min(Math.abs(firstValue) * 10, 100)}%`,
-                        }}
+                    </span>
+                    <span class="meter">
+                      <i
+                        class="meter-fill green"
+                        style={{ width: `${Math.min(Math.abs(firstValue) * 10, 100)}%` }}
+                        aria-hidden="true"
                       />
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        'flex-wrap': 'wrap',
-                        gap: '7px',
-                        'margin-top': '12px',
-                      }}
-                    >
+                    </span>
+                    <span class="flex gap-sm" style={{ 'flex-wrap': 'wrap' }}>
                       <For each={firstKpi}>
                         {([kpiId, value]) => (
-                          <span
-                            style={{
-                              padding: '4px 7px',
-                              'border-radius': '999px',
-                              background: colors.bgSoft,
-                              color: colors.textMuted,
-                              'font-size': '12px',
-                              'font-weight': 800,
-                            }}
-                          >
+                          <span class="tag tag-gray">
                             {dept.kpiIndicators.find((k) => k.id === kpiId)?.name ?? kpiId}{' '}
                             {String(value)}
                           </span>
                         )}
                       </For>
-                    </div>
-                  </article>
+                    </span>
+                  </button>
                 );
               }}
             </For>
           </div>
         </Show>
       </Show>
-
-      <div style={{ height: '24px' }} />
-    </AppShell>
+    </>
   );
 }
 
@@ -180,41 +141,21 @@ function DeptDetailView(props: { dept: DepartmentConfig; onBack: () => void }) {
   const { state, dispatch } = useGameStore();
 
   return (
-    <div style={{ 'margin-top': '16px' }}>
-      {/* 返回按钮 + 部门名 */}
-      <div
-        style={{ display: 'flex', 'align-items': 'center', gap: '12px', 'margin-bottom': '16px' }}
-      >
-        <button
-          onClick={props.onBack}
-          style={{
-            display: 'grid',
-            'place-items': 'center',
-            width: '32px',
-            height: '32px',
-            border: `1px solid ${colors.border}`,
-            'border-radius': '50%',
-            background: '#fff',
-            color: colors.textPrimary,
-            'font-size': '16px',
-            cursor: 'pointer',
-          }}
-        >
-          {'\u2190'}
+    <div class="flex-col gap-lg">
+      <div class="flex gap-sm center">
+        <button class="btn btn-sm" onClick={props.onBack} aria-label="返回部门列表">
+          {'\u2190'} 返回部门列表
         </button>
-        <h2 style={{ 'font-size': '20px', 'font-family': font.title }}>{props.dept.name}</h2>
+        <h2 class="doc-title" style={{ 'font-size': '1.2rem' }}>
+          {props.dept.name}
+        </h2>
       </div>
 
-      {/* 行动列表 */}
       <Show
         when={props.dept.actions.length > 0}
-        fallback={
-          <div style={{ color: colors.textMuted, 'font-size': '13px', padding: '16px' }}>
-            该部门暂无可用行动。
-          </div>
-        }
+        fallback={<div class="card card-pad muted text-sm">该部门暂无可用行动。</div>}
       >
-        <div style={{ display: 'grid', gap: '12px' }}>
+        <div class="flex-col gap-md">
           <For each={props.dept.actions}>
             {(action) => {
               const deptState = state.actions.departmentStates[props.dept.id];
@@ -223,127 +164,78 @@ function DeptDetailView(props: { dept: DepartmentConfig; onBack: () => void }) {
                 action.category !== 'routine' && state.time.totalDaysPlayed < cooldownUntil;
 
               return (
-                <div
-                  style={{
-                    padding: '15px',
-                    border: `1px solid ${colors.border}`,
-                    'border-radius': '8px',
-                    background: '#fff',
-                  }}
-                >
-                  <h3 style={{ 'font-size': '16px' }}>{action.name}</h3>
-                  <p
-                    style={{
-                      'margin-top': '8px',
-                      color: colors.textMuted,
-                      'font-size': '13px',
-                      'line-height': '1.6',
-                    }}
-                  >
-                    {action.category === 'major'
-                      ? '重大'
-                      : action.category === 'minor'
-                        ? '次要'
-                        : '日常'}
-                    行动 · {action.durationDays}天
-                    {action.cooldownDays > 0 && ` · 冷却${action.cooldownDays}天`}
-                  </p>
-                  <div
-                    style={{
-                      display: 'flex',
-                      'flex-wrap': 'wrap',
-                      gap: '7px',
-                      'margin-top': '12px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        padding: '4px 7px',
-                        'border-radius': '999px',
-                        background: colors.bgSoft,
-                        color: colors.textMuted,
-                        'font-size': '12px',
-                        'font-weight': 800,
-                      }}
-                    >
-                      {action.budgetDelta >= 0
-                        ? `预算+${action.budgetDelta}万`
-                        : `预算${action.budgetDelta}万`}
-                    </span>
-                    <For each={action.effects.slice(0, 3)}>
-                      {(eff) => (
-                        <span
-                          style={{
-                            padding: '4px 7px',
-                            'border-radius': '999px',
-                            background: colors.bgSoft,
-                            color: colors.textMuted,
-                            'font-size': '12px',
-                            'font-weight': 800,
-                          }}
-                        >
-                          {formatEffectLabel(eff)}
-                        </span>
-                      )}
-                    </For>
-                  </div>
-                  <Show when={onCooldown}>
-                    <div
-                      style={{
-                        'margin-top': '8px',
-                        'font-size': '12px',
-                        color: colors.warning,
-                      }}
-                    >
-                      冷却中（{cooldownUntil - state.time.totalDaysPlayed}天）
+                <div class="card">
+                  <div class="card-pad flex-col gap-sm">
+                    <div class="flex between center">
+                      <h3 style={{ 'font-size': '1rem' }}>{action.name}</h3>
+                      <span class="tag tag-blue">{CATEGORY_LABELS[action.category]}行动</span>
                     </div>
-                  </Show>
-                  {/* 日程选择按钮 */}
-                  <div style={{ display: 'flex', gap: '8px', 'margin-top': '12px' }}>
-                    <For each={TIER_BUTTONS}>
-                      {(tb) => {
-                        const disallowedByCategory =
-                          action.category === 'major' && tb.key !== 'primary';
-                        if (disallowedByCategory) return null;
-                        const tierGroup = state.actions.slots[tb.key];
-                        const hasFree = tierGroup.occupants.some(
-                          (o: SlotOccupant | null) => o === null,
-                        );
-                        const insufficientBudget = state.remainingBudget < action.budgetDelta;
-                        const disabled = onCooldown || !hasFree || insufficientBudget;
-                        return (
-                          <button
-                            data-testid={`start-action-${props.dept.id}-${action.id}-${tb.key}`}
-                            onClick={() =>
-                              dispatch({
-                                type: 'START_ACTION',
-                                deptId: props.dept.id,
-                                actionId: action.id,
-                                tierKey: tb.key,
-                              })
-                            }
-                            disabled={disabled}
-                            style={{
-                              flex: 1,
-                              padding: '7px',
-                              border: disabled ? `1px solid ${colors.border}` : 'none',
-                              'border-radius': '6px',
-                              background: disabled
-                                ? colors.bgSoft
-                                : tb.key === 'reserve'
-                                  ? colors.danger
-                                  : colors.primary,
-                              color: disabled ? colors.textMuted : '#fff',
-                              cursor: disabled ? 'not-allowed' : 'pointer',
-                              'font-size': '13px',
-                              'font-weight': 700,
-                            }}
-                          >
-                            {tb.label}
-                          </button>
-                        );
-                      }}
-                    </For>
+                    <p class="text-sm secondary-text">
+                      {action.durationDays} 天
+                      {action.cooldownDays > 0 && ` · 冷却 ${action.cooldownDays} 天`}
+                    </p>
+                    <div class="flex gap-sm" style={{ 'flex-wrap': 'wrap' }}>
+                      <span class="tag tag-gray">
+                        {action.budgetDelta >= 0
+                          ? `预算 +${action.budgetDelta}万`
+                          : `预算 ${action.budgetDelta}万`}
+                      </span>
+                      <For each={action.effects.slice(0, 3)}>
+                        {(eff) => <span class="tag tag-gray">{formatEffectLabel(eff)}</span>}
+                      </For>
+                    </div>
+                    <Show when={onCooldown}>
+                      <p class="banner banner-warning text-sm">
+                        冷却中（{cooldownUntil - state.time.totalDaysPlayed} 天）
+                      </p>
+                    </Show>
+                    <div class="flex gap-sm">
+                      <For each={TIER_BUTTONS}>
+                        {(tb) => {
+                          const disallowedByCategory =
+                            action.category === 'major' && tb.key !== 'primary';
+                          if (disallowedByCategory) return null;
+                          const tierGroup = state.actions.slots[tb.key];
+                          const hasFree = tierGroup.occupants.some(
+                            (o: SlotOccupant | null) => o === null,
+                          );
+                          const insufficientBudget = state.remainingBudget < action.budgetDelta;
+                          const disabled = onCooldown || !hasFree || insufficientBudget;
+                          return (
+                            <button
+                              data-testid={`start-action-${props.dept.id}-${action.id}-${tb.key}`}
+                              class={
+                                disabled
+                                  ? 'btn flex-1'
+                                  : tb.key === 'reserve'
+                                    ? 'btn btn-danger flex-1'
+                                    : 'btn btn-primary flex-1'
+                              }
+                              onClick={() =>
+                                dispatch({
+                                  type: 'START_ACTION',
+                                  deptId: props.dept.id,
+                                  actionId: action.id,
+                                  tierKey: tb.key,
+                                })
+                              }
+                              disabled={disabled}
+                              title={
+                                disabled
+                                  ? onCooldown
+                                    ? '行动冷却中'
+                                    : !hasFree
+                                      ? '该档位已无空槽'
+                                      : '预算不足'
+                                  : undefined
+                              }
+                            >
+                              {tb.label}槽
+                            </button>
+                          );
+                        }}
+                      </For>
+                    </div>
                   </div>
                 </div>
               );

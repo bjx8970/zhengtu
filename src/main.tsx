@@ -15,6 +15,10 @@ import { App } from './app';
 import { dispatch } from './store/game-store';
 import { readLocalSave } from './services/save-repo';
 import { setStartupSaveResult } from './services/startup-save-state';
+import { initTheme } from './utils/theme';
+
+// 首帧前应用主题，避免亮暗闪烁
+initTheme();
 
 const root = document.getElementById('root');
 if (root) {

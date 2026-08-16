@@ -1,192 +1,89 @@
 /**
- * 主题工具函数
+ * 主题服务
  *
- * 从 CSS 变量提取为 TypeScript 常量，供 inline style 中使用。
- * CSS 变量定义见 src/styles/tokens.css，此文件为同源的 TS 版本。
+ * 职责：
+ * - 亮/暗主题切换（localStorage 持久化 + 系统偏好回退）
+ * - 把主题写入 <html data-theme="...">，CSS 变量在 tokens.css 中按主题定义
+ * - 提供与主题无关的运行时辅助（进度条配色类名等）
  *
- * 用法：
- *   style={{ background: colors.primary, borderRadius: radius.md }}
+ * 页面不再使用内联十六进制颜色；视觉一律走 CSS 变量与组件类名。
  */
 
-export const colors = {
-  bgMain: '#eeece6',
-  bgPaper: '#f1eee8',
-  bgCard: '#fffdf8',
-  bgCardLight: '#ffffff',
-  bgSoft: '#f8f4ec',
-  bgHeader: '#172b45',
+/** 主题偏好 */
+export type ThemePreference = 'light' | 'dark';
 
-  textPrimary: '#202a35',
-  textSecondary: '#657080',
-  textDark: '#1a1a1a',
-  textMuted: '#8d939b',
-
-  primary: '#b3262d',
-  primaryHover: '#8f1f25',
-  primaryLight: 'rgba(190, 45, 45, 0.15)',
-  primaryText: '#ffffff',
-
-  secondary: '#284b70',
-  secondaryLight: 'rgba(40, 75, 112, 0.15)',
-  secondaryText: '#e8e6e3',
-
-  success: '#4caf50',
-  successLight: 'rgba(76, 175, 80, 0.15)',
-  warning: '#e6a817',
-  warningLight: 'rgba(230, 168, 23, 0.15)',
-  danger: '#c44d4d',
-
-  gold: '#b78324',
-  cyan: '#3b7f8f',
-  purple: '#6b5b8a',
-
-  border: '#d8d4cc',
-  borderLight: '#e8e4dc',
-
-  /** 亮色输入框底色 */
-  bgInput: '#f8f7f5',
-
-  white: '#ffffff',
-  black: '#000000',
-} as const;
-
-export const radius = {
-  sm: '2px',
-  md: '4px',
-  lg: '8px',
-  xl: '12px',
-} as const;
-
-export const space = {
-  xs: '0.25rem',
-  sm: '0.5rem',
-  md: '1rem',
-  lg: '1.5rem',
-  xl: '2rem',
-} as const;
-
-export const font = {
-  title: '"STKaiti", "KaiTi", "楷体", serif',
-  body: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
-} as const;
-
-/** 页面容器基础样式 */
-export const pageBase = {
-  display: 'flex',
-  'flex-direction': 'column' as const,
-  height: '100%',
-  'background-color': colors.bgMain,
-  color: colors.textPrimary,
-} as const;
+/** 主题持久化使用的 localStorage 键 */
+const STORAGE_KEY = 'zhengtu_theme';
 
 /**
- * 进度条颜色计算函数。
+ * 读取系统是否偏好深色模式。
  *
- * @param rate 完成率（0~∞）
- * @returns 对应的进度条颜色
+ * @returns 系统偏好深色时返回 true；无 matchMedia（如测试环境）时返回 false
  */
-export function progressBarColor(rate: number): string {
-  if (rate >= 1) return colors.success;
-  if (rate >= 0.6) return colors.primary;
-  return colors.danger;
+function systemPrefersDark(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
 /**
- * 亮色卡片样式，悬浮于深色背景上。
- * @param pad 可选内边距覆盖
- */
-export function cardStyle(pad?: string) {
-  return {
-    background: colors.bgCardLight,
-    'border-radius': radius.md,
-    padding: pad ?? space.md,
-    color: colors.textDark,
-    border: `1px solid ${colors.borderLight}`,
-  };
-}
-
-/**
- * 暗色卡片样式，与背景同色系。
- * @param pad 可选内边距覆盖
- */
-export function darkCardStyle(pad?: string) {
-  return {
-    background: colors.bgCard,
-    'border-radius': radius.md,
-    padding: pad ?? space.md,
-    border: `1px solid ${colors.border}`,
-  };
-}
-
-/**
- * Pill 标签样式（圆角药丸形状）。
+ * 计算当前生效主题。
  *
- * @param bgColor 背景色
- * @param textColor 文字色
- * @returns SolidJS style 对象
+ * @returns 当前生效主题（用户显式选择优先，否则跟随系统偏好）
  */
-export function pillStyle(bgColor: string, textColor: string) {
-  return {
-    display: 'inline-flex',
-    'align-items': 'center',
-    'min-height': '28px',
-    padding: '4px 9px',
-    'border-radius': '999px',
-    background: bgColor,
-    color: textColor,
-    'font-size': '12px',
-    'font-weight': 800,
-  } as const;
+export function getCurrentTheme(): ThemePreference {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === 'light' || saved === 'dark') return saved;
+  } catch {
+    // localStorage 不可用（隐私模式等）时跟随系统偏好
+  }
+  return systemPrefersDark() ? 'dark' : 'light';
 }
 
 /**
- * 带阴影的悬浮卡片样式。
+ * 将主题应用到 <html> 根节点。
  *
- * @param pad 可选内边距覆盖
- * @returns SolidJS style 对象
+ * @param theme 目标主题
  */
-export function cardElevated(pad?: string) {
-  return {
-    background: colors.bgCard,
-    'border-radius': radius.lg,
-    padding: pad ?? space.md,
-    border: `1px solid ${colors.border}`,
-    'box-shadow': '0 16px 36px rgba(32, 42, 53, 0.1)',
-  } as const;
+export function applyTheme(theme: ThemePreference): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.dataset.theme = theme;
 }
 
 /**
- * Meter 进度条容器样式。
- *
- * @returns SolidJS style 对象
+ * 应用启动时初始化：读取偏好并写入根节点。
+ * 在 main.tsx 渲染前调用，避免首帧闪烁。
  */
-export function meterContainer() {
-  return {
-    height: '7px',
-    overflow: 'hidden' as const,
-    'border-radius': '999px',
-    background: '#e7e1d6',
-  } as const;
+export function initTheme(): void {
+  applyTheme(getCurrentTheme());
 }
 
 /**
- * 品牌方块样式（红底楷体白字）。
+ * 切换亮/暗主题并持久化。
  *
- * @returns SolidJS style 对象
+ * @returns 切换后的主题
  */
-export function sealStyle() {
-  return {
-    display: 'grid',
-    'place-items': 'center',
-    width: '44px',
-    height: '44px',
-    'border-radius': '8px',
-    color: '#fff',
-    background: colors.primary,
-    'font-family': font.title,
-    'font-size': '25px',
-    'font-weight': 700,
-  } as const;
+export function toggleTheme(): ThemePreference {
+  const next: ThemePreference = getCurrentTheme() === 'dark' ? 'light' : 'dark';
+  try {
+    localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    // 持久化失败时仅本次会话生效
+  }
+  applyTheme(next);
+  return next;
+}
+
+/**
+ * 进度条填充色类名。
+ *
+ * @param rate 完成率（0~∞，1 表示达标）
+ * @returns meter-fill 的配色变体类名
+ */
+export function meterFillClass(rate: number): string {
+  if (rate >= 1) return 'meter-fill green';
+  if (rate >= 0.6) return 'meter-fill primary';
+  return 'meter-fill red';
 }
 
 /** 属性名到中文显示名的映射 */

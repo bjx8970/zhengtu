@@ -2,7 +2,6 @@
  * Step 4 — 院校选择（档次 → 院校级联）
  */
 import { Show, For, createMemo } from 'solid-js';
-import { colors, radius, cardStyle } from '../../utils/theme';
 import { getAvailableTiers } from '../../utils/gaokao';
 import type { CharacterData } from '../../types/character';
 import type { UniversityConfig } from '../../types/config';
@@ -13,6 +12,14 @@ interface StepSchoolProps {
   updateField: <K extends keyof CharacterData>(field: K, value: CharacterData[K]) => void;
 }
 
+/**
+ * 院校选择步骤组件（档次/院校两栏级联）。
+ *
+ * @param props.data        当前建档数据
+ * @param props.universities 院校配置
+ * @param props.updateField 字段更新回调
+ * @returns 档次与院校两栏选择面板
+ */
 export function StepSchool(props: StepSchoolProps) {
   const schools = createMemo(() =>
     props.data.universityTier
@@ -21,124 +28,46 @@ export function StepSchool(props: StepSchoolProps) {
   );
 
   return (
-    <div
-      style={{
-        ...cardStyle('1.5rem'),
-        width: '100%',
-        'max-width': '600px',
-        display: 'flex',
-        gap: '1rem',
-        'max-height': '60vh',
-      }}
-    >
-      {/* 档次选择 */}
-      <div style={{ flex: 1, display: 'flex', 'flex-direction': 'column' }}>
-        <div
-          style={{
-            'font-size': '0.85rem',
-            color: colors.textSecondary,
-            'margin-bottom': '0.5rem',
-            'text-align': 'center',
-          }}
-        >
-          院校档次
-        </div>
-        <div
-          style={{
-            flex: 1,
-            'overflow-y': 'auto',
-            'border-radius': radius.md,
-            border: `1px solid ${colors.borderLight}`,
-          }}
-        >
+    <div class="flex gap-md responsive-col" style={{ 'max-width': '620px', margin: '0 auto' }}>
+      <div class="flex-1 flex-col gap-sm">
+        <span class="form-label">院校档次</span>
+        <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
           <For each={getAvailableTiers(props.data.gaokaoTier)}>
             {(tier) => (
-              <div
+              <button
                 data-testid={`university-tier-${tier}`}
+                class={props.data.universityTier === tier ? 'choice-card selected' : 'choice-card'}
                 onClick={() => {
                   props.updateField('universityTier', tier);
                   props.updateField('university', '');
                   props.updateField('isPreparatory', tier === '预科');
                 }}
-                style={{
-                  padding: '0.6rem 1rem',
-                  'font-size': '0.9rem',
-                  cursor: 'pointer',
-                  'background-color':
-                    props.data.universityTier === tier ? colors.primaryLight : 'transparent',
-                  color: props.data.universityTier === tier ? colors.primary : colors.textDark,
-                  'border-left':
-                    props.data.universityTier === tier
-                      ? `3px solid ${colors.primary}`
-                      : '3px solid transparent',
-                }}
               >
-                {tier === '预科' ? `预科班 🏔 (入职+1年)` : `${tier} 院校`}
-              </div>
+                <span class="choice-card-title">
+                  {tier === '预科' ? '预科班（入职+1年）' : `${tier} 院校`}
+                </span>
+              </button>
             )}
           </For>
         </div>
       </div>
-      {/* 院校列表 */}
-      <div style={{ flex: 1, display: 'flex', 'flex-direction': 'column' }}>
-        <div
-          style={{
-            'font-size': '0.85rem',
-            color: colors.textSecondary,
-            'margin-bottom': '0.5rem',
-            'text-align': 'center',
-          }}
-        >
-          选择院校
-        </div>
+      <div class="flex-1 flex-col gap-sm">
+        <span class="form-label">选择院校</span>
         <Show
           when={schools()}
-          fallback={
-            <div
-              style={{
-                flex: 1,
-                display: 'flex',
-                'align-items': 'center',
-                'justify-content': 'center',
-                color: colors.textMuted,
-                'font-size': '0.85rem',
-                border: `1px solid ${colors.borderLight}`,
-                'border-radius': radius.md,
-              }}
-            >
-              请先选择档次
-            </div>
-          }
+          fallback={<div class="card center muted text-sm flex-1">请先选择档次</div>}
         >
-          <div
-            style={{
-              flex: 1,
-              'overflow-y': 'auto',
-              'border-radius': radius.md,
-              border: `1px solid ${colors.borderLight}`,
-            }}
-          >
+          <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
             {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Show guarantees existence */}
             <For each={schools()!}>
               {(school) => (
-                <div
+                <button
                   data-testid={`university-${school}`}
+                  class={props.data.university === school ? 'choice-card selected' : 'choice-card'}
                   onClick={() => props.updateField('university', school)}
-                  style={{
-                    padding: '0.6rem 1rem',
-                    'font-size': '0.9rem',
-                    cursor: 'pointer',
-                    'background-color':
-                      props.data.university === school ? colors.primaryLight : 'transparent',
-                    color: props.data.university === school ? colors.primary : colors.textDark,
-                    'border-left':
-                      props.data.university === school
-                        ? `3px solid ${colors.primary}`
-                        : '3px solid transparent',
-                  }}
                 >
-                  {school}
-                </div>
+                  <span class="choice-card-title">{school}</span>
+                </button>
               )}
             </For>
           </div>

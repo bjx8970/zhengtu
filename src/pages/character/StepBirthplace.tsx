@@ -2,7 +2,6 @@
  * Step 2 — 出生地选择（省份 → 城市级联）
  */
 import { Show, For } from 'solid-js';
-import { colors, radius, cardStyle } from '../../utils/theme';
 import type { CharacterData } from '../../types/character';
 import type { ProvinceConfig } from '../../types/config';
 
@@ -13,126 +12,57 @@ interface StepBirthplaceProps {
   updateField: <K extends keyof CharacterData>(field: K, value: CharacterData[K]) => void;
 }
 
+/**
+ * 出生地步骤组件（省份/城市两栏级联）。
+ *
+ * @param props.data            当前建档数据
+ * @param props.provinces       省份配置
+ * @param props.selectedProvince 当前选中的省份
+ * @param props.updateField     字段更新回调
+ * @returns 省份/城市两栏选择面板
+ */
 export function StepBirthplace(props: StepBirthplaceProps) {
   return (
-    <div
-      style={{
-        ...cardStyle('1.5rem'),
-        width: '100%',
-        'max-width': '600px',
-        display: 'flex',
-        gap: '1rem',
-        'max-height': '60vh',
-      }}
-    >
-      <div style={{ flex: 1, display: 'flex', 'flex-direction': 'column' }}>
-        <div
-          style={{
-            'font-size': '0.85rem',
-            color: colors.textSecondary,
-            'margin-bottom': '0.5rem',
-            'text-align': 'center',
-          }}
-        >
-          选择省份
-        </div>
-        <div
-          style={{
-            flex: 1,
-            'overflow-y': 'auto',
-            'border-radius': radius.md,
-            border: `1px solid ${colors.borderLight}`,
-          }}
-        >
+    <div class="flex gap-md responsive-col" style={{ 'max-width': '620px', margin: '0 auto' }}>
+      <div class="flex-1 flex-col gap-sm">
+        <span class="form-label">选择省份</span>
+        <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
           <For each={props.provinces()}>
             {(p) => (
-              <div
+              <button
                 data-testid={`birthplace-province-${p.name}`}
+                class={props.data.province === p.name ? 'choice-card selected' : 'choice-card'}
                 onClick={() => {
                   props.updateField('province', p.name);
                   props.updateField('city', '');
                 }}
-                style={{
-                  padding: '0.6rem 1rem',
-                  'font-size': '0.9rem',
-                  cursor: 'pointer',
-                  'background-color':
-                    props.data.province === p.name ? colors.primaryLight : 'transparent',
-                  color: props.data.province === p.name ? colors.primary : colors.textDark,
-                  'border-left':
-                    props.data.province === p.name
-                      ? `3px solid ${colors.primary}`
-                      : '3px solid transparent',
-                }}
               >
-                {p.name}
-                {p.ethnicBonus > 0 && (
-                  <span style={{ 'font-size': '0.8rem', color: colors.primary }}> 🏔</span>
-                )}
-              </div>
+                <span class="choice-card-title">
+                  {p.name}
+                  {p.ethnicBonus > 0 && <span class="tag tag-gold">民族加分</span>}
+                </span>
+              </button>
             )}
           </For>
         </div>
       </div>
-      <div style={{ flex: 1, display: 'flex', 'flex-direction': 'column' }}>
-        <div
-          style={{
-            'font-size': '0.85rem',
-            color: colors.textSecondary,
-            'margin-bottom': '0.5rem',
-            'text-align': 'center',
-          }}
-        >
-          选择城市
-        </div>
+      <div class="flex-1 flex-col gap-sm">
+        <span class="form-label">选择城市</span>
         <Show
           when={props.selectedProvince()}
-          fallback={
-            <div
-              style={{
-                flex: 1,
-                display: 'flex',
-                'align-items': 'center',
-                'justify-content': 'center',
-                color: colors.textMuted,
-                'font-size': '0.85rem',
-                border: `1px solid ${colors.borderLight}`,
-                'border-radius': radius.md,
-              }}
-            >
-              请先选择省份
-            </div>
-          }
+          fallback={<div class="card center muted text-sm flex-1">请先选择省份</div>}
         >
           {(prov) => (
-            <div
-              style={{
-                flex: 1,
-                'overflow-y': 'auto',
-                'border-radius': radius.md,
-                border: `1px solid ${colors.borderLight}`,
-              }}
-            >
+            <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
               <For each={prov().cities}>
                 {(c) => (
-                  <div
+                  <button
                     data-testid={`birthplace-city-${c}`}
+                    class={props.data.city === c ? 'choice-card selected' : 'choice-card'}
                     onClick={() => props.updateField('city', c)}
-                    style={{
-                      padding: '0.6rem 1rem',
-                      'font-size': '0.9rem',
-                      cursor: 'pointer',
-                      'background-color':
-                        props.data.city === c ? colors.primaryLight : 'transparent',
-                      color: props.data.city === c ? colors.primary : colors.textDark,
-                      'border-left':
-                        props.data.city === c
-                          ? `3px solid ${colors.primary}`
-                          : '3px solid transparent',
-                    }}
                   >
-                    {c}
-                  </div>
+                    <span class="choice-card-title">{c}</span>
+                  </button>
                 )}
               </For>
             </div>

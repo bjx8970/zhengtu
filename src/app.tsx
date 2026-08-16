@@ -20,17 +20,18 @@ import { CareerPage } from './pages/career/career-page';
 import { PoliciesPage } from './pages/policies/policies-page';
 import { EventsPage } from './pages/events/events-page';
 import { BlockingEventModal } from './components/blocking-event-modal';
+import { AppShell } from './components/app-shell';
 
-/** 全局路由表 */
+/** 全局路由表（shell 页面统一渲染在机关工作台外壳内） */
 const routes: Route[] = [
   { path: '/', component: SplashPage },
   { path: '/character', component: CharacterCreation },
-  { path: '/main', component: HomePage },
-  { path: '/departments', component: DepartmentsPage },
-  { path: '/assessment', component: AssessmentPage },
-  { path: '/career', component: CareerPage },
-  { path: '/policies', component: PoliciesPage },
-  { path: '/events', component: EventsPage },
+  { path: '/main', component: HomePage, shell: true },
+  { path: '/departments', component: DepartmentsPage, shell: true },
+  { path: '/assessment', component: AssessmentPage, shell: true },
+  { path: '/career', component: CareerPage, shell: true },
+  { path: '/policies', component: PoliciesPage, shell: true },
+  { path: '/events', component: EventsPage, shell: true },
 ];
 
 /**
@@ -47,17 +48,24 @@ export function App(): JSX.Element {
         const result = resolveRoute();
         if (!result) {
           return (
-            <div style={{ padding: '2rem', 'text-align': 'center' }}>
-              <h2>404</h2>
-              <p>页面未找到</p>
-              <a href="#" onClick={() => (window.location.hash = '/')}>
-                返回首页
-              </a>
+            <div class="doc-scroll">
+              <div class="doc-page" style={{ display: 'grid', 'place-items': 'center' }}>
+                <div class="card card-pad" style={{ 'text-align': 'center' }}>
+                  <h2 class="doc-title">404</h2>
+                  <p class="doc-meta" style={{ margin: '0.5rem 0 1rem' }}>
+                    页面未找到
+                  </p>
+                  <a class="btn btn-primary" href="#/">
+                    返回首页
+                  </a>
+                </div>
+              </div>
             </div>
           );
         }
         const Component = result.route.component;
-        return <Component {...result.params} />;
+        const page = <Component {...result.params} />;
+        return result.route.shell ? <AppShell>{page}</AppShell> : page;
       })()}
       <BlockingEventModal />
     </div>

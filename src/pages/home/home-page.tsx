@@ -1,18 +1,18 @@
 /**
  * 工作台主页
  *
- * 单一工作台布局，自上而下包含：
- * - 信息栏：人物名称、职务、就职位置、当前日期、设置按钮
- * - 时间推进模块：推进1天/1周/1月
- * - 日程规划模块：主要日程(3格)、次要日程(2格)、紧急日程(1格)，进度条展示
- * - 工作台卡片区：按功能分类的政务操作入口
+ * 单一工作台布局，自上而下：
+ * - 干部档案卡：姓名 + 职位/机构/地区/层级/领导职务/公务员职级分开展示
+ * - 推进时间：1 天 / 1 周 / 1 月 三档 + 结算状态反馈
+ * - 日程规划：主要/次要/紧急三类槽位的在办日程与进度
+ * - 政务入口：真实可用的五大功能入口（不展示未实现功能）
  */
 
-import { createMemo, createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, For } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { navigate } from '../../router';
-import { AppShell } from '../../components/app-shell';
 import { AlertBanner, type AlertItem } from '../../components/alert-banner';
+import { PageHeader } from '../../components/page-header';
 import { calculateKPI } from '../../engine/governance/kpi';
 import { getConfigLoader } from '../../config/loader';
 import { formatDate } from '../../utils/format';
@@ -27,7 +27,6 @@ import {
 } from '../../engine/career/civil-service-rank-eligibility';
 import { formatCareerRegion } from '../career/career-display';
 import type { SlotOccupant, SlotTierKey } from '../../types/player';
-import { colors, font } from '../../utils/theme';
 
 /** 时间推进选项 */
 const GRANULARITIES: { label: string; desc: string; granularity: 'day' | 'week' | 'month' }[] = [
@@ -37,76 +36,24 @@ const GRANULARITIES: { label: string; desc: string; granularity: 'day' | 'week' 
 ];
 
 /** 日程分组配置 */
-const SCHEDULE_TIERS: { key: SlotTierKey; label: string; color: string }[] = [
-  { key: 'primary', label: '主要日程', color: colors.secondary },
-  { key: 'secondary', label: '次要日程', color: colors.success },
-  { key: 'reserve', label: '紧急日程', color: colors.danger },
+const SCHEDULE_TIERS: { key: SlotTierKey; label: string; hint: string }[] = [
+  { key: 'primary', label: '主要日程', hint: '仅主要槽位' },
+  { key: 'secondary', label: '次要日程', hint: '任意槽位' },
+  { key: 'reserve', label: '紧急日程', hint: '加班：扣减健康、增加消沉' },
 ];
 
-/** 工作台功能卡片 */
-const WORK_CARDS: {
-  icon: string;
-  label: string;
-  desc: string;
-  route: string;
-  color: string;
-}[] = [
+/** 工作台政务入口（仅已实现功能） */
+const WORK_CARDS: { icon: string; label: string; desc: string; route: string }[] = [
   {
-    icon: '政',
+    icon: '部',
     label: '部门治理',
-    desc: '查看部门、安排日程、管理冷却',
+    desc: '查看部门、安排行动、管理槽位与冷却',
     route: '/departments',
-    color: colors.secondary,
   },
-  {
-    icon: '考',
-    label: 'KPI 考核',
-    desc: '查看指标完成度、得分与改进建议',
-    route: '/assessment',
-    color: colors.gold,
-  },
-  {
-    icon: '策',
-    label: '政策治理',
-    desc: '提议政策、跟踪阶段与处理生命周期操作',
-    route: '/policies',
-    color: colors.primary,
-  },
-  {
-    icon: '事',
-    label: '事件中心',
-    desc: '处理收件箱事件并查看计划与历史记录',
-    route: '/events',
-    color: colors.purple,
-  },
-  {
-    icon: '晋',
-    label: '职务与职级',
-    desc: '查看职级晋升条件、岗位机会与选拔流程',
-    route: '/career',
-    color: colors.cyan,
-  },
-  {
-    icon: '文',
-    label: '公文处理',
-    desc: '批阅请示、报告、方案与建议',
-    route: '/departments', // TODO: Phase 4 实现独立路由
-    color: colors.warning,
-  },
-  {
-    icon: '廉',
-    label: '廉政风险',
-    desc: '监控贪腐风险值、应对调查与举报',
-    route: '/departments', // TODO: Phase 4 实现独立路由
-    color: colors.primary,
-  },
-  {
-    icon: '交',
-    label: '人脉关系',
-    desc: '维护上级、同事、学界与媒体关系',
-    route: '/departments', // TODO: Phase 4 实现独立路由
-    color: colors.purple,
-  },
+  { icon: '考', label: 'KPI 考核', desc: '指标完成度、得分与改进建议', route: '/assessment' },
+  { icon: '策', label: '政策治理', desc: '提议政策、跟踪阶段与生命周期操作', route: '/policies' },
+  { icon: '事', label: '事件中心', desc: '处理收件箱事件、计划与历史记录', route: '/events' },
+  { icon: '晋', label: '职务与职级', desc: '职级晋升条件、岗位机会与选拔流程', route: '/career' },
 ];
 
 /**
@@ -228,8 +175,7 @@ export function HomePage() {
 
   /** 按分组获取日程占用列表 */
   function getTierOccupants(tierKey: SlotTierKey) {
-    const tier = state.actions.slots[tierKey];
-    return tier.occupants;
+    return state.actions.slots[tierKey].occupants;
   }
 
   /** 计算占用数/总数 */
@@ -239,377 +185,202 @@ export function HomePage() {
     return { occupied, total: tier.count };
   }
 
-  return (
-    <AppShell>
-      {/* ═══ 信息栏 ═══ */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          'z-index': 10,
-          display: 'flex',
-          'align-items': 'center',
-          'justify-content': 'space-between',
-          padding: '14px 20px',
-          background: colors.bgHeader,
-          color: '#fff',
-          'border-radius': '0 0 8px 8px',
-          'box-shadow': '0 4px 16px rgba(23,43,69,0.18)',
-        }}
-      >
-        <div style={{ display: 'flex', 'align-items': 'center', gap: '14px' }}>
-          <div
-            style={{
-              display: 'grid',
-              'place-items': 'center',
-              width: '40px',
-              height: '40px',
-              'border-radius': '8px',
-              background: colors.primary,
-              'font-family': font.title,
-              'font-size': '22px',
-              'font-weight': 700,
-              color: '#fff',
-            }}
-          >
-            {state.character.characterName ? state.character.characterName.charAt(0) : '?'}
-          </div>
-          <div>
-            <div
-              style={{
-                'font-size': '18px',
-                'font-weight': 700,
-                'font-family': font.title,
-              }}
-            >
-              {state.character.characterName || '未创建角色'}
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                'grid-template-columns': 'repeat(3, max-content)',
-                gap: '3px 10px',
-                'margin-top': '4px',
-                'font-size': '11px',
-                color: 'rgba(255,255,255,0.72)',
-              }}
-            >
-              <span>职位：{positionConfig()?.name ?? '未分配'}</span>
-              <span>机构：{institutionConfig()?.name ?? '未知机构'}</span>
-              <span>地区：{formatCareerRegion(state.career.appointment.regionId)}</span>
-              <span>
-                层级：{INSTITUTION_LEVEL_LABELS[state.career.appointment.institutionLevel]}
-              </span>
-              <span>
-                领导职务：{LEADERSHIP_RANK_LABELS[state.career.appointment.leadershipRank]}
-              </span>
-              <span>公务员职级：{CIVIL_SERVICE_RANK_LABELS[state.career.civilServiceRank]}</span>
-            </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', 'align-items': 'center', gap: '16px' }}>
-          <div
-            style={{ 'text-align': 'right', 'font-size': '13px', color: 'rgba(255,255,255,0.85)' }}
-          >
-            {dateStr()}
-            <div
-              style={{ 'font-size': '11px', color: 'rgba(255,255,255,0.55)', 'margin-top': '2px' }}
-            >
-              当前任职 {state.time.totalDaysPlayed - state.career.appointment.startedAtDay} 天 ·
-              当前职级 {state.time.totalDaysPlayed - state.career.civilServiceRankStartedAtDay} 天
-            </div>
-          </div>
-          <button
-            title="设置"
-            style={{
-              display: 'grid',
-              'place-items': 'center',
-              width: '34px',
-              height: '34px',
-              border: '1px solid rgba(255,255,255,0.25)',
-              'border-radius': '50%',
-              background: 'transparent',
-              color: 'rgba(255,255,255,0.8)',
-              'font-size': '16px',
-              cursor: 'pointer',
-            }}
-          >
-            ⚙
-          </button>
-        </div>
-      </header>
+  const identityStats = () => [
+    { label: '职位', value: positionConfig()?.name ?? '未分配' },
+    { label: '机构', value: institutionConfig()?.name ?? '未知机构' },
+    { label: '地区', value: formatCareerRegion(state.career.appointment.regionId) },
+    {
+      label: '机构层级',
+      value: INSTITUTION_LEVEL_LABELS[state.career.appointment.institutionLevel],
+    },
+    { label: '领导职务', value: LEADERSHIP_RANK_LABELS[state.career.appointment.leadershipRank] },
+    { label: '公务员职级', value: CIVIL_SERVICE_RANK_LABELS[state.career.civilServiceRank] },
+  ];
 
-      {/* ═══ 信息提醒 ═══ */}
+  return (
+    <>
+      <PageHeader
+        eyebrow="工作台 · DASHBOARD"
+        title="工作台"
+        meta={`${dateStr()} · 在任第 ${state.time.totalDaysPlayed} 日`}
+        desc="干部档案、时间推进与政务入口总览"
+      />
+
       <AlertBanner alerts={alerts()} />
 
-      {/* ═══ 时间推进 ═══ */}
-      <section
-        style={{
-          'margin-top': '16px',
-          background: colors.bgCard,
-          border: `1px solid ${colors.border}`,
-          'border-radius': '8px',
-          padding: '18px 20px',
-        }}
-      >
-        <h2 style={{ 'font-size': '16px', 'font-weight': 700, 'font-family': font.title }}>
-          时间推进
-        </h2>
-        <p style={{ 'font-size': '12px', color: colors.textMuted, margin: '4px 0 14px' }}>
-          推进时间以结算进行中的日程，触发月度预算扣除与年度考核。
-        </p>
-        <div style={{ display: 'grid', 'grid-template-columns': 'repeat(3, 1fr)', gap: '10px' }}>
-          <For each={GRANULARITIES}>
-            {(g, i) => (
-              <button
-                data-testid={`advance-${g.granularity}`}
-                onClick={() => {
-                  setLastAdvance(true);
-                  dispatch({ type: 'ADVANCE_TIME', granularity: g.granularity });
-                }}
-                style={{
-                  padding: '14px 12px',
-                  border: i() === 2 ? 'none' : `1px solid ${colors.border}`,
-                  'border-radius': '8px',
-                  background: i() === 2 ? colors.primary : '#fff',
-                  color: i() === 2 ? '#fff' : colors.textPrimary,
-                  cursor: 'pointer',
-                  'text-align': 'left',
-                }}
-              >
-                <strong style={{ display: 'block', 'font-size': '14px' }}>{g.label}</strong>
-                <span
-                  style={{
-                    display: 'block',
-                    'margin-top': '5px',
-                    'font-size': '11px',
-                    color: i() === 2 ? 'rgba(255,255,255,0.75)' : colors.textMuted,
-                    'line-height': '1.4',
-                  }}
-                >
-                  {g.desc}
-                </span>
-              </button>
-            )}
-          </For>
+      {/* 干部档案 */}
+      <section class="card">
+        <div class="card-title">
+          <span class="card-title-mark" aria-hidden="true" />
+          干部档案
         </div>
-        <p
-          role="status"
-          style={{
-            'margin-top': '12px',
-            padding: '9px 11px',
-            'border-left': `3px solid ${state.events.activeBlockingEventId ? colors.danger : colors.secondary}`,
-            background: colors.bgSoft,
-            color: colors.textSecondary,
-            'font-size': '12px',
-            'line-height': '1.6',
-          }}
-        >
-          {timeFeedback()}
-        </p>
-      </section>
-
-      {/* ═══ 日程规划 ═══ */}
-      <section
-        style={{
-          'margin-top': '16px',
-          background: colors.bgCard,
-          border: `1px solid ${colors.border}`,
-          'border-radius': '8px',
-          padding: '18px 20px',
-        }}
-      >
-        <h2 style={{ 'font-size': '16px', 'font-weight': 700, 'font-family': font.title }}>
-          日程规划
-        </h2>
-        <p style={{ 'font-size': '12px', color: colors.textMuted, margin: '4px 0 14px' }}>
-          管理当前正在执行的政务日程，日程完成后自动结算效果。
-        </p>
-
-        <For each={SCHEDULE_TIERS}>
-          {(tier) => {
-            const count = getTierCount(tier.key);
-            const occupants = getTierOccupants(tier.key);
-            return (
-              <div style={{ 'margin-bottom': '16px' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    'align-items': 'center',
-                    gap: '8px',
-                    'margin-bottom': '10px',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      'border-radius': '50%',
-                      background: tier.color,
-                    }}
-                  />
-                  <span style={{ 'font-size': '13px', 'font-weight': 700 }}>{tier.label}</span>
-                  <span style={{ 'font-size': '11px', color: colors.textMuted }}>
-                    {count.occupied}/{count.total}
-                  </span>
-                  <Show when={tier.key === 'reserve'}>
-                    <span
-                      style={{ 'font-size': '11px', color: colors.warning, 'margin-left': '4px' }}
-                    >
-                      ⚠ 使用将扣减健康、增加消沉
-                    </span>
-                  </Show>
-                </div>
-
-                <For each={occupants}>
-                  {(occupant: SlotOccupant | null) => {
-                    if (occupant) {
-                      const elapsed = state.time.totalDaysPlayed - occupant.startedAtDay;
-                      const total = occupant.durationDays;
-                      const pct = Math.min((elapsed / total) * 100, 100);
-                      const remain = Math.max(total - elapsed, 0);
-                      return (
-                        <div
-                          style={{
-                            display: 'grid',
-                            'grid-template-columns': '1fr auto',
-                            gap: '8px 12px',
-                            'align-items': 'center',
-                            padding: '10px 14px',
-                            border: `1px solid ${colors.borderLight}`,
-                            'border-radius': '4px',
-                            background: '#fff',
-                            'margin-bottom': '6px',
-                          }}
-                        >
-                          <div style={{ 'font-size': '13px', 'font-weight': 600 }}>
-                            {occupant.actionName}
-                          </div>
-                          <div
-                            style={{
-                              'font-size': '11px',
-                              color: colors.textMuted,
-                              'text-align': 'right',
-                            }}
-                          >
-                            剩余 {remain} 天
-                          </div>
-                          <div
-                            style={{
-                              'grid-column': '1 / -1',
-                              height: '6px',
-                              'border-radius': '999px',
-                              background: '#e7e1d6',
-                              overflow: 'hidden',
-                            }}
-                          >
-                            <div
-                              style={{
-                                height: '100%',
-                                'border-radius': 'inherit',
-                                width: `${pct}%`,
-                                background: tier.color,
-                                transition: 'width 0.3s',
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div
-                        style={{
-                          padding: '10px 14px',
-                          border: `1px dashed ${colors.border}`,
-                          'border-radius': '4px',
-                          'text-align': 'center',
-                          'font-size': '12px',
-                          color: colors.textMuted,
-                          'margin-bottom': '6px',
-                        }}
-                      >
-                        （空闲）
-                      </div>
-                    );
-                  }}
-                </For>
+        <div class="card-pad flex-col gap-lg">
+          <div class="flex gap-md center">
+            <div
+              class="masthead-seal"
+              style={{ width: '52px', height: '52px', 'font-size': '28px' }}
+            >
+              {state.character.characterName ? state.character.characterName.charAt(0) : '?'}
+            </div>
+            <div>
+              <div class="serif" style={{ 'font-size': '1.3rem', 'font-weight': 700 }}>
+                {state.character.characterName || '未创建角色'}
               </div>
-            );
-          }}
-        </For>
+              <div class="text-xs secondary-text">
+                当前任职 {state.time.totalDaysPlayed - state.career.appointment.startedAtDay} 天 ·
+                当前职级 {state.time.totalDaysPlayed - state.career.civilServiceRankStartedAtDay} 天
+              </div>
+            </div>
+          </div>
+          <div class="stat-grid">
+            <For each={identityStats()}>
+              {(item) => (
+                <div class="stat">
+                  <div class="stat-value">{item.value}</div>
+                  <div class="stat-label">{item.label}</div>
+                </div>
+              )}
+            </For>
+          </div>
+        </div>
       </section>
 
-      {/* ═══ 工作台 ═══ */}
-      <section
-        style={{
-          'margin-top': '16px',
-          background: colors.bgCard,
-          border: `1px solid ${colors.border}`,
-          'border-radius': '8px',
-          padding: '18px 20px',
-        }}
-      >
-        <h2 style={{ 'font-size': '16px', 'font-weight': 700, 'font-family': font.title }}>
-          工作台
-        </h2>
-        <p style={{ 'font-size': '12px', color: colors.textMuted, margin: '4px 0 14px' }}>
-          按功能分类的政务操作入口。
-        </p>
-        <div style={{ display: 'grid', 'grid-template-columns': 'repeat(2, 1fr)', gap: '12px' }}>
-          <For each={WORK_CARDS}>
-            {(card) => (
-              <button
-                onClick={() => navigate(card.route)}
-                style={{
-                  display: 'flex',
-                  'align-items': 'flex-start',
-                  gap: '12px',
-                  padding: '16px',
-                  border: `1px solid ${colors.border}`,
-                  'border-radius': '8px',
-                  background: '#fff',
-                  cursor: 'pointer',
-                  'text-align': 'left',
-                  width: '100%',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'grid',
-                    'place-items': 'center',
-                    width: '38px',
-                    height: '38px',
-                    'border-radius': '8px',
-                    color: '#fff',
-                    'font-weight': 900,
-                    'font-size': '16px',
-                    'flex-shrink': 0,
-                    background: card.color,
+      {/* 推进时间 */}
+      <section class="card">
+        <div class="card-title">
+          <span class="card-title-mark" aria-hidden="true" />
+          推进时间
+        </div>
+        <div class="card-pad flex-col gap-md">
+          <div class="flex gap-sm responsive-col">
+            <For each={GRANULARITIES}>
+              {(g, i) => (
+                <button
+                  data-testid={`advance-${g.granularity}`}
+                  class={i() === 2 ? 'btn btn-primary flex-1' : 'btn flex-1'}
+                  onClick={() => {
+                    setLastAdvance(true);
+                    dispatch({ type: 'ADVANCE_TIME', granularity: g.granularity });
                   }}
+                  style={{ 'flex-direction': 'column', 'align-items': 'flex-start', gap: '0.2rem' }}
                 >
-                  {card.icon}
-                </div>
-                <div style={{ flex: 1, 'min-width': 0 }}>
-                  <div style={{ 'font-size': '14px', 'font-weight': 700 }}>{card.label}</div>
-                  <div
+                  <strong>{g.label}</strong>
+                  <span
+                    class="text-xs"
                     style={{
-                      'margin-top': '4px',
-                      'font-size': '12px',
-                      color: colors.textMuted,
-                      'line-height': '1.5',
+                      color: i() === 2 ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
+                      'font-weight': 400,
                     }}
                   >
-                    {card.desc}
+                    {g.desc}
+                  </span>
+                </button>
+              )}
+            </For>
+          </div>
+          <p
+            role="status"
+            class={state.events.activeBlockingEventId ? 'banner banner-danger' : 'banner'}
+          >
+            {timeFeedback()}
+          </p>
+        </div>
+      </section>
+
+      {/* 日程规划 */}
+      <section class="card">
+        <div class="card-title">
+          <span class="card-title-mark" aria-hidden="true" />
+          日程规划
+        </div>
+        <div class="card-pad flex-col gap-lg">
+          <For each={SCHEDULE_TIERS}>
+            {(tier) => {
+              const count = getTierCount(tier.key);
+              const occupants = getTierOccupants(tier.key);
+              return (
+                <div class="flex-col gap-sm">
+                  <div class="flex gap-sm center">
+                    <span style={{ 'font-weight': 700 }}>{tier.label}</span>
+                    <span class="tag tag-gray">
+                      {count.occupied}/{count.total}
+                    </span>
+                    <span class="text-xs muted">{tier.hint}</span>
                   </div>
+                  <For each={occupants}>
+                    {(occupant: SlotOccupant | null) => {
+                      if (occupant) {
+                        const elapsed = state.time.totalDaysPlayed - occupant.startedAtDay;
+                        const total = occupant.durationDays;
+                        const pct = Math.min((elapsed / total) * 100, 100);
+                        const remain = Math.max(total - elapsed, 0);
+                        return (
+                          <div
+                            class="card flex between center gap-md"
+                            style={{ padding: '0.6rem 0.9rem' }}
+                          >
+                            <strong class="text-sm">{occupant.actionName}</strong>
+                            <span class="text-xs muted">剩余 {remain} 天</span>
+                            <div class="meter flex-1" style={{ 'max-width': '220px' }}>
+                              <i
+                                class="meter-fill blue"
+                                style={{ width: `${pct}%` }}
+                                aria-hidden="true"
+                              />
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div
+                          class="card center text-xs muted"
+                          style={{ padding: '0.55rem 0.9rem' }}
+                        >
+                          （空闲）
+                        </div>
+                      );
+                    }}
+                  </For>
                 </div>
-              </button>
-            )}
+              );
+            }}
           </For>
+        </div>
+      </section>
+
+      {/* 政务入口 */}
+      <section class="card">
+        <div class="card-title">
+          <span class="card-title-mark" aria-hidden="true" />
+          政务入口
+        </div>
+        <div class="card-pad">
+          <div
+            class="choice-grid"
+            style={{ 'grid-template-columns': 'repeat(auto-fill, minmax(200px, 1fr))' }}
+          >
+            <For each={WORK_CARDS}>
+              {(card) => (
+                <button class="choice-card" onClick={() => navigate(card.route)}>
+                  <span class="flex gap-sm center">
+                    <span
+                      class="masthead-seal"
+                      style={{ width: '32px', height: '32px', 'font-size': '16px' }}
+                    >
+                      {card.icon}
+                    </span>
+                    <span class="choice-card-title">{card.label}</span>
+                  </span>
+                  <span class="choice-card-desc">{card.desc}</span>
+                </button>
+              )}
+            </For>
+          </div>
         </div>
       </section>
 
       {/* 底部留白 */}
-      <div style={{ height: '24px' }} />
-    </AppShell>
+      <div style={{ height: '8px' }} />
+    </>
   );
 }

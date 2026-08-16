@@ -1,19 +1,19 @@
 /**
- * Global blocking-event dialog.
+ * 全局阻塞事件弹窗
  *
- * Reads the active event directly from the game store so it remains visible after a
- * reload and above every route until the player has settled the required choice.
+ * 直接从 Store 读取当前阻塞事件：刷新后仍保持可见，玩家必须做出处置
+ * 才能继续推进时间。语义保持 role="dialog" + aria-modal，选项按钮沿用
+ * data-testid="blocking-event-option-{instanceId}-{optionId}" 契约。
  */
 
 import { createMemo, For, Show } from 'solid-js';
 import { useGameStore } from '../store/game-store';
-import { colors, font } from '../utils/theme';
 import { formatDate } from '../utils/format';
 
 /**
- * Renders the non-dismissible dialog for the active blocking event.
+ * 渲染当前阻塞事件的非关闭式弹窗。
  *
- * @returns A full-screen modal when a blocking event is active, otherwise nothing.
+ * @returns 存在阻塞事件时渲染全屏弹窗，否则不渲染任何 DOM
  */
 export function BlockingEventModal() {
   const { state, dispatch } = useGameStore();
@@ -35,58 +35,26 @@ export function BlockingEventModal() {
     <Show when={activeEvent()}>
       {(event) => (
         <div
+          class="modal-overlay"
           role="dialog"
           aria-modal="true"
           aria-labelledby="blocking-event-title"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            'z-index': 100,
-            display: 'grid',
-            'place-items': 'center',
-            padding: '20px',
-            background: 'rgba(15, 27, 42, 0.76)',
-          }}
         >
-          <section
-            style={{
-              width: 'min(640px, 100%)',
-              padding: '26px',
-              background: colors.bgCard,
-              border: `2px solid ${colors.primary}`,
-              'border-radius': '12px',
-              'box-shadow': '0 24px 64px rgba(0,0,0,0.35)',
-            }}
-          >
-            <div style={{ color: colors.primary, 'font-size': '12px', 'font-weight': 800 }}>
-              必须处理的紧急事件
-            </div>
-            <h2
-              id="blocking-event-title"
-              style={{ 'margin-top': '6px', 'font-family': font.title, 'font-size': '24px' }}
-            >
+          <section class="modal-card">
+            <div class="modal-kicker">紧急公文 · 必须处置</div>
+            <h2 id="blocking-event-title" class="modal-title">
               {event().snapshot.title}
             </h2>
-            <p style={{ 'margin-top': '12px', 'line-height': '1.7', color: colors.textSecondary }}>
-              {event().snapshot.description}
-            </p>
-            <div
-              style={{
-                display: 'flex',
-                'flex-wrap': 'wrap',
-                gap: '8px',
-                'margin-top': '16px',
-                color: colors.textMuted,
-                'font-size': '12px',
-              }}
-            >
+            <p class="modal-body">{event().snapshot.description}</p>
+            <div class="flex gap-md text-xs muted" style={{ 'margin-top': 'var(--space-md)' }}>
               <span>当前：{formatDate(state.time.year, state.time.month, state.time.day)}</span>
               <span>截止：{deadline()}</span>
             </div>
-            <div style={{ display: 'grid', gap: '10px', 'margin-top': '22px' }}>
+            <div class="modal-actions">
               <For each={event().snapshot.options}>
                 {(option) => (
                   <button
+                    class="btn"
                     data-testid={`blocking-event-option-${event().instanceId}-${option.id}`}
                     onClick={() =>
                       dispatch({
@@ -96,25 +64,14 @@ export function BlockingEventModal() {
                       })
                     }
                     style={{
-                      padding: '13px 15px',
-                      border: `1px solid ${colors.border}`,
-                      'border-radius': '7px',
-                      background: '#fff',
-                      color: colors.textPrimary,
-                      cursor: 'pointer',
-                      'text-align': 'left',
+                      'flex-direction': 'column',
+                      'align-items': 'flex-start',
+                      gap: '0.2rem',
                     }}
                   >
-                    <strong style={{ display: 'block' }}>{option.label}</strong>
+                    <strong>{option.label}</strong>
                     <Show when={option.description}>
-                      <span
-                        style={{
-                          display: 'block',
-                          'margin-top': '4px',
-                          color: colors.textMuted,
-                          'font-size': '12px',
-                        }}
-                      >
+                      <span class="text-xs muted" style={{ 'font-weight': '400' }}>
                         {option.description}
                       </span>
                     </Show>
@@ -122,8 +79,8 @@ export function BlockingEventModal() {
                 )}
               </For>
             </div>
-            <p style={{ 'margin-top': '16px', color: colors.textMuted, 'font-size': '12px' }}>
-              处理后，系统会继续结算本日尚未执行的时间轴节点。
+            <p class="text-xs muted" style={{ 'margin-top': 'var(--space-md)' }}>
+              处置后，系统将继续结算本日尚未执行的时间轴节点。
             </p>
           </section>
         </div>
