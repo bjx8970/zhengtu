@@ -71,6 +71,7 @@ test('科员以个人任务完成工作循环且看不到部门治理行动', as
   // 承接 3 天日常任务（政策解读简报 → 办公效率 +3）
   await page.goto('/#/tasks');
   await expect(page.getByTestId('personal-task-task_policy_brief')).toBeVisible();
+  await expect(page.getByTestId('task-cost-task_policy_brief')).toHaveText('成本 5万');
   const budgetBefore = Number((await savedState(page)).remainingBudget);
   await page.getByTestId('start-task-task_policy_brief-primary').click();
   let state = await savedState(page);

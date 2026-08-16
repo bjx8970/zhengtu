@@ -69,13 +69,29 @@ export function describePersonalTaskAvailability(
     return { available: false, reason: `需先完成 ${prerequisites.minCompletedTasks} 项任务` };
 
   if (prerequisites.requiredFacts) {
+    // 契约为"必须为真"的布尔事实：false/数值/字符串/缺失一律视为未满足，
+    // 避免 #121/#122 消费时把已证伪事实误判为满足。
     for (const factId of prerequisites.requiredFacts) {
-      if (context.facts[factId] === undefined || context.facts[factId] === null)
-        return { available: false, reason: '尚不满足承接条件' };
+      if (context.facts[factId] !== true) return { available: false, reason: '尚不满足承接条件' };
     }
   }
 
   return { available: true };
+}
+
+/**
+ * 判断任务是否允许同 ID 实例并行（首份完成前再次承接）。
+ *
+ * once 任务整局仅可完成一次，并行会结算多次，契约优先于配置，恒为否；
+ * 其余任务缺省按分类推导（routine 可并行，major/minor 不可），
+ * 可由配置的 allowParallel 显式覆盖。
+ *
+ * @param task 任务模板
+ * @returns 是否允许并行承接
+ */
+export function taskAllowsParallel(task: PersonalTaskTemplate): boolean {
+  if (task.repeatPolicy === 'once') return false;
+  return task.allowParallel ?? task.category === 'routine';
 }
 
 /**
@@ -110,7 +126,10 @@ export function validatePersonalTaskStart(input: PersonalTaskStartInput): StartA
     return { success: false, error: '该任务已完成后不可再次承接' };
   }
 
-  if (task.category !== 'routine') {
+  // 并行规则是任务配置语义（allowParallel，缺省按分类推导）；
+  // once 任务恒不允许并行：首份尚未完成时 completedCount 仍为 0，
+  // 若放行会在结算时完成多次，违反"整局仅可完成一次"契约。
+  if (!taskAllowsParallel(task)) {
     const duplicate = TIER_ORDER.some((key) =>
       slotState[key].occupants.some(
         (occupant) => occupant?.actionId === task.id && occupant.deptId === PERSONAL_TASK_LEDGER_ID,
@@ -119,6 +138,9 @@ export function validatePersonalTaskStart(input: PersonalTaskStartInput): StartA
     if (duplicate) {
       return { success: false, error: '该任务已在执行中' };
     }
+  }
+
+  if (task.category !== 'routine') {
     if (currentDay < cooldownUntilDay) {
       return { success: false, error: `任务冷却中，需等待至第 ${cooldownUntilDay} 天` };
     }

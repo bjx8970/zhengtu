@@ -124,7 +124,7 @@ export interface PersonalTaskPrecondition {
   civilServiceRankMin?: CivilServiceRank;
   /** 累计完成任务数下限 */
   minCompletedTasks?: number;
-  /** 必须为真的持久化世界事实 ID 列表 */
+  /** 必须为 true 的布尔世界事实 ID 列表；false/缺失/非布尔值均视为未满足 */
   requiredFacts?: string[];
 }
 
@@ -150,6 +150,12 @@ export interface PersonalTaskTemplate {
   prerequisites?: PersonalTaskPrecondition;
   /** once = 整局仅可完成一次；repeatable = 受冷却与槽位约束可重复 */
   repeatPolicy: 'once' | 'repeatable';
+  /**
+   * 是否允许同 ID 实例并行（首份完成前再次承接）。
+   * 缺省按分类推导：routine 可并行、major/minor 不可；
+   * once 任务恒不允许并行（契约优先，配置该字段为 true 会被 Schema 拒绝）。
+   */
+  allowParallel?: boolean;
 }
 
 /** KPI 指标模板 */

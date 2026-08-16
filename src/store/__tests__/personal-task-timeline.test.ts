@@ -240,6 +240,32 @@ describe('personal task settlement', () => {
     expect(store.getRawState().actions.slots.primary.occupants[0]).toBeNull();
   });
 
+  it('routine+once 任务在首份完成前不可并行承接（回归：初任培训）', () => {
+    const state = createInitialState();
+    const store = createTestStore(state);
+    store.dispatch({
+      type: 'START_PERSONAL_TASK',
+      taskId: 'task_induction_training',
+      tierKey: 'primary',
+      _idFactory: () => 'once-parallel-1',
+    });
+    store.dispatch({
+      type: 'START_PERSONAL_TASK',
+      taskId: 'task_induction_training',
+      tierKey: 'secondary',
+      _idFactory: () => 'once-parallel-2',
+    });
+    expect(store.getRawState().actions.slots.primary.occupants[0]?.instanceId).toBe(
+      'once-parallel-1',
+    );
+    expect(store.getRawState().actions.slots.secondary.occupants[0]).toBeNull();
+
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'month' });
+    expect(store.getRawState().actions.personalTasks.completedCounts.task_induction_training).toBe(
+      1,
+    );
+  });
+
   it('进行中任务经存档往返后保留冻结快照', () => {
     const state = createInitialState();
     const store = createTestStore(state);

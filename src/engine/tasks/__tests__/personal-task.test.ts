@@ -5,6 +5,7 @@ import {
   applyPersonalTaskKpiEffects,
   describePersonalTaskAvailability,
   isPersonalTaskOccupant,
+  taskAllowsParallel,
   validatePersonalTaskStart,
 } from '../personal-task';
 import type { PersonalTaskTemplate } from '../../../types/config';
@@ -123,7 +124,7 @@ describe('describePersonalTaskAvailability', () => {
     expect(result.reason).toContain('3');
   });
 
-  it('必需事实缺失或为空时拒绝', () => {
+  it('必需事实缺失、为空或为 false 时均拒绝（契约：必须为真）', () => {
     const task = makeTask({ prerequisites: { requiredFacts: ['assigned_project_delivered'] } });
     expect(describePersonalTaskAvailability(task, baseContext).available).toBe(false);
     expect(
@@ -135,9 +136,39 @@ describe('describePersonalTaskAvailability', () => {
     expect(
       describePersonalTaskAvailability(task, {
         ...baseContext,
+        facts: { assigned_project_delivered: false },
+      }).available,
+    ).toBe(false);
+    expect(
+      describePersonalTaskAvailability(task, {
+        ...baseContext,
+        facts: { assigned_project_delivered: '2026' },
+      }).available,
+    ).toBe(false);
+    expect(
+      describePersonalTaskAvailability(task, {
+        ...baseContext,
         facts: { assigned_project_delivered: true },
       }).available,
     ).toBe(true);
+  });
+});
+
+describe('taskAllowsParallel', () => {
+  it('once 任务恒不允许并行（契约优先于配置）', () => {
+    expect(taskAllowsParallel(makeTask({ repeatPolicy: 'once' }))).toBe(false);
+    expect(taskAllowsParallel(makeTask({ repeatPolicy: 'once', allowParallel: true }))).toBe(false);
+  });
+
+  it('缺省按分类推导：routine 可并行、major/minor 不可', () => {
+    expect(taskAllowsParallel(makeTask({ category: 'routine' }))).toBe(true);
+    expect(taskAllowsParallel(makeTask({ category: 'minor' }))).toBe(false);
+    expect(taskAllowsParallel(makeTask({ category: 'major' }))).toBe(false);
+  });
+
+  it('allowParallel 显式覆盖分类缺省', () => {
+    expect(taskAllowsParallel(makeTask({ category: 'minor', allowParallel: true }))).toBe(true);
+    expect(taskAllowsParallel(makeTask({ category: 'routine', allowParallel: false }))).toBe(false);
   });
 });
 
@@ -180,6 +211,36 @@ describe('validatePersonalTaskStart', () => {
     });
     const result = validatePersonalTaskStart(makeInput({ slotState, tierKey: 'primary' }));
     expect(result).toEqual({ success: false, error: '该任务已在执行中' });
+  });
+
+  it('routine+once 任务在首份完成前不可并行承接（回归：初任培训）', () => {
+    const onceRoutine = makeTask({ category: 'routine', cooldownDays: 0, repeatPolicy: 'once' });
+    const slotState = makeSlotState({
+      primary: {
+        label: '主要',
+        count: 3,
+        occupants: [runningTaskOccupant('task_test'), null, null],
+      },
+    });
+    const result = validatePersonalTaskStart(
+      makeInput({ task: onceRoutine, slotState, completedCount: 0 }),
+    );
+    expect(result).toEqual({ success: false, error: '该任务已在执行中' });
+  });
+
+  it('allowParallel=true 的次要任务可在另一槽位并行承接', () => {
+    const parallelTask = makeTask({ category: 'minor', allowParallel: true });
+    const slotState = makeSlotState({
+      secondary: {
+        label: '次要',
+        count: 2,
+        occupants: [runningTaskOccupant('task_test'), null],
+      },
+    });
+    const result = validatePersonalTaskStart(
+      makeInput({ task: parallelTask, slotState, tierKey: 'secondary' }),
+    );
+    expect(result).toEqual({ success: true, tierKey: 'secondary', slotIndex: 1 });
   });
 
   it('冷却未结束时拒绝', () => {

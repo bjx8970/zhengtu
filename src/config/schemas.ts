@@ -376,6 +376,7 @@ export const PersonalTaskTemplateSchema = z
     kpiEffects: z.array(PersonalTaskKpiEffectSchema).min(1).optional(),
     prerequisites: PersonalTaskPreconditionSchema.optional(),
     repeatPolicy: z.enum(['once', 'repeatable']),
+    allowParallel: z.boolean().optional(),
   })
   .strict()
   .superRefine((task, ctx) => {
@@ -399,6 +400,14 @@ export const PersonalTaskTemplateSchema = z
         code: z.ZodIssueCode.custom,
         path: ['cooldownDays'],
         message: '日常任务的冷却天数必须为 0',
+      });
+    }
+    // once 任务整局仅可完成一次，并行会结算多次，契约优先于 allowParallel 配置
+    if (task.repeatPolicy === 'once' && task.allowParallel === true) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['allowParallel'],
+        message: 'once 任务不允许并行，不能将 allowParallel 配置为 true',
       });
     }
   });

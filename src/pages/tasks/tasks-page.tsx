@@ -224,10 +224,8 @@ function TaskCard(props: {
           {props.task.repeatPolicy === 'once' && ' · 仅可完成一次'}
         </p>
         <div class="flex gap-sm" style={{ 'flex-wrap': 'wrap' }}>
-          <span class="tag tag-gray">
-            {props.task.budgetDelta >= 0
-              ? `预算 +${props.task.budgetDelta}万`
-              : `预算 ${props.task.budgetDelta}万`}
+          <span class="tag tag-gray" data-testid={`task-cost-${props.task.id}`}>
+            成本 {props.task.budgetDelta}万
           </span>
           <For each={effectLabels()}>{(label) => <span class="tag tag-gray">{label}</span>}</For>
         </div>
