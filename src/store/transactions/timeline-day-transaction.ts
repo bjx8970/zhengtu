@@ -8,6 +8,11 @@
 import type { EventDefinition } from '../../domain/events/definition';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import { resolveActionEffects } from '../../engine/core/action';
+import {
+  applyPersonalTaskKpiEffects,
+  isPersonalTaskOccupant,
+} from '../../engine/tasks/personal-task';
+import { applyEffects } from '../../engine/events/effect-executor';
 import { activateScheduledEvents, expireEventInstances } from '../../engine/events/event-scheduler';
 import { activatePolicy, advancePolicyPhase } from '../../engine/governance/policy-lifecycle';
 import {
@@ -27,6 +32,7 @@ import { decayStyleScores } from '../../engine/career/style-decay';
 import type { ActionCompletionTimelineEvent } from '../../types/game';
 import type {
   CompletedActionNotification,
+  PersonalTaskExecutableSnapshot,
   PlayerSave,
   TimelineContinuationNode,
 } from '../../types/player';
@@ -277,7 +283,13 @@ function processActionCompletion(
   notifications: CompletedActionNotification[],
   idFactory: () => string,
 ): DomainSignalSnapshot {
+  if (isPersonalTaskOccupant(event.occupant)) {
+    return processPersonalTaskCompletion(draft, event, notifications, idFactory);
+  }
   const snapshot = event.occupant.executableSnapshot;
+  if (!('action' in snapshot)) {
+    throw new Error(`Action snapshot "${event.occupant.instanceId}" is inconsistent`);
+  }
   if (
     snapshot.department.id !== event.occupant.deptId ||
     snapshot.action.id !== event.occupant.actionId
@@ -322,13 +334,7 @@ function processActionCompletion(
     effects: labels,
     completedAtDay: event.absoluteDay,
   });
-  const probation = draft.career.appointment.probation;
-  if (
-    probation?.status === 'active' &&
-    event.occupant.startedAtDay >= probation.startedAtDay &&
-    event.absoluteDay <= probation.endsAtDay
-  )
-    probation.completedActionCount += 1;
+  incrementProbationCompletedActions(draft, event.occupant, event.absoluteDay);
   draft.actions.slots[event.tierKey].occupants[event.slotIndex] = null;
   if (event.occupant.cooldownDays > 0) {
     const state = draft.actions.departmentStates[event.occupant.deptId];
@@ -348,6 +354,94 @@ function processActionCompletion(
       regionId: event.occupant.originRegionId,
     },
   };
+}
+
+/**
+ * 结算到期的个人任务：统一效果通道 + KPI 隐藏台账 + task.completed 信号。
+ *
+ * 效果经 applyEffects 两阶段原子执行（任一目标非法即抛错回滚整个时间推进），
+ * 信号先于效果构建以充当 EffectExecutionContext.signal。
+ */
+function processPersonalTaskCompletion(
+  draft: PlayerSave,
+  event: ActionCompletionTimelineEvent,
+  notifications: CompletedActionNotification[],
+  idFactory: () => string,
+): DomainSignalSnapshot {
+  const snapshot = event.occupant.executableSnapshot as PersonalTaskExecutableSnapshot;
+  const task = snapshot.task;
+  if (
+    snapshot.department.id !== event.occupant.deptId ||
+    task.id !== event.occupant.actionId ||
+    task.name !== event.occupant.actionName ||
+    task.durationDays !== event.occupant.durationDays ||
+    task.cooldownDays !== event.occupant.cooldownDays
+  ) {
+    throw new Error(`Task snapshot "${event.occupant.instanceId}" is inconsistent`);
+  }
+
+  const signal: DomainSignalSnapshot = {
+    signalId: idFactory(),
+    signalType: 'task.completed',
+    occurredAtDay: event.absoluteDay,
+    data: {
+      taskInstanceId: event.occupant.instanceId,
+      taskId: task.id,
+      taskType: task.type,
+      institutionId: event.occupant.originInstitutionId,
+      regionId: event.occupant.originRegionId,
+    },
+  };
+
+  const loader = getConfigLoader();
+  const institutions = loader.getAllInstitutions();
+  const result = applyEffects(draft, task.effects, {
+    signal,
+    currentDay: event.absoluteDay,
+    attributeBounds: snapshot.attributeBounds,
+    knownInstitutionIds: new Set(institutions.map((institution) => institution.id)),
+    knownRegionIds: new Set(institutions.map((institution) => institution.regionId)),
+  });
+  const labels = result.applied.map(
+    (record) =>
+      `${record.targetDescription} ${String(record.previousValue)}→${String(record.newValue)}`,
+  );
+  labels.push(
+    ...applyPersonalTaskKpiEffects(draft.actions.departmentStates, task.kpiEffects ?? []),
+  );
+
+  notifications.push({
+    actionName: task.name,
+    deptName: snapshot.department.name,
+    effects: labels,
+    completedAtDay: event.absoluteDay,
+  });
+  incrementProbationCompletedActions(draft, event.occupant, event.absoluteDay);
+  draft.actions.slots[event.tierKey].occupants[event.slotIndex] = null;
+
+  const taskRuntime = draft.actions.personalTasks;
+  if (event.occupant.cooldownDays > 0) {
+    taskRuntime.cooldownUntilDays[task.id] =
+      event.occupant.startedAtDay + event.occupant.durationDays + event.occupant.cooldownDays;
+  }
+  taskRuntime.completedCounts[task.id] = (taskRuntime.completedCounts[task.id] ?? 0) + 1;
+  taskRuntime.totalCompleted += 1;
+  return signal;
+}
+
+/** 试用期内完成的槽位工作计入转正考核的行动数（部门行动与个人任务同规）。 */
+function incrementProbationCompletedActions(
+  draft: PlayerSave,
+  occupant: { startedAtDay: number },
+  absoluteDay: number,
+): void {
+  const probation = draft.career.appointment.probation;
+  if (
+    probation?.status === 'active' &&
+    occupant.startedAtDay >= probation.startedAtDay &&
+    absoluteDay <= probation.endsAtDay
+  )
+    probation.completedActionCount += 1;
 }
 
 /**

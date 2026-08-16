@@ -46,6 +46,8 @@ export function deriveCareerOpportunitySourceKey(signal: DomainSignalSnapshot): 
   switch (signal.signalType) {
     case 'action.completed':
       return `action:${signal.data.actionInstanceId}`;
+    case 'task.completed':
+      return `task:${signal.data.taskInstanceId}`;
     case 'assessment.completed':
       return `assessment:${signal.data.year}`;
     case 'policy.approved':

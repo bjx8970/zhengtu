@@ -1,0 +1,302 @@
+[
+  {
+    "id": "task_draft_material",
+    "name": "乡镇工作汇报材料",
+    "type": "drafting",
+    "description": "起草乡镇阶段性工作汇报，锤炼综合文字能力",
+    "durationDays": 7,
+    "category": "minor",
+    "cooldownDays": 7,
+    "budgetDelta": 10,
+    "effects": [
+      { "target": "character", "field": "competence", "operation": "add", "value": 2 },
+      { "target": "assessment_score", "operation": "add", "value": 1 }
+    ],
+    "kpiEffects": [{ "indicatorId": "office_efficiency", "operation": "add", "value": 6 }],
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_draft_speech",
+    "name": "领导讲话稿起草",
+    "type": "drafting",
+    "description": "为领导会议讲话捉刀代笔，练就笔下功夫",
+    "durationDays": 5,
+    "category": "minor",
+    "cooldownDays": 7,
+    "budgetDelta": 8,
+    "effects": [{ "target": "character", "field": "competence", "operation": "add", "value": 2 }],
+    "kpiEffects": [{ "indicatorId": "office_efficiency", "operation": "add", "value": 4 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_policy_brief",
+    "name": "政策解读简报",
+    "type": "drafting",
+    "description": "编写上级政策解读简报，供科室同事学习参考",
+    "durationDays": 3,
+    "category": "routine",
+    "cooldownDays": 0,
+    "budgetDelta": 5,
+    "effects": [{ "target": "character", "field": "competence", "operation": "add", "value": 1 }],
+    "kpiEffects": [{ "indicatorId": "office_efficiency", "operation": "add", "value": 3 }],
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_team_sync",
+    "name": "跨科室协调纪要",
+    "type": "drafting",
+    "description": "牵头跨科室事务协调并整理会议纪要",
+    "durationDays": 5,
+    "category": "minor",
+    "cooldownDays": 7,
+    "budgetDelta": 8,
+    "effects": [{ "target": "character", "field": "charisma", "operation": "add", "value": 2 }],
+    "kpiEffects": [{ "indicatorId": "staff_satisfaction", "operation": "add", "value": 5 }],
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_monthly_report",
+    "name": "月度报表汇总",
+    "type": "data_reporting",
+    "description": "按月汇总条线报表数据，确保按时上报",
+    "durationDays": 3,
+    "category": "routine",
+    "cooldownDays": 0,
+    "budgetDelta": 5,
+    "effects": [{ "target": "character", "field": "competence", "operation": "add", "value": 1 }],
+    "kpiEffects": [{ "indicatorId": "data_accuracy", "operation": "add", "value": 5 }],
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_stat_ledger",
+    "name": "统计台账整理",
+    "type": "data_reporting",
+    "description": "系统整理年度统计台账，夯实数据底数",
+    "durationDays": 10,
+    "category": "minor",
+    "cooldownDays": 14,
+    "budgetDelta": 12,
+    "effects": [
+      { "target": "character", "field": "competence", "operation": "add", "value": 2 },
+      { "target": "character", "field": "diligence", "operation": "add", "value": 2 }
+    ],
+    "kpiEffects": [{ "indicatorId": "data_accuracy", "operation": "add", "value": 8 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_data_check",
+    "name": "基层数据核查",
+    "type": "data_reporting",
+    "description": "赴村核实上报数据的真实性，守住统计红线",
+    "durationDays": 7,
+    "category": "minor",
+    "cooldownDays": 7,
+    "budgetDelta": 10,
+    "effects": [{ "target": "character", "field": "integrity", "operation": "add", "value": 2 }],
+    "kpiEffects": [{ "indicatorId": "data_accuracy", "operation": "add", "value": 6 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_village_research",
+    "name": "村情民意调研",
+    "type": "research",
+    "description": "驻村开展村情民意调研，形成专题报告",
+    "durationDays": 20,
+    "category": "major",
+    "cooldownDays": 14,
+    "budgetDelta": 25,
+    "effects": [
+      { "target": "character", "field": "charisma", "operation": "add", "value": 2 },
+      { "target": "character", "field": "network", "operation": "add", "value": 1 }
+    ],
+    "kpiEffects": [
+      { "indicatorId": "livelihood_score", "operation": "add", "value": 8 },
+      { "indicatorId": "resident_satisfaction", "operation": "add", "value": 4 }
+    ],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_poverty_visit",
+    "name": "脱贫户回访",
+    "type": "research",
+    "description": "逐户回访脱贫户，核实帮扶政策落实情况",
+    "durationDays": 10,
+    "category": "minor",
+    "cooldownDays": 14,
+    "budgetDelta": 15,
+    "effects": [{ "target": "character", "field": "charisma", "operation": "add", "value": 2 }],
+    "kpiEffects": [{ "indicatorId": "livelihood_score", "operation": "add", "value": 6 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_agri_walk",
+    "name": "农情走访协助",
+    "type": "research",
+    "description": "随农技员下田走访，协助记录农情数据",
+    "durationDays": 10,
+    "category": "minor",
+    "cooldownDays": 14,
+    "budgetDelta": 15,
+    "effects": [{ "target": "character", "field": "diligence", "operation": "add", "value": 2 }],
+    "kpiEffects": [
+      { "indicatorId": "agricultural_output", "operation": "add", "value": 8 },
+      { "indicatorId": "data_accuracy", "operation": "add", "value": 3 }
+    ],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_window_duty",
+    "name": "窗口接待值班",
+    "type": "public_service",
+    "description": "便民服务窗口坐班，直面群众诉求",
+    "durationDays": 2,
+    "category": "routine",
+    "cooldownDays": 0,
+    "budgetDelta": 3,
+    "effects": [{ "target": "character", "field": "charisma", "operation": "add", "value": 1 }],
+    "kpiEffects": [{ "indicatorId": "resident_satisfaction", "operation": "add", "value": 3 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_petition_mediation",
+    "name": "矛盾纠纷调解",
+    "type": "public_service",
+    "description": "参与邻里矛盾纠纷调解，化解信访苗头",
+    "durationDays": 7,
+    "category": "minor",
+    "cooldownDays": 7,
+    "budgetDelta": 10,
+    "effects": [
+      { "target": "character", "field": "charisma", "operation": "add", "value": 2 },
+      { "target": "character", "field": "stability", "operation": "add", "value": 1 }
+    ],
+    "kpiEffects": [{ "indicatorId": "livelihood_score", "operation": "add", "value": 5 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_emergency_support",
+    "name": "防汛值守支援",
+    "type": "public_service",
+    "description": "汛期驻守堤段值守巡查，为防汛应急争取主动",
+    "durationDays": 14,
+    "category": "minor",
+    "cooldownDays": 14,
+    "budgetDelta": 20,
+    "effects": [
+      { "target": "character", "field": "diligence", "operation": "add", "value": 3 },
+      { "target": "character", "field": "stability", "operation": "add", "value": 2 },
+      { "target": "world_fact", "factId": "flood_prepared", "operation": "set", "value": true }
+    ],
+    "kpiEffects": [{ "indicatorId": "resident_satisfaction", "operation": "add", "value": 3 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_social_security_promotion",
+    "name": "社保政策入户宣传",
+    "type": "public_service",
+    "description": "入户宣传社保政策，推动应保尽保",
+    "durationDays": 7,
+    "category": "minor",
+    "cooldownDays": 7,
+    "budgetDelta": 10,
+    "effects": [{ "target": "character", "field": "charisma", "operation": "add", "value": 1 }],
+    "kpiEffects": [
+      { "indicatorId": "social_security_coverage", "operation": "add", "value": 6 },
+      { "indicatorId": "livelihood_score", "operation": "add", "value": 3 }
+    ],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_assigned_special",
+    "name": "上级交办专项攻坚",
+    "type": "assigned_project",
+    "description": "牵头承办上级交办专项任务，全面锻炼独当一面能力",
+    "durationDays": 30,
+    "category": "major",
+    "cooldownDays": 14,
+    "budgetDelta": 40,
+    "effects": [
+      { "target": "character", "field": "performance", "operation": "add", "value": 3 },
+      { "target": "character", "field": "competence", "operation": "add", "value": 3 },
+      { "target": "assessment_score", "operation": "add", "value": 2 },
+      {
+        "target": "world_fact",
+        "factId": "assigned_project_delivered",
+        "operation": "set",
+        "value": true
+      }
+    ],
+    "kpiEffects": [{ "indicatorId": "office_efficiency", "operation": "add", "value": 10 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"], "minCompletedTasks": 3 },
+    "repeatPolicy": "once"
+  },
+  {
+    "id": "task_inspection_prep",
+    "name": "迎检材料筹备",
+    "type": "assigned_project",
+    "description": "筹备上级检查的台账与汇报材料，检验细致功夫",
+    "durationDays": 14,
+    "category": "minor",
+    "cooldownDays": 14,
+    "budgetDelta": 20,
+    "effects": [{ "target": "character", "field": "diligence", "operation": "add", "value": 3 }],
+    "kpiEffects": [
+      { "indicatorId": "office_efficiency", "operation": "add", "value": 8 },
+      { "indicatorId": "staff_satisfaction", "operation": "add", "value": 3 }
+    ],
+    "prerequisites": { "allowedLeadershipRanks": ["none"], "minCompletedTasks": 2 },
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_induction_training",
+    "name": "初任培训",
+    "type": "training",
+    "description": "参加新录用公务员初任培训，完成角色转换",
+    "durationDays": 15,
+    "category": "routine",
+    "cooldownDays": 0,
+    "budgetDelta": 15,
+    "effects": [
+      { "target": "character", "field": "competence", "operation": "add", "value": 4 },
+      { "target": "character", "field": "stability", "operation": "add", "value": 2 }
+    ],
+    "repeatPolicy": "once"
+  },
+  {
+    "id": "task_policy_study",
+    "name": "政策理论学习",
+    "type": "training",
+    "description": "集中学习最新政策理论，筑牢思想根基",
+    "durationDays": 5,
+    "category": "routine",
+    "cooldownDays": 0,
+    "budgetDelta": 5,
+    "effects": [
+      { "target": "character", "field": "competence", "operation": "add", "value": 1 },
+      { "target": "character", "field": "integrity", "operation": "add", "value": 1 }
+    ],
+    "repeatPolicy": "repeatable"
+  },
+  {
+    "id": "task_skill_training",
+    "name": "业务技能研修",
+    "type": "training",
+    "description": "参加条线业务技能研修班，精进专业本领",
+    "durationDays": 10,
+    "category": "minor",
+    "cooldownDays": 14,
+    "budgetDelta": 12,
+    "effects": [{ "target": "character", "field": "competence", "operation": "add", "value": 3 }],
+    "repeatPolicy": "repeatable"
+  }
+]

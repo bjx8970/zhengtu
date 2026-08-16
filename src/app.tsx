@@ -14,6 +14,7 @@ import { createRouter, type Route } from './router';
 import { SplashPage } from './pages/auth/splash';
 import { CharacterCreation } from './pages/character/character-creation';
 import { HomePage } from './pages/home/home-page';
+import { TasksPage } from './pages/tasks/tasks-page';
 import { DepartmentsPage } from './pages/departments/departments-page';
 import { AssessmentPage } from './pages/assessment/assessment-page';
 import { CareerPage } from './pages/career/career-page';
@@ -27,6 +28,7 @@ const routes: Route[] = [
   { path: '/', component: SplashPage },
   { path: '/character', component: CharacterCreation },
   { path: '/main', component: HomePage, shell: true },
+  { path: '/tasks', component: TasksPage, shell: true },
   { path: '/departments', component: DepartmentsPage, shell: true },
   { path: '/assessment', component: AssessmentPage, shell: true },
   { path: '/career', component: CareerPage, shell: true },

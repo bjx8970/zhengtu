@@ -18,6 +18,8 @@ export function deriveEventSourceKey(signal: DomainSignalSnapshot): string {
   switch (signal.signalType) {
     case 'action.completed':
       return signal.data.actionInstanceId;
+    case 'task.completed':
+      return signal.data.taskInstanceId;
     case 'policy.approved':
     case 'policy.phase_changed':
     case 'policy.metric_changed':

@@ -10,6 +10,7 @@ export * from './core/action';
 export * from './core/effect';
 export * from './core/timeline';
 export * from './core/daily-timeline-plan';
+export * from './tasks/personal-task';
 export * from './events/condition-interpreter';
 export * from './events/effect-executor';
 export * from './events/metric-signal-bridge';

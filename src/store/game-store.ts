@@ -1,12 +1,12 @@
 /**
- * 游戏状态管理（Schema 9）
+ * 游戏状态管理（Schema 10）
  *
  * 核心设计：
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 仅在实际状态变化时写入 localStorage
  *
- * 当前持久化结构为 Schema 9，包含政策/事件运行时、时间轴 continuation、职级履历与试用期审计。
+ * 当前持久化结构为 Schema 10，包含政策/事件运行时、时间轴 continuation、职级履历、试用期审计与个人任务状态。
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
@@ -20,6 +20,7 @@ import { createAppointmentProbation } from '../engine/career/probation-evaluatio
 
 // Reducer 模块
 import { reduceStartAction } from './reducers/action-reducer';
+import { reduceStartPersonalTask } from './reducers/personal-task-reducer';
 import { reduceAdvanceTime } from './reducers/time-reducer';
 import { reduceNewGame, reduceLoadSave } from './reducers/character-reducer';
 import { reduceChooseEventOption } from './reducers/event-reducer';
@@ -48,6 +49,12 @@ export type GameAction =
       type: 'START_ACTION';
       deptId: string;
       actionId: string;
+      tierKey: 'primary' | 'secondary' | 'reserve';
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'START_PERSONAL_TASK';
+      taskId: string;
       tierKey: 'primary' | 'secondary' | 'reserve';
       _idFactory?: () => string;
     }
@@ -305,6 +312,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       departmentStates: {},
       totalActions: 0,
       lastCompletedActions: [],
+      personalTasks: { cooldownUntilDays: {}, completedCounts: {}, totalCompleted: 0 },
     },
     assessments: {
       comprehensiveScore: 0,
@@ -342,6 +350,15 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
       reduceStartAction(draft, {
         deptId: action.deptId,
         actionId: action.actionId,
+        tierKey: action.tierKey,
+        _idFactory: action._idFactory,
+      });
+      return draft.actions.totalActions !== before;
+    }
+    case 'START_PERSONAL_TASK': {
+      const before = draft.actions.totalActions;
+      reduceStartPersonalTask(draft, {
+        taskId: action.taskId,
         tierKey: action.tierKey,
         _idFactory: action._idFactory,
       });

@@ -67,12 +67,9 @@ test('建档、完成最低要求、跨到期日转正并刷新保持', async ({
   await expect(page.getByTestId('probation-status-card')).toBeVisible();
   await expect(page.getByTestId('probation-status')).toHaveText('试用中');
 
-  await page.goto('/#/departments');
-  await page.locator('[data-testid^="department-"]').first().click();
-  await page
-    .locator('[data-testid^="start-action-"][data-testid$="-primary"]:not([disabled])')
-    .first()
-    .click();
+  await page.goto('/#/tasks');
+  await expect(page.getByTestId('personal-task-task_policy_study')).toBeVisible();
+  await page.getByTestId('start-task-task_policy_study-primary').click();
   await page.goto('/#/main');
   await page.getByTestId('advance-month').click();
 

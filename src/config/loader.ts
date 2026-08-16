@@ -24,6 +24,7 @@ import type {
   LeadershipStyleConfig,
   CareerOpportunityDefinition,
   CareerExperienceQualificationRules,
+  PersonalTaskTemplate,
 } from '../types/config';
 import type { PositionConfigV2, InstitutionConfig } from '../types/position-v2';
 import type { CivilServiceRank, InstitutionLevel } from '../domain/career/types';
@@ -37,11 +38,13 @@ import {
   CivilServiceRankConfigSchema,
   CareerOpportunityDefinitionArraySchema,
   CareerExperienceQualificationRulesSchema,
+  PersonalTaskTemplateArraySchema,
 } from './schemas';
 import { EventDefinitionArraySchema } from '../domain/events/definition';
 import deptTemplateData from './templates/departments.json' with { type: 'json' };
 import deptExtraData from './templates/departments-extra.json' with { type: 'json' };
 import kpiData from './templates/kpis.json' with { type: 'json' };
+import personalTasksData from './templates/personal-tasks.json' with { type: 'json' };
 import positionsData from './positions/positions.json' with { type: 'json' };
 import institutionsData from './institutions/institutions.json' with { type: 'json' };
 import constantsData from './constants.json' with { type: 'json' };
@@ -75,10 +78,27 @@ const parsedCareerOpportunities =
 const parsedExperienceQualificationRules = CareerExperienceQualificationRulesSchema.parse(
   experienceQualificationData,
 );
+const parsedPersonalTasks = PersonalTaskTemplateArraySchema.parse(personalTasksData);
 const ALL_POSITIONS = parsedPositions;
 const ALL_INSTITUTIONS = parsedInstitutions;
 const ALL_EVENTS = parsedEvents;
 const ALL_POLICIES = parsedPolicies;
+
+/**
+ * 个人任务 KPI 台账贡献的引用完整性：指标必须存在于 KPI 模板库。
+ * 运行期 eager 校验，配置错误在加载时立即失败。
+ */
+function validatePersonalTaskReferences(tasks: readonly PersonalTaskTemplate[]): void {
+  for (const task of tasks) {
+    if (!task.kpiEffects) continue;
+    for (const effect of task.kpiEffects) {
+      if (!ALL_KPI_TEMPLATES[effect.indicatorId])
+        throw new Error(`Personal task ${task.id} targets unknown KPI "${effect.indicatorId}"`);
+    }
+  }
+}
+
+validatePersonalTaskReferences(parsedPersonalTasks);
 
 function validateCareerOpportunityReferences(
   definitions: readonly CareerOpportunityDefinition[],
@@ -122,6 +142,7 @@ class ConfigLoader {
   private civilServiceRanks: typeof parsedCivilServiceRanks;
   private careerOpportunities: CareerOpportunityDefinition[];
   private experienceQualificationRules: CareerExperienceQualificationRules;
+  private personalTasks: PersonalTaskTemplate[];
   private regionConfig: RegionConfig;
   private universityConfig: UniversityConfig;
   private backgroundConfig: BackgroundConfig;
@@ -147,6 +168,7 @@ class ConfigLoader {
     this.civilServiceRanks = parsedCivilServiceRanks;
     this.careerOpportunities = parsedCareerOpportunities;
     this.experienceQualificationRules = parsedExperienceQualificationRules;
+    this.personalTasks = parsedPersonalTasks;
     this.gameConfig = constantsData as unknown as GameConfig;
     this.regionConfig = regionData as unknown as RegionConfig;
     this.universityConfig = universityData as unknown as UniversityConfig;
@@ -216,6 +238,17 @@ class ConfigLoader {
   /** 获取职业履历资格规则的防御性副本。 */
   getCareerExperienceQualificationRules(): CareerExperienceQualificationRules {
     return structuredClone(this.experienceQualificationRules);
+  }
+
+  /** 获取全部个人任务模板（深拷贝）。 */
+  getAllPersonalTaskTemplates(): PersonalTaskTemplate[] {
+    return this.personalTasks.map((task) => structuredClone(task));
+  }
+
+  /** 按稳定 ID 查询个人任务模板（未知 ID 返回 null）。 */
+  getPersonalTaskTemplate(taskId: string): PersonalTaskTemplate | null {
+    const task = this.personalTasks.find((item) => item.id === taskId);
+    return task ? structuredClone(task) : null;
   }
 
   /** 按领域信号查询职业机会定义（深拷贝）。 */

@@ -26,7 +26,8 @@ import {
   getActiveCareerRestrictions,
 } from '../../engine/career/civil-service-rank-eligibility';
 import { formatCareerRegion } from '../career/career-display';
-import type { SlotOccupant, SlotTierKey } from '../../types/player';
+import { PERSONAL_TASK_LEDGER_ID, type SlotOccupant, type SlotTierKey } from '../../types/player';
+import { PERSONAL_TASK_TYPE_LABELS } from '../../types/config';
 
 /** 时间推进选项 */
 const GRANULARITIES: { label: string; desc: string; granularity: 'day' | 'week' | 'month' }[] = [
@@ -42,14 +43,24 @@ const SCHEDULE_TIERS: { key: SlotTierKey; label: string; hint: string }[] = [
   { key: 'reserve', label: '紧急日程', hint: '加班：扣减健康、增加消沉' },
 ];
 
-/** 工作台政务入口（仅已实现功能） */
-const WORK_CARDS: { icon: string; label: string; desc: string; route: string }[] = [
+/** 工作台政务入口（仅已实现功能；科员阶段个人任务为第一入口） */
+const WORK_CARDS_LEADER: { icon: string; label: string; desc: string; route: string }[] = [
   {
     icon: '部',
     label: '部门治理',
     desc: '查看部门、安排行动、管理槽位与冷却',
     route: '/departments',
   },
+  { icon: '任', label: '个人任务', desc: '承接并交付本人具体任务', route: '/tasks' },
+  { icon: '考', label: 'KPI 考核', desc: '指标完成度、得分与改进建议', route: '/assessment' },
+  { icon: '策', label: '政策治理', desc: '提议政策、跟踪阶段与生命周期操作', route: '/policies' },
+  { icon: '事', label: '事件中心', desc: '处理收件箱事件、计划与历史记录', route: '/events' },
+  { icon: '晋', label: '职务与职级', desc: '职级晋升条件、岗位机会与选拔流程', route: '/career' },
+];
+
+/** 科员（无领导职务）阶段的政务入口：部门治理转由领导负责 */
+const WORK_CARDS_CLERK: { icon: string; label: string; desc: string; route: string }[] = [
+  { icon: '任', label: '个人任务', desc: '承接、排期、交付本人具体任务', route: '/tasks' },
   { icon: '考', label: 'KPI 考核', desc: '指标完成度、得分与改进建议', route: '/assessment' },
   { icon: '策', label: '政策治理', desc: '提议政策、跟踪阶段与生命周期操作', route: '/policies' },
   { icon: '事', label: '事件中心', desc: '处理收件箱事件、计划与历史记录', route: '/events' },
@@ -339,12 +350,20 @@ export function HomePage() {
                         const total = occupant.durationDays;
                         const pct = Math.min((elapsed / total) * 100, 100);
                         const remain = Math.max(total - elapsed, 0);
+                        const taskType =
+                          occupant.deptId === PERSONAL_TASK_LEDGER_ID &&
+                          'task' in occupant.executableSnapshot
+                            ? PERSONAL_TASK_TYPE_LABELS[occupant.executableSnapshot.task.type]
+                            : null;
                         return (
                           <div
                             class="card flex between center gap-md"
                             style={{ padding: '0.6rem 0.9rem' }}
                           >
-                            <strong class="text-sm">{occupant.actionName}</strong>
+                            <strong class="text-sm">
+                              {occupant.actionName}
+                              {taskType && <span class="tag tag-blue">{taskType}</span>}
+                            </strong>
                             <span class="text-xs muted">剩余 {remain} 天</span>
                             <div class="meter flex-1" style={{ 'max-width': '220px' }}>
                               <i
@@ -384,7 +403,13 @@ export function HomePage() {
             class="choice-grid"
             style={{ 'grid-template-columns': 'repeat(auto-fill, minmax(200px, 1fr))' }}
           >
-            <For each={WORK_CARDS}>
+            <For
+              each={
+                state.career.appointment.leadershipRank === 'none'
+                  ? WORK_CARDS_CLERK
+                  : WORK_CARDS_LEADER
+              }
+            >
               {(card) => (
                 <button class="choice-card" onClick={() => navigate(card.route)}>
                   <span class="flex gap-sm center">

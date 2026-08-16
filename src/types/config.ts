@@ -20,6 +20,8 @@ import type {
   AppointmentType,
   CareerOpportunityType,
   CareerRestrictionType,
+  CivilServiceRank,
+  LeadershipRank,
 } from '../domain/career/types';
 
 /** 单类任职可计入职业履历资格的配置规则。 */
@@ -74,6 +76,80 @@ export interface ActionTemplate {
   unlockLevel?: number;
   /** 该行动倾向的领导风格 ID（Phase C 新增） */
   styleAlignment?: string;
+}
+
+// ===== 个人任务制（无领导职务阶段工作模型） =====
+
+/** 个人任务类型常量数组 */
+export const PERSONAL_TASK_TYPES = [
+  'drafting', // 材料起草/综合文字
+  'data_reporting', // 数据汇总/报表
+  'research', // 调研走访
+  'public_service', // 群众服务/窗口事项
+  'assigned_project', // 上级交办专项
+  'training', // 培训学习
+] as const;
+
+/** 个人任务类型 */
+export type PersonalTaskType = (typeof PERSONAL_TASK_TYPES)[number];
+
+/** 个人任务类型中文标签 */
+export const PERSONAL_TASK_TYPE_LABELS: Record<PersonalTaskType, string> = {
+  drafting: '材料起草',
+  data_reporting: '数据汇总',
+  research: '调研走访',
+  public_service: '群众服务',
+  assigned_project: '上级交办',
+  training: '培训学习',
+};
+
+/** 个人任务对个人工作 KPI 台账的贡献 */
+export interface PersonalTaskKpiEffect {
+  /** KPI 指标 ID（须存在于科员岗位部门聚合的指标集内） */
+  indicatorId: string;
+  operation: 'add' | 'multiply' | 'set';
+  value: number;
+}
+
+/**
+ * 个人任务前置条件（轻量专用形状）。
+ *
+ * 不复用 ConditionExpression：其评估上下文强制要求触发信号，
+ * 而任务承接时机没有信号语义。
+ */
+export interface PersonalTaskPrecondition {
+  /** 允许承接的领导职务等级列表；缺省表示不限 */
+  allowedLeadershipRanks?: LeadershipRank[];
+  /** 最低公务员职级（按职级序数比较） */
+  civilServiceRankMin?: CivilServiceRank;
+  /** 累计完成任务数下限 */
+  minCompletedTasks?: number;
+  /** 必须为真的持久化世界事实 ID 列表 */
+  requiredFacts?: string[];
+}
+
+/** 个人任务模板定义（JSON 中存储，冻结进可执行快照） */
+export interface PersonalTaskTemplate {
+  id: string;
+  name: string;
+  type: PersonalTaskType;
+  description?: string;
+  /** 执行所需天数 */
+  durationDays: number;
+  /** 任务分类，复用槽位调度规则 */
+  category: ActionCategory;
+  /** 完成后的冷却天数 */
+  cooldownDays: number;
+  /** 任务消耗预算（万元） */
+  budgetDelta: number;
+  /** 完成时经统一效果执行器原子应用的效果 */
+  effects: EffectDefinition[];
+  /** 完成时写入个人工作 KPI 台账的贡献（隐藏台账，随任命变更重置） */
+  kpiEffects?: PersonalTaskKpiEffect[];
+  /** 可选前置条件 */
+  prerequisites?: PersonalTaskPrecondition;
+  /** once = 整局仅可完成一次；repeatable = 受冷却与槽位约束可重复 */
+  repeatPolicy: 'once' | 'repeatable';
 }
 
 /** KPI 指标模板 */

@@ -3,6 +3,8 @@
  *
  * 展示当前职位的所有部门，点击部门进入行动列表并安排日程。
  * 交互流程：部门列表 → 点击部门 → 行动列表 + 槽位选择按钮。
+ * 无领导职务阶段部门治理行动为领导专属：本页转为只读说明，
+ * 科员的核心工作入口在「个人任务」工作台（issue #120）。
  */
 
 import { createMemo, createSignal, For, Show } from 'solid-js';
@@ -36,6 +38,8 @@ export function DepartmentsPage() {
   const { state } = useGameStore();
   const [selectedDeptIdx, setSelectedDeptIdx] = createSignal<number | null>(null);
 
+  const isClerk = createMemo(() => state.career.appointment.leadershipRank === 'none');
+
   const positionConfig = createMemo(() => {
     const posId = state.career.appointment.positionId;
     if (!posId) return null;
@@ -63,67 +67,86 @@ export function DepartmentsPage() {
       />
 
       <Show
-        when={selectedDept() === null}
+        when={!isClerk()}
         fallback={
-          // 安全：fallback 仅在 selectedDept() !== null 时渲染
-          <DeptDetailView dept={selectedDept()!} onBack={() => setSelectedDeptIdx(null)} />
+          <div class="card card-pad flex-col gap-sm" data-testid="departments-readonly-notice">
+            <h2 class="doc-title" style={{ 'font-size': '1.1rem' }}>
+              部门治理由领导职务负责
+            </h2>
+            <p class="text-sm secondary-text">
+              当前无领导职务：请通过「个人任务」工作台承接材料起草、调研走访、群众服务等具体任务开展工作。
+            </p>
+            <div>
+              <a class="btn btn-primary" href="#/tasks">
+                前往个人任务
+              </a>
+            </div>
+          </div>
         }
       >
         <Show
-          when={allDepts().length > 0}
+          when={selectedDept() === null}
           fallback={
-            <div class="card center muted" style={{ padding: '3rem 0' }}>
-              暂无部门数据
-            </div>
+            // 安全：fallback 仅在 selectedDept() !== null 时渲染
+            <DeptDetailView dept={selectedDept()!} onBack={() => setSelectedDeptIdx(null)} />
           }
         >
-          <div
-            class="choice-grid"
-            style={{ 'grid-template-columns': 'repeat(auto-fill, minmax(230px, 1fr))' }}
+          <Show
+            when={allDepts().length > 0}
+            fallback={
+              <div class="card center muted" style={{ padding: '3rem 0' }}>
+                暂无部门数据
+              </div>
+            }
           >
-            <For each={allDepts()}>
-              {(dept, idx) => {
-                const deptState = state.actions.departmentStates[dept.id];
-                const kpiValues = deptState?.kpiValues ?? {};
-                const firstKpi = Object.entries(kpiValues).slice(0, 2);
-                const firstValue = firstKpi.length > 0 ? Number(firstKpi[0]?.[1] ?? 0) : 0;
-                return (
-                  <button
-                    data-testid={`department-${dept.id}`}
-                    class="choice-card"
-                    onClick={() => setSelectedDeptIdx(idx())}
-                    style={{ 'min-height': '150px' }}
-                  >
-                    <span class="choice-card-title serif" style={{ 'font-size': '1.05rem' }}>
-                      {dept.name}
-                    </span>
-                    <span class="choice-card-desc">
-                      {dept.actions.length > 0
-                        ? `可执行 ${dept.actions.length} 个行动`
-                        : '暂无可用行动'}
-                    </span>
-                    <span class="meter">
-                      <i
-                        class="meter-fill green"
-                        style={{ width: `${Math.min(Math.abs(firstValue) * 10, 100)}%` }}
-                        aria-hidden="true"
-                      />
-                    </span>
-                    <span class="flex gap-sm" style={{ 'flex-wrap': 'wrap' }}>
-                      <For each={firstKpi}>
-                        {([kpiId, value]) => (
-                          <span class="tag tag-gray">
-                            {dept.kpiIndicators.find((k) => k.id === kpiId)?.name ?? kpiId}{' '}
-                            {String(value)}
-                          </span>
-                        )}
-                      </For>
-                    </span>
-                  </button>
-                );
-              }}
-            </For>
-          </div>
+            <div
+              class="choice-grid"
+              style={{ 'grid-template-columns': 'repeat(auto-fill, minmax(230px, 1fr))' }}
+            >
+              <For each={allDepts()}>
+                {(dept, idx) => {
+                  const deptState = state.actions.departmentStates[dept.id];
+                  const kpiValues = deptState?.kpiValues ?? {};
+                  const firstKpi = Object.entries(kpiValues).slice(0, 2);
+                  const firstValue = firstKpi.length > 0 ? Number(firstKpi[0]?.[1] ?? 0) : 0;
+                  return (
+                    <button
+                      data-testid={`department-${dept.id}`}
+                      class="choice-card"
+                      onClick={() => setSelectedDeptIdx(idx())}
+                      style={{ 'min-height': '150px' }}
+                    >
+                      <span class="choice-card-title serif" style={{ 'font-size': '1.05rem' }}>
+                        {dept.name}
+                      </span>
+                      <span class="choice-card-desc">
+                        {dept.actions.length > 0
+                          ? `可执行 ${dept.actions.length} 个行动`
+                          : '暂无可用行动'}
+                      </span>
+                      <span class="meter">
+                        <i
+                          class="meter-fill green"
+                          style={{ width: `${Math.min(Math.abs(firstValue) * 10, 100)}%` }}
+                          aria-hidden="true"
+                        />
+                      </span>
+                      <span class="flex gap-sm" style={{ 'flex-wrap': 'wrap' }}>
+                        <For each={firstKpi}>
+                          {([kpiId, value]) => (
+                            <span class="tag tag-gray">
+                              {dept.kpiIndicators.find((k) => k.id === kpiId)?.name ?? kpiId}{' '}
+                              {String(value)}
+                            </span>
+                          )}
+                        </For>
+                      </span>
+                    </button>
+                  );
+                }}
+              </For>
+            </div>
+          </Show>
         </Show>
       </Show>
     </>
