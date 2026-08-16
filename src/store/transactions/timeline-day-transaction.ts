@@ -45,6 +45,7 @@ import {
 } from '../reducers/shared';
 import { commitPolicyTransitionInTransaction } from './policy-transition-transaction';
 import { expireCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
+import { evaluateProbation } from '../../engine/career/probation-evaluation';
 
 /**
  * 结算当日行动与到期政策，再统一处理它们产生的领域信号。
@@ -119,7 +120,7 @@ export function processDailyFacts(
  * @param rng 随机数生成器
  * @param idFactory 事务共享 ID 工厂
  * @param definitions 事件定义
- * @returns 是否被阻塞以及仍需持久化的节点
+ * @returns 是否被阻塞/终止，以及仍需持久化的节点
  */
 export function processTimelineNodes(
   draft: PlayerSave,
@@ -127,11 +128,16 @@ export function processTimelineNodes(
   rng: () => number,
   idFactory: () => string,
   definitions: readonly EventDefinition[],
-): { interrupted: boolean; remainingNodes: TimelineContinuationNode[] } {
+): { interrupted: boolean; terminal: boolean; remainingNodes: TimelineContinuationNode[] } {
   for (let index = 0; index < nodes.length; index++) {
     const node = nodes[index];
     if (!node) continue;
     switch (node.type) {
+      case 'probation_evaluation':
+        processProbationEvaluation(draft, node.absoluteDay);
+        if (draft.career.appointment.probation?.status === 'failed')
+          return { interrupted: false, terminal: true, remainingNodes: [] };
+        break;
       case 'career_opportunity_expiry':
         expireCareerOpportunitiesAtDay(draft, node.absoluteDay);
         break;
@@ -148,6 +154,7 @@ export function processTimelineNodes(
           // 已完整提交的节点必须跳过，避免恢复时重复无效编排。
           return {
             interrupted: true,
+            terminal: false,
             remainingNodes: nodes.slice(hasRemainingDueEvent ? index : index + 1),
           };
         }
@@ -172,7 +179,11 @@ export function processTimelineNodes(
             definitions,
           );
           if (draft.events.activeBlockingEventId !== null) {
-            return { interrupted: true, remainingNodes: nodes.slice(index + 1) };
+            return {
+              interrupted: true,
+              terminal: false,
+              remainingNodes: nodes.slice(index + 1),
+            };
           }
         }
         break;
@@ -188,7 +199,11 @@ export function processTimelineNodes(
           definitions,
         );
         if (draft.events.activeBlockingEventId !== null) {
-          return { interrupted: true, remainingNodes: nodes.slice(index + 1) };
+          return {
+            interrupted: true,
+            terminal: false,
+            remainingNodes: nodes.slice(index + 1),
+          };
         }
         break;
       }
@@ -198,7 +213,42 @@ export function processTimelineNodes(
         break;
     }
   }
-  return { interrupted: false, remainingNodes: [] };
+  return { interrupted: false, terminal: false, remainingNodes: [] };
+}
+
+function processProbationEvaluation(draft: PlayerSave, currentDay: number): void {
+  const probation = draft.career.appointment.probation;
+  const result = evaluateProbation({
+    currentDay,
+    probation,
+    attributes: {
+      competence: draft.character.competence,
+      diligence: draft.character.diligence,
+      integrity: draft.character.integrity,
+      stability: draft.character.stability,
+    },
+    restrictions: draft.career.restrictions,
+    config: getConfigLoader().getGameConfig().probation,
+  });
+  if (!result.success) {
+    if (result.failure === 'not_active' || result.failure === 'not_due') return;
+    throw new Error(`Probation evaluation failed safely: ${result.failure}`);
+  }
+  draft.career.appointment.probation = result.probation;
+  if (result.outcome !== 'failed') return;
+  const openExperiences = draft.career.experiences.filter(
+    (experience) => experience.endedAtDay === null,
+  );
+  if (
+    openExperiences.length !== 1 ||
+    openExperiences[0]?.appointmentId !== draft.career.appointment.appointmentId
+  )
+    throw new Error('Probation failure cannot close an inconsistent appointment experience');
+  openExperiences[0].endedAtDay = currentDay;
+  openExperiences[0].endReason = 'probation_failed';
+  draft.career.appointment.status = 'ended';
+  draft.career.appointment.endedAtDay = currentDay;
+  draft.career.appointment.endReason = 'probation_failed';
 }
 
 function expireCareerOpportunitiesAtDay(draft: PlayerSave, currentDay: number): void {
@@ -272,6 +322,13 @@ function processActionCompletion(
     effects: labels,
     completedAtDay: event.absoluteDay,
   });
+  const probation = draft.career.appointment.probation;
+  if (
+    probation?.status === 'active' &&
+    event.occupant.startedAtDay >= probation.startedAtDay &&
+    event.absoluteDay <= probation.endsAtDay
+  )
+    probation.completedActionCount += 1;
   draft.actions.slots[event.tierKey].occupants[event.slotIndex] = null;
   if (event.occupant.cooldownDays > 0) {
     const state = draft.actions.departmentStates[event.occupant.deptId];

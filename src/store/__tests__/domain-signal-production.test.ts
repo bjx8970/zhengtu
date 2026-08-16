@@ -13,6 +13,7 @@ import { processCascadeSignals } from '../reducers/event-reducer';
 import { getConfigLoader } from '../../config/loader';
 import { createInitialState, createTestStore } from '../game-store';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
+import { CURRENT_CONTENT_VERSION } from '../../types/save';
 
 function eventDefinition(
   id: string,
@@ -135,7 +136,7 @@ describe('domain signal production', () => {
       originInstitutionId: state.career.appointment.institutionId,
       originRegionId: state.career.appointment.regionId,
       executableSnapshot: {
-        contentVersion: '2026.07.8',
+        contentVersion: CURRENT_CONTENT_VERSION,
         department: { id: department.id, name: department.name },
         action: { id: 'staff_meeting' },
         attributeBounds: { competence: [0, 100] },

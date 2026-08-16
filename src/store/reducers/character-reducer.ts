@@ -10,6 +10,7 @@ import type { PlayerSave } from '../../types/player';
 import type { NewGamePayload } from '../../types/actions';
 import { getConfigLoader } from '../../config/loader';
 import { clampAttr } from '../../utils/math';
+import { createAppointmentProbation } from '../../engine/career/probation-evaluation';
 
 /**
  * 处理 LOAD_SAVE 动作。
@@ -115,7 +116,10 @@ export function reduceNewGame(
       appointmentType: 'substantive',
       appointmentReason: 'initial_assignment',
       sourceOpportunityId: null,
-      probationEndsAtDay: 360,
+      status: 'active',
+      endedAtDay: null,
+      endReason: null,
+      probation: createAppointmentProbation(0, gameCfg.probation),
     };
     draft.career.experiences = [
       {

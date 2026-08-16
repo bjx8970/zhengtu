@@ -128,6 +128,7 @@ function reduceAdvanceTimeInternal(draft: PlayerSave, payload: AdvanceTimePayloa
     }
 
     const processed = processTimelineNodes(draft, remainingNodes, rng, idFactory, definitions);
+    if (processed.terminal) break;
     if (processed.interrupted) {
       saveContinuation(draft, processed.remainingNodes);
       break;
@@ -151,6 +152,7 @@ function processCurrentDayBeforeAdvance(
     return false;
   }
   const processed = processTimelineNodes(draft, nodes, rng, idFactory, definitions);
+  if (processed.terminal) return false;
   if (processed.interrupted) {
     saveContinuation(draft, processed.remainingNodes);
     return false;

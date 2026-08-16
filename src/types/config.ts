@@ -19,6 +19,7 @@ import type {
   AppointmentReason,
   AppointmentType,
   CareerOpportunityType,
+  CareerRestrictionType,
 } from '../domain/career/types';
 
 /** 单类任职可计入职业履历资格的配置规则。 */
@@ -215,6 +216,23 @@ export interface PromotionConfig {
   };
 }
 
+/** 新录用公务员试用期配置。 */
+export interface ProbationConfig {
+  durationDays: number;
+  minimumCompletedActions: number;
+  passScoreThreshold: number;
+  extensionScoreThreshold: number;
+  extensionDays: number;
+  maxExtensions: number;
+  attributeWeights: {
+    competence: number;
+    diligence: number;
+    integrity: number;
+    stability: number;
+  };
+  disqualifyingRestrictionTypes: CareerRestrictionType[];
+}
+
 /** 全局游戏配置常量（从 constants.json 读取） */
 export interface GameConfig {
   slotTiers: SlotTiersConfig;
@@ -275,6 +293,8 @@ export interface GameConfig {
   };
   /** 晋升引擎阈值配置 */
   promotion: PromotionConfig;
+  /** 新录用公务员试用期生命周期配置。 */
+  probation: ProbationConfig;
   /** 月度防汛风险自动变化参数 */
   floodRiskByMonth: { rainyMonths: number[]; monthlyRise: number; monthlyFall: number };
 }

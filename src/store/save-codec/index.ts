@@ -1,9 +1,9 @@
 /**
- * 存档严格解码器（Schema 8）
+ * 存档严格解码器（Schema 9）
  *
- * 只接受当前版本（Schema 7）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 9）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -77,6 +77,59 @@ export function backupIncompatibleSave(rawData: string): string {
 
 // ===== Schema 2 Zod 验证（领域枚举来自 domain/ 单一事实来源） =====
 
+/** 试用期单次评估审计 Schema。 */
+const ProbationEvaluationRecordSchema = z
+  .object({
+    evaluatedAtDay: z.number().int().nonnegative(),
+    outcome: z.enum(['passed', 'extended', 'failed']),
+    score: z.number().min(0).max(100),
+    completedActionCount: z.number().int().nonnegative(),
+    unmetRequirements: z.array(z.string().min(1)),
+    previousEndsAtDay: z.number().int().nonnegative(),
+    nextEndsAtDay: z.number().int().nonnegative().nullable(),
+  })
+  .strict();
+
+/** 任职试用期生命周期 Schema。 */
+const AppointmentProbationSchema = z
+  .object({
+    status: z.enum(['active', 'passed', 'failed']),
+    startedAtDay: z.number().int().nonnegative(),
+    endsAtDay: z.number().int().nonnegative(),
+    extensionCount: z.number().int().nonnegative(),
+    completedActionCount: z.number().int().nonnegative(),
+    resolvedAtDay: z.number().int().nonnegative().nullable(),
+    outcomeReason: z.string().min(1).nullable(),
+    evaluations: z.array(ProbationEvaluationRecordSchema),
+  })
+  .strict()
+  .superRefine((probation, ctx) => {
+    if (probation.endsAtDay < probation.startedAtDay)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Probation end precedes start' });
+    const active = probation.status === 'active';
+    if (active && probation.resolvedAtDay !== null)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Active probation cannot have a resolution date',
+      });
+    if (!active && (probation.resolvedAtDay === null || probation.outcomeReason === null))
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Terminal probation requires resolution metadata',
+      });
+    const latestEvaluation = probation.evaluations[probation.evaluations.length - 1];
+    if (active && latestEvaluation && latestEvaluation.outcome !== 'extended')
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Active probation can only retain an extension evaluation',
+      });
+    if (active && !latestEvaluation && probation.outcomeReason !== null)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Initial probation cannot have an outcome reason',
+      });
+  });
+
 /** CurrentAppointment Schema */
 const CurrentAppointmentSchema = z
   .object({
@@ -91,9 +144,62 @@ const CurrentAppointmentSchema = z
     appointmentType: z.enum(APPOINTMENT_TYPES),
     appointmentReason: z.enum(APPOINTMENT_REASONS),
     sourceOpportunityId: z.string().nullable(),
-    probationEndsAtDay: z.number().nullable(),
+    status: z.enum(['active', 'ended']),
+    endedAtDay: z.number().int().nonnegative().nullable(),
+    endReason: z
+      .enum([
+        'promotion',
+        'lateral_transfer',
+        'rotation',
+        'temporary_assignment',
+        'secondment',
+        'demotion',
+        'retirement',
+        'probation_failed',
+      ])
+      .nullable(),
+    probation: AppointmentProbationSchema.nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine((appointment, ctx) => {
+    if (appointment.probation && appointment.probation.startedAtDay !== appointment.startedAtDay)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Probation start must match appointment start',
+      });
+    const activeHasEndFacts =
+      appointment.status === 'active' &&
+      (appointment.endedAtDay !== null || appointment.endReason !== null);
+    const endedMissingEndFacts =
+      appointment.status === 'ended' &&
+      (appointment.endedAtDay === null || appointment.endReason === null);
+    if (activeHasEndFacts || endedMissingEndFacts)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Appointment end facts must match appointment status',
+      });
+    if (appointment.endedAtDay !== null && appointment.endedAtDay < appointment.startedAtDay)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Appointment cannot end before it starts',
+      });
+    if (appointment.probation?.status === 'failed') {
+      if (
+        appointment.status !== 'ended' ||
+        appointment.endReason !== 'probation_failed' ||
+        appointment.endedAtDay !== appointment.probation.resolvedAtDay
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Failed probation must terminate its appointment on the resolution day',
+        });
+    } else if (appointment.endReason === 'probation_failed') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Probation failure end reason requires a failed probation',
+      });
+    }
+  });
 
 /** CareerExperience Schema */
 const CareerExperienceSchema = z
@@ -122,6 +228,7 @@ const CareerExperienceSchema = z
         'secondment',
         'demotion',
         'retirement',
+        'probation_failed',
       ])
       .nullable(),
     assessmentResults: z.array(
@@ -391,7 +498,45 @@ const CareerStateSchema = z
     activeProcess: CareerProcessSchema.nullable(),
     completedProcesses: z.array(CareerProcessSchema).default([]),
   })
-  .strict();
+  .strict()
+  .superRefine((career, ctx) => {
+    const matchingExperiences = career.experiences.filter(
+      (experience) => experience.appointmentId === career.appointment.appointmentId,
+    );
+    const openExperiences = career.experiences.filter(
+      (experience) => experience.endedAtDay === null,
+    );
+    if (matchingExperiences.length !== 1)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['experiences'],
+        message: 'Appointment must have exactly one matching career experience',
+      });
+    const matching = matchingExperiences[0];
+    if (career.appointment.status === 'active') {
+      if (
+        openExperiences.length !== 1 ||
+        openExperiences[0]?.appointmentId !== career.appointment.appointmentId ||
+        matching?.endReason !== null
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['experiences'],
+          message: 'Active appointment must be represented by the only open experience',
+        });
+      return;
+    }
+    if (
+      openExperiences.length !== 0 ||
+      matching?.endedAtDay !== career.appointment.endedAtDay ||
+      matching?.endReason !== career.appointment.endReason
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['experiences'],
+        message: 'Ended appointment must match its closed career experience',
+      });
+  });
 
 /** PolicyPhaseDefinition Schema */
 const PolicyPhaseDefinitionSchema = z
@@ -811,6 +956,12 @@ const CharacterStateSchema = z
 const TimelineContinuationNodeSchema = z.discriminatedUnion('type', [
   z
     .object({
+      type: z.literal('probation_evaluation'),
+      absoluteDay: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('career_opportunity_expiry'),
       absoluteDay: z.number().int().nonnegative(),
     })
@@ -861,13 +1012,14 @@ const TIMELINE_NODE_PRIORITY: Record<
   z.infer<typeof TimelineContinuationNodeSchema>['type'],
   number
 > = {
-  career_opportunity_expiry: 0,
-  scheduled_event_activation: 1,
-  event_deadline: 2,
-  monthly_settlement: 3,
-  annual_assessment: 4,
-  political_cycle: 5,
-  retirement_check: 6,
+  probation_evaluation: 0,
+  career_opportunity_expiry: 1,
+  scheduled_event_activation: 2,
+  event_deadline: 3,
+  monthly_settlement: 4,
+  annual_assessment: 5,
+  political_cycle: 6,
+  retirement_check: 7,
 };
 
 const GameTimeStateSchema = z
@@ -1441,6 +1593,57 @@ export function migrateSchema7To8(prev: Record<string, unknown>): Record<string,
       : [];
   }
   migrated.schemaVersion = 8;
+  migrated.contentVersion = '2026.07.8';
+  return migrated;
+}
+
+/**
+ * 将 Schema 8 存档迁移至 Schema 9。
+ *
+ * 旧版仅有 `probationEndsAtDay`：数值表示尚未消费的活动试用期，null 表示
+ * 本次任职没有试用期。迁移后用显式状态与空审计记录表达同一事实。
+ *
+ * @param prev Schema 8 SaveEnvelope
+ * @returns Schema 9 SaveEnvelope
+ */
+export function migrateSchema8To9(prev: Record<string, unknown>): Record<string, unknown> {
+  const migrated = structuredClone(prev);
+  if (migrated.contentVersion !== '2026.07.8')
+    throw new Error(`Schema 8 content version "${String(migrated.contentVersion)}" is unsupported`);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const career = state?.career as Record<string, unknown> | undefined;
+  const appointment = career?.appointment as Record<string, unknown> | undefined;
+  if (!appointment || typeof appointment.startedAtDay !== 'number')
+    throw new Error('Schema 8 save is missing a valid appointment');
+  const legacyEnd = appointment.probationEndsAtDay;
+  const alreadyExpanded = appointment.probation;
+  if (
+    legacyEnd === undefined &&
+    alreadyExpanded !== null &&
+    (typeof alreadyExpanded !== 'object' || Array.isArray(alreadyExpanded))
+  )
+    throw new Error('Schema 8 appointment has invalid expanded probation data');
+  if (legacyEnd !== undefined && legacyEnd !== null && typeof legacyEnd !== 'number')
+    throw new Error('Schema 8 appointment has an invalid probation end');
+  if (legacyEnd !== undefined)
+    appointment.probation =
+      legacyEnd === null
+        ? null
+        : {
+            status: 'active',
+            startedAtDay: appointment.startedAtDay,
+            endsAtDay: legacyEnd,
+            extensionCount: 0,
+            completedActionCount: 0,
+            resolvedAtDay: null,
+            outcomeReason: null,
+            evaluations: [],
+          };
+  delete appointment.probationEndsAtDay;
+  appointment.status = 'active';
+  appointment.endedAtDay = null;
+  appointment.endReason = null;
+  migrated.schemaVersion = 9;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
@@ -1450,12 +1653,8 @@ export function migrateSchema7To8(prev: Record<string, unknown>): Record<string,
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
- * - Schema 2：链式迁移至 Schema 7；
- * - Schema 3：链式迁移至 Schema 7；
- * - Schema 4：链式迁移至 Schema 7；
- * - Schema 5：链式迁移至 Schema 7；
- * - Schema 6：迁移至 Schema 7；
- * - 当前版本（Schema 7）：直接解码；
+ * - Schema 2–8：按版本顺序链式迁移至 Schema 9；
+ * - 当前版本（Schema 9）：直接解码；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
@@ -1495,23 +1694,31 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
   let target: unknown = data;
   try {
     if (obj.schemaVersion === 2) {
-      target = migrateSchema7To8(
-        migrateSchema6To7(
-          migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj)))),
+      target = migrateSchema8To9(
+        migrateSchema7To8(
+          migrateSchema6To7(
+            migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj)))),
+          ),
         ),
       );
     } else if (obj.schemaVersion === 3) {
-      target = migrateSchema7To8(
-        migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(obj)))),
+      target = migrateSchema8To9(
+        migrateSchema7To8(
+          migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(obj)))),
+        ),
       );
     } else if (obj.schemaVersion === 4) {
-      target = migrateSchema7To8(migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(obj))));
+      target = migrateSchema8To9(
+        migrateSchema7To8(migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(obj)))),
+      );
     } else if (obj.schemaVersion === 5) {
-      target = migrateSchema7To8(migrateSchema6To7(migrateSchema5To6(obj)));
+      target = migrateSchema8To9(migrateSchema7To8(migrateSchema6To7(migrateSchema5To6(obj))));
     } else if (obj.schemaVersion === 6) {
-      target = migrateSchema7To8(migrateSchema6To7(obj));
+      target = migrateSchema8To9(migrateSchema7To8(migrateSchema6To7(obj)));
     } else if (obj.schemaVersion === 7) {
-      target = migrateSchema7To8(obj);
+      target = migrateSchema8To9(migrateSchema7To8(obj));
+    } else if (obj.schemaVersion === 8) {
+      target = migrateSchema8To9(obj);
     }
   } catch (e) {
     return {

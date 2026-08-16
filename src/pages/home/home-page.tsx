@@ -114,6 +114,30 @@ export function HomePage() {
   /** 通用提醒列表（后续扩展只需追加条件） */
   const alerts = createMemo<AlertItem[]>(() => {
     const items: AlertItem[] = [];
+    const probation = state.career.appointment.probation;
+    if (probation?.status === 'active') {
+      const remaining = Math.max(probation.endsAtDay - state.time.totalDaysPlayed, 0);
+      items.push({
+        id: 'probation-active',
+        level: remaining <= 30 ? 'warning' : 'info',
+        message: `${probation.extensionCount > 0 ? '延期试用' : '录用试用'}进行中，距转正评估还有 ${remaining} 天。`,
+        action: { label: '查看条件', route: '/career' },
+      });
+    } else if (probation?.status === 'passed') {
+      items.push({
+        id: 'probation-passed',
+        level: 'info',
+        message: probation.outcomeReason ?? '试用期已通过。',
+        action: { label: '查看记录', route: '/career' },
+      });
+    } else if (probation?.status === 'failed') {
+      items.push({
+        id: 'probation-failed',
+        level: 'danger',
+        message: probation.outcomeReason ?? '试用期未通过，本次任职已终止。',
+        action: { label: '查看原因', route: '/career' },
+      });
+    }
     if (kpiResult()?.indicators.some((i) => i.completionRate < 0.5)) {
       items.push({
         id: 'kpi-low',
@@ -258,6 +282,7 @@ export function HomePage() {
                 <button
                   data-testid={`advance-${g.granularity}`}
                   class={i() === 2 ? 'btn btn-primary flex-1' : 'btn flex-1'}
+                  disabled={state.career.appointment.status === 'ended'}
                   onClick={() => {
                     setLastAdvance(true);
                     dispatch({ type: 'ADVANCE_TIME', granularity: g.granularity });

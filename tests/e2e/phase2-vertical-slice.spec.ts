@@ -111,6 +111,8 @@ function seedYearEnd(state: JsonRecord, totalDaysPlayed = 359): void {
   time.month = 12;
   time.day = 30;
   time.totalDaysPlayed = totalDaysPlayed;
+  const career = asRecord(state.career, 'career');
+  asRecord(career.appointment, 'appointment').probation = null;
 }
 
 function seedHighAssessmentPreconditions(state: JsonRecord): void {

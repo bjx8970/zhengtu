@@ -32,6 +32,8 @@ export * from './career/civil-service-rank-progression';
 export * from './career/career-opportunity-lifecycle';
 export * from './career/career-opportunity-eligibility';
 export * from './career/career-experience-analysis';
+export * from './career/probation-evaluation';
+export * from './career/probation-progress';
 export * from './career/opportunity-orchestrator';
 export * from './career/philosophy-imbalance';
 export * from './career/spectrum-constraint';

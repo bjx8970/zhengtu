@@ -400,6 +400,35 @@ const ConstantsSchema = z.object({
       politicalCapitalBonusOnSuccess: z.number().min(0),
     }),
   }),
+  probation: z
+    .object({
+      durationDays: z.number().int().positive(),
+      minimumCompletedActions: z.number().int().nonnegative(),
+      passScoreThreshold: z.number().min(0).max(100),
+      extensionScoreThreshold: z.number().min(0).max(100),
+      extensionDays: z.number().int().positive(),
+      maxExtensions: z.number().int().nonnegative(),
+      attributeWeights: z
+        .object({
+          competence: z.number().min(0).max(1),
+          diligence: z.number().min(0).max(1),
+          integrity: z.number().min(0).max(1),
+          stability: z.number().min(0).max(1),
+        })
+        .refine(
+          (weights) =>
+            Math.abs(
+              weights.competence + weights.diligence + weights.integrity + weights.stability - 1,
+            ) < 0.001,
+          { message: 'probation.attributeWeights 总和必须为 1.0' },
+        ),
+      disqualifyingRestrictionTypes: z.array(
+        z.enum(['rank_advancement_freeze', 'appointment_selection_freeze', 'disciplinary_action']),
+      ),
+    })
+    .refine((probation) => probation.extensionScoreThreshold <= probation.passScoreThreshold, {
+      message: 'probation.extensionScoreThreshold 不能高于 passScoreThreshold',
+    }),
 });
 
 const ExtremeActionSchema = z.object({
