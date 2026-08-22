@@ -733,6 +733,34 @@ describe('Schema 2 存档', () => {
       { year: 2014, score: 85, tier: '称职' },
       { year: 2015, score: 90, tier: '优秀' },
     ];
+    state.events.history.push(
+      {
+        eventId: 'flood_preparation_metrics',
+        instanceId: 'legacy-flood-evidence',
+        finalStatus: 'resolved',
+        triggeredAtDay: 800,
+        completedAtDay: 800,
+        sourceKey: 'legacy-flood-evidence',
+        chainInstanceId: null,
+        titleSnapshot: '防汛准备指标形成',
+        chosenOptionId: null,
+        chosenOptionLabel: null,
+        appliedEffects: [],
+      },
+      {
+        eventId: 'industrial_park_progress_crisis',
+        instanceId: 'legacy-park-evidence',
+        finalStatus: 'resolved',
+        triggeredAtDay: 1100,
+        completedAtDay: 1100,
+        sourceKey: 'legacy-park-evidence',
+        chainInstanceId: null,
+        titleSnapshot: '产业园区推进危机',
+        chosenOptionId: 'rectification_plan',
+        chosenOptionLabel: '制定整改方案',
+        appliedEffects: [],
+      },
+    );
     Object.assign(state.time, {
       year: 2016,
       month: 1,
@@ -757,6 +785,62 @@ describe('Schema 2 存档', () => {
       { year: 2014, score: 85, tier: '称职' },
       { year: 2015, score: 90, tier: '优秀' },
     ]);
+    expect(
+      result.state?.career.opportunities.find(
+        (opportunity) => opportunity.definitionId === 'township_chief_leadership_vacancy',
+      ),
+    ).toMatchObject({
+      status: 'available',
+      appearedAtDay: 1260,
+      expiresAtDay: 1530,
+      source: { sourceId: 'assessment:2015' },
+    });
+
+    const lateEvidenceState = structuredClone(state);
+    const lateParkEvidence = lateEvidenceState.events.history.find(
+      (record) => record.eventId === 'industrial_park_progress_crisis',
+    );
+    if (!lateParkEvidence) throw new Error('Expected industrial park evidence');
+    lateParkEvidence.triggeredAtDay = 1300;
+    lateParkEvidence.completedAtDay = 1300;
+    Object.assign(lateEvidenceState.time, {
+      year: 2016,
+      month: 7,
+      day: 1,
+      totalDaysPlayed: 1440,
+    });
+    const lateEvidenceResult = decodeCurrentSave(
+      JSON.stringify({
+        ...wrapSaveEnvelope(lateEvidenceState),
+        contentVersion: '2026.08.5',
+      }),
+    );
+    expect(lateEvidenceResult.success).toBe(true);
+    expect(
+      lateEvidenceResult.state?.career.opportunities.some(
+        (opportunity) => opportunity.definitionId === 'township_chief_leadership_vacancy',
+      ),
+    ).toBe(false);
+
+    const expiredState = structuredClone(state);
+    Object.assign(expiredState.time, {
+      year: 2016,
+      month: 10,
+      day: 2,
+      totalDaysPlayed: 1531,
+    });
+    const expiredResult = decodeCurrentSave(
+      JSON.stringify({
+        ...wrapSaveEnvelope(expiredState),
+        contentVersion: '2026.08.5',
+      }),
+    );
+    expect(expiredResult.success).toBe(true);
+    expect(
+      expiredResult.state?.career.opportunities.some(
+        (opportunity) => opportunity.definitionId === 'township_chief_leadership_vacancy',
+      ),
+    ).toBe(false);
   });
 
   it('Schema 9 旧内容迁移在覆盖内容版本前清除预置未来职数', () => {

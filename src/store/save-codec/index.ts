@@ -45,6 +45,7 @@ import {
 } from '../../domain/events/definition';
 import { getConfigLoader } from '../../config/loader';
 import { PersonalTaskTemplateSchema } from '../../config/schemas';
+import { processCareerOpportunitySignal } from '../../engine/career/opportunity-orchestrator';
 import { createActionExecutableSnapshot } from '../action-executable-snapshot';
 
 /** 不兼容存档备份的 localStorage key 前缀 */
@@ -1896,6 +1897,87 @@ function backfillCareerExperienceAssessments(
   }
 }
 
+function restoreMissedTownshipChiefOpportunity(
+  state: Record<string, unknown>,
+  currentDay: number,
+): void {
+  const typedState = state as unknown as PlayerSave;
+  const appointment = typedState.career.appointment;
+  if (appointment.leadershipRank !== 'township_deputy' || appointment.status !== 'active') return;
+  const experience = typedState.career.experiences.find(
+    (item) => item.appointmentId === appointment.appointmentId && item.endedAtDay === null,
+  );
+  if (!experience) return;
+  const time = typedState.time;
+  const currentYearStartDay = currentDay - ((time.month - 1) * 30 + time.day - 1);
+  const qualified = experience.assessmentResults
+    .filter((assessment) => assessment.tier === '优秀' || assessment.tier === '称职')
+    .map((assessment) => ({
+      assessment,
+      absoluteDay: currentYearStartDay + (assessment.year + 1 - time.year) * 360,
+    }))
+    .filter(
+      (item) =>
+        item.absoluteDay >= experience.startedAtDay &&
+        item.absoluteDay <= currentDay &&
+        (experience.endedAtDay === null || item.absoluteDay <= experience.endedAtDay),
+    )
+    .sort((left, right) => left.absoluteDay - right.absoluteDay);
+  const source = qualified[1];
+  if (!source) return;
+  const expiresAtDay = source.absoluteDay + 270;
+  if (currentDay >= expiresAtDay) return;
+  const sourceId = `assessment:${source.assessment.year}`;
+  if (
+    typedState.career.opportunities.some(
+      (opportunity) =>
+        opportunity.definitionId === 'township_chief_leadership_vacancy' &&
+        opportunity.source.sourceId === sourceId,
+    )
+  )
+    return;
+
+  // 历史信号只能读取当时已经完成的治理证据和任内考核，不能借用迁移日之后的成果。
+  const historicalState = structuredClone(typedState);
+  historicalState.events.history = historicalState.events.history.filter(
+    (record) => record.completedAtDay <= source.absoluteDay,
+  );
+  const historicalExperience = historicalState.career.experiences.find(
+    (item) => item.appointmentId === appointment.appointmentId && item.endedAtDay === null,
+  );
+  if (!historicalExperience) return;
+  historicalExperience.assessmentResults = historicalExperience.assessmentResults.filter(
+    (assessment) => assessment.year <= source.assessment.year,
+  );
+  const signal = {
+    signalId: `content-migration-assessment-${appointment.appointmentId}-${source.assessment.year}`,
+    signalType: 'assessment.completed' as const,
+    occurredAtDay: source.absoluteDay,
+    data: {
+      year: source.assessment.year,
+      score: source.assessment.score,
+      tier: source.assessment.tier,
+    },
+  };
+  const loader = getConfigLoader();
+  const result = processCareerOpportunitySignal({
+    state: historicalState,
+    signal,
+    currentDay: source.absoluteDay,
+    definitions: loader
+      .getCareerOpportunityDefinitionsBySignal('assessment.completed')
+      .filter((definition) => definition.id === 'township_chief_leadership_vacancy'),
+    positions: loader.getAllPositions(),
+    institutions: loader.getAllInstitutions(),
+    daysPerYear: 360,
+    careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
+    idFactory: () =>
+      `content-migration-chief-${appointment.appointmentId}-${source.assessment.year}`,
+  });
+  const restored = result.created[0];
+  if (restored) typedState.career.opportunities.push(restored);
+}
+
 /**
  * 取消旧版宽松正职机会并升级乡镇正职内容语义。
  *
@@ -1968,6 +2050,7 @@ export function migrateSchema10TownshipChiefContent(
       career.activeProcess = null;
     }
   }
+  restoreMissedTownshipChiefOpportunity(state, currentDay);
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
