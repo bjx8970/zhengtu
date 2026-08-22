@@ -9,6 +9,8 @@ import type { CareerOpportunity } from '../domain/career/state';
 import type { CareerExperienceQualificationRules } from './config';
 import type { PlayerSave } from './player';
 import type { PositionConfigV2 } from './position-v2';
+import type { ConditionExpression } from '../domain/conditions';
+import type { CareerOpportunityDefinition } from './config';
 
 /** 职业机会接受或任职复核失败原因。 */
 export type CareerOpportunityEligibilityFailure =
@@ -47,6 +49,30 @@ export interface CareerSelectionSettlement {
   outcome: 'passed' | 'failed' | 'continued';
   score: number | null;
   detail: string;
+}
+
+/** 配置驱动的单项职业机会准备度。 */
+export interface CareerOpportunityReadinessItem {
+  phase: 'generation' | 'acceptance';
+  condition: ConditionExpression;
+  satisfied: boolean;
+  detail: string;
+}
+
+/** 职业机会定义准备度输入。 */
+export interface CareerOpportunityDefinitionReadinessInput {
+  definition: CareerOpportunityDefinition;
+  state: Readonly<PlayerSave>;
+  currentDay: number;
+  daysPerYear: number;
+  careerExperienceQualificationRules: Readonly<CareerExperienceQualificationRules>;
+}
+
+/** 职业机会定义准备度结果。 */
+export interface CareerOpportunityDefinitionReadiness {
+  readyToGenerate: boolean;
+  readyToAccept: boolean;
+  items: CareerOpportunityReadinessItem[];
 }
 
 /** 公务员职级晋升资格失败原因。 */

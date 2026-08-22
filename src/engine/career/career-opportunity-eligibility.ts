@@ -77,7 +77,11 @@ function evaluateOpportunityEligibility(
   const { opportunity, state, currentDay, targetPosition } = input;
   if (requireAvailable && opportunity.status !== 'available')
     return { eligible: false, failure: 'opportunity_unavailable' };
-  if (opportunity.expiresAtDay !== null && opportunity.expiresAtDay <= currentDay)
+  if (
+    requireAvailable &&
+    opportunity.expiresAtDay !== null &&
+    opportunity.expiresAtDay <= currentDay
+  )
     return { eligible: false, failure: 'opportunity_expired' };
   if (!satisfiesConditions(opportunity.eligibilityConditions, input))
     return { eligible: false, failure: 'opportunity_conditions' };

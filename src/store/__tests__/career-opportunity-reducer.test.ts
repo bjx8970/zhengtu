@@ -8,6 +8,7 @@ import type {
   TrainingCareerOpportunity,
 } from '../../domain/career/state';
 import * as effectExecutor from '../../engine/events/effect-executor';
+import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
 
 function createAvailableOpportunity(id = 'opportunity-1'): AppointmentCareerOpportunity {
   return {
@@ -310,6 +311,43 @@ describe('career opportunity reducer', () => {
       status: 'failed',
       stageResults: [{ stage: 'eligibility_review', outcome: 'failed' }],
     });
+  });
+
+  it('continues an accepted selection across its opportunity deadline and save restore', () => {
+    const initial = createInitialState();
+    const opportunity = createAvailableOpportunity('deadline-opportunity');
+    opportunity.expiresAtDay = 1;
+    initial.career.opportunities = [opportunity];
+    const beforeDeadline = createTestStore(initial);
+    let sequence = 0;
+    const ids = () => `deadline-id-${sequence++}`;
+    beforeDeadline.dispatch({
+      type: 'ACCEPT_CAREER_OPPORTUNITY',
+      opportunityId: opportunity.id,
+      _idFactory: ids,
+    });
+    beforeDeadline.dispatch({ type: 'ADVANCE_TIME', granularity: 'day', _idFactory: ids });
+    expect(beforeDeadline.getRawState().time.totalDaysPlayed).toBe(1);
+    expect(beforeDeadline.getRawState().career.opportunities[0]?.status).toBe('in_process');
+    const decoded = decodeCurrentSave(
+      JSON.stringify(wrapSaveEnvelope(beforeDeadline.getRawState())),
+    );
+    if (!decoded.success || !decoded.state) throw new Error('Expected restored selection save');
+    const restored = createTestStore(decoded.state);
+
+    for (let step = 0; step < 6; step++)
+      restored.dispatch({
+        type: 'ADVANCE_CAREER_PROCESS',
+        opportunityId: opportunity.id,
+        _idFactory: ids,
+        _rng: () => 0,
+      });
+
+    expect(restored.getRawState().career.opportunities[0]).toMatchObject({
+      status: 'resolved',
+      finalOutcome: 'appointed',
+    });
+    expect(restored.getRawState().career.appointment.positionId).toBe('admin_l2_0');
   });
 
   it('allows selection stages but not final appointment while a blocking event is active', () => {

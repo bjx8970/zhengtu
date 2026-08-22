@@ -9,7 +9,6 @@ import { createMemo, For, Show } from 'solid-js';
 import { getConfigLoader } from '../../config/loader';
 import type { CivilServiceRankProgressionRule } from '../../config/schemas';
 import {
-  CIVIL_SERVICE_RANKS,
   CIVIL_SERVICE_RANK_LABELS,
   INSTITUTION_LEVEL_LABELS,
   LEADERSHIP_RANK_LABELS,
@@ -21,6 +20,7 @@ import {
 import { calculateCareerServiceDays } from '../../engine/career/career-service';
 import { inspectProbationProgress } from '../../engine/career/probation-progress';
 import { evaluateCareerOpportunityAcceptanceEligibility } from '../../engine/career/career-opportunity-eligibility';
+import { evaluateCareerOpportunityDefinitionReadiness } from '../../engine/career/career-opportunity-readiness';
 import type { CareerOpportunityEligibilityFailure } from '../../types/career';
 import { useGameStore } from '../../store/game-store';
 import { PageHeader } from '../../components/page-header';
@@ -140,39 +140,18 @@ export function CareerPage() {
     });
   });
   const deputyReadiness = createMemo(() => {
-    const qualifiedAssessments = state.assessments.annualAssessments.filter(
-      (item) => item.tier === '优秀' || item.tier === '称职',
-    ).length;
-    const latestAssessment = state.assessments.annualAssessments.at(-1);
-    const rankReady =
-      CIVIL_SERVICE_RANKS.indexOf(state.career.civilServiceRank) >=
-      CIVIL_SERVICE_RANKS.indexOf('clerk_1');
-    const restrictions = activeRestrictions();
-    return [
-      {
-        label: '录用试用期已通过',
-        satisfied: state.career.appointment.probation?.status === 'passed',
-      },
-      { label: '当前没有领导职务', satisfied: state.career.appointment.leadershipRank === 'none' },
-      { label: '公务员职级达到一级科员', satisfied: rankReady },
-      { label: `累计服务满 720 天（当前 ${serviceDays()} 天）`, satisfied: serviceDays() >= 720 },
-      {
-        label: `至少 2 次称职考核（当前 ${qualifiedAssessments} 次）`,
-        satisfied: qualifiedAssessments >= 2,
-      },
-      {
-        label: '完成上级交办专项攻坚',
-        satisfied: state.world.facts.assigned_project_delivered === true,
-      },
-      { label: '最近一次考核分数不低于 60', satisfied: (latestAssessment?.score ?? 0) >= 60 },
-      {
-        label: '当前无任职选拔冻结或处分',
-        satisfied: !restrictions.some(
-          (item) =>
-            item.type === 'appointment_selection_freeze' || item.type === 'disciplinary_action',
-        ),
-      },
-    ];
+    const definition = getConfigLoader()
+      .getAllCareerOpportunityDefinitions()
+      .find((item) => item.id === 'township_deputy_leadership_vacancy');
+    if (!definition) return null;
+    const config = getConfigLoader().getGameConfig();
+    return evaluateCareerOpportunityDefinitionReadiness({
+      definition,
+      state,
+      currentDay: currentDay(),
+      daysPerYear: config.daysPerMonth * config.monthsPerYear,
+      careerExperienceQualificationRules: getConfigLoader().getCareerExperienceQualificationRules(),
+    });
   });
   const latestAppointedOpportunity = createMemo(() =>
     [...state.career.opportunities]
@@ -404,10 +383,10 @@ export function CareerPage() {
                 <p class="text-xs secondary-text">
                   合格年度考核触发选拔窗口；机会出现后仍须满足服务年限，并先完成在途工作。
                 </p>
-                <For each={deputyReadiness()}>
+                <For each={deputyReadiness()?.items ?? []}>
                   {(requirement) => (
                     <p class="text-sm secondary-text">
-                      {requirement.satisfied ? '✓' : '○'} {requirement.label}
+                      {requirement.satisfied ? '✓' : '○'} {requirement.detail}
                     </p>
                   )}
                 </For>
