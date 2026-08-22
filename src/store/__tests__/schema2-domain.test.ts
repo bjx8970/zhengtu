@@ -747,7 +747,7 @@ describe('Schema 2 存档', () => {
 
     const migratedOnce = migrateSchema10TownshipChiefContent(legacyEnvelope);
     expect(migrateSchema10TownshipChiefContent(migratedOnce)).toEqual(migratedOnce);
-    const result = decodeCurrentSave(JSON.stringify(migratedOnce));
+    const result = decodeCurrentSave(JSON.stringify(legacyEnvelope));
 
     expect(result.success).toBe(true);
     expect(result.state?.career.experiences[0]?.assessmentResults).toEqual([
