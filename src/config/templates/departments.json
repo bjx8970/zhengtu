@@ -137,6 +137,11 @@
         "budgetDelta": 25,
         "effects": [
           { "target": "dept.kpi.livelihood_score", "operation": "add", "value": 4 },
+          {
+            "target": "dept.kpi.social_security_coverage",
+            "operation": "add",
+            "value": 5
+          },
           { "target": "player.charisma", "operation": "add", "value": 1 }
         ]
       }
@@ -156,7 +161,10 @@
         "category": "routine",
         "cooldownDays": 0,
         "budgetDelta": 20,
-        "effects": [{ "target": "dept.kpi.safety", "operation": "add", "value": 8 }]
+        "effects": [
+          { "target": "dept.kpi.safety", "operation": "add", "value": 8 },
+          { "target": "dept.kpi.resident_satisfaction", "operation": "add", "value": 5 }
+        ]
       },
       {
         "id": "emergency_drill",
@@ -200,7 +208,10 @@
         "category": "minor",
         "cooldownDays": 7,
         "budgetDelta": 35,
-        "effects": [{ "target": "dept.kpi.agricultural_output", "operation": "add", "value": 7 }]
+        "effects": [
+          { "target": "dept.kpi.agricultural_output", "operation": "add", "value": 7 },
+          { "target": "dept.kpi.data_accuracy", "operation": "add", "value": 5 }
+        ]
       },
       {
         "id": "rural_infrastructure",

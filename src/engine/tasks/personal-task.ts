@@ -16,7 +16,7 @@ import { PERSONAL_TASK_LEDGER_ID } from '../../types/player';
 import type { PersonalTaskStartInput, StartActionResult } from '../../types/game';
 import type { ActionExecutableSnapshot } from '../../types/player';
 import type { CivilServiceRank, LeadershipRank } from '../../domain/career/types';
-import { CIVIL_SERVICE_RANKS } from '../../domain/career/types';
+import { isCivilServiceRankAtLeast } from '../../domain/career/types';
 
 const TIER_ORDER: SlotTierKey[] = ['primary', 'secondary', 'reserve'];
 
@@ -57,9 +57,8 @@ export function describePersonalTaskAvailability(
     return { available: false, reason: '当前职务阶段不可承接' };
 
   if (prerequisites.civilServiceRankMin) {
-    const current = CIVIL_SERVICE_RANKS.indexOf(context.civilServiceRank);
-    const required = CIVIL_SERVICE_RANKS.indexOf(prerequisites.civilServiceRankMin);
-    if (current < required) return { available: false, reason: '职级尚未达到要求' };
+    if (!isCivilServiceRankAtLeast(context.civilServiceRank, prerequisites.civilServiceRankMin))
+      return { available: false, reason: '职级尚未达到要求' };
   }
 
   if (

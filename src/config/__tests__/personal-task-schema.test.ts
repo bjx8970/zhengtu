@@ -37,4 +37,10 @@ describe('PersonalTaskTemplateArraySchema', () => {
       'once 任务不允许并行',
     );
   });
+
+  it('拒绝负数预算成本，避免以任务伪造无限预算 producer', () => {
+    expect(PersonalTaskTemplateArraySchema.safeParse([makeTask({ budgetDelta: -1 })]).success).toBe(
+      false,
+    );
+  });
 });
