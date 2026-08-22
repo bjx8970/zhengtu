@@ -236,6 +236,82 @@ describe('career opportunity reducer', () => {
     });
   });
 
+  it('blocks acceptance and final appointment while personal work is running', () => {
+    const initial = createInitialState();
+    const opportunity = createAvailableOpportunity();
+    initial.career.opportunities = [opportunity];
+    const acceptingStore = createTestStore(initial);
+    acceptingStore.dispatch({
+      type: 'START_PERSONAL_TASK',
+      taskId: 'task_induction_training',
+      tierKey: 'primary',
+      _idFactory: () => 'running-task',
+    });
+    acceptingStore.dispatch({
+      type: 'ACCEPT_CAREER_OPPORTUNITY',
+      opportunityId: opportunity.id,
+    });
+    expect(acceptingStore.getRawState().career.activeProcess).toBeNull();
+
+    const clear = createInitialState();
+    clear.career.opportunities = [opportunity];
+    const finalStore = createTestStore(clear);
+    finalStore.dispatch({
+      type: 'ACCEPT_CAREER_OPPORTUNITY',
+      opportunityId: opportunity.id,
+      _idFactory: () => 'selection-process',
+    });
+    finalStore.dispatch({
+      type: 'START_PERSONAL_TASK',
+      taskId: 'task_induction_training',
+      tierKey: 'primary',
+      _idFactory: () => 'final-running-task',
+    });
+    for (let step = 0; step < 5; step++)
+      finalStore.dispatch({
+        type: 'ADVANCE_CAREER_PROCESS',
+        opportunityId: opportunity.id,
+        _rng: () => 0,
+      });
+    expect(finalStore.getRawState().career.activeProcess?.currentStage).toBe('appointment');
+    const before = structuredClone(finalStore.getRawState());
+    finalStore.dispatch({
+      type: 'ADVANCE_CAREER_PROCESS',
+      opportunityId: opportunity.id,
+      _rng: () => 0,
+    });
+    expect(finalStore.getRawState()).toEqual(before);
+  });
+
+  it('archives a failed process when eligibility review no longer passes', () => {
+    const initial = createInitialState();
+    const opportunity = createAvailableOpportunity();
+    opportunity.eligibilityConditions = [{ worldMetric: 'selection_ready', op: 'gte', value: 1 }];
+    initial.world.metrics.selection_ready = 1;
+    initial.career.opportunities = [opportunity];
+    const acceptedStore = createTestStore(initial);
+    acceptedStore.dispatch({
+      type: 'ACCEPT_CAREER_OPPORTUNITY',
+      opportunityId: opportunity.id,
+      _idFactory: () => 'selection-process',
+    });
+    const changed = structuredClone(acceptedStore.getRawState());
+    changed.world.metrics.selection_ready = 0;
+    const store = createTestStore(changed);
+
+    store.dispatch({ type: 'ADVANCE_CAREER_PROCESS', opportunityId: opportunity.id });
+
+    expect(store.getRawState().career.activeProcess).toBeNull();
+    expect(store.getRawState().career.opportunities[0]).toMatchObject({
+      status: 'resolved',
+      finalOutcome: 'not_selected',
+    });
+    expect(store.getRawState().career.completedProcesses.at(-1)).toMatchObject({
+      status: 'failed',
+      stageResults: [{ stage: 'eligibility_review', outcome: 'failed' }],
+    });
+  });
+
   it('allows selection stages but not final appointment while a blocking event is active', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();

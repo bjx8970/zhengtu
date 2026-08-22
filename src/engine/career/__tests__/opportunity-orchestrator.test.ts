@@ -6,8 +6,24 @@ import type { CareerOpportunityDefinition } from '../../../types/config';
 import { createInitialState } from '../../../store/game-store';
 import { expireCareerOpportunity } from '../career-opportunity-lifecycle';
 import { processCareerOpportunitySignal } from '../opportunity-orchestrator';
+import { evaluateCareerOpportunityAcceptanceEligibility } from '../career-opportunity-eligibility';
 
 describe('career opportunity orchestrator', () => {
+  const assessmentTrainingDefinition: CareerOpportunityDefinition = {
+    id: 'assessment-training',
+    type: 'training',
+    triggerSignals: ['assessment.completed'],
+    conditions: [],
+    expiresAfterDays: 30,
+    repeatPolicy: 'once_per_source',
+    cooldownDays: 0,
+    requiresSelection: false,
+    reasonTemplate: 'test',
+    targetPositionId: null,
+    trainingDefinitionId: 'training-1',
+    effects: [],
+  };
+
   it('creates an assessment opportunity once per source signal', () => {
     const state = createInitialState();
     const loader = getConfigLoader();
@@ -22,7 +38,7 @@ describe('career opportunity orchestrator', () => {
       signal,
       currentDay: 360,
       idFactory: () => 'opportunity-1',
-      definitions: loader.getCareerOpportunityDefinitionsBySignal(signal.signalType),
+      definitions: [assessmentTrainingDefinition],
       positions: loader.getAllPositions(),
       institutions: loader.getAllInstitutions(),
       daysPerYear: 360,
@@ -35,7 +51,7 @@ describe('career opportunity orchestrator', () => {
       signal,
       currentDay: 360,
       idFactory: () => 'opportunity-2',
-      definitions: loader.getCareerOpportunityDefinitionsBySignal(signal.signalType),
+      definitions: [assessmentTrainingDefinition],
       positions: loader.getAllPositions(),
       institutions: loader.getAllInstitutions(),
       daysPerYear: 360,
@@ -58,13 +74,99 @@ describe('career opportunity orchestrator', () => {
       signal,
       currentDay: 1,
       idFactory: () => 'opportunity-3',
-      definitions: loader.getCareerOpportunityDefinitionsBySignal(signal.signalType),
+      definitions: [assessmentTrainingDefinition],
       positions: loader.getAllPositions(),
       institutions: loader.getAllInstitutions(),
       daysPerYear: 360,
     }).created[0]!;
     expect(expireCareerOpportunity(opportunity, 30).success).toBe(false);
     expect(expireCareerOpportunity(opportunity, 31).opportunity?.status).toBe('expired');
+  });
+
+  it('creates the official deputy window only after durable prerequisites and defers service tenure to acceptance', () => {
+    const state = createInitialState();
+    const loader = getConfigLoader();
+    if (!state.career.appointment.probation) throw new Error('Expected probation');
+    state.career.appointment.probation.status = 'passed';
+    state.career.civilServiceRank = 'clerk_1';
+    state.world.facts.assigned_project_delivered = true;
+    state.assessments.annualAssessments.push(
+      { year: 2026, score: 70, tier: '称职' },
+      { year: 2027, score: 80, tier: '称职' },
+    );
+    const signal = {
+      signalId: 'assessment-2027',
+      signalType: 'assessment.completed' as const,
+      occurredAtDay: 540,
+      data: { year: 2027, score: 80, tier: '称职' },
+    };
+    const result = processCareerOpportunitySignal({
+      state,
+      signal,
+      currentDay: 540,
+      idFactory: () => 'deputy-window',
+      definitions: loader
+        .getCareerOpportunityDefinitionsBySignal(signal.signalType)
+        .filter((item) => item.id === 'township_deputy_leadership_vacancy'),
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(result.created).toHaveLength(1);
+    const opportunity = result.created[0];
+    if (!opportunity) throw new Error('Expected deputy opportunity');
+    const evaluateAt = (currentDay: number) =>
+      evaluateCareerOpportunityAcceptanceEligibility({
+        opportunity,
+        state,
+        currentDay,
+        daysPerYear: 360,
+        targetPosition:
+          opportunity.type === 'training'
+            ? null
+            : loader.getPositionById(opportunity.target.positionId),
+        careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
+      });
+    expect(evaluateAt(540).failure).toBe('opportunity_conditions');
+    expect(evaluateAt(720)).toEqual({ eligible: true, failure: null });
+
+    state.career.opportunities.push({
+      ...opportunity,
+      status: 'rejected',
+      rejectedAtDay: 541,
+    });
+    const replay = processCareerOpportunitySignal({
+      state,
+      signal: { ...signal, signalId: 'assessment-2027-replay' },
+      currentDay: 541,
+      idFactory: () => 'duplicate-deputy-window',
+      definitions: loader
+        .getCareerOpportunityDefinitionsBySignal(signal.signalType)
+        .filter((item) => item.id === 'township_deputy_leadership_vacancy'),
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(replay.created).toHaveLength(0);
+    expect(replay.skipped[0]?.reason).toBe('duplicate');
+    const nextYear = processCareerOpportunitySignal({
+      state,
+      signal: {
+        ...signal,
+        signalId: 'assessment-2028',
+        occurredAtDay: 900,
+        data: { ...signal.data, year: 2028 },
+      },
+      currentDay: 900,
+      idFactory: () => 'next-deputy-window',
+      definitions: loader
+        .getCareerOpportunityDefinitionsBySignal(signal.signalType)
+        .filter((item) => item.id === 'township_deputy_leadership_vacancy'),
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(nextYear.created).toHaveLength(1);
   });
 
   it('uses a stable assessment source and preserves once-per-source history after rejection', () => {

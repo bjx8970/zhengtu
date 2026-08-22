@@ -487,6 +487,89 @@ describe('Schema 2 存档', () => {
     expect(result.state?.world.metrics['rank_quota.clerk_1']).toBe(1);
   });
 
+  it('Schema 10 旧副职流程被取消并保留审计，其他机会不受影响', () => {
+    const state = createInitialState();
+    state.time.totalDaysPlayed = 600;
+    const base: AppointmentCareerOpportunity = {
+      id: 'legacy-deputy',
+      definitionId: 'township_deputy_leadership_vacancy',
+      type: 'leadership_vacancy',
+      status: 'in_process',
+      source: {
+        sourceType: 'assessment',
+        sourceId: 'assessment:2027',
+        signalId: 'signal-1',
+        description: 'assessment.completed',
+      },
+      sourceSignal: {
+        signalId: 'signal-1',
+        signalType: 'assessment.completed',
+        occurredAtDay: 540,
+        data: { year: 2027, score: 80, tier: '称职' },
+      },
+      target: {
+        positionId: 'admin_l2_0',
+        positionName: '副镇长',
+        institutionId: 'township_govt_01',
+        institutionName: '青云镇人民政府',
+        regionId: 'region_qingyun_town',
+        institutionLevel: 'township',
+        positionDomain: 'local_governance',
+        leadershipRank: 'township_deputy',
+      },
+      appointmentType: 'substantive',
+      appointmentReason: 'promotion',
+      appearedAtDay: 540,
+      expiresAtDay: 810,
+      acceptedAtDay: 550,
+      rejectedAtDay: null,
+      resolvedAtDay: null,
+      cancelledAtDay: null,
+      requiresSelection: true,
+      eligibilityConditions: [],
+      finalOutcome: null,
+      reason: '旧版无条件机会',
+    };
+    state.career.opportunities = [
+      base,
+      {
+        ...structuredClone(base),
+        id: 'unrelated',
+        definitionId: 'other-definition',
+        status: 'available',
+        acceptedAtDay: null,
+      },
+    ];
+    state.career.activeProcess = {
+      id: 'legacy-process',
+      type: 'leadership_selection',
+      status: 'active',
+      opportunityId: base.id,
+      currentStage: 'organization_inspection',
+      startedAtDay: 550,
+      completedAtDay: null,
+      stageResults: [],
+    };
+    const result = decodeCurrentSave(
+      JSON.stringify({ ...wrapSaveEnvelope(state), contentVersion: '2026.08.3' }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.state?.career.opportunities[0]).toMatchObject({
+      status: 'cancelled',
+      acceptedAtDay: null,
+      cancelledAtDay: 600,
+    });
+    expect(result.state?.career.opportunities[1]?.status).toBe('available');
+    expect(result.state?.career.activeProcess).toBeNull();
+    expect(result.state?.career.completedProcesses.at(-1)).toMatchObject({
+      id: 'legacy-process',
+      status: 'cancelled',
+      completedAtDay: 600,
+      stageResults: [{ stage: 'organization_inspection', outcome: 'cancelled' }],
+    });
+  });
+
   it('Schema 9 旧内容迁移在覆盖内容版本前清除预置未来职数', () => {
     const state = createInitialState();
     for (const rule of getConfigLoader().getAllCivilServiceRankProgressionRules()) {

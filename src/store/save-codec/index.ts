@@ -1739,6 +1739,76 @@ export function migrateSchema9To10(prev: Record<string, unknown>): Record<string
   // 清除旧规则预置库存，否则后续统一迁移无法再识别其来源。
   resetLegacyRankQuotaMetrics(migrated);
   migrated.schemaVersion = 10;
+  migrated.contentVersion = '2026.08.3';
+  return migrated;
+}
+
+/**
+ * 取消旧版无条件副职机会，避免内容更新后绕过正式资格。
+ *
+ * 已终结机会作为历史保留；待处理、已接受或选拔中的旧机会转为取消。
+ * 若对应流程正在运行，则以可审计的取消阶段归档，其他职业流程不受影响。
+ *
+ * @param prev Schema 10、内容版本 2026.08.3 的存档
+ * @returns 已应用正式副职资格语义的存档
+ */
+export function migrateSchema10DeputyOpportunityContent(
+  prev: Record<string, unknown>,
+): Record<string, unknown> {
+  if (prev.contentVersion !== '2026.08.3') return prev;
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const career = state?.career as Record<string, unknown> | undefined;
+  const time = state?.time as Record<string, unknown> | undefined;
+  const opportunities = career?.opportunities;
+  if (!career || !Array.isArray(opportunities) || typeof time?.totalDaysPlayed !== 'number')
+    throw new Error('Legacy save is missing career opportunity state for content migration');
+  const currentDay = time.totalDaysPlayed;
+  const cancelledOpportunityIds = new Set<string>();
+  for (const value of opportunities) {
+    if (!value || typeof value !== 'object') continue;
+    const opportunity = value as Record<string, unknown>;
+    if (
+      opportunity.definitionId !== 'township_deputy_leadership_vacancy' ||
+      !['available', 'accepted', 'in_process'].includes(String(opportunity.status))
+    )
+      continue;
+    if (typeof opportunity.id !== 'string')
+      throw new Error('Legacy deputy opportunity has no stable ID');
+    cancelledOpportunityIds.add(opportunity.id);
+    opportunity.status = 'cancelled';
+    opportunity.acceptedAtDay = null;
+    opportunity.rejectedAtDay = null;
+    opportunity.resolvedAtDay = null;
+    opportunity.cancelledAtDay = currentDay;
+    opportunity.finalOutcome = null;
+  }
+  const activeProcess = career.activeProcess;
+  if (activeProcess && typeof activeProcess === 'object') {
+    const process = activeProcess as Record<string, unknown>;
+    if (
+      typeof process.opportunityId === 'string' &&
+      cancelledOpportunityIds.has(process.opportunityId)
+    ) {
+      const stageResults = Array.isArray(process.stageResults) ? process.stageResults : [];
+      stageResults.push({
+        stage: process.currentStage,
+        resolvedAtDay: currentDay,
+        outcome: 'cancelled',
+        score: null,
+        detail: '内容更新后按正式副职资格重新等待机会',
+      });
+      process.stageResults = stageResults;
+      process.status = 'cancelled';
+      process.completedAtDay = currentDay;
+      const completedProcesses = Array.isArray(career.completedProcesses)
+        ? career.completedProcesses
+        : [];
+      completedProcesses.push(process);
+      career.completedProcesses = completedProcesses;
+      career.activeProcess = null;
+    }
+  }
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
@@ -1759,7 +1829,7 @@ export function migrateSchema10RankQuotaContent(
   if (prev.contentVersion !== '2026.08.2') return prev;
   const migrated = structuredClone(prev);
   resetLegacyRankQuotaMetrics(migrated);
-  migrated.contentVersion = CURRENT_CONTENT_VERSION;
+  migrated.contentVersion = '2026.08.3';
   return migrated;
 }
 
@@ -1846,6 +1916,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
       target = migrateSchema9To10(obj);
     }
     target = migrateSchema10RankQuotaContent(target as Record<string, unknown>);
+    target = migrateSchema10DeputyOpportunityContent(target as Record<string, unknown>);
   } catch (e) {
     return {
       success: false,

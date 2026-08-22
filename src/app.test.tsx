@@ -26,6 +26,8 @@ describe('App routes', () => {
 
     expect(screen.getByText('职务与职级')).toBeInTheDocument();
     expect(screen.getByText('公务员职级')).toBeInTheDocument();
+    expect(screen.getByTestId('township-deputy-readiness')).toHaveTextContent('乡科级副职准备度');
+    expect(screen.getByTestId('township-deputy-readiness')).toHaveTextContent('累计服务满 720 天');
   });
 
   it('exposes the policy and event interaction routes', () => {

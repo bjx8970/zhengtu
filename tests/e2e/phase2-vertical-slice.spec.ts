@@ -220,7 +220,7 @@ function seedEconomicDevelopmentPost(state: JsonRecord): void {
   asRecord(state.actions, 'actions').departmentStates = departmentStates;
 }
 
-test('职业链：年度考核生成机会，职级与两次任职独立变化', async ({ page }) => {
+test('职业链：合格履历生成副职机会，职级与两次任职独立变化', async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -237,17 +237,34 @@ test('职业链：年度考核生成机会，职级与两次任职独立变化',
   await expect(page.getByText(/优秀或称职年度考核补充 1/)).toBeVisible();
   await page.goto('/#/main');
   await changeSave(page, (state) => {
-    seedYearEnd(state);
+    seedYearEnd(state, 719);
     seedHighAssessmentPreconditions(state);
+    const time = asRecord(state.time, 'time');
+    time.year = 2013;
+    const career = asRecord(state.career, 'career');
+    career.civilServiceRank = 'clerk_1';
+    career.civilServiceRankStartedAtDay = 360;
+    asRecord(career.appointment, 'appointment').probation = {
+      status: 'passed',
+      startedAtDay: 0,
+      endsAtDay: 360,
+      extensionCount: 0,
+      completedActionCount: 1,
+      resolvedAtDay: 360,
+      outcomeReason: '已通过试用期',
+      evaluations: [],
+    };
+    asRecord(state.world, 'world').facts = {
+      ...asRecord(asRecord(state.world, 'world').facts, 'world facts'),
+      assigned_project_delivered: true,
+    };
+    asRecord(state.assessments, 'assessments').annualAssessments = [
+      { year: 2012, score: 90, tier: '优秀' },
+    ];
   });
   await page.getByTestId('advance-day').click();
   await page.goto('/#/career');
-  await expect(page.getByTestId('advance-civil-service-rank')).toBeVisible();
   const deputyId = selectOpportunityId(await savedState(page), 'admin_l2_0');
-  await page.getByTestId('advance-civil-service-rank').click();
-  await expect(page.getByTestId('rank-change-feedback')).toContainText(
-    '仅职级发生变化，具体职位、所属机构和领导职务均未变化',
-  );
   await page.getByTestId(`accept-opportunity-${deputyId}`).click();
   await advanceCareerProcess(page, deputyId);
 
@@ -258,7 +275,7 @@ test('职业链：年度考核生成机会，职级与两次任职独立变化',
 
   await changeSave(page, seedHighAssessmentPreconditions);
   await page.goto('/#/main');
-  while (Number(asRecord((await savedState(page)).time, 'time').totalDaysPlayed) < 1080)
+  while (Number(asRecord((await savedState(page)).time, 'time').totalDaysPlayed) < 1440)
     await advanceMonthResolvingFloodBlocker(page);
   await page.goto('/#/career');
   const chiefId = selectOpportunityId(await savedState(page), 'admin_l3_0');

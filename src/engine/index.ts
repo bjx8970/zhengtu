@@ -33,6 +33,7 @@ export * from './career/civil-service-rank-progression';
 export * from './career/career-opportunity-lifecycle';
 export * from './career/career-opportunity-eligibility';
 export * from './career/career-experience-analysis';
+export * from './career/career-service';
 export * from './career/probation-evaluation';
 export * from './career/probation-progress';
 export * from './career/rank-quota';

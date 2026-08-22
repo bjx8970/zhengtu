@@ -1,16 +1,13 @@
 /** 公务员职级资格与职业限制纯函数。 */
 
-import type {
-  CareerExperience,
-  CareerRestriction,
-  CurrentAppointment,
-} from '../../domain/career/state';
+import type { CareerRestriction } from '../../domain/career/state';
 import { CIVIL_SERVICE_RANKS } from '../../domain/career/types';
 import { evaluateCondition } from '../events/condition-interpreter';
 import type { PlayerSave } from '../../types/player';
 import type { CivilServiceRankProgressionRule } from '../../config/schemas';
 import type { CareerExperienceQualificationRules } from '../../types/config';
 import type { RankEligibilityFailure, RankEligibilityResult } from '../../types/career';
+import { calculateCareerServiceDays } from './career-service';
 
 /** @param restrictions 全部持久化限制 @param currentDay 当前绝对日 @returns 当前有效的限制。 */
 export function getActiveCareerRestrictions(
@@ -22,38 +19,6 @@ export function getActiveCareerRestrictions(
       restriction.startedAtDay <= currentDay &&
       (restriction.endsAtDay === null || currentDay < restriction.endsAtDay),
   );
-}
-
-/** @param appointment 当前任职 @param experiences 历史履历 @param currentDay 当前绝对日 @returns 去重后的职业服务天数。 */
-export function calculateCareerServiceDays(
-  appointment: CurrentAppointment,
-  experiences: readonly CareerExperience[],
-  currentDay: number,
-): number {
-  const intervals = [
-    ...experiences.map((item) => [item.startedAtDay, item.endedAtDay ?? currentDay] as const),
-    [appointment.startedAtDay, currentDay] as const,
-  ]
-    .filter(([start, end]) => Number.isInteger(start) && Number.isInteger(end) && end >= start)
-    .sort(([left], [right]) => left - right);
-  let total = 0;
-  let start: number | null = null;
-  let end: number | null = null;
-  for (const [nextStart, nextEnd] of intervals) {
-    if (start === null || end === null) {
-      start = nextStart;
-      end = nextEnd;
-      continue;
-    }
-    if (nextStart > end) {
-      total += end - start;
-      start = nextStart;
-      end = nextEnd;
-    } else {
-      end = Math.max(end, nextEnd);
-    }
-  }
-  return start === null || end === null ? 0 : total + end - start;
 }
 
 /** @param tier 年度考核等次 @returns 是否为称职及以上。 */

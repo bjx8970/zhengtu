@@ -9,20 +9,19 @@ import { createMemo, For, Show } from 'solid-js';
 import { getConfigLoader } from '../../config/loader';
 import type { CivilServiceRankProgressionRule } from '../../config/schemas';
 import {
+  CIVIL_SERVICE_RANKS,
   CIVIL_SERVICE_RANK_LABELS,
   INSTITUTION_LEVEL_LABELS,
   LEADERSHIP_RANK_LABELS,
 } from '../../domain/career/types';
 import {
-  calculateCareerServiceDays,
   evaluateCivilServiceRankEligibility,
   getActiveCareerRestrictions,
 } from '../../engine/career/civil-service-rank-eligibility';
+import { calculateCareerServiceDays } from '../../engine/career/career-service';
 import { inspectProbationProgress } from '../../engine/career/probation-progress';
-import {
-  evaluateCareerOpportunityAcceptanceEligibility,
-  type CareerOpportunityEligibilityFailure,
-} from '../../engine/career/career-opportunity-eligibility';
+import { evaluateCareerOpportunityAcceptanceEligibility } from '../../engine/career/career-opportunity-eligibility';
+import type { CareerOpportunityEligibilityFailure } from '../../types/career';
 import { useGameStore } from '../../store/game-store';
 import { PageHeader } from '../../components/page-header';
 import {
@@ -140,6 +139,46 @@ export function CareerPage() {
       config: getConfigLoader().getGameConfig().probation,
     });
   });
+  const deputyReadiness = createMemo(() => {
+    const qualifiedAssessments = state.assessments.annualAssessments.filter(
+      (item) => item.tier === '优秀' || item.tier === '称职',
+    ).length;
+    const latestAssessment = state.assessments.annualAssessments.at(-1);
+    const rankReady =
+      CIVIL_SERVICE_RANKS.indexOf(state.career.civilServiceRank) >=
+      CIVIL_SERVICE_RANKS.indexOf('clerk_1');
+    const restrictions = activeRestrictions();
+    return [
+      {
+        label: '录用试用期已通过',
+        satisfied: state.career.appointment.probation?.status === 'passed',
+      },
+      { label: '当前没有领导职务', satisfied: state.career.appointment.leadershipRank === 'none' },
+      { label: '公务员职级达到一级科员', satisfied: rankReady },
+      { label: `累计服务满 720 天（当前 ${serviceDays()} 天）`, satisfied: serviceDays() >= 720 },
+      {
+        label: `至少 2 次称职考核（当前 ${qualifiedAssessments} 次）`,
+        satisfied: qualifiedAssessments >= 2,
+      },
+      {
+        label: '完成上级交办专项攻坚',
+        satisfied: state.world.facts.assigned_project_delivered === true,
+      },
+      { label: '最近一次考核分数不低于 60', satisfied: (latestAssessment?.score ?? 0) >= 60 },
+      {
+        label: '当前无任职选拔冻结或处分',
+        satisfied: !restrictions.some(
+          (item) =>
+            item.type === 'appointment_selection_freeze' || item.type === 'disciplinary_action',
+        ),
+      },
+    ];
+  });
+  const latestAppointedOpportunity = createMemo(() =>
+    [...state.career.opportunities]
+      .reverse()
+      .find((opportunity) => opportunity.finalOutcome === 'appointed'),
+  );
 
   return (
     <>
@@ -357,6 +396,29 @@ export function CareerPage() {
           </div>
           <div class="card-pad flex-col gap-md">
             <p class="doc-meta">岗位变动需接受机会并按流程完成选拔；职级不会由此自动变化。</p>
+            <article class="card" data-testid="township-deputy-readiness">
+              <div class="card-pad flex-col gap-sm">
+                <h3 class="serif" style={{ 'font-size': '1.05rem' }}>
+                  乡科级副职准备度
+                </h3>
+                <p class="text-xs secondary-text">
+                  合格年度考核触发选拔窗口；机会出现后仍须满足服务年限，并先完成在途工作。
+                </p>
+                <For each={deputyReadiness()}>
+                  {(requirement) => (
+                    <p class="text-sm secondary-text">
+                      {requirement.satisfied ? '✓' : '○'} {requirement.label}
+                    </p>
+                  )}
+                </For>
+              </div>
+            </article>
+            <Show when={latestAppointedOpportunity()}>
+              <p class="banner banner-success" data-testid="appointment-change-feedback">
+                已完成岗位任职：旧履历已关闭，新履历已建立；公务员职级保持
+                {CIVIL_SERVICE_RANK_LABELS[state.career.civilServiceRank]}不变。
+              </p>
+            </Show>
             <Show
               when={state.career.opportunities.length > 0}
               fallback={
@@ -536,9 +598,50 @@ export function CareerPage() {
                         }}
                       </For>
                     </div>
+                    <Show when={process().stageResults.length > 0}>
+                      <div class="flex-col gap-sm" data-testid="career-process-audit">
+                        <For each={process().stageResults}>
+                          {(result) => (
+                            <p class="text-xs secondary-text">
+                              {formatCareerProcessStage(result.stage)} · 第 {result.resolvedAtDay}{' '}
+                              天 ·{' '}
+                              {result.outcome === 'passed'
+                                ? '通过'
+                                : result.outcome === 'continued'
+                                  ? '继续观察'
+                                  : result.outcome === 'cancelled'
+                                    ? '已取消'
+                                    : '未通过'}
+                              {result.score === null ? '' : ` · ${result.score} 分`}：
+                              {result.detail}
+                            </p>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
                   </div>
                 </article>
               )}
+            </Show>
+            <Show when={state.career.completedProcesses.length > 0}>
+              <div class="flex-col gap-sm" data-testid="completed-career-processes">
+                <h3 class="text-sm">最近选拔记录</h3>
+                <For each={state.career.completedProcesses.slice(-3).reverse()}>
+                  {(process) => (
+                    <p class="text-xs secondary-text">
+                      第 {process.startedAtDay} 天开始 ·{' '}
+                      {process.status === 'completed'
+                        ? '已完成'
+                        : process.status === 'failed'
+                          ? '未通过'
+                          : '已取消'}
+                      {process.stageResults.at(-1)?.detail
+                        ? `：${process.stageResults.at(-1)?.detail}`
+                        : ''}
+                    </p>
+                  )}
+                </For>
+              </div>
             </Show>
           </div>
         </section>
