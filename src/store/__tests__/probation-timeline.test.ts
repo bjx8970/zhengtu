@@ -61,31 +61,18 @@ describe('probation timeline', () => {
     }).toEqual(identity);
   });
 
-  it('counts an action completed on the due day before evaluating probation', () => {
+  it('counts a personal task completed on the due day before evaluating probation', () => {
     const state = createInitialState();
-    const department = getConfigLoader()
-      .resolvePositionDepartments(state.career.appointment.positionId)
-      .find((item) => item.actions.length > 0);
-    const action = department?.actions[0];
-    expect(department).toBeDefined();
-    expect(action).toBeDefined();
-    if (!department || !action) return;
-    state.actions.departmentStates[department.id] = {
-      id: department.id,
-      kpiValues: {},
-      monthlyConsumption: 0,
-      cumulativeConsumption: 0,
-      lastActionDay: 0,
-      actionCooldownUntilDays: {},
-    };
-    setDay(state, 360 - action.durationDays);
+    const task = getConfigLoader().getPersonalTaskTemplate('task_policy_study');
+    expect(task).toBeDefined();
+    if (!task) return;
+    setDay(state, 360 - task.durationDays);
     const store = createTestStore(state);
     store.dispatch({
-      type: 'START_ACTION',
-      deptId: department.id,
-      actionId: action.id,
+      type: 'START_PERSONAL_TASK',
+      taskId: task.id,
       tierKey: 'primary',
-      _idFactory: () => 'due-day-action',
+      _idFactory: () => 'due-day-task',
     });
     expect(store.getRawState().actions.slots.primary.occupants[0]).not.toBeNull();
     setDay(store.getRawState(), 359);
@@ -115,27 +102,14 @@ describe('probation timeline', () => {
     if (!decoded.state) return;
     const resumedStore = createTestStore(decoded.state);
     setDay(resumedStore.getRawState(), 449);
-    const department = getConfigLoader()
-      .resolvePositionDepartments(resumedStore.getRawState().career.appointment.positionId)
-      .find((item) => item.actions.some((action) => action.durationDays > 1));
-    const action = department?.actions.find((item) => item.durationDays > 1);
-    expect(department).toBeDefined();
-    expect(action).toBeDefined();
-    if (!department || !action) return;
-    resumedStore.getRawState().actions.departmentStates[department.id] = {
-      id: department.id,
-      kpiValues: {},
-      monthlyConsumption: 0,
-      cumulativeConsumption: 0,
-      lastActionDay: 0,
-      actionCooldownUntilDays: {},
-    };
+    const task = getConfigLoader().getPersonalTaskTemplate('task_policy_study');
+    expect(task).toBeDefined();
+    if (!task) return;
     resumedStore.dispatch({
-      type: 'START_ACTION',
-      deptId: department.id,
-      actionId: action.id,
+      type: 'START_PERSONAL_TASK',
+      taskId: task.id,
       tierKey: 'primary',
-      _idFactory: () => 'post-failure-action',
+      _idFactory: () => 'post-failure-task',
     });
     expect(resumedStore.getRawState().actions.slots.primary.occupants[0]).not.toBeNull();
     resumedStore.dispatch({ type: 'ADVANCE_TIME', granularity: 'month' });
@@ -154,7 +128,7 @@ describe('probation timeline', () => {
       endedAtDay: 450,
       endReason: 'probation_failed',
     });
-    expect(failed.actions.slots.primary.occupants[0]?.instanceId).toBe('post-failure-action');
+    expect(failed.actions.slots.primary.occupants[0]?.instanceId).toBe('post-failure-task');
     const failedDecoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(failed)));
     expect(failedDecoded.success).toBe(true);
     resumedStore.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });

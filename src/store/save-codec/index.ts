@@ -1,15 +1,16 @@
 /**
- * 存档严格解码器（Schema 9）
+ * 存档严格解码器（Schema 10）
  *
- * 只接受当前版本（Schema 9）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 10）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
 
 import { z } from 'zod';
 import type { PlayerSave } from '../../types/player';
+import { PERSONAL_TASK_LEDGER_ID } from '../../types/player';
 import type { SaveEnvelope, SaveDecodeResult } from '../../types/save';
 import {
   CURRENT_SCHEMA_VERSION,
@@ -43,6 +44,7 @@ import {
   EventRepeatPolicySchema,
 } from '../../domain/events/definition';
 import { getConfigLoader } from '../../config/loader';
+import { PersonalTaskTemplateSchema } from '../../config/schemas';
 import { createActionExecutableSnapshot } from '../action-executable-snapshot';
 
 /** 不兼容存档备份的 localStorage key 前缀 */
@@ -771,8 +773,8 @@ const WorldStateSchema = z
   })
   .strict();
 
-/** ActionExecutableSnapshot Schema */
-const ActionExecutableSnapshotSchema = z
+/** 部门行动可执行快照 Schema */
+const DepartmentActionExecutableSnapshotSchema = z
   .object({
     contentVersion: z.string().min(1),
     department: z
@@ -814,6 +816,27 @@ const ActionExecutableSnapshotSchema = z
   })
   .strict();
 
+/** 个人任务可执行快照 Schema（与部门行动共用槽位，department 固定为台账哨兵） */
+const PersonalTaskExecutableSnapshotSchema = z
+  .object({
+    contentVersion: z.string().min(1),
+    department: z
+      .object({
+        id: z.literal(PERSONAL_TASK_LEDGER_ID),
+        name: z.string().min(1),
+      })
+      .strict(),
+    task: PersonalTaskTemplateSchema,
+    attributeBounds: z.record(z.string(), z.tuple([z.number(), z.number()])),
+  })
+  .strict();
+
+/** ActionExecutableSnapshot Schema（按 action/task 判别部门行动与个人任务） */
+const ActionExecutableSnapshotSchema = z.union([
+  DepartmentActionExecutableSnapshotSchema,
+  PersonalTaskExecutableSnapshotSchema,
+]);
+
 /** SlotOccupant Schema */
 const SlotOccupantSchema = z
   .object({
@@ -840,8 +863,26 @@ const SlotOccupantSchema = z
   })
   .strict()
   .superRefine((occupant, ctx) => {
-    const action = occupant.executableSnapshot.action;
-    const department = occupant.executableSnapshot.department;
+    const snapshot = occupant.executableSnapshot;
+    if ('task' in snapshot) {
+      // 个人任务：快照任务字段须与占用记录一致，且部门为台账哨兵
+      if (
+        snapshot.task.id !== occupant.actionId ||
+        snapshot.task.name !== occupant.actionName ||
+        snapshot.task.category !== occupant.category ||
+        snapshot.task.durationDays !== occupant.durationDays ||
+        snapshot.task.cooldownDays !== occupant.cooldownDays ||
+        snapshot.department.id !== occupant.deptId
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Personal task snapshot does not match its slot occupant',
+        });
+      }
+      return;
+    }
+    const action = snapshot.action;
+    const department = snapshot.department;
     if (
       action.id !== occupant.actionId ||
       action.name !== occupant.actionName ||
@@ -908,6 +949,13 @@ const ActionRuntimeStateSchema = z
         })
         .strict(),
     ),
+    personalTasks: z
+      .object({
+        cooldownUntilDays: z.record(z.number()),
+        completedCounts: z.record(z.number()),
+        totalCompleted: z.number(),
+      })
+      .strict(),
   })
   .strict();
 
@@ -1644,6 +1692,37 @@ export function migrateSchema8To9(prev: Record<string, unknown>): Record<string,
   appointment.endedAtDay = null;
   appointment.endReason = null;
   migrated.schemaVersion = 9;
+  migrated.contentVersion = '2026.08.1';
+  return migrated;
+}
+
+/**
+ * 将 Schema 9 存档迁移至 Schema 10。
+ *
+ * 唯一变化：行动运行时新增个人任务状态 `actions.personalTasks`
+ * （冷却表、完成计数、累计总数）。Schema 9 存档没有个人任务数据，
+ * 确定性回填空集合；槽位中的部门行动快照结构不变。
+ *
+ * @param prev Schema 9 SaveEnvelope
+ * @returns Schema 10 SaveEnvelope
+ */
+export function migrateSchema9To10(prev: Record<string, unknown>): Record<string, unknown> {
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const actions = state?.actions as Record<string, unknown> | undefined;
+  if (!actions) throw new Error('Schema 9 save is missing action runtime state');
+  if (actions.personalTasks !== undefined) {
+    const personalTasks = actions.personalTasks as Record<string, unknown>;
+    if (typeof personalTasks !== 'object' || Array.isArray(personalTasks))
+      throw new Error('Schema 9 save has invalid personal task state');
+  } else {
+    actions.personalTasks = {
+      cooldownUntilDays: {},
+      completedCounts: {},
+      totalCompleted: 0,
+    };
+  }
+  migrated.schemaVersion = 10;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
@@ -1653,8 +1732,8 @@ export function migrateSchema8To9(prev: Record<string, unknown>): Record<string,
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
- * - Schema 2–8：按版本顺序链式迁移至 Schema 9；
- * - 当前版本（Schema 9）：直接解码；
+ * - Schema 2–9：按版本顺序链式迁移至 Schema 10；
+ * - 当前版本（Schema 10）：直接解码；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
@@ -1694,31 +1773,41 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
   let target: unknown = data;
   try {
     if (obj.schemaVersion === 2) {
-      target = migrateSchema8To9(
-        migrateSchema7To8(
-          migrateSchema6To7(
-            migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj)))),
+      target = migrateSchema9To10(
+        migrateSchema8To9(
+          migrateSchema7To8(
+            migrateSchema6To7(
+              migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(migrateSchema2To3(obj)))),
+            ),
           ),
         ),
       );
     } else if (obj.schemaVersion === 3) {
-      target = migrateSchema8To9(
-        migrateSchema7To8(
-          migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(obj)))),
+      target = migrateSchema9To10(
+        migrateSchema8To9(
+          migrateSchema7To8(
+            migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(migrateSchema3To4(obj)))),
+          ),
         ),
       );
     } else if (obj.schemaVersion === 4) {
-      target = migrateSchema8To9(
-        migrateSchema7To8(migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(obj)))),
+      target = migrateSchema9To10(
+        migrateSchema8To9(
+          migrateSchema7To8(migrateSchema6To7(migrateSchema5To6(migrateSchema4To5(obj)))),
+        ),
       );
     } else if (obj.schemaVersion === 5) {
-      target = migrateSchema8To9(migrateSchema7To8(migrateSchema6To7(migrateSchema5To6(obj))));
+      target = migrateSchema9To10(
+        migrateSchema8To9(migrateSchema7To8(migrateSchema6To7(migrateSchema5To6(obj)))),
+      );
     } else if (obj.schemaVersion === 6) {
-      target = migrateSchema8To9(migrateSchema7To8(migrateSchema6To7(obj)));
+      target = migrateSchema9To10(migrateSchema8To9(migrateSchema7To8(migrateSchema6To7(obj))));
     } else if (obj.schemaVersion === 7) {
-      target = migrateSchema8To9(migrateSchema7To8(obj));
+      target = migrateSchema9To10(migrateSchema8To9(migrateSchema7To8(obj)));
     } else if (obj.schemaVersion === 8) {
-      target = migrateSchema8To9(obj);
+      target = migrateSchema9To10(migrateSchema8To9(obj));
+    } else if (obj.schemaVersion === 9) {
+      target = migrateSchema9To10(obj);
     }
   } catch (e) {
     return {

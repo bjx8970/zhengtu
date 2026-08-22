@@ -41,6 +41,7 @@ export const PolicyStatusSchema = z.enum(POLICY_STATUSES);
 /** 领域信号类型常量数组 */
 export const DOMAIN_SIGNALS = [
   'action.completed',
+  'task.completed',
   'policy.approved',
   'policy.phase_changed',
   'policy.metric_changed',
@@ -66,6 +67,7 @@ export const DomainSignalSchema = z.enum(DOMAIN_SIGNALS);
  */
 export const SIGNAL_TYPE_PAYLOAD_FIELDS: Record<DomainSignal, readonly string[]> = {
   'action.completed': ['actionInstanceId', 'actionId', 'deptId', 'regionId', 'institutionId'],
+  'task.completed': ['taskInstanceId', 'taskId', 'taskType', 'regionId', 'institutionId'],
   'policy.approved': [
     'policyInstanceId',
     'policyId',
@@ -130,6 +132,19 @@ export type DomainSignalSnapshot =
         actionInstanceId: string;
         actionId: string;
         deptId: string;
+        regionId: string;
+        institutionId: string;
+      };
+    }
+  | {
+      signalId: string;
+      signalType: 'task.completed';
+      occurredAtDay: number;
+      data: {
+        taskInstanceId: string;
+        taskId: string;
+        /** 个人任务类型（PERSONAL_TASK_TYPES 之一） */
+        taskType: string;
         regionId: string;
         institutionId: string;
       };
@@ -249,6 +264,22 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
           actionInstanceId: z.string(),
           actionId: z.string(),
           deptId: z.string(),
+          regionId: z.string(),
+          institutionId: z.string(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalId: z.string(),
+      signalType: z.literal('task.completed'),
+      occurredAtDay: z.number(),
+      data: z
+        .object({
+          taskInstanceId: z.string(),
+          taskId: z.string(),
+          taskType: z.string(),
           regionId: z.string(),
           institutionId: z.string(),
         })

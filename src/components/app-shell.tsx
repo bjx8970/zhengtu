@@ -3,10 +3,10 @@
  *
  * 结构：
  * - 红头文件式总栏：机关印章 + 名称 + 游戏内日期 + 亮暗主题切换
- * - 全局导航条：工作台 / 部门治理 / 年度考核 / 职务职级 / 政策 / 事件
+ * - 全局导航条：工作台 / 任务 / 部门治理 / 年度考核 / 职务职级 / 政策 / 事件
  * - 可滚动内容区（公文版面）
  *
- * 所有工作台页面（/main、/departments、/assessment、/career、/policies、/events）
+ * 所有工作台页面（/main、/tasks、/departments、/assessment、/career、/policies、/events）
  * 由此组件包裹；启动页与建档向导使用独立全屏版面。
  */
 
@@ -18,6 +18,7 @@ import { getCurrentTheme, toggleTheme } from '../utils/theme';
 /** 全局导航项配置 */
 const NAV_ITEMS = [
   { path: '/main', label: '工作台' },
+  { path: '/tasks', label: '任务' },
   { path: '/departments', label: '部门治理' },
   { path: '/assessment', label: '年度考核' },
   { path: '/career', label: '职务职级' },

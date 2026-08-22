@@ -259,6 +259,7 @@ describe('行动效果结算语义', () => {
       },
       totalActions: 1,
       lastCompletedActions: [],
+      personalTasks: { cooldownUntilDays: {}, completedCounts: {}, totalCompleted: 0 },
     };
   }
 

@@ -16,6 +16,13 @@ export interface StartActionPayload {
   _idFactory?: () => string;
 }
 
+/** START_PERSONAL_TASK 动作参数 */
+export interface StartPersonalTaskPayload {
+  taskId: string;
+  tierKey: SlotTierKey;
+  _idFactory?: () => string;
+}
+
 /** ADVANCE_TIME 动作参数 */
 export interface AdvanceTimePayload {
   granularity: TimeGranularity;

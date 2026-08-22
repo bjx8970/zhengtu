@@ -107,6 +107,8 @@ describe('domain signal production', () => {
       actionEvent,
     ]);
     const state = createInitialState();
+    // 部门治理行动为领导职务专属（issue #120）；快照冻结测试以领导身份执行
+    state.career.appointment.leadershipRank = 'township_deputy';
     const department = loader
       .resolvePositionDepartments(state.career.appointment.positionId)
       .find((item) => item.actions.some((action) => action.id === 'staff_meeting'));

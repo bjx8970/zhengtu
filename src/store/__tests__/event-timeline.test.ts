@@ -730,6 +730,8 @@ describe('event timeline integration', () => {
   it('防汛准备完整链条: 行动完成 → 风险突破 80 → prepared_emergency 触发 → 灾后重建', () => {
     const loader = getConfigLoader();
     const state = createInitialState();
+    // 部门治理行动为领导职务专属（issue #120）；防汛行动链测试以领导身份执行
+    state.career.appointment.leadershipRank = 'township_deputy';
     state.remainingBudget = 10_000;
     const department = loader
       .resolvePositionDepartments(state.career.appointment.positionId)
@@ -824,6 +826,8 @@ describe('event timeline integration', () => {
   it('两轮防汛准备: 风险驱动各自触发 prepared_emergency 且冷却期拒绝', () => {
     const loader = getConfigLoader();
     const state = createInitialState();
+    // 部门治理行动为领导职务专属（issue #120）；防汛行动链测试以领导身份执行
+    state.career.appointment.leadershipRank = 'township_deputy';
     state.remainingBudget = 10_000;
     const department = loader
       .resolvePositionDepartments(state.career.appointment.positionId)
@@ -969,6 +973,8 @@ describe('event timeline integration', () => {
     const state = createInitialState();
     // 切换到包含 economic_development 部门的职位（admin_l1_0 不含该部门）
     state.career.appointment.positionId = 'admin_l6_0';
+    // 部门治理行动为领导职务专属（issue #120）；匹配领导职位等级
+    state.career.appointment.leadershipRank = 'prefecture_deputy';
 
     const loader = getConfigLoader();
     const department = loader

@@ -10,7 +10,7 @@
 import type { FileType, FileCategory, SentimentType, InvestigationEvidence } from './enums';
 import type { KPITier } from './enums';
 import type { SlotTierKey, SlotOccupant, SlotState } from './player';
-import type { ActionTemplate } from './config';
+import type { ActionTemplate, PersonalTaskTemplate } from './config';
 
 /** 时间推进后触发的周期事件 */
 export interface TimeTrigger {
@@ -61,6 +61,19 @@ export interface StartActionFailure {
 /** 行动启动结果（放入槽位时的校验结果） */
 export type StartActionResult =
   StartActionFailure | { success: true; tierKey: SlotTierKey; slotIndex: number };
+
+/** 个人任务启动校验输入 */
+export interface PersonalTaskStartInput {
+  task: PersonalTaskTemplate;
+  slotState: SlotState;
+  remainingBudget: number;
+  currentDay: number;
+  tierKey: SlotTierKey;
+  /** 该任务当前的绝对冷却截止日，未设置时为 0 */
+  cooldownUntilDay: number;
+  /** 该任务已完成的次数（once 策略据此拒绝重复承接） */
+  completedCount: number;
+}
 
 /** 槽位完成结果：已到期的行动记录 */
 export interface CompletedSlotAction {

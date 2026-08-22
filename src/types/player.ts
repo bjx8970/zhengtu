@@ -1,5 +1,5 @@
 /**
- * 玩家存档类型定义（Schema 9）
+ * 玩家存档类型定义（Schema 10）
  *
  * PlayerSave 重构为正式子状态结构：
  * - character：角色基础信息和属性
@@ -19,7 +19,7 @@
 
 import type { TimeGranularity } from './enums';
 import type { FiveDimensionScore, ActionRuntimeSnapshot } from './game';
-import type { ActionCategory, ActionTemplate, GameConfig } from './config';
+import type { ActionCategory, ActionTemplate, GameConfig, PersonalTaskTemplate } from './config';
 import type { CareerState } from '../domain/career/state';
 import type { GovernanceState } from '../domain/governance/state';
 import type { EventRuntimeState } from '../domain/events/state';
@@ -30,8 +30,16 @@ import type { WorldState } from '../domain/world-state';
 /** 槽位等级 key */
 export type SlotTierKey = 'primary' | 'secondary' | 'reserve';
 
-/** 行动启动时冻结的完整可执行快照。 */
-export interface ActionExecutableSnapshot {
+/**
+ * 个人任务在槽位/快照中使用的保留部门 ID。
+ *
+ * 个人任务不属于任何真实部门：占用记录以它作为 deptId 哨兵，
+ * KPI 贡献写入以它为键的隐藏台账（参与现有 KPI 聚合，不暴露治理 UI）。
+ */
+export const PERSONAL_TASK_LEDGER_ID = 'personal_work';
+
+/** 部门行动启动时冻结的完整可执行快照。 */
+export interface DepartmentActionExecutableSnapshot {
   /** 创建快照时的内容包版本。 */
   contentVersion: string;
   /** 部门显示与稳定标识快照。 */
@@ -44,6 +52,28 @@ export interface ActionExecutableSnapshot {
   /** 行动效果结算使用的属性边界；防止内容版本变化改变钳制结果。 */
   attributeBounds: GameConfig['attributeBounds'];
 }
+
+/** 个人任务启动时冻结的完整可执行快照。 */
+export interface PersonalTaskExecutableSnapshot {
+  /** 创建快照时的内容包版本。 */
+  contentVersion: string;
+  /** 固定为个人任务台账哨兵 { id: PERSONAL_TASK_LEDGER_ID, name: '个人任务' }。 */
+  department: {
+    id: typeof PERSONAL_TASK_LEDGER_ID;
+    name: string;
+  };
+  /** 完整任务定义；完成时不得重新读取当前内容配置。 */
+  task: PersonalTaskTemplate;
+  /** 任务效果结算使用的属性边界；防止内容版本变化改变钳制结果。 */
+  attributeBounds: GameConfig['attributeBounds'];
+}
+
+/**
+ * 行动可执行快照：按快照内是否携带 `task` 判别部门行动与个人任务。
+ * 完成事务据此分流结算，两者共用槽位调度与时间轴。
+ */
+export type ActionExecutableSnapshot =
+  DepartmentActionExecutableSnapshot | PersonalTaskExecutableSnapshot;
 
 /** 槽位占用记录 */
 export interface SlotOccupant {
@@ -102,12 +132,24 @@ export interface DepartmentState {
   actionCooldownUntilDays: Record<string, number>;
 }
 
+/** 个人任务运行时状态（冷却、完成计数；不占用真实部门状态） */
+export interface PersonalTaskRuntimeState {
+  /** 任务冷却截止绝对日，按任务 ID 记录 */
+  cooldownUntilDays: Record<string, number>;
+  /** 已完成任务计数，按任务 ID 记录（支撑 once 重复策略） */
+  completedCounts: Record<string, number>;
+  /** 累计完成任务总数 */
+  totalCompleted: number;
+}
+
 /** 行动运行时状态（PlayerSave 子状态） */
 export interface ActionRuntimeState {
   slots: SlotState;
   departmentStates: Record<string, DepartmentState>;
   totalActions: number;
   lastCompletedActions: CompletedActionNotification[];
+  /** 个人任务制运行时状态 */
+  personalTasks: PersonalTaskRuntimeState;
 }
 
 // ===== 考核状态（保留） =====
@@ -212,7 +254,7 @@ export interface TimelineContinuation {
 // ===== 新版 PlayerSave =====
 
 /**
- * 玩家存档（Schema 9）
+ * 玩家存档（Schema 10）
  *
  * 重构为正式子状态结构，删除旧职业事实来源。
  */

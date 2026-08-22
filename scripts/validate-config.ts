@@ -28,6 +28,7 @@ import leadershipStyles from '../src/config/templates/leadership-styles.json' wi
 import positionsData from '../src/config/positions/positions.json' with { type: 'json' };
 import institutionsData from '../src/config/institutions/institutions.json' with { type: 'json' };
 import policiesData from '../src/config/templates/policies.json' with { type: 'json' };
+import personalTasksData from '../src/config/templates/personal-tasks.json' with { type: 'json' };
 import { EventDefinitionArraySchema } from '../src/domain/events/definition';
 import type { EventDefinition } from '../src/domain/events/definition';
 import { validateEventDefinitions } from '../src/domain/events/validation';
@@ -783,6 +784,76 @@ if (!parsedPoliciesResult.success) {
     console.log(`   ✅ 政策 ID 全局唯一`);
     console.log(`   ✅ 各政策阶段 ID 唯一`);
     console.log(`   ✅ 标签去重通过`);
+  }
+}
+
+// ===== 个人任务配置校验 =====
+console.log('\n--- 个人任务配置校验 (personal-tasks.json) ---\n');
+
+import { PersonalTaskTemplateArraySchema } from '../src/config/schemas';
+
+const parsedPersonalTasksResult = PersonalTaskTemplateArraySchema.safeParse(personalTasksData);
+if (!parsedPersonalTasksResult.success) {
+  console.error('❌ personal-tasks.json 未通过 PersonalTaskTemplateSchema 校验：');
+  for (const issue of parsedPersonalTasksResult.error.issues) {
+    console.error(`   ${issue.path.join('.')}: ${issue.message}`);
+    errors++;
+  }
+} else {
+  const validTasks = parsedPersonalTasksResult.data;
+  const kpiLookup = kpis as Record<string, { calcType: 'ratio' | 'absolute' | 'inverse' }>;
+
+  // KPI 台账引用完整性：indicatorId 必须存在于 KPI 模板库
+  for (const task of validTasks) {
+    for (const effect of task.kpiEffects ?? []) {
+      if (!kpiLookup[effect.indicatorId]) {
+        console.error(
+          `❌ 个人任务 "${task.id}" 的 kpiEffects 引用不存在的 KPI "${effect.indicatorId}"`,
+        );
+        errors++;
+      }
+    }
+  }
+
+  // 可玩性护栏：初始科员岗位聚合的非反向 KPI 指标，必须至少被一个
+  // leadershipRank === 'none' 可承接的任务覆盖，否则考核「绩」维度无从积累。
+  const initialPositionId = (constants as { initialPositionId: string }).initialPositionId;
+  const initialPosition = (positionsData as { id: string; departmentTemplateIds: string[] }[]).find(
+    (position) => position.id === initialPositionId,
+  );
+  if (!initialPosition) {
+    console.error(
+      `❌ constants.initialPositionId "${initialPositionId}" 在 positions.json 中不存在`,
+    );
+    errors++;
+  } else {
+    const coveredIndicators = new Set<string>();
+    for (const task of validTasks) {
+      if (
+        task.prerequisites?.allowedLeadershipRanks &&
+        !task.prerequisites.allowedLeadershipRanks.includes('none')
+      )
+        continue;
+      for (const effect of task.kpiEffects ?? []) coveredIndicators.add(effect.indicatorId);
+    }
+    for (const deptId of initialPosition.departmentTemplateIds) {
+      const template = departmentsLookup[deptId] as { kpiTemplateIds: string[] } | undefined;
+      if (!template) continue;
+      for (const kpiId of template.kpiTemplateIds) {
+        if (kpiLookup[kpiId]?.calcType === 'inverse') continue; // 反向指标 0 值即满分
+        if (!coveredIndicators.has(kpiId)) {
+          console.error(
+            `❌ 初始科员岗位的 KPI "${kpiId}" 没有任何科员可承接的个人任务覆盖，考核「绩」维度无法积累`,
+          );
+          errors++;
+        }
+      }
+    }
+  }
+
+  if (errors === 0) {
+    console.log(`   ✅ ${validTasks.length} 个个人任务模板全部通过校验`);
+    console.log('   ✅ KPI 台账引用完整，初始岗位指标覆盖检查通过');
   }
 }
 

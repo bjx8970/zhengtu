@@ -13,10 +13,13 @@ import {
   LEADERSHIP_RANKS,
   APPOINTMENT_TYPES,
   APPOINTMENT_REASONS,
+  LeadershipRankSchema,
+  CivilServiceRankSchema,
 } from '../domain/career/types';
 import { ConditionExpressionSchema } from '../domain/conditions';
 import { EffectDefinitionSchema } from '../domain/conditions';
 import { DomainSignalSchema, PolicyCategorySchema } from '../domain/governance/types';
+import { PERSONAL_TASK_TYPES } from '../types/config';
 
 /** 机构配置 Schema */
 export const InstitutionConfigSchema = z
@@ -334,5 +337,92 @@ export const CareerOpportunityDefinitionArraySchema = z
           code: z.ZodIssueCode.custom,
           message: `Leadership vacancy ${definition.id} must require selection`,
         });
+    }
+  });
+
+// ===== 个人任务配置 Schema =====
+
+/** 个人任务 KPI 台账贡献 Schema */
+const PersonalTaskKpiEffectSchema = z
+  .object({
+    indicatorId: z.string().min(1),
+    operation: z.enum(['add', 'multiply', 'set']),
+    value: z.number(),
+  })
+  .strict();
+
+/** 个人任务前置条件 Schema */
+const PersonalTaskPreconditionSchema = z
+  .object({
+    allowedLeadershipRanks: z.array(LeadershipRankSchema).min(1).optional(),
+    civilServiceRankMin: CivilServiceRankSchema.optional(),
+    minCompletedTasks: z.number().int().nonnegative().optional(),
+    requiredFacts: z.array(z.string().min(1)).min(1).optional(),
+  })
+  .strict();
+
+/** 个人任务模板 Schema（导出供存档快照冻结结构复用） */
+export const PersonalTaskTemplateSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    type: z.enum(PERSONAL_TASK_TYPES),
+    description: z.string().optional(),
+    durationDays: z.number().int().min(1),
+    category: z.enum(['major', 'minor', 'routine']),
+    cooldownDays: z.number().int().min(0),
+    budgetDelta: z.number(),
+    effects: z.array(EffectDefinitionSchema),
+    kpiEffects: z.array(PersonalTaskKpiEffectSchema).min(1).optional(),
+    prerequisites: PersonalTaskPreconditionSchema.optional(),
+    repeatPolicy: z.enum(['once', 'repeatable']),
+    allowParallel: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((task, ctx) => {
+    // 冷却规则与部门行动（validate-config ActionSchema）保持一致
+    if (task.category === 'major' && task.cooldownDays < 14) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cooldownDays'],
+        message: '重大任务的冷却天数不得少于 14 天',
+      });
+    }
+    if (task.category === 'minor' && task.cooldownDays < 7) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cooldownDays'],
+        message: '次要任务的冷却天数不得少于 7 天',
+      });
+    }
+    if (task.category === 'routine' && task.cooldownDays !== 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cooldownDays'],
+        message: '日常任务的冷却天数必须为 0',
+      });
+    }
+    // once 任务整局仅可完成一次，并行会结算多次，契约优先于 allowParallel 配置
+    if (task.repeatPolicy === 'once' && task.allowParallel === true) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['allowParallel'],
+        message: 'once 任务不允许并行，不能将 allowParallel 配置为 true',
+      });
+    }
+  });
+
+/** 个人任务模板数组 Schema（ID 全局唯一） */
+export const PersonalTaskTemplateArraySchema = z
+  .array(PersonalTaskTemplateSchema)
+  .superRefine((tasks, ctx) => {
+    const ids = new Set<string>();
+    for (const task of tasks) {
+      if (ids.has(task.id))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate personal task ID: ${task.id}`,
+        });
+      ids.add(task.id);
     }
   });

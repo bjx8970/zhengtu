@@ -28,6 +28,10 @@ import { createRuntimeIdFactory } from '../runtime-id';
  * @param payload 动作参数
  */
 export function reduceStartAction(draft: PlayerSave, payload: StartActionPayload): void {
+  // 部门治理行动是领导职务专属：无领导职务阶段以个人任务为主要工作，
+  // 引擎侧拒绝与 UI 侧隐藏双重封禁（issue #120）。
+  if (draft.career.appointment.leadershipRank === 'none') return;
+
   const loader = getConfigLoader();
   const cfg = loader.getGameConfig();
   const positionId = draft.career.appointment.positionId;
