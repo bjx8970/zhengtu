@@ -13,6 +13,7 @@
       { "target": "assessment_score", "operation": "add", "value": 1 }
     ],
     "kpiEffects": [{ "indicatorId": "office_efficiency", "operation": "add", "value": 6 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
     "repeatPolicy": "repeatable"
   },
   {
@@ -40,6 +41,7 @@
     "budgetDelta": 5,
     "effects": [{ "target": "character", "field": "competence", "operation": "add", "value": 1 }],
     "kpiEffects": [{ "indicatorId": "office_efficiency", "operation": "add", "value": 3 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
     "repeatPolicy": "repeatable"
   },
   {
@@ -66,6 +68,7 @@
     "budgetDelta": 5,
     "effects": [{ "target": "character", "field": "competence", "operation": "add", "value": 1 }],
     "kpiEffects": [{ "indicatorId": "data_accuracy", "operation": "add", "value": 5 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
     "repeatPolicy": "repeatable"
   },
   {
@@ -270,6 +273,7 @@
       { "target": "character", "field": "competence", "operation": "add", "value": 4 },
       { "target": "character", "field": "stability", "operation": "add", "value": 2 }
     ],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
     "repeatPolicy": "once"
   },
   {
@@ -297,6 +301,7 @@
     "cooldownDays": 14,
     "budgetDelta": 12,
     "effects": [{ "target": "character", "field": "competence", "operation": "add", "value": 3 }],
+    "prerequisites": { "allowedLeadershipRanks": ["none"] },
     "repeatPolicy": "repeatable"
   }
 ]

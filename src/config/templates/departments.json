@@ -23,6 +23,19 @@
         "cooldownDays": 7,
         "budgetDelta": 20,
         "effects": [{ "target": "dept.kpi.planning_score", "operation": "add", "value": 5 }]
+      },
+      {
+        "id": "township_investment_promotion",
+        "name": "基层招商项目对接",
+        "description": "统筹镇域招商线索和项目落地条件，推动产业项目进入政策协同阶段",
+        "durationDays": 5,
+        "category": "major",
+        "cooldownDays": 14,
+        "budgetDelta": 150,
+        "effects": [
+          { "target": "dept.kpi.project_completion", "operation": "add", "value": 8 },
+          { "target": "player.performance", "operation": "add", "value": 3 }
+        ]
       }
     ],
     "kpiTemplateIds": ["project_completion", "planning_score"]

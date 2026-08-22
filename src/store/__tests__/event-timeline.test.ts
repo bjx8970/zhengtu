@@ -1065,15 +1065,14 @@ describe('event timeline integration', () => {
 
   it('产业园政策链: 招商完成 → 提交提议 → 同日提案审批 → 政策审批事件触发并保留上下文', () => {
     const state = createInitialState();
-    // 切换到包含 economic_development 部门的职位（admin_l1_0 不含该部门）
-    state.career.appointment.positionId = 'admin_l6_0';
-    // 部门治理行动为领导职务专属（issue #120）；匹配领导职位等级
-    state.career.appointment.leadershipRank = 'prefecture_deputy';
+    // 乡镇副职直接复用既有招商→产业园政策链，不另造平行事件。
+    state.career.appointment.positionId = 'admin_l2_0';
+    state.career.appointment.leadershipRank = 'township_deputy';
 
     const loader = getConfigLoader();
     const department = loader
       .resolvePositionDepartments(state.career.appointment.positionId)
-      .find((item) => item.actions.some((a) => a.id === 'investment_promotion'));
+      .find((item) => item.actions.some((a) => a.id === 'township_investment_promotion'));
     expect(department).toBeDefined();
     if (!department) return;
 
@@ -1095,7 +1094,7 @@ describe('event timeline integration', () => {
     store.dispatch({
       type: 'START_ACTION',
       deptId: department.id,
-      actionId: 'investment_promotion',
+      actionId: 'township_investment_promotion',
       tierKey: 'primary',
       _idFactory: nextId,
     });

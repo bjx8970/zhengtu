@@ -577,7 +577,16 @@
     "presentation": "automatic",
     "trigger": {
       "sources": ["action.completed"],
-      "condition": { "signalField": "actionId", "op": "eq", "value": "investment_promotion" },
+      "condition": {
+        "any": [
+          { "signalField": "actionId", "op": "eq", "value": "investment_promotion" },
+          {
+            "signalField": "actionId",
+            "op": "eq",
+            "value": "township_investment_promotion"
+          }
+        ]
+      },
       "probability": 1
     },
     "repeatPolicy": { "mode": "once_per_source" },

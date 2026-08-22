@@ -1809,6 +1809,24 @@ export function migrateSchema10DeputyOpportunityContent(
       career.activeProcess = null;
     }
   }
+  migrated.contentVersion = '2026.08.4';
+  return migrated;
+}
+
+/**
+ * 迁移 Schema 10 的乡镇领导治理内容版本。
+ *
+ * 本次仅扩展当前职位配置与新任务准入规则，不重写玩家已经消耗的预算，
+ * 也不替换在途行动/任务的可执行快照；新年度预算会在下一次年结按新配置补充。
+ *
+ * @param prev Schema 10、内容版本 2026.08.4 的存档
+ * @returns 保留运行时状态并升级内容版本的存档
+ */
+export function migrateSchema10TownshipGovernanceContent(
+  prev: Record<string, unknown>,
+): Record<string, unknown> {
+  if (prev.contentVersion !== '2026.08.4') return prev;
+  const migrated = structuredClone(prev);
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
@@ -1917,6 +1935,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     }
     target = migrateSchema10RankQuotaContent(target as Record<string, unknown>);
     target = migrateSchema10DeputyOpportunityContent(target as Record<string, unknown>);
+    target = migrateSchema10TownshipGovernanceContent(target as Record<string, unknown>);
   } catch (e) {
     return {
       success: false,
