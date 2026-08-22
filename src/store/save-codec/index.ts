@@ -1728,6 +1728,34 @@ export function migrateSchema9To10(prev: Record<string, unknown>): Record<string
 }
 
 /**
+ * 迁移 Schema 10 的年度职数内容语义。
+ *
+ * `2026.08.2` 新存档会为所有未来职级预置职数；该库存无法与玩家行为区分，
+ * 而当时也不存在年度 producer。因此迁移时将全部正式职数恢复为新配置的
+ * 初始值，让后续库存只能由年度考核重新取得。行动/政策快照继续保留原内容版本。
+ *
+ * @param prev Schema 10 SaveEnvelope
+ * @returns 已应用当前内容语义的 Schema 10 SaveEnvelope
+ */
+export function migrateSchema10RankQuotaContent(
+  prev: Record<string, unknown>,
+): Record<string, unknown> {
+  if (prev.contentVersion !== '2026.08.2') return prev;
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const world = state?.world as Record<string, unknown> | undefined;
+  const metrics = world?.metrics as Record<string, unknown> | undefined;
+  if (!metrics) throw new Error('Schema 10 save is missing world metrics for content migration');
+  for (const [metricId, initialValue] of Object.entries(
+    getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
+  )) {
+    metrics[metricId] = initialValue;
+  }
+  migrated.contentVersion = CURRENT_CONTENT_VERSION;
+  return migrated;
+}
+
+/**
  * 严格解码存档数据（已解析的对象）。
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
@@ -1809,6 +1837,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     } else if (obj.schemaVersion === 9) {
       target = migrateSchema9To10(obj);
     }
+    target = migrateSchema10RankQuotaContent(target as Record<string, unknown>);
   } catch (e) {
     return {
       success: false,

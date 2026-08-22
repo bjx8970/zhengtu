@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createInitialState, createTestStore } from '../game-store';
 import { decodeCurrentSave, wrapSaveEnvelope, validatePlayerSave } from '../save-codec';
-import { CURRENT_SCHEMA_VERSION } from '../../types/save';
+import { CURRENT_CONTENT_VERSION, CURRENT_SCHEMA_VERSION } from '../../types/save';
 import { getConfigLoader } from '../../config/loader';
 import { createActionExecutableSnapshot } from '../action-executable-snapshot';
 import type { AppointmentCareerOpportunity } from '../../domain/career/state';
@@ -452,6 +452,39 @@ describe('Schema 2 存档', () => {
       outcomeReason: null,
       evaluations: [],
     });
+  });
+
+  it('Schema 10 旧内容存档清除无法证明来源的预置未来职数', () => {
+    const state = createInitialState();
+    state.assessments.annualAssessments = [];
+    for (const rule of getConfigLoader().getAllCivilServiceRankProgressionRules()) {
+      const quota = rule.quotaRequirement;
+      if (quota) state.world.metrics[quota.metricId] = quota.requiredValue;
+    }
+    state.world.metrics.unrelated_metric = 42;
+    const envelope = { ...wrapSaveEnvelope(state), contentVersion: '2026.08.2' };
+
+    const result = decodeCurrentSave(JSON.stringify(envelope));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.assessments.annualAssessments).toEqual([]);
+    expect(result.state?.world.metrics).toMatchObject(
+      getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
+    );
+    expect(result.state?.world.metrics.unrelated_metric).toBe(42);
+  });
+
+  it('Schema 10 当前内容存档保留年度 producer 已取得的职数', () => {
+    const state = createInitialState();
+    state.assessments.annualAssessments.push({ year: 2012, score: 75, tier: '称职' });
+    state.world.metrics['rank_quota.clerk_1'] = 1;
+    const envelope = wrapSaveEnvelope(state);
+    expect(envelope.contentVersion).toBe(CURRENT_CONTENT_VERSION);
+
+    const result = decodeCurrentSave(JSON.stringify(envelope));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.world.metrics['rank_quota.clerk_1']).toBe(1);
   });
 
   it('rejects career opportunities with invalid lifecycle dates during strict decode', () => {
