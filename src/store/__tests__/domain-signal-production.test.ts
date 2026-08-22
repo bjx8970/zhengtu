@@ -14,6 +14,7 @@ import { getConfigLoader } from '../../config/loader';
 import { createInitialState, createTestStore } from '../game-store';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
 import { CURRENT_CONTENT_VERSION } from '../../types/save';
+import { PERSONAL_TASK_LEDGER_ID } from '../../types/player';
 
 function eventDefinition(
   id: string,
@@ -271,6 +272,65 @@ describe('domain signal production', () => {
     store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
     expect(store.getRawState().assessments.annualAssessments).toHaveLength(1);
     expect(store.getRawState().remainingBudget).toBe(budgetAfterSettlement);
+  });
+
+  it('称职年度考核生产下一职级职数并发出精确 world.metric_changed 信号', () => {
+    const loader = getConfigLoader();
+    const rankQuotaEvent: EventDefinition = {
+      ...eventDefinition('rank-quota-produced-test', 'world.metric_changed'),
+      trigger: {
+        sources: ['world.metric_changed'],
+        condition: { signalField: 'metricId', op: 'eq', value: 'rank_quota.clerk_1' },
+        probability: 1,
+      },
+    };
+    vi.spyOn(loader, 'getAllEventDefinitions').mockReturnValue([
+      ...loader.getAllEventDefinitions(),
+      rankQuotaEvent,
+    ]);
+    const config = loader.getGameConfig();
+    const state = createInitialState();
+    state.time = {
+      year: config.startYear,
+      month: config.monthsPerYear,
+      day: config.daysPerMonth,
+      granularity: 'day',
+      totalDaysPlayed: config.monthsPerYear * config.daysPerMonth - 1,
+      pendingContinuation: null,
+    };
+    state.actions.departmentStates[PERSONAL_TASK_LEDGER_ID] = {
+      id: PERSONAL_TASK_LEDGER_ID,
+      kpiValues: {
+        office_efficiency: 100,
+        staff_satisfaction: 100,
+        livelihood_score: 100,
+        social_security_coverage: 100,
+        agricultural_output: 100,
+        data_accuracy: 100,
+        resident_satisfaction: 100,
+      },
+      monthlyConsumption: 0,
+      cumulativeConsumption: 0,
+      lastActionDay: 0,
+      actionCooldownUntilDays: {},
+    };
+    const store = createTestStore(state);
+    let sequence = 0;
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0.99,
+      _idFactory: () => `rank-quota-signal-${sequence++}`,
+    });
+
+    const assessed = store.getRawState();
+    expect(assessed.assessments.annualAssessments[0]?.tier).toMatch(/优秀|称职/);
+    expect(assessed.world.metrics['rank_quota.clerk_1']).toBe(1);
+    const triggered = assessed.events.pending.find((event) => event.eventId === rankQuotaEvent.id);
+    expect(triggered?.triggerContext).toMatchObject({
+      signalType: 'world.metric_changed',
+      data: { metricId: 'rank_quota.clerk_1', value: 1 },
+    });
   });
 
   it('政策效果产生 policy.metric_changed 并使用冻结原始上下文', () => {

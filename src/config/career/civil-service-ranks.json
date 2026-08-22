@@ -25,8 +25,12 @@
       "minExcellentAssessmentCount": 0,
       "quotaRequirement": {
         "metricId": "rank_quota.clerk_1",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     },
@@ -41,8 +45,12 @@
       "minExcellentAssessmentCount": 0,
       "quotaRequirement": {
         "metricId": "rank_quota.section_member_4",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     },
@@ -57,8 +65,12 @@
       "minExcellentAssessmentCount": 0,
       "quotaRequirement": {
         "metricId": "rank_quota.section_member_3",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     },
@@ -73,8 +85,12 @@
       "minExcellentAssessmentCount": 1,
       "quotaRequirement": {
         "metricId": "rank_quota.section_member_2",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     },
@@ -89,8 +105,12 @@
       "minExcellentAssessmentCount": 1,
       "quotaRequirement": {
         "metricId": "rank_quota.section_member_1",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     },
@@ -105,8 +125,12 @@
       "minExcellentAssessmentCount": 2,
       "quotaRequirement": {
         "metricId": "rank_quota.researcher_4",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     },
@@ -121,8 +145,12 @@
       "minExcellentAssessmentCount": 3,
       "quotaRequirement": {
         "metricId": "rank_quota.researcher_3",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     },
@@ -137,8 +165,12 @@
       "minExcellentAssessmentCount": 4,
       "quotaRequirement": {
         "metricId": "rank_quota.researcher_2",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     },
@@ -153,8 +185,12 @@
       "minExcellentAssessmentCount": 5,
       "quotaRequirement": {
         "metricId": "rank_quota.researcher_1",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     },
@@ -169,8 +205,12 @@
       "minExcellentAssessmentCount": 6,
       "quotaRequirement": {
         "metricId": "rank_quota.inspector_2",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     },
@@ -185,8 +225,12 @@
       "minExcellentAssessmentCount": 7,
       "quotaRequirement": {
         "metricId": "rank_quota.inspector_1",
+        "initialValue": 0,
         "requiredValue": 1,
-        "consumeValue": 1
+        "consumeValue": 1,
+        "annualGrant": 1,
+        "maxValue": 1,
+        "grantAssessmentTiers": ["优秀", "称职"]
       },
       "additionalConditions": []
     }

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../../store/game-store';
 import { getConfigLoader } from '../../../config/loader';
 import { CivilServiceRankConfigSchema } from '../../../config/schemas';
+import { KPITier } from '../../../types/enums';
 import {
   calculateCareerServiceDays,
   evaluateCivilServiceRankEligibility,
@@ -59,23 +60,72 @@ describe('civil-service rank eligibility', () => {
   it('requires days, assessment, quota and no restrictions', () => {
     const state = createInitialState();
     state.career.civilServiceRankStartedAtDay = 0;
+    const probation = state.career.appointment.probation;
+    expect(probation).not.toBeNull();
+    if (!probation) return;
+    probation.status = 'passed';
     state.assessments.annualAssessments.push({ year: 2026, score: 90, tier: '优秀' });
     state.world.metrics['rank_quota.clerk_1'] = 1;
     const rule = getConfigLoader().getCivilServiceRankProgressionRule('clerk_2');
     const result = evaluateCivilServiceRankEligibility(state, 360, 360, rule);
     expect(result.eligible).toBe(true);
-    state.career.restrictions.push({
+    const restriction = {
       id: 'discipline',
-      type: 'disciplinary_action',
+      type: 'rank_advancement_freeze' as const,
       startedAtDay: 0,
       endsAtDay: null,
       reason: '',
-      sourceType: 'system',
+      sourceType: 'system' as const,
       sourceId: null,
-    });
+    };
+    state.career.restrictions.push(restriction);
+    expect(evaluateCivilServiceRankEligibility(state, 360, 360, rule).failures[0]?.reason).toBe(
+      'rank_advancement_frozen',
+    );
+    state.career.restrictions[0] = { ...restriction, type: 'disciplinary_action' };
     expect(evaluateCivilServiceRankEligibility(state, 360, 360, rule).failures[0]?.reason).toBe(
       'disciplinary_restriction',
     );
+  });
+
+  it('returns every concrete missing prerequisite for a new clerk', () => {
+    const state = createInitialState();
+    const rule = getConfigLoader().getCivilServiceRankProgressionRule('clerk_2');
+    const reasons = evaluateCivilServiceRankEligibility(state, 0, 360, rule).failures.map(
+      (failure) => failure.reason,
+    );
+    expect(reasons).toEqual(
+      expect.arrayContaining([
+        'probation_active',
+        'insufficient_days_in_rank',
+        'insufficient_service_days',
+        'insufficient_assessments',
+        'insufficient_qualified_assessments',
+        'quota_unavailable',
+      ]),
+    );
+  });
+
+  it('blocks active or failed probation but allows passed and later no-probation appointments', () => {
+    const state = createInitialState();
+    state.assessments.annualAssessments.push({ year: 2026, score: 90, tier: '优秀' });
+    state.world.metrics['rank_quota.clerk_1'] = 1;
+    const rule = getConfigLoader().getCivilServiceRankProgressionRule('clerk_2');
+
+    expect(evaluateCivilServiceRankEligibility(state, 360, 360, rule).failures[0]?.reason).toBe(
+      'probation_active',
+    );
+    const probation = state.career.appointment.probation;
+    expect(probation).not.toBeNull();
+    if (!probation) return;
+    probation.status = 'failed';
+    expect(evaluateCivilServiceRankEligibility(state, 360, 360, rule).failures[0]?.reason).toBe(
+      'probation_failed',
+    );
+    probation.status = 'passed';
+    expect(evaluateCivilServiceRankEligibility(state, 360, 360, rule).eligible).toBe(true);
+    state.career.appointment.probation = null;
+    expect(evaluateCivilServiceRankEligibility(state, 360, 360, rule).eligible).toBe(true);
   });
 
   it('rejects transient signal-field conditions in rank rules', () => {
@@ -160,6 +210,32 @@ describe('civil-service rank eligibility', () => {
     const config = {
       definitions,
       progressionRules: getConfigLoader().getAllCivilServiceRankProgressionRules(),
+    };
+    expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('rejects quota requirements that exceed their inventory ceiling', () => {
+    const progressionRules = getConfigLoader().getAllCivilServiceRankProgressionRules();
+    const firstRule = progressionRules[0];
+    expect(firstRule?.quotaRequirement).not.toBeNull();
+    if (!firstRule?.quotaRequirement) return;
+    firstRule.quotaRequirement.requiredValue = firstRule.quotaRequirement.maxValue + 1;
+    const config = {
+      definitions: getConfigLoader().getAllCivilServiceRankDefinitions(),
+      progressionRules,
+    };
+    expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('rejects duplicate annual-assessment tiers in a quota producer', () => {
+    const progressionRules = getConfigLoader().getAllCivilServiceRankProgressionRules();
+    const firstRule = progressionRules[0];
+    expect(firstRule?.quotaRequirement).not.toBeNull();
+    if (!firstRule?.quotaRequirement) return;
+    firstRule.quotaRequirement.grantAssessmentTiers = [KPITier.Excellent, KPITier.Excellent];
+    const config = {
+      definitions: getConfigLoader().getAllCivilServiceRankDefinitions(),
+      progressionRules,
     };
     expect(CivilServiceRankConfigSchema.safeParse(config).success).toBe(false);
   });

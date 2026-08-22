@@ -290,8 +290,8 @@ class ConfigLoader {
     for (const rule of this.civilServiceRanks.progressionRules) {
       const quota = rule.quotaRequirement;
       if (!quota) continue;
-      // 职数由正式职级配置确定，且与具体岗位 vacancyCount 保持独立。
-      metrics[quota.metricId] = Math.max(metrics[quota.metricId] ?? 0, quota.requiredValue);
+      // 新存档只取得配置声明的初始库存；后续库存必须由年度考核自然生产。
+      metrics[quota.metricId] = Math.max(metrics[quota.metricId] ?? 0, quota.initialValue);
     }
     return metrics;
   }

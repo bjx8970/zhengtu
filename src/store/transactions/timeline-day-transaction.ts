@@ -52,6 +52,7 @@ import {
 import { commitPolicyTransitionInTransaction } from './policy-transition-transaction';
 import { expireCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
 import { evaluateProbation } from '../../engine/career/probation-evaluation';
+import { grantAnnualCivilServiceRankQuota } from '../../engine/career/rank-quota';
 
 /**
  * 结算当日行动与到期政策，再统一处理它们产生的领域信号。
@@ -516,7 +517,7 @@ function processMonthlySettlement(
  * @param year       考核年份
  * @param absoluteDay 当前绝对日
  * @param idFactory   事务共享 ID 工厂
- * @returns 包含 assessment.completed 和 world.metric_changed 的信号数组
+ * @returns 包含考核、职数与年度世界指标变化的信号数组
  */
 function processAnnualAssessment(
   draft: PlayerSave,
@@ -571,6 +572,23 @@ function processAnnualAssessment(
       data: { year, score, tier: annual.tier },
     },
   ];
+
+  const rankRule = loader.getCivilServiceRankProgressionRule(draft.career.civilServiceRank);
+  const quotaMetricId = rankRule?.quotaRequirement?.metricId;
+  const quotaGrant = grantAnnualCivilServiceRankQuota(
+    rankRule,
+    annual.tier,
+    quotaMetricId ? (draft.world.metrics[quotaMetricId] ?? 0) : 0,
+  );
+  if (quotaGrant && quotaGrant.currentValue !== quotaGrant.previousValue) {
+    draft.world.metrics[quotaGrant.metricId] = quotaGrant.currentValue;
+    signals.push({
+      signalId: idFactory(),
+      signalType: 'world.metric_changed',
+      occurredAtDay: absoluteDay,
+      data: { metricId: quotaGrant.metricId, value: quotaGrant.currentValue },
+    });
+  }
 
   const newReport = computeCorruptionReport({
     integrity: draft.character.integrity,

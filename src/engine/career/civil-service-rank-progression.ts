@@ -4,11 +4,8 @@ import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { CivilServiceRankProgressionRule } from '../../config/schemas';
 import type { PlayerSave } from '../../types/player';
 import type { CareerExperienceQualificationRules } from '../../types/config';
-import {
-  evaluateCivilServiceRankEligibility,
-  type RankEligibilityFailure,
-  type RankEligibilityResult,
-} from './civil-service-rank-eligibility';
+import type { RankEligibilityFailure, RankEligibilityResult } from '../../types/career';
+import { evaluateCivilServiceRankEligibility } from './civil-service-rank-eligibility';
 
 export interface AdvanceCivilServiceRankParams {
   state: Readonly<PlayerSave>;
