@@ -162,6 +162,8 @@ describe('Phase 3 reachability foundation', () => {
     expect(store.getRawState().career.appointment.probation?.status).toBe('passed');
     const appointmentIdentity = structuredClone(store.getRawState().career.appointment);
     const openExperience = structuredClone(store.getRawState().career.experiences[0]);
+    if (!openExperience) throw new Error('Expected open career experience');
+    const { assessmentResults: priorAssessmentResults, ...experienceIdentity } = openExperience;
     store.dispatch({ type: 'ADVANCE_CIVIL_SERVICE_RANK', _idFactory: idFactory });
     expect(store.getRawState().career.civilServiceRank).toBe('clerk_1');
     expect(store.getRawState().world.metrics['rank_quota.clerk_1']).toBe(0);
@@ -175,7 +177,10 @@ describe('Phase 3 reachability foundation', () => {
     expect(store.getRawState().career.civilServiceRank).toBe('section_member_4');
     expect(store.getRawState().world.metrics['rank_quota.section_member_4']).toBe(0);
     expect(store.getRawState().career.appointment).toEqual(appointmentIdentity);
-    expect(store.getRawState().career.experiences[0]).toEqual(openExperience);
+    expect(store.getRawState().career.experiences[0]).toMatchObject(experienceIdentity);
+    expect(store.getRawState().career.experiences[0]?.assessmentResults).toHaveLength(
+      priorAssessmentResults.length + 2,
+    );
     expect(store.getRawState().career.civilServiceRankHistory).toHaveLength(2);
     expect(store.getRawState().time.totalDaysPlayed).toBe(
       acceptance.milestones.sectionMember4Promotion.minDay,

@@ -594,6 +594,89 @@ describe('Schema 2 存档', () => {
     });
   });
 
+  it('Schema 10 旧正职流程被取消并保留审计，治理运行时状态不受影响', () => {
+    const state = createInitialState();
+    state.time.totalDaysPlayed = 1260;
+    const legacyChief: AppointmentCareerOpportunity = {
+      id: 'legacy-chief',
+      definitionId: 'township_chief_leadership_vacancy',
+      type: 'leadership_vacancy',
+      status: 'in_process',
+      source: {
+        sourceType: 'assessment',
+        sourceId: 'assessment:2015',
+        signalId: 'chief-signal',
+        description: 'assessment.completed',
+      },
+      sourceSignal: {
+        signalId: 'chief-signal',
+        signalType: 'assessment.completed',
+        occurredAtDay: 1260,
+        data: { year: 2015, score: 80, tier: '称职' },
+      },
+      target: {
+        positionId: 'admin_l3_0',
+        positionName: '镇长',
+        institutionId: 'township_govt_01',
+        institutionName: '青云镇人民政府',
+        regionId: 'region_qingyun_town',
+        institutionLevel: 'township',
+        positionDomain: 'local_governance',
+        leadershipRank: 'township_chief',
+      },
+      appointmentType: 'substantive',
+      appointmentReason: 'promotion',
+      appearedAtDay: 1260,
+      expiresAtDay: 1530,
+      acceptedAtDay: 1260,
+      rejectedAtDay: null,
+      resolvedAtDay: null,
+      cancelledAtDay: null,
+      requiresSelection: true,
+      eligibilityConditions: [],
+      finalOutcome: null,
+      reason: '旧版宽松正职机会',
+    };
+    const unrelated = structuredClone(legacyChief);
+    unrelated.id = 'unrelated-opportunity';
+    unrelated.definitionId = 'unrelated-definition';
+    unrelated.status = 'available';
+    unrelated.acceptedAtDay = null;
+    state.career.opportunities = [legacyChief, unrelated];
+    state.career.activeProcess = {
+      id: 'legacy-chief-process',
+      type: 'leadership_selection',
+      status: 'active',
+      opportunityId: legacyChief.id,
+      currentStage: 'democratic_recommendation',
+      startedAtDay: 1260,
+      completedAtDay: null,
+      stageResults: [],
+    };
+    state.world.facts.industrial_park_policy_proposed = true;
+    state.remainingBudget = 4321;
+    const envelope = { ...wrapSaveEnvelope(state), contentVersion: '2026.08.5' };
+
+    const result = decodeCurrentSave(JSON.stringify(envelope));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.career.opportunities[0]).toMatchObject({
+      status: 'cancelled',
+      acceptedAtDay: null,
+      cancelledAtDay: 1260,
+    });
+    expect(result.state?.career.opportunities[1]?.status).toBe('available');
+    expect(result.state?.career.activeProcess).toBeNull();
+    expect(result.state?.career.completedProcesses.at(-1)).toMatchObject({
+      id: 'legacy-chief-process',
+      status: 'cancelled',
+      completedAtDay: 1260,
+      stageResults: [{ stage: 'democratic_recommendation', outcome: 'cancelled' }],
+    });
+    expect(result.state?.world.facts.industrial_park_policy_proposed).toBe(true);
+    expect(result.state?.remainingBudget).toBe(4321);
+  });
+
   it('Schema 9 旧内容迁移在覆盖内容版本前清除预置未来职数', () => {
     const state = createInitialState();
     for (const rule of getConfigLoader().getAllCivilServiceRankProgressionRules()) {

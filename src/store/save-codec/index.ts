@@ -1827,6 +1827,76 @@ export function migrateSchema10TownshipGovernanceContent(
 ): Record<string, unknown> {
   if (prev.contentVersion !== '2026.08.4') return prev;
   const migrated = structuredClone(prev);
+  migrated.contentVersion = '2026.08.5';
+  return migrated;
+}
+
+/**
+ * 取消旧版宽松正职机会并升级乡镇正职内容语义。
+ *
+ * 已终结机会作为历史保留；采用旧条件生成且仍可处理的正职机会会被取消，
+ * 对应运行中选拔以可审计阶段归档。治理事件、政策、预算和在途快照均原样保留。
+ *
+ * @param prev Schema 10、内容版本 2026.08.5 的存档
+ * @returns 已应用正式正职资格语义的存档
+ */
+export function migrateSchema10TownshipChiefContent(
+  prev: Record<string, unknown>,
+): Record<string, unknown> {
+  if (prev.contentVersion !== '2026.08.5') return prev;
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const career = state?.career as Record<string, unknown> | undefined;
+  const time = state?.time as Record<string, unknown> | undefined;
+  const opportunities = career?.opportunities;
+  if (!career || !Array.isArray(opportunities) || typeof time?.totalDaysPlayed !== 'number')
+    throw new Error('Legacy save is missing career opportunity state for chief content migration');
+  const currentDay = time.totalDaysPlayed;
+  const cancelledOpportunityIds = new Set<string>();
+  for (const value of opportunities) {
+    if (!value || typeof value !== 'object') continue;
+    const opportunity = value as Record<string, unknown>;
+    if (
+      opportunity.definitionId !== 'township_chief_leadership_vacancy' ||
+      !['available', 'accepted', 'in_process'].includes(String(opportunity.status))
+    )
+      continue;
+    if (typeof opportunity.id !== 'string')
+      throw new Error('Legacy chief opportunity has no stable ID');
+    cancelledOpportunityIds.add(opportunity.id);
+    opportunity.status = 'cancelled';
+    opportunity.acceptedAtDay = null;
+    opportunity.rejectedAtDay = null;
+    opportunity.resolvedAtDay = null;
+    opportunity.cancelledAtDay = currentDay;
+    opportunity.finalOutcome = null;
+  }
+  const activeProcess = career.activeProcess;
+  if (activeProcess && typeof activeProcess === 'object') {
+    const process = activeProcess as Record<string, unknown>;
+    if (
+      typeof process.opportunityId === 'string' &&
+      cancelledOpportunityIds.has(process.opportunityId)
+    ) {
+      const stageResults = Array.isArray(process.stageResults) ? process.stageResults : [];
+      stageResults.push({
+        stage: process.currentStage,
+        resolvedAtDay: currentDay,
+        outcome: 'cancelled',
+        score: null,
+        detail: '内容更新后按正式正职资格重新等待机会',
+      });
+      process.stageResults = stageResults;
+      process.status = 'cancelled';
+      process.completedAtDay = currentDay;
+      const completedProcesses = Array.isArray(career.completedProcesses)
+        ? career.completedProcesses
+        : [];
+      completedProcesses.push(process);
+      career.completedProcesses = completedProcesses;
+      career.activeProcess = null;
+    }
+  }
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
@@ -1936,6 +2006,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     target = migrateSchema10RankQuotaContent(target as Record<string, unknown>);
     target = migrateSchema10DeputyOpportunityContent(target as Record<string, unknown>);
     target = migrateSchema10TownshipGovernanceContent(target as Record<string, unknown>);
+    target = migrateSchema10TownshipChiefContent(target as Record<string, unknown>);
   } catch (e) {
     return {
       success: false,

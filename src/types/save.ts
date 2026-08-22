@@ -20,7 +20,7 @@ export const CURRENT_SCHEMA_VERSION = 10;
 export const MIN_MIGRATABLE_SCHEMA_VERSION = 2;
 
 /** 当前内容版本号，用于标识配置/内容包的版本（格式：YYYY.MM.REVISION） */
-export const CURRENT_CONTENT_VERSION = '2026.08.5';
+export const CURRENT_CONTENT_VERSION = '2026.08.6';
 
 /**
  * 存档外层封装

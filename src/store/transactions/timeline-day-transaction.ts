@@ -550,7 +550,19 @@ function processAnnualAssessment(
   const yearsInPosition = Math.floor((absoluteDay - draft.career.appointment.startedAtDay) / 360);
   const annual = runAnnualAssessment(score, kpiTier, yearsInPosition, cfg);
   draft.assessments.comprehensiveScore = score;
-  draft.assessments.annualAssessments.push({ year, score, tier: annual.tier, dimensions });
+  const assessmentRecord = { year, score, tier: annual.tier, dimensions };
+  draft.assessments.annualAssessments.push(assessmentRecord);
+  const currentExperience = draft.career.experiences.find(
+    (experience) =>
+      experience.appointmentId === draft.career.appointment.appointmentId &&
+      experience.endedAtDay === null,
+  );
+  if (!currentExperience)
+    throw new Error(
+      `Current appointment ${draft.career.appointment.appointmentId} has no open experience`,
+    );
+  // 先写入任内履历再发出 assessment.completed，确保同日机会资格读取到本次结果。
+  currentExperience.assessmentResults.push({ year, score, tier: annual.tier });
   if (annual.tier === '优秀') {
     draft.character.performance = clampAttr(
       'performance',

@@ -1,5 +1,5 @@
 /**
- * Browser acceptance coverage for the playable Phase 2 vertical slice.
+ * Browser acceptance coverage for the playable Phase 2/3 vertical slice.
  *
  * Saves only accelerate to legal pre-trigger states. Opportunities, policy
  * facts, blocking events and delayed follow-ups must be produced by UI actions
@@ -172,10 +172,14 @@ async function advanceCareerProcess(page: Page, opportunityId: string): Promise<
     await page.getByTestId(`advance-career-process-${opportunityId}`).click();
 }
 
-async function advanceMonthResolvingFloodBlocker(page: Page): Promise<void> {
+async function advanceMonthResolvingBlockingEvents(page: Page): Promise<void> {
   await page.getByTestId('advance-month').click();
-  if (await page.getByRole('dialog').isVisible()) {
-    await page.getByTestId(/blocking-event-option-.*-coordinate_rescue/).click();
+  for (let attempt = 0; attempt < 5 && (await page.getByRole('dialog').isVisible()); attempt += 1) {
+    await page
+      .getByRole('dialog')
+      .locator('[data-testid^="blocking-event-option-"]')
+      .first()
+      .click();
     await page.getByTestId('advance-day').click();
   }
 }
@@ -220,7 +224,8 @@ function seedEconomicDevelopmentPost(state: JsonRecord): void {
   asRecord(state.actions, 'actions').departmentStates = departmentStates;
 }
 
-test('职业链：合格履历生成副职机会，职级与两次任职独立变化', async ({ page }) => {
+test('职业链：副职治理成果生成正职机会，职级与两次任职独立变化', async ({ page }) => {
+  test.setTimeout(60_000);
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -274,10 +279,51 @@ test('职业链：合格履历生成副职机会，职级与两次任职独立�
   expect(asRecord(career.appointment, 'appointment').positionId).toBe('admin_l2_0');
 
   await changeSave(page, seedHighAssessmentPreconditions);
+  await page.goto('/#/departments');
+  await page.getByTestId('department-admin_l2_0_dept_0').click();
+  await page
+    .getByTestId('start-action-admin_l2_0_dept_0-township_investment_promotion-primary')
+    .click();
   await page.goto('/#/main');
+  await page.getByTestId('advance-week').click();
+  await page.goto('/#/departments');
+  await page.getByTestId('department-admin_l2_0_dept_2').click();
+  await page.getByTestId('start-action-admin_l2_0_dept_2-flood_preparation-primary').click();
+  await page.goto('/#/main');
+  await page.getByTestId('advance-week').click();
+  let events = asRecord((await savedState(page)).events, 'events');
+  expect(
+    asRecords(events.history, 'event history').some(
+      (event) => event.eventId === 'flood_preparation_metrics',
+    ),
+  ).toBe(true);
+  await page.goto('/#/events');
+  await page.getByTestId(/event-option-.*-submit_proposal/).click();
+  await page.goto('/#/policies');
+  await page.getByTestId('propose-policy-industrial_park_support').click();
+  const governance = asRecord((await savedState(page)).governance, 'governance');
+  const policies = asRecords(governance.policies, 'policies');
+  const industrialPolicy = policies.find((item) => item.policyId === 'industrial_park_support');
+  if (!industrialPolicy || typeof industrialPolicy.instanceId !== 'string')
+    throw new Error('Expected industrial park policy');
+  await page.getByTestId(`approve_policy-policy-${industrialPolicy.instanceId}`).click();
+  await page.goto('/#/main');
+  await page.getByTestId('advance-month').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByTestId(/blocking-event-option-.*-rectification_plan/).click();
+  await page.getByTestId('advance-day').click();
+  events = asRecord((await savedState(page)).events, 'events');
+  expect(
+    asRecords(events.history, 'event history').some(
+      (event) => event.eventId === 'industrial_park_progress_crisis',
+    ),
+  ).toBe(true);
   while (Number(asRecord((await savedState(page)).time, 'time').totalDaysPlayed) < 1440)
-    await advanceMonthResolvingFloodBlocker(page);
+    await advanceMonthResolvingBlockingEvents(page);
   await page.goto('/#/career');
+  await expect(page.getByTestId('township-chief-readiness')).toContainText(
+    '当前任职内称职及以上考核次数不少于 2 次',
+  );
   const chiefId = selectOpportunityId(await savedState(page), 'admin_l3_0');
   await page.getByTestId(`accept-opportunity-${chiefId}`).click();
   await advanceCareerProcess(page, chiefId);
