@@ -2064,6 +2064,25 @@ export function migrateSchema10TownshipChiefContent(
   // 30 天旧窗口会反过来阻止 270 天正式窗口恢复。迁移前已终结的记录仍参与去重，
   // 防止已经消费过的来源被再次开放。
   restoreMissedTownshipChiefOpportunity(state, currentDay, replaceableOpportunityIds);
+  migrated.contentVersion = '2026.08.6';
+  return migrated;
+}
+
+/**
+ * 迁移 Phase 3 发布内容版本。
+ *
+ * 本次只补齐正式配置 producer、可达性验收和数值平衡，不改变持久化结构。
+ * 既有预算、机会、事件、政策及在途可执行快照全部保持原样；新配置只作用于
+ * 后续创建的运行时实例和下一次正常年度预算结算。
+ *
+ * @param prev Schema 10、内容版本 2026.08.6 的存档
+ * @returns 保留运行时状态并升级至当前内容版本的存档
+ */
+export function migrateSchema10Phase3ReleaseContent(
+  prev: Record<string, unknown>,
+): Record<string, unknown> {
+  if (prev.contentVersion !== '2026.08.6') return prev;
+  const migrated = structuredClone(prev);
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
@@ -2174,6 +2193,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     target = migrateSchema10DeputyOpportunityContent(target as Record<string, unknown>);
     target = migrateSchema10TownshipGovernanceContent(target as Record<string, unknown>);
     target = migrateSchema10TownshipChiefContent(target as Record<string, unknown>);
+    target = migrateSchema10Phase3ReleaseContent(target as Record<string, unknown>);
   } catch (e) {
     return {
       success: false,

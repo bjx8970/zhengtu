@@ -1,10 +1,18 @@
 # 政途人生 — 架构文档
 
-> 当前版本：0.2.0-alpha.1 | 存档 Schema：8 | 内容版本：2026.07.8
+> 当前版本：0.3.0-alpha.1 | 存档 Schema：10 | 内容版本：2026.08.7
 
 ## 当前范围
 
-当前版本是可运行的单机原型，最小可玩纵向切片（#98）已交付并通过 Playwright 端到端验收。职业、治理、事件与世界状态已使用新版领域骨架；政策生命周期、事件编排、真实领域信号和可中断统一时间轴已经闭环，职业仪表盘、政策列表、事件收件箱与阻塞弹窗 UI 均已接入。
+当前版本完成 Phase 3 基层纵向切片：新录用科员经个人任务、试用期、年度考核和两次公务员职级晋升，依次进入乡科级副职与正职；领导阶段切换为部门治理，并以招商、防汛、产业园政策/事件链产生正式治理履历。Store 四年场景和不写业务存档的 Playwright 自然路径共同证明完整链路。
+
+## Phase 3 工作模式与双通道
+
+- 无领导职务时以 `PersonalTaskTemplate` 为工作入口，任务与部门行动共用槽位；任务完成写入 `actions.personalTasks` 和保留的 `personal_work` KPI 台账。
+- 试用期是当前任职的一部分，由绝对日时间轴在到期日评估；当日任务先结算，再执行试用评估。
+- 公务员职级只通过 `ADVANCE_CIVIL_SERVICE_RANK` 消费服务年限、考核与年度职数，不改变任职实例。
+- 领导岗位只通过职业机会和选拔事务变更任职，原子关闭旧履历、创建新履历、重建部门运行时，不自动提升公务员职级。
+- `src/config/phase3/acceptance.json` 锁定阶段职位、里程碑和任务可达边界；`auditPhase3Reachability()` 对 producer/consumer、经济和配置漂移执行 CI 审计。
 
 ## 岗位机会与任职事务
 
@@ -39,6 +47,7 @@ src/
 │   ├── auth/splash.tsx          # 启动页（存档状态提示）
 │   ├── character/               # 六步建档
 │   ├── home/home-page.tsx       # 综合 Dashboard（日程概览 + 跳转入口）
+│   ├── tasks/                   # 科员个人任务与领导本人事务
 │   ├── departments/             # 部门治理（行动安排与槽位管理）
 │   ├── assessment/              # 考核详情页面
 │   ├── career/                  # 晋升任命（职级晋升 + 岗位机会任职）
@@ -55,9 +64,10 @@ src/
 ├── config/
 │   ├── career-lines/            # 当前已接入 administrative.json
 │   ├── templates/               # 部门、KPI 等复用模板
+│   ├── phase3/acceptance.json   # Phase 3 入口、里程碑与任务可达边界
 │   ├── constants.json           # 时间、槽位、晋升等常量
 │   └── loader.ts                # ConfigLoader
-  ├── engine/
+├── engine/
 │   ├── core/
 │   │   ├── action.ts            # 行动校验与效果解析
 │   │   ├── effect.ts            # 效果应用
@@ -74,6 +84,7 @@ src/
 │   │   └── metric-signal-bridge.ts   # 指标效果→领域信号
 │   ├── governance/              # assessment/budget/kpi/policy lifecycle
 │   ├── career/                  # promotion/deviation-penalty/spectrum 等
+│   ├── tasks/                   # 个人任务准入、排期与 KPI 结算
 │   └── index.ts                 # 引擎聚合导出
 ├── store/
 │   ├── game-store.ts            # Store 入口、dispatch、条件持久化
@@ -88,7 +99,7 @@ src/
 │   │   ├── timeline-day-transaction.ts
 │   │   └── policy-transition-transaction.ts
 │   └── save-codec/
-│       └── index.ts             # 严格存档解码器（Zod Schema 8，支持 Schema 2→8 迁移）
+│       └── index.ts             # 严格存档解码器（Zod Schema 10，支持 Schema 2→10 迁移）
 └── services/
     ├── save-repo.ts             # 本地/远程存档读写
     ├── startup-save-state.ts    # 启动存档状态服务
@@ -121,14 +132,17 @@ UI（页面/组件） → Store（dispatch/reducer） → Engine（纯函数） 
 
 ### Reducer 分域
 
-| Reducer                | 处理的 Action                                           |
-| ---------------------- | ------------------------------------------------------- |
-| `action-reducer.ts`    | START_ACTION（含 runtimeSnapshot 计算）                 |
-| `time-reducer.ts`      | ADVANCE_TIME（使用统一时间轴）                          |
-| `career-reducer.ts`    | START_PROMOTION / SELECT_TARGET / RESOLVE_STAGE / RESET |
-| `character-reducer.ts` | NEW_GAME / LOAD_SAVE                                    |
-| `event-reducer.ts`     | CHOOSE_EVENT_OPTION（原子效果应用 + 事件结算）          |
-| `shared.ts`            | applyPlayerAttr / initializeDepartmentStates 等         |
+| Reducer                          | 处理的 Action                                      |
+| -------------------------------- | -------------------------------------------------- |
+| `action-reducer.ts`              | START_ACTION（冻结部门行动快照）                   |
+| `personal-task-reducer.ts`       | START_PERSONAL_TASK（前置、槽位与任务快照）        |
+| `time-reducer.ts`                | ADVANCE_TIME（可中断统一时间轴）                   |
+| `career-rank-reducer.ts`         | ADVANCE_CIVIL_SERVICE_RANK                         |
+| `career-opportunity-reducer.ts`  | 机会接受/拒绝、选拔阶段与原子任职                 |
+| `policy-reducer.ts`              | 政策生命周期事务                                  |
+| `event-reducer.ts`               | CHOOSE_EVENT_OPTION（原子效果应用 + 事件结算）     |
+| `character-reducer.ts`           | NEW_GAME / LOAD_SAVE                               |
+| `shared.ts`                      | applyPlayerAttr / initializeDepartmentStates 等    |
 
 ### 测试 Store
 
@@ -140,8 +154,8 @@ UI（页面/组件） → Store（dispatch/reducer） → Engine（纯函数） 
 
 ```typescript
 interface SaveEnvelope {
-  schemaVersion: number; // 存档结构版本（当前：8）
-  contentVersion: string; // 内容配置版本（当前：2026.07.8）
+  schemaVersion: number; // 存档结构版本（当前：10）
+  contentVersion: string; // 内容配置版本（当前：2026.08.7）
   revision: number; // 同一存档的逻辑修订号
   savedAt: number; // 保存时间戳
   state: PlayerSave; // 实际游戏状态
@@ -150,8 +164,8 @@ interface SaveEnvelope {
 
 ### 严格解码行为
 
-- 当前 Schema 8 的完整 SaveEnvelope 直接进入严格结构解码
-- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → 4 → 5 → 6 → 7 → 8
+- 当前 Schema 10 的完整 SaveEnvelope 直接进入严格结构解码
+- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
 - `schemaVersion < 2` → 拒绝（`legacy_save_unsupported`）
 - `schemaVersion > CURRENT` → 拒绝（`future_version`）
 - 结构验证失败 → 拒绝（`invalid_envelope`）
@@ -161,7 +175,7 @@ interface SaveEnvelope {
 
 ### 兼容性说明
 
-解码器以 `schemaVersion` 决定结构兼容性；迁移步骤会在需要可靠重建运行时快照时校验对应的历史 `contentVersion`。Schema 2–7 通过确定性迁移链升级至 Schema 8；Schema 1 和缺少 Envelope 的裸 PlayerSave 被拒绝并保留只读备份。
+解码器以 `schemaVersion` 决定结构兼容性；迁移步骤会在需要可靠重建运行时快照时校验对应的历史 `contentVersion`。Schema 2–9 通过确定性迁移链升级至 Schema 10；Schema 10 内再按 `2026.08.2→.3→.4→.5→.6→.7` 应用内容迁移。Schema 1 和缺少 Envelope 的裸 PlayerSave 被拒绝并保留只读备份。
 
 ### revision 和 updatedAt
 
