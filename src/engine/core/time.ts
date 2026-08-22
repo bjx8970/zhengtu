@@ -69,14 +69,24 @@ export function advanceTime(
   };
 }
 
-/** 判断是否跨越了月（新日=1 且 旧日>1） */
-
+/**
+ * 判断是否跨越了月（新日=1 且旧日>1）。
+ *
+ * @param current 当前时间状态
+ * @param newDay 推进后的日
+ * @returns 是否跨越月份边界
+ */
 export function isCrossMonth(current: TimeState, newDay: number): boolean {
   return newDay === 1 && current.day > newDay;
 }
 
-/** 判断结果年 > 当前年 */
-
+/**
+ * 判断推进结果是否跨越年份。
+ *
+ * @param current 当前时间状态
+ * @param result 推进后的时间状态
+ * @returns 是否跨越年份边界
+ */
 export function isCrossYear(current: TimeState, result: TimeState): boolean {
   return result.year > current.year;
 }
@@ -86,12 +96,19 @@ export function isCrossYear(current: TimeState, result: TimeState): boolean {
  *
  * @param year               年份
  * @param congressCycleYears 周期年数
+ * @returns 是否为周期年份
  */
 export function isCongressYear(year: number, congressCycleYears: number): boolean {
   return year % congressCycleYears === 0;
 }
 
-/** 计算当前年龄 */
+/**
+ * 计算当前年龄。
+ *
+ * @param gameYear 当前游戏年份
+ * @param birthYear 出生年份
+ * @returns 当前年龄
+ */
 export function getAge(gameYear: number, birthYear: number): number {
   return gameYear - birthYear;
 }
@@ -102,6 +119,7 @@ export function getAge(gameYear: number, birthYear: number): number {
  * @param gameYear      当前游戏年份
  * @param birthYear     出生年份
  * @param retirementAge 退休年龄
+ * @returns 距离退休的剩余年数
  */
 export function getRetirementCountdown(
   gameYear: number,
@@ -116,6 +134,7 @@ export function getRetirementCountdown(
  *
  * @param granularity 推进粒度
  * @param config      游戏配置
+ * @returns 对应的推进天数
  */
 export function getGranularityDays(
   granularity: 'day' | 'week' | 'month',

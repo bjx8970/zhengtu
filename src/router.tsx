@@ -52,8 +52,9 @@ export function createRouter(routes: Route[]) {
 
     const params: Record<string, string> = {};
     for (let i = 0; i < patternParts.length; i++) {
-      const pp = patternParts[i]!;
-      const pathp = pathParts[i]!;
+      const pp = patternParts[i];
+      const pathp = pathParts[i];
+      if (pp === undefined || pathp === undefined) return null;
       if (pp.startsWith(':')) {
         params[pp.slice(1)] = pathp;
       } else if (pp !== pathp) {
