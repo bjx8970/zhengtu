@@ -900,6 +900,41 @@ describe('Schema 2 存档', () => {
       ]),
     );
 
+    const expiredLegacyWindowState = structuredClone(sameSourceState);
+    Object.assign(expiredLegacyWindowState.time, {
+      year: 2017,
+      month: 3,
+      day: 21,
+      totalDaysPlayed: 1700,
+    });
+    const expiredLegacyOpportunity = expiredLegacyWindowState.career.opportunities[0];
+    if (!expiredLegacyOpportunity) throw new Error('Expected expired legacy window fixture');
+    expiredLegacyOpportunity.status = 'expired';
+    const expiredLegacyWindowResult = decodeCurrentSave(
+      JSON.stringify({
+        ...wrapSaveEnvelope(expiredLegacyWindowState),
+        contentVersion: '2026.08.5',
+      }),
+    );
+    expect(expiredLegacyWindowResult.success).toBe(true);
+    expect(expiredLegacyWindowResult.state?.career.opportunities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'legacy-chief-same-assessment-source',
+          status: 'expired',
+          appearedAtDay: 1620,
+          expiresAtDay: 1650,
+        }),
+        expect.objectContaining({
+          id: 'content-migration-chief-legacy-deputy-appointment-2016',
+          status: 'available',
+          appearedAtDay: 1620,
+          expiresAtDay: 1890,
+          source: expect.objectContaining({ sourceId: 'assessment:2016' }),
+        }),
+      ]),
+    );
+
     const consumedSourceState = structuredClone(sameSourceState);
     const consumedOpportunity = consumedSourceState.career.opportunities[0];
     if (!consumedOpportunity) throw new Error('Expected consumed source fixture');

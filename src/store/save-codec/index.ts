@@ -2013,16 +2013,19 @@ export function migrateSchema10TownshipChiefContent(
   const currentDay = time.totalDaysPlayed;
   backfillCareerExperienceAssessments(state, currentDay);
   const cancelledOpportunityIds = new Set<string>();
+  const replaceableOpportunityIds = new Set<string>();
   for (const value of opportunities) {
     if (!value || typeof value !== 'object') continue;
     const opportunity = value as Record<string, unknown>;
-    if (
-      opportunity.definitionId !== 'township_chief_leadership_vacancy' ||
-      !['available', 'accepted', 'in_process'].includes(String(opportunity.status))
-    )
-      continue;
+    if (opportunity.definitionId !== 'township_chief_leadership_vacancy') continue;
+    const status = String(opportunity.status);
+    if (!['available', 'accepted', 'in_process', 'expired'].includes(status)) continue;
     if (typeof opportunity.id !== 'string')
       throw new Error('Legacy chief opportunity has no stable ID');
+    replaceableOpportunityIds.add(opportunity.id);
+    // 旧窗口自然过期只说明 30 天时限已结束，保留原 expired 记录并让下方按
+    // 正式 270 天时限判断是否恢复；活动机会才需要在内容切换时显式取消。
+    if (status === 'expired') continue;
     cancelledOpportunityIds.add(opportunity.id);
     opportunity.status = 'cancelled';
     opportunity.acceptedAtDay = null;
@@ -2060,7 +2063,7 @@ export function migrateSchema10TownshipChiefContent(
   // 本轮刚取消的旧内容机会不能充当正式机会的去重凭据；否则同一考核源下的
   // 30 天旧窗口会反过来阻止 270 天正式窗口恢复。迁移前已终结的记录仍参与去重，
   // 防止已经消费过的来源被再次开放。
-  restoreMissedTownshipChiefOpportunity(state, currentDay, cancelledOpportunityIds);
+  restoreMissedTownshipChiefOpportunity(state, currentDay, replaceableOpportunityIds);
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
