@@ -7,6 +7,7 @@
 import type { ConditionExpression, EffectDefinition } from '../domain/conditions';
 import type { EventDefinition } from '../domain/events/definition';
 import type { DomainSignal } from '../domain/governance/types';
+import { isCivilServiceRankAtLeast } from '../domain/career/types';
 import type {
   CareerOpportunityDefinition,
   DepartmentConfig,
@@ -14,6 +15,7 @@ import type {
   PolicyDefinitionConfig,
 } from '../types/config';
 import type { Phase3AcceptanceConfig } from '../types/phase3';
+import type { Phase3TaskReachabilityBound } from '../types/phase3';
 import type { PositionConfigV2 } from '../types/position-v2';
 import type { CivilServiceRankProgressionRule } from './schemas';
 
@@ -26,6 +28,8 @@ export interface Phase3ReachabilityCatalog {
   policies: readonly PolicyDefinitionConfig[];
   rankProgressionRules: readonly CivilServiceRankProgressionRule[];
   departmentsByPosition: Readonly<Record<string, readonly DepartmentConfig[]>>;
+  /** 配置允许同时执行的工作槽位总数，用于计算任务完成数的时间上界。 */
+  totalSlotCount: number;
 }
 
 /** 单阶段的可玩内容摘要。 */
@@ -245,6 +249,48 @@ function contradictionErrors(label: string, conditions: readonly ConditionExpres
     .map(([key, values]) => `${label} has contradictory ${key} values: ${[...values].join(', ')}`);
 }
 
+function completedTaskUpperBound(catalog: Phase3ReachabilityCatalog, deadlineDay: number): number {
+  const minimumDuration = Math.min(...catalog.personalTasks.map((task) => task.durationDays));
+  if (!Number.isFinite(minimumDuration) || minimumDuration <= 0) return 0;
+  // 使用全目录最短工期和全部槽位，刻意取宽松上界；超过它在任何玩法路径都不可能完成。
+  return Math.floor(deadlineDay / minimumDuration) * catalog.totalSlotCount;
+}
+
+function taskAvailabilityErrors(
+  task: PersonalTaskTemplate,
+  bound: Phase3TaskReachabilityBound,
+  catalog: Phase3ReachabilityCatalog,
+  producedFacts: ReadonlySet<string>,
+): string[] {
+  const errors: string[] = [];
+  const prerequisites = task.prerequisites;
+  if (!prerequisites) return errors;
+  if (
+    prerequisites.allowedLeadershipRanks &&
+    !prerequisites.allowedLeadershipRanks.includes(bound.leadershipRank)
+  )
+    errors.push(`leadership rank ${bound.leadershipRank} is not allowed`);
+  if (
+    prerequisites.civilServiceRankMin &&
+    !isCivilServiceRankAtLeast(bound.civilServiceRank, prerequisites.civilServiceRankMin)
+  )
+    errors.push(
+      `civil service rank ${bound.civilServiceRank} is below ${prerequisites.civilServiceRankMin}`,
+    );
+  const completionUpperBound = completedTaskUpperBound(catalog, bound.deadlineDay);
+  if (
+    prerequisites.minCompletedTasks !== undefined &&
+    prerequisites.minCompletedTasks > completionUpperBound
+  )
+    errors.push(
+      `requires ${prerequisites.minCompletedTasks} completed tasks but at most ${completionUpperBound} fit before day ${bound.deadlineDay}`,
+    );
+  for (const factId of prerequisites.requiredFacts ?? [])
+    if (!producedFacts.has(factId))
+      errors.push(`required fact ${factId} has no reachable producer`);
+  return errors;
+}
+
 /**
  * 审计 Phase 3 的正式内容可达性、阶段节奏和基层预算/KPI producer。
  *
@@ -293,6 +339,7 @@ export function auditPhase3Reachability(
       entrypoint.kind === 'timeline_node' &&
       entrypoint.contentId === 'annual_assessment',
   );
+  const phaseTaskDeadline = config.milestones.townshipChiefAppointment.maxDay;
 
   if (hasAnnualAssessment)
     for (const rule of catalog.rankProgressionRules) {
@@ -310,9 +357,22 @@ export function auditPhase3Reachability(
     let changed = false;
     for (const task of catalog.personalTasks) {
       if (reachableTasks.has(task.id)) continue;
-      const allowed = task.prerequisites?.allowedLeadershipRanks;
-      if (allowed && !allowed.some((rank) => leadershipRanks.has(rank))) continue;
-      if (task.prerequisites?.requiredFacts?.some((fact) => !factProducers.has(fact))) continue;
+      const producedFacts = new Set(factProducers.keys());
+      const hasReachableRuntimeContext = [...leadershipRanks].some(
+        (leadershipRank) =>
+          taskAvailabilityErrors(
+            task,
+            {
+              taskId: task.id,
+              leadershipRank,
+              civilServiceRank: 'section_member_4',
+              deadlineDay: phaseTaskDeadline,
+            },
+            catalog,
+            producedFacts,
+          ).length === 0,
+      );
+      if (!hasReachableRuntimeContext) continue;
       reachableTasks.add(task.id);
       addEffects(task.effects, `personal_task:${task.id}`, factProducers, metricProducers);
       changed = true;
@@ -380,6 +440,21 @@ export function auditPhase3Reachability(
     if (!changed) break;
   }
 
+  const finalProducedFacts = new Set(factProducers.keys());
+  const taskBounds = new Map(config.taskReachabilityBounds.map((bound) => [bound.taskId, bound]));
+  for (const bound of config.taskReachabilityBounds) {
+    const task = tasks.get(bound.taskId);
+    if (!task) {
+      errors.push(`Phase 3 task reachability bound references unknown task ${bound.taskId}`);
+      continue;
+    }
+    const availabilityErrors = taskAvailabilityErrors(task, bound, catalog, finalProducedFacts);
+    for (const reason of availabilityErrors)
+      errors.push(
+        `Phase 3 task ${bound.taskId} is not reachable by day ${bound.deadlineDay}: ${reason}`,
+      );
+  }
+
   const context = {
     actionIds,
     taskIds: reachableTasks,
@@ -408,8 +483,12 @@ export function auditPhase3Reachability(
 
   for (const entrypoint of config.entrypoints) {
     const label = `Phase 3 ${entrypoint.role} ${entrypoint.kind} ${entrypoint.contentId}`;
-    if (entrypoint.kind === 'personal_task' && !reachableTasks.has(entrypoint.contentId))
-      errors.push(`${label} is not reachable by a stage player`);
+    if (entrypoint.kind === 'personal_task') {
+      if (!taskBounds.has(entrypoint.contentId))
+        errors.push(`${label} has no bounded runtime availability context`);
+      if (!reachableTasks.has(entrypoint.contentId))
+        errors.push(`${label} is not reachable by a stage player`);
+    }
     if (entrypoint.kind === 'department_action' && !actionIds.has(entrypoint.contentId))
       errors.push(`${label} is not available to a stage position`);
     if (entrypoint.kind === 'event') {

@@ -135,6 +135,20 @@ export const CIVIL_SERVICE_RANKS = [
 /** 公务员职级类型 */
 export type CivilServiceRank = (typeof CIVIL_SERVICE_RANKS)[number];
 
+/**
+ * 判断当前公务员职级是否达到最低要求。
+ *
+ * @param current 当前职级
+ * @param required 最低职级
+ * @returns 当前职级不低于最低职级时返回 true
+ */
+export function isCivilServiceRankAtLeast(
+  current: CivilServiceRank,
+  required: CivilServiceRank,
+): boolean {
+  return CIVIL_SERVICE_RANKS.indexOf(current) >= CIVIL_SERVICE_RANKS.indexOf(required);
+}
+
 /** 公务员职级中文标签 */
 export const CIVIL_SERVICE_RANK_LABELS: Record<CivilServiceRank, string> = {
   clerk_2: '二级科员',

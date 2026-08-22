@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import { CivilServiceRankSchema, LeadershipRankSchema } from '../domain/career/types';
 import type { Phase3AcceptanceConfig } from '../types/phase3';
 import { auditPhase3Reachability, type Phase3ReachabilityCatalog } from './phase3-reachability';
 import acceptanceData from './phase3/acceptance.json' with { type: 'json' };
@@ -38,6 +39,15 @@ const KpiProducerRequirementSchema = z
     positionId: z.string().min(1),
     kpiId: z.string().min(1),
     personalTaskIds: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
+
+const TaskReachabilityBoundSchema = z
+  .object({
+    taskId: z.string().min(1),
+    leadershipRank: LeadershipRankSchema,
+    civilServiceRank: CivilServiceRankSchema,
+    deadlineDay: z.number().int().positive(),
   })
   .strict();
 
@@ -94,6 +104,7 @@ export const Phase3AcceptanceConfigSchema = z
     deterministicScenarioDays: DeterministicScenarioDaysSchema,
     entrypoints: z.array(EntrypointSchema).min(1),
     requiredKpiProducers: z.array(KpiProducerRequirementSchema).min(1),
+    taskReachabilityBounds: z.array(TaskReachabilityBoundSchema).min(1),
   })
   .strict()
   .superRefine((config, ctx) => {
@@ -110,6 +121,25 @@ export const Phase3AcceptanceConfigSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Phase 3 KPI producer requirements must be unique',
       });
+    const boundedTaskIds = config.taskReachabilityBounds.map((bound) => bound.taskId);
+    if (new Set(boundedTaskIds).size !== boundedTaskIds.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Phase 3 task reachability bounds must be unique',
+      });
+    const requiredBoundTaskIds = new Set([
+      ...config.entrypoints
+        .filter((entrypoint) => entrypoint.kind === 'personal_task')
+        .map((entrypoint) => entrypoint.contentId),
+      ...config.requiredKpiProducers.flatMap((requirement) => requirement.personalTaskIds),
+    ]);
+    for (const taskId of requiredBoundTaskIds)
+      if (!boundedTaskIds.includes(taskId))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['taskReachabilityBounds'],
+          message: `Formal Phase 3 task ${taskId} must have a reachability bound`,
+        });
     for (const key of MilestoneDayKeys) {
       const range = config.milestones[key];
       const day = config.deterministicScenarioDays[key];
@@ -155,6 +185,7 @@ export function validatePhase3AcceptanceReferences(
   const errors: string[] = [];
   const positions = new Map(catalog.positions.map((item) => [item.id, item]));
   const tasks = new Map(catalog.personalTasks.map((item) => [item.id, item]));
+  const boundedTaskIds = new Set(config.taskReachabilityBounds.map((bound) => bound.taskId));
   const idsByKind = {
     personal_task: new Set(tasks.keys()),
     department_action: new Set(
@@ -196,6 +227,8 @@ export function validatePhase3AcceptanceReferences(
         errors.push(`Phase 3 KPI ${requirement.kpiId} references unknown personal task ${taskId}`);
         continue;
       }
+      if (!boundedTaskIds.has(taskId))
+        errors.push(`Phase 3 KPI producer ${taskId} has no bounded runtime availability context`);
       const allowedRanks = task.prerequisites?.allowedLeadershipRanks;
       if (allowedRanks && !allowedRanks.includes('none'))
         errors.push(`Phase 3 KPI producer ${taskId} cannot be performed without a leadership rank`);

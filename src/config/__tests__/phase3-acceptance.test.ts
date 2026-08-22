@@ -22,6 +22,10 @@ function createCatalog() {
         .getAllPositions()
         .map((position) => [position.id, loader.resolvePositionDepartments(position.id)]),
     ),
+    totalSlotCount: Object.values(loader.getGameConfig().slotTiers).reduce(
+      (sum, tier) => sum + tier.count,
+      0,
+    ),
   };
 }
 
@@ -90,6 +94,38 @@ describe('Phase 3 acceptance config', () => {
       expect.arrayContaining([
         expect.stringContaining('missing_task'),
         expect.stringContaining('task_induction_training does not produce office_efficiency'),
+      ]),
+    );
+  });
+
+  it('rejects formal KPI tasks outside their bounded runtime rank and task-count capacity', () => {
+    const rankConfig = getConfigLoader().getPhase3AcceptanceConfig();
+    const rankCatalog = createCatalog();
+    const rankTask = rankCatalog.personalTasks.find((task) => task.id === 'task_agri_walk');
+    if (!rankTask) throw new Error('Expected agricultural walk task fixture');
+    rankTask.prerequisites = {
+      ...rankTask.prerequisites,
+      civilServiceRankMin: 'inspector_1',
+    };
+    expect(validatePhase3AcceptanceReferences(rankConfig, rankCatalog)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          'task_agri_walk is not reachable by day 180: civil service rank clerk_2 is below inspector_1',
+        ),
+      ]),
+    );
+
+    const countConfig = getConfigLoader().getPhase3AcceptanceConfig();
+    const countCatalog = createCatalog();
+    const countTask = countCatalog.personalTasks.find((task) => task.id === 'task_agri_walk');
+    if (!countTask) throw new Error('Expected agricultural walk task fixture');
+    countTask.prerequisites = {
+      ...countTask.prerequisites,
+      minCompletedTasks: 541,
+    };
+    expect(validatePhase3AcceptanceReferences(countConfig, countCatalog)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('requires 541 completed tasks but at most 540 fit before day 180'),
       ]),
     );
   });

@@ -136,5 +136,49 @@
       "kpiId": "agricultural_output",
       "personalTaskIds": ["task_agri_walk"]
     }
+  ],
+  "taskReachabilityBounds": [
+    {
+      "taskId": "task_draft_material",
+      "leadershipRank": "none",
+      "civilServiceRank": "clerk_2",
+      "deadlineDay": 180
+    },
+    {
+      "taskId": "task_policy_brief",
+      "leadershipRank": "none",
+      "civilServiceRank": "clerk_2",
+      "deadlineDay": 180
+    },
+    {
+      "taskId": "task_village_research",
+      "leadershipRank": "none",
+      "civilServiceRank": "clerk_2",
+      "deadlineDay": 180
+    },
+    {
+      "taskId": "task_poverty_visit",
+      "leadershipRank": "none",
+      "civilServiceRank": "clerk_2",
+      "deadlineDay": 180
+    },
+    {
+      "taskId": "task_agri_walk",
+      "leadershipRank": "none",
+      "civilServiceRank": "clerk_2",
+      "deadlineDay": 180
+    },
+    {
+      "taskId": "task_induction_training",
+      "leadershipRank": "none",
+      "civilServiceRank": "clerk_2",
+      "deadlineDay": 360
+    },
+    {
+      "taskId": "task_assigned_special",
+      "leadershipRank": "none",
+      "civilServiceRank": "clerk_1",
+      "deadlineDay": 540
+    }
   ]
 }

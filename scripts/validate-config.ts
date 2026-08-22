@@ -899,6 +899,10 @@ if (
         .getAllPositions()
         .map((position) => [position.id, phase3Loader.resolvePositionDepartments(position.id)]),
     ),
+    totalSlotCount: Object.values(phase3Loader.getGameConfig().slotTiers).reduce(
+      (sum, tier) => sum + tier.count,
+      0,
+    ),
   };
   const referenceErrors = validatePhase3AcceptanceReferences(
     PHASE3_ACCEPTANCE_CONFIG,
