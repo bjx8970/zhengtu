@@ -1831,6 +1831,71 @@ export function migrateSchema10TownshipGovernanceContent(
   return migrated;
 }
 
+function backfillCareerExperienceAssessments(
+  state: Record<string, unknown>,
+  currentDay: number,
+): void {
+  const career = state.career as Record<string, unknown> | undefined;
+  const assessmentState = state.assessments as Record<string, unknown> | undefined;
+  const time = state.time as Record<string, unknown> | undefined;
+  const experiences = career?.experiences;
+  const annualAssessments = assessmentState?.annualAssessments;
+  if (
+    !Array.isArray(experiences) ||
+    !Array.isArray(annualAssessments) ||
+    typeof time?.year !== 'number' ||
+    typeof time.month !== 'number' ||
+    typeof time.day !== 'number'
+  )
+    throw new Error('Legacy save is missing assessment history for chief content migration');
+
+  // 2026.08.5 使用固定的 30 日月、360 日年。以当前日历锚点反推每次年结的绝对日，
+  // 避免把玩家全局已有成绩错误归入尚未开始或已经结束的任职履历。
+  const currentYearStartDay = currentDay - ((time.month - 1) * 30 + time.day - 1);
+  for (const value of annualAssessments) {
+    if (!value || typeof value !== 'object') continue;
+    const assessment = value as Record<string, unknown>;
+    if (
+      typeof assessment.year !== 'number' ||
+      typeof assessment.score !== 'number' ||
+      typeof assessment.tier !== 'string'
+    )
+      continue;
+    const assessmentDay = currentYearStartDay + (assessment.year + 1 - time.year) * 360;
+    if (assessmentDay < 0 || assessmentDay > currentDay) continue;
+    const candidates = experiences
+      .filter((experience): experience is Record<string, unknown> => {
+        if (!experience || typeof experience !== 'object') return false;
+        const record = experience as Record<string, unknown>;
+        return (
+          typeof record.startedAtDay === 'number' &&
+          record.startedAtDay <= assessmentDay &&
+          (record.endedAtDay === null ||
+            (typeof record.endedAtDay === 'number' && record.endedAtDay >= assessmentDay))
+        );
+      })
+      .sort((left, right) => {
+        const leftEndedToday = left.endedAtDay === assessmentDay ? 1 : 0;
+        const rightEndedToday = right.endedAtDay === assessmentDay ? 1 : 0;
+        if (leftEndedToday !== rightEndedToday) return rightEndedToday - leftEndedToday;
+        return Number(right.startedAtDay) - Number(left.startedAtDay);
+      });
+    const experience = candidates[0];
+    if (!experience) continue;
+    const results = Array.isArray(experience.assessmentResults) ? experience.assessmentResults : [];
+    if (
+      !results.some(
+        (result) =>
+          result &&
+          typeof result === 'object' &&
+          (result as Record<string, unknown>).year === assessment.year,
+      )
+    )
+      results.push({ year: assessment.year, score: assessment.score, tier: assessment.tier });
+    experience.assessmentResults = results;
+  }
+}
+
 /**
  * 取消旧版宽松正职机会并升级乡镇正职内容语义。
  *
@@ -1849,9 +1914,15 @@ export function migrateSchema10TownshipChiefContent(
   const career = state?.career as Record<string, unknown> | undefined;
   const time = state?.time as Record<string, unknown> | undefined;
   const opportunities = career?.opportunities;
-  if (!career || !Array.isArray(opportunities) || typeof time?.totalDaysPlayed !== 'number')
+  if (
+    !state ||
+    !career ||
+    !Array.isArray(opportunities) ||
+    typeof time?.totalDaysPlayed !== 'number'
+  )
     throw new Error('Legacy save is missing career opportunity state for chief content migration');
   const currentDay = time.totalDaysPlayed;
+  backfillCareerExperienceAssessments(state, currentDay);
   const cancelledOpportunityIds = new Set<string>();
   for (const value of opportunities) {
     if (!value || typeof value !== 'object') continue;

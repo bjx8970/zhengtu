@@ -10,7 +10,12 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createInitialState, createTestStore } from '../game-store';
-import { decodeCurrentSave, wrapSaveEnvelope, validatePlayerSave } from '../save-codec';
+import {
+  decodeCurrentSave,
+  migrateSchema10TownshipChiefContent,
+  wrapSaveEnvelope,
+  validatePlayerSave,
+} from '../save-codec';
 import { CURRENT_CONTENT_VERSION, CURRENT_SCHEMA_VERSION } from '../../types/save';
 import { getConfigLoader } from '../../config/loader';
 import { createActionExecutableSnapshot } from '../action-executable-snapshot';
@@ -675,6 +680,83 @@ describe('Schema 2 存档', () => {
     });
     expect(result.state?.world.facts.industrial_park_policy_proposed).toBe(true);
     expect(result.state?.remainingBudget).toBe(4321);
+  });
+
+  it('Schema 10 正职迁移按实际任职区间回填旧年度考核且保持幂等', () => {
+    const loader = getConfigLoader();
+    const deputy = loader.getPositionById('admin_l2_0');
+    const institution = deputy ? loader.getInstitutionById(deputy.institutionId) : null;
+    const state = createInitialState();
+    const initialExperience = state.career.experiences[0];
+    if (!deputy || !institution || !initialExperience)
+      throw new Error('Expected deputy migration fixtures');
+    initialExperience.endedAtDay = 720;
+    initialExperience.endReason = 'promotion';
+    state.career.appointment = {
+      appointmentId: 'legacy-deputy-appointment',
+      positionId: deputy.id,
+      institutionId: deputy.institutionId,
+      regionId: deputy.regionId,
+      institutionLevel: deputy.institutionLevel,
+      positionDomain: deputy.positionDomain,
+      leadershipRank: deputy.leadershipRank,
+      startedAtDay: 720,
+      appointmentType: 'substantive',
+      appointmentReason: 'promotion',
+      sourceOpportunityId: 'legacy-deputy-opportunity',
+      status: 'active',
+      endedAtDay: null,
+      endReason: null,
+      probation: null,
+    };
+    state.career.experiences.push({
+      id: 'legacy-deputy-experience',
+      appointmentId: 'legacy-deputy-appointment',
+      positionId: deputy.id,
+      positionNameSnapshot: deputy.name,
+      institutionId: institution.id,
+      institutionNameSnapshot: institution.name,
+      regionId: deputy.regionId,
+      institutionLevel: deputy.institutionLevel,
+      positionDomain: deputy.positionDomain,
+      leadershipRank: deputy.leadershipRank,
+      appointmentType: 'substantive',
+      appointmentReason: 'promotion',
+      sourceOpportunityId: 'legacy-deputy-opportunity',
+      startedAtDay: 720,
+      endedAtDay: null,
+      endReason: null,
+      assessmentResults: [],
+    });
+    state.assessments.annualAssessments = [
+      { year: 2013, score: 80, tier: '称职' },
+      { year: 2014, score: 85, tier: '称职' },
+      { year: 2015, score: 90, tier: '优秀' },
+    ];
+    Object.assign(state.time, {
+      year: 2016,
+      month: 1,
+      day: 1,
+      totalDaysPlayed: 1260,
+      pendingContinuation: null,
+    });
+    const legacyEnvelope = {
+      ...wrapSaveEnvelope(state),
+      contentVersion: '2026.08.5',
+    } as Record<string, unknown>;
+
+    const migratedOnce = migrateSchema10TownshipChiefContent(legacyEnvelope);
+    expect(migrateSchema10TownshipChiefContent(migratedOnce)).toEqual(migratedOnce);
+    const result = decodeCurrentSave(JSON.stringify(migratedOnce));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.career.experiences[0]?.assessmentResults).toEqual([
+      { year: 2013, score: 80, tier: '称职' },
+    ]);
+    expect(result.state?.career.experiences[1]?.assessmentResults).toEqual([
+      { year: 2014, score: 85, tier: '称职' },
+      { year: 2015, score: 90, tier: '优秀' },
+    ]);
   });
 
   it('Schema 9 旧内容迁移在覆盖内容版本前清除预置未来职数', () => {
