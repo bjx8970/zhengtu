@@ -188,7 +188,12 @@ export function processCareerOpportunitySignal(
       resolvedAtDay: null,
       cancelledAtDay: null,
       requiresSelection: definition.requiresSelection,
-      eligibilityConditions: structuredClone(definition.conditions),
+      // Generation-only checks may include the assessment signal. Acceptance checks
+      // are appended to the durable snapshot so later revalidation cannot drift with config.
+      eligibilityConditions: structuredClone([
+        ...definition.conditions,
+        ...(definition.acceptanceConditions ?? []),
+      ]),
       finalOutcome: null,
       reason: definition.reasonTemplate,
     };

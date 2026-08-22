@@ -5,10 +5,10 @@ import { getConfigLoader } from '../../../config/loader';
 import { CivilServiceRankConfigSchema } from '../../../config/schemas';
 import { KPITier } from '../../../types/enums';
 import {
-  calculateCareerServiceDays,
   evaluateCivilServiceRankEligibility,
   getActiveCareerRestrictions,
 } from '../civil-service-rank-eligibility';
+import { calculateCareerServiceDays } from '../career-service';
 
 describe('civil-service rank eligibility', () => {
   it('uses [startedAtDay, endsAtDay) for active restrictions', () => {

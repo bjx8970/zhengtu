@@ -18,6 +18,7 @@ import {
 import {
   evaluateCareerOpportunityAcceptanceEligibility,
   evaluateCareerOpportunityAppointmentEligibility,
+  evaluateCareerOpportunitySelectionEligibility,
   hasRunningCareerAction,
 } from '../../engine/career/career-opportunity-eligibility';
 import { applyEffects } from '../../engine/events/effect-executor';
@@ -279,15 +280,35 @@ export function reduceAdvanceCareerProcess(
     original.status !== 'in_process'
   )
     return false;
+  const loader = getConfigLoader();
+  const selectionEligibility =
+    original.type !== 'training' &&
+    original.requiresSelection &&
+    process.currentStage === 'eligibility_review'
+      ? evaluateCareerOpportunitySelectionEligibility({
+          opportunity: original,
+          state: draft,
+          currentDay,
+          daysPerYear: loader.getGameConfig().daysPerMonth * loader.getGameConfig().monthsPerYear,
+          targetPosition: loader.getPositionById(original.target.positionId),
+          careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
+        })
+      : null;
   const settlement =
-    original.type !== 'training' && original.requiresSelection
-      ? settleCareerSelectionStage(
-          process.currentStage,
-          draft,
-          getConfigLoader().getGameConfig().promotion,
-          payload._rng ?? Math.random,
-        )
-      : { outcome: 'passed' as const, score: null, detail: 'Career process stage settled' };
+    selectionEligibility && !selectionEligibility.eligible
+      ? {
+          outcome: 'failed' as const,
+          score: null,
+          detail: `资格复查未通过：${selectionEligibility.failure ?? 'unknown'}`,
+        }
+      : original.type !== 'training' && original.requiresSelection
+        ? settleCareerSelectionStage(
+            process.currentStage,
+            draft,
+            loader.getGameConfig().promotion,
+            payload._rng ?? Math.random,
+          )
+        : { outcome: 'passed' as const, score: null, detail: '职业流程阶段已完成' };
   const outcome = settlement.outcome;
   // Only the final appointment commits a job change. Selection stages can run while
   // ordinary actions or blocking events are active; the final transition rechecks it.

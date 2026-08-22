@@ -11,6 +11,7 @@ import {
   PositionDomainSchema,
   LeadershipRankSchema,
   CivilServiceRankSchema,
+  CareerRestrictionTypeSchema,
 } from './career/types';
 import { PolicyStatusSchema } from './governance/types';
 
@@ -91,6 +92,31 @@ export type CareerCondition =
       careerCheck: 'days_in_civil_service_rank';
       value: number;
       op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+    }
+  | {
+      careerCheck: 'years_in_civil_service';
+      value: number;
+      op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+    }
+  | {
+      careerCheck: 'probation_status';
+      value: 'active' | 'passed' | 'failed' | 'none';
+      op?: 'eq' | 'neq';
+    }
+  | {
+      careerCheck: 'assessment_history';
+      check:
+        | 'total_count'
+        | 'qualified_count'
+        | 'excellent_count'
+        | 'current_appointment_qualified_count';
+      value: number;
+      op: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+    }
+  | {
+      careerCheck: 'active_restriction';
+      value: import('./career/types').CareerRestrictionType;
+      op?: 'eq' | 'neq';
     };
 
 /** 世界指标条件 */
@@ -234,6 +260,40 @@ const CareerConditionSchema = z.union([
       careerCheck: z.literal('days_in_civil_service_rank'),
       value: z.number(),
       op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('years_in_civil_service'),
+      value: z.number().nonnegative(),
+      op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('probation_status'),
+      value: z.enum(['active', 'passed', 'failed', 'none']),
+      op: z.enum(['eq', 'neq']).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('assessment_history'),
+      check: z.enum([
+        'total_count',
+        'qualified_count',
+        'excellent_count',
+        'current_appointment_qualified_count',
+      ]),
+      value: z.number().int().nonnegative(),
+      op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq']),
+    })
+    .strict(),
+  z
+    .object({
+      careerCheck: z.literal('active_restriction'),
+      value: CareerRestrictionTypeSchema,
+      op: z.enum(['eq', 'neq']).optional(),
     })
     .strict(),
 ]);

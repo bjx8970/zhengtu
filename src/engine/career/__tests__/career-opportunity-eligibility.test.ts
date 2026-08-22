@@ -128,5 +128,6 @@ describe('career opportunity eligibility', () => {
       },
     };
     expect(hasRunningCareerAction(state)).toBe(true);
+    expect(evaluateTrainingOpportunity(state).failure).toBe('running_work');
   });
 });

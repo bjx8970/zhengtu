@@ -14,15 +14,14 @@ import {
   LEADERSHIP_RANK_LABELS,
 } from '../../domain/career/types';
 import {
-  calculateCareerServiceDays,
   evaluateCivilServiceRankEligibility,
   getActiveCareerRestrictions,
 } from '../../engine/career/civil-service-rank-eligibility';
+import { calculateCareerServiceDays } from '../../engine/career/career-service';
 import { inspectProbationProgress } from '../../engine/career/probation-progress';
-import {
-  evaluateCareerOpportunityAcceptanceEligibility,
-  type CareerOpportunityEligibilityFailure,
-} from '../../engine/career/career-opportunity-eligibility';
+import { evaluateCareerOpportunityAcceptanceEligibility } from '../../engine/career/career-opportunity-eligibility';
+import { evaluateCareerOpportunityDefinitionReadiness } from '../../engine/career/career-opportunity-readiness';
+import type { CareerOpportunityEligibilityFailure } from '../../types/career';
 import { useGameStore } from '../../store/game-store';
 import { PageHeader } from '../../components/page-header';
 import {
@@ -140,6 +139,25 @@ export function CareerPage() {
       config: getConfigLoader().getGameConfig().probation,
     });
   });
+  const deputyReadiness = createMemo(() => {
+    const definition = getConfigLoader()
+      .getAllCareerOpportunityDefinitions()
+      .find((item) => item.id === 'township_deputy_leadership_vacancy');
+    if (!definition) return null;
+    const config = getConfigLoader().getGameConfig();
+    return evaluateCareerOpportunityDefinitionReadiness({
+      definition,
+      state,
+      currentDay: currentDay(),
+      daysPerYear: config.daysPerMonth * config.monthsPerYear,
+      careerExperienceQualificationRules: getConfigLoader().getCareerExperienceQualificationRules(),
+    });
+  });
+  const latestAppointedOpportunity = createMemo(() =>
+    [...state.career.opportunities]
+      .reverse()
+      .find((opportunity) => opportunity.finalOutcome === 'appointed'),
+  );
 
   return (
     <>
@@ -357,6 +375,29 @@ export function CareerPage() {
           </div>
           <div class="card-pad flex-col gap-md">
             <p class="doc-meta">岗位变动需接受机会并按流程完成选拔；职级不会由此自动变化。</p>
+            <article class="card" data-testid="township-deputy-readiness">
+              <div class="card-pad flex-col gap-sm">
+                <h3 class="serif" style={{ 'font-size': '1.05rem' }}>
+                  乡科级副职准备度
+                </h3>
+                <p class="text-xs secondary-text">
+                  合格年度考核触发选拔窗口；机会出现后仍须满足服务年限，并先完成在途工作。
+                </p>
+                <For each={deputyReadiness()?.items ?? []}>
+                  {(requirement) => (
+                    <p class="text-sm secondary-text">
+                      {requirement.satisfied ? '✓' : '○'} {requirement.detail}
+                    </p>
+                  )}
+                </For>
+              </div>
+            </article>
+            <Show when={latestAppointedOpportunity()}>
+              <p class="banner banner-success" data-testid="appointment-change-feedback">
+                已完成岗位任职：旧履历已关闭，新履历已建立；公务员职级保持
+                {CIVIL_SERVICE_RANK_LABELS[state.career.civilServiceRank]}不变。
+              </p>
+            </Show>
             <Show
               when={state.career.opportunities.length > 0}
               fallback={
@@ -536,9 +577,50 @@ export function CareerPage() {
                         }}
                       </For>
                     </div>
+                    <Show when={process().stageResults.length > 0}>
+                      <div class="flex-col gap-sm" data-testid="career-process-audit">
+                        <For each={process().stageResults}>
+                          {(result) => (
+                            <p class="text-xs secondary-text">
+                              {formatCareerProcessStage(result.stage)} · 第 {result.resolvedAtDay}{' '}
+                              天 ·{' '}
+                              {result.outcome === 'passed'
+                                ? '通过'
+                                : result.outcome === 'continued'
+                                  ? '继续观察'
+                                  : result.outcome === 'cancelled'
+                                    ? '已取消'
+                                    : '未通过'}
+                              {result.score === null ? '' : ` · ${result.score} 分`}：
+                              {result.detail}
+                            </p>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
                   </div>
                 </article>
               )}
+            </Show>
+            <Show when={state.career.completedProcesses.length > 0}>
+              <div class="flex-col gap-sm" data-testid="completed-career-processes">
+                <h3 class="text-sm">最近选拔记录</h3>
+                <For each={state.career.completedProcesses.slice(-3).reverse()}>
+                  {(process) => (
+                    <p class="text-xs secondary-text">
+                      第 {process.startedAtDay} 天开始 ·{' '}
+                      {process.status === 'completed'
+                        ? '已完成'
+                        : process.status === 'failed'
+                          ? '未通过'
+                          : '已取消'}
+                      {process.stageResults.at(-1)?.detail
+                        ? `：${process.stageResults.at(-1)?.detail}`
+                        : ''}
+                    </p>
+                  )}
+                </For>
+              </div>
             </Show>
           </div>
         </section>

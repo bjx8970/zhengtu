@@ -555,7 +555,10 @@ export interface CareerOpportunityDefinitionBase {
   id: string;
   type: CareerOpportunityType;
   triggerSignals: DomainSignal[];
+  /** 产生机会时必须满足，并冻结到机会实例中的条件。 */
   conditions: ConditionExpression[];
+  /** 机会出现后、接受和最终任职时额外复核的条件。 */
+  acceptanceConditions?: ConditionExpression[];
   expiresAfterDays: number | null;
   repeatPolicy: 'once' | 'once_per_source' | 'repeatable';
   cooldownDays: number;

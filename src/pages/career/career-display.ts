@@ -7,8 +7,10 @@
 
 import type { CareerProcessStage } from '../../domain/career/state';
 import type { CareerOpportunityStatus, CareerRestrictionType } from '../../domain/career/types';
-import type { RankEligibilityFailure } from '../../types/career';
-import type { CareerOpportunityEligibilityFailure } from '../../engine/career/career-opportunity-eligibility';
+import type {
+  CareerOpportunityEligibilityFailure,
+  RankEligibilityFailure,
+} from '../../types/career';
 
 /** 机构配置中使用的虚构地区标识的显示名称。 */
 const REGION_LABELS: Record<string, string> = {
@@ -79,6 +81,7 @@ const OPPORTUNITY_ELIGIBILITY_FAILURE_LABELS: Record<CareerOpportunityEligibilit
     opportunity_unavailable: '机会当前不可接受',
     opportunity_expired: '机会已到期',
     active_process: '已有进行中的职业流程',
+    running_work: '请先完成进行中的工作',
     blocking_event: '存在待处理的阻塞事件',
     pending_continuation: '请先完成当前时间推进',
     opportunity_conditions: '未满足机会资格条件',

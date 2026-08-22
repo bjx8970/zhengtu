@@ -5,42 +5,15 @@
  * 的持久化裁定保持一致。
  */
 
-import type { CareerExperienceQualificationRules } from '../../types/config';
 import type { PlayerSave } from '../../types/player';
-import type { PositionConfigV2 } from '../../types/position-v2';
 import type { ConditionExpression } from '../../domain/conditions';
-import type { CareerOpportunity } from '../../domain/career/state';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
+import type {
+  CareerOpportunityEligibilityInput,
+  CareerOpportunityEligibilityResult,
+} from '../../types/career';
 import { getActiveCareerRestrictions } from './civil-service-rank-eligibility';
 import { evaluateCondition } from '../events/condition-interpreter';
-
-export type CareerOpportunityEligibilityFailure =
-  | 'opportunity_unavailable'
-  | 'opportunity_expired'
-  | 'active_process'
-  | 'blocking_event'
-  | 'pending_continuation'
-  | 'opportunity_conditions'
-  | 'target_missing'
-  | 'target_snapshot_mismatch'
-  | 'target_vacant'
-  | 'same_position'
-  | 'appointment_restriction'
-  | 'target_conditions';
-
-export interface CareerOpportunityEligibilityResult {
-  eligible: boolean;
-  failure: CareerOpportunityEligibilityFailure | null;
-}
-
-export interface CareerOpportunityEligibilityInput {
-  opportunity: CareerOpportunity;
-  state: Readonly<PlayerSave>;
-  currentDay: number;
-  daysPerYear: number;
-  targetPosition: PositionConfigV2 | null;
-  careerExperienceQualificationRules: Readonly<CareerExperienceQualificationRules>;
-}
 
 const ELIGIBLE: CareerOpportunityEligibilityResult = { eligible: true, failure: null };
 
@@ -104,7 +77,11 @@ function evaluateOpportunityEligibility(
   const { opportunity, state, currentDay, targetPosition } = input;
   if (requireAvailable && opportunity.status !== 'available')
     return { eligible: false, failure: 'opportunity_unavailable' };
-  if (opportunity.expiresAtDay !== null && opportunity.expiresAtDay <= currentDay)
+  if (
+    requireAvailable &&
+    opportunity.expiresAtDay !== null &&
+    opportunity.expiresAtDay <= currentDay
+  )
     return { eligible: false, failure: 'opportunity_expired' };
   if (!satisfiesConditions(opportunity.eligibilityConditions, input))
     return { eligible: false, failure: 'opportunity_conditions' };
@@ -141,6 +118,7 @@ export function evaluateCareerOpportunityAcceptanceEligibility(
 ): CareerOpportunityEligibilityResult {
   const { state } = input;
   if (state.career.activeProcess) return { eligible: false, failure: 'active_process' };
+  if (hasRunningCareerAction(state)) return { eligible: false, failure: 'running_work' };
   if (state.events.activeBlockingEventId) return { eligible: false, failure: 'blocking_event' };
   if (state.time.pendingContinuation) return { eligible: false, failure: 'pending_continuation' };
   return evaluateOpportunityEligibility(input, true);
@@ -151,6 +129,17 @@ export function evaluateCareerOpportunityAcceptanceEligibility(
  * @returns 是否仍可完成任职落位及失败原因
  */
 export function evaluateCareerOpportunityAppointmentEligibility(
+  input: CareerOpportunityEligibilityInput,
+): CareerOpportunityEligibilityResult {
+  if (hasRunningCareerAction(input.state)) return { eligible: false, failure: 'running_work' };
+  return evaluateOpportunityEligibility(input, false);
+}
+
+/**
+ * @param input 职业机会资格评估输入
+ * @returns 选拔资格复查结果；在途工作留到最终任职阶段处理
+ */
+export function evaluateCareerOpportunitySelectionEligibility(
   input: CareerOpportunityEligibilityInput,
 ): CareerOpportunityEligibilityResult {
   return evaluateOpportunityEligibility(input, false);

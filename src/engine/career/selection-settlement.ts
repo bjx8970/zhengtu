@@ -8,12 +8,7 @@
 import type { CareerProcessStage } from '../../domain/career/state';
 import type { PlayerSave } from '../../types/player';
 import type { PromotionConfig } from '../../types/config';
-
-export interface CareerSelectionSettlement {
-  outcome: 'passed' | 'failed' | 'continued';
-  score: number | null;
-  detail: string;
-}
+import type { CareerSelectionSettlement } from '../../types/career';
 
 function boundedScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -45,32 +40,32 @@ export function settleCareerSelectionStage(
 ): CareerSelectionSettlement {
   switch (stage) {
     case 'eligibility_review':
-      return { outcome: 'passed', score: null, detail: 'Eligibility was revalidated' };
+      return { outcome: 'passed', score: null, detail: '资格复查通过' };
     case 'democratic_recommendation': {
       const score = capabilityScore(state, rng) + Math.min(state.character.network, 20);
       return score >= promotion.democraticVote.passThreshold
         ? {
             outcome: 'passed',
             score: boundedScore(score),
-            detail: 'Democratic recommendation passed',
+            detail: '民主推荐通过',
           }
         : {
             outcome: 'failed',
             score: boundedScore(score),
-            detail: 'Democratic recommendation failed',
+            detail: '民主推荐未通过',
           };
     }
     case 'organization_inspection': {
       const score = capabilityScore(state, rng);
       if (score >= promotion.orgInspection.qualifiedThreshold)
-        return { outcome: 'passed', score, detail: 'Organization inspection qualified' };
+        return { outcome: 'passed', score, detail: '组织考察合格' };
       if (score >= promotion.orgInspection.suspendedThreshold)
         return {
           outcome: 'continued',
           score,
-          detail: 'Organization inspection requires observation',
+          detail: '组织考察转为继续观察',
         };
-      return { outcome: 'failed', score, detail: 'Organization inspection failed' };
+      return { outcome: 'failed', score, detail: '组织考察未通过' };
     }
     case 'collective_decision': {
       const passed =
@@ -79,7 +74,7 @@ export function settleCareerSelectionStage(
       return {
         outcome: passed ? 'passed' : 'failed',
         score: null,
-        detail: passed ? 'Collective decision approved' : 'Collective decision rejected',
+        detail: passed ? '集体决定通过' : '集体决定未通过',
       };
     }
     case 'public_notice': {
@@ -90,18 +85,16 @@ export function settleCareerSelectionStage(
       return {
         outcome: passed ? 'passed' : 'failed',
         score: null,
-        detail: passed
-          ? 'Public notice completed'
-          : 'Public notice received a disqualifying complaint',
+        detail: passed ? '公示完成' : '公示期间出现影响任职的举报',
       };
     }
     case 'appointment':
       return {
         outcome: 'passed',
         score: null,
-        detail: 'Appointment submitted for final validation',
+        detail: '任职提交最终复核',
       };
     default:
-      return { outcome: 'passed', score: null, detail: 'Career process stage settled' };
+      return { outcome: 'passed', score: null, detail: '职业流程阶段已完成' };
   }
 }

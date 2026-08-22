@@ -172,6 +172,68 @@ describe('条件解释器 - 职业状态', () => {
       evalCond({ careerCheck: 'days_in_civil_service_rank', value: 201, op: 'gte' }, ctx),
     ).toBe(false);
   });
+
+  it('累计服务年限、试用状态与考核历史', () => {
+    const ctx = makeContext((c) => {
+      c.currentDay = 720;
+      c.state.career.appointment.startedAtDay = 0;
+      if (!c.state.career.appointment.probation) throw new Error('Expected probation');
+      c.state.career.appointment.probation.status = 'passed';
+      c.state.assessments.annualAssessments.push(
+        { year: 2026, score: 70, tier: '称职' },
+        { year: 2027, score: 90, tier: '优秀' },
+      );
+      const open = c.state.career.experiences.find((item) => item.endedAtDay === null);
+      if (!open) throw new Error('Expected open experience');
+      open.assessmentResults.push({ year: 2027, score: 90, tier: '优秀' });
+    });
+    expect(evalCond({ careerCheck: 'years_in_civil_service', value: 2, op: 'gte' }, ctx)).toBe(
+      true,
+    );
+    expect(evalCond({ careerCheck: 'probation_status', value: 'passed' }, ctx)).toBe(true);
+    expect(
+      evalCond(
+        { careerCheck: 'assessment_history', check: 'qualified_count', value: 2, op: 'gte' },
+        ctx,
+      ),
+    ).toBe(true);
+    expect(
+      evalCond(
+        {
+          careerCheck: 'assessment_history',
+          check: 'current_appointment_qualified_count',
+          value: 1,
+          op: 'eq',
+        },
+        ctx,
+      ),
+    ).toBe(true);
+  });
+
+  it('任职限制使用左闭右开有效期', () => {
+    const ctx = makeContext((c) => {
+      c.currentDay = 100;
+      c.state.career.restrictions.push({
+        id: 'freeze',
+        type: 'appointment_selection_freeze',
+        startedAtDay: 50,
+        endsAtDay: 100,
+        reason: 'test',
+        sourceType: 'system',
+        sourceId: null,
+      });
+    });
+    expect(
+      evalCond(
+        {
+          careerCheck: 'active_restriction',
+          value: 'appointment_selection_freeze',
+          op: 'neq',
+        },
+        ctx,
+      ),
+    ).toBe(true);
+  });
 });
 
 describe('条件解释器 - 世界指标与事实', () => {
