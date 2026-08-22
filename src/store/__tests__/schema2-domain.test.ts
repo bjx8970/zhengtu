@@ -487,6 +487,35 @@ describe('Schema 2 存档', () => {
     expect(result.state?.world.metrics['rank_quota.clerk_1']).toBe(1);
   });
 
+  it('Schema 9 旧内容迁移在覆盖内容版本前清除预置未来职数', () => {
+    const state = createInitialState();
+    for (const rule of getConfigLoader().getAllCivilServiceRankProgressionRules()) {
+      const quota = rule.quotaRequirement;
+      if (quota) state.world.metrics[quota.metricId] = quota.requiredValue;
+    }
+    state.world.metrics.unrelated_metric = 73;
+    const envelope = {
+      ...wrapSaveEnvelope(state),
+      schemaVersion: 9,
+      contentVersion: '2026.08.1',
+    } as Record<string, unknown>;
+    const actions = (envelope.state as Record<string, unknown>).actions as Record<string, unknown>;
+    delete actions.personalTasks;
+
+    const result = decodeCurrentSave(JSON.stringify(envelope));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.actions.personalTasks).toEqual({
+      cooldownUntilDays: {},
+      completedCounts: {},
+      totalCompleted: 0,
+    });
+    expect(result.state?.world.metrics).toMatchObject(
+      getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
+    );
+    expect(result.state?.world.metrics.unrelated_metric).toBe(73);
+  });
+
   it('rejects career opportunities with invalid lifecycle dates during strict decode', () => {
     const invalidOpportunities: Array<Partial<AppointmentCareerOpportunity>> = [
       { status: 'available', acceptedAtDay: 1 },

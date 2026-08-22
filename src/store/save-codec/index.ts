@@ -1696,6 +1696,19 @@ export function migrateSchema8To9(prev: Record<string, unknown>): Record<string,
   return migrated;
 }
 
+/** 将不存在年度 producer 的旧内容职数恢复为当前配置初始值。 */
+function resetLegacyRankQuotaMetrics(envelope: Record<string, unknown>): void {
+  const state = envelope.state as Record<string, unknown> | undefined;
+  const world = state?.world as Record<string, unknown> | undefined;
+  const metrics = world?.metrics as Record<string, unknown> | undefined;
+  if (!metrics) throw new Error('Legacy save is missing world metrics for content migration');
+  for (const [metricId, initialValue] of Object.entries(
+    getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
+  )) {
+    metrics[metricId] = initialValue;
+  }
+}
+
 /**
  * 将 Schema 9 存档迁移至 Schema 10。
  *
@@ -1722,6 +1735,9 @@ export function migrateSchema9To10(prev: Record<string, unknown>): Record<string
       totalCompleted: 0,
     };
   }
+  // Schema 9 及更早内容从未存在年度职数 producer；必须在覆盖内容版本前
+  // 清除旧规则预置库存，否则后续统一迁移无法再识别其来源。
+  resetLegacyRankQuotaMetrics(migrated);
   migrated.schemaVersion = 10;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
@@ -1742,15 +1758,7 @@ export function migrateSchema10RankQuotaContent(
 ): Record<string, unknown> {
   if (prev.contentVersion !== '2026.08.2') return prev;
   const migrated = structuredClone(prev);
-  const state = migrated.state as Record<string, unknown> | undefined;
-  const world = state?.world as Record<string, unknown> | undefined;
-  const metrics = world?.metrics as Record<string, unknown> | undefined;
-  if (!metrics) throw new Error('Schema 10 save is missing world metrics for content migration');
-  for (const [metricId, initialValue] of Object.entries(
-    getConfigLoader().getInitialCivilServiceRankQuotaMetrics(),
-  )) {
-    metrics[metricId] = initialValue;
-  }
+  resetLegacyRankQuotaMetrics(migrated);
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
