@@ -527,8 +527,9 @@ function processAnnualAssessment(
 ): DomainSignalSnapshot[] {
   const loader = getConfigLoader();
   const cfg = loader.getGameConfig();
-  const departments = loader.resolvePositionDepartments(draft.career.appointment.positionId);
-  const indicators = departments.flatMap((department) => department.kpiIndicators);
+  // 与工作台和 KPI 页面共用同一权威入口，确保玩家看到的责任指标
+  // 与年终实际结算完全一致。
+  const indicators = loader.resolvePositionKpis(draft.career.appointment.positionId);
   const kpi = calculateKPI(indicators, draft.actions.departmentStates, cfg);
   const kpiTier = scoreToKPITier(kpi.totalScore, cfg.kpiTierThresholds);
   const dimensions = computeFiveDimensions(

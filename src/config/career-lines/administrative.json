@@ -71,7 +71,7 @@
           "name": "副镇长",
           "departmentTemplateIds": ["urban_dev", "finance", "public_safety", "civil_affairs"],
           "kpiTemplateIds": ["gdp_growth", "fiscal_revenue", "safety", "livelihood_score"],
-          "annualBudget": 2000
+          "annualBudget": 6000
         },
         {
           "id": "admin_l2_1",
@@ -135,7 +135,7 @@
             "project_completion",
             "safety"
           ],
-          "annualBudget": 5000
+          "annualBudget": 7500
         },
         {
           "id": "admin_l3_1",

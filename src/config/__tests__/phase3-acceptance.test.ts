@@ -71,4 +71,34 @@ describe('Phase 3 acceptance config', () => {
     first.stagePositionIds.clerk = 'mutated';
     expect(loader.getPhase3AcceptanceConfig().stagePositionIds.clerk).toBe('admin_l1_0');
   });
+
+  it('provides a sustainable township leadership budget and only leadership-level personal work', () => {
+    const loader = getConfigLoader();
+    const deputy = loader.getPositionById('admin_l2_0');
+    const chief = loader.getPositionById('admin_l3_0');
+    expect(deputy?.annualBudget).toBe(6000);
+    expect(chief?.annualBudget).toBe(7500);
+    const deputyDepartments = loader.resolvePositionDepartments('admin_l2_0');
+    const deputyActionIds = deputyDepartments
+      .flatMap((department) => department.actions)
+      .map((action) => action.id);
+    expect(deputyActionIds).toEqual(
+      expect.arrayContaining(['township_investment_promotion', 'township_priority_delivery']),
+    );
+    expect(loader.resolvePositionKpis('admin_l2_0').map((indicator) => indicator.id)).toEqual(
+      deputyDepartments.flatMap((department) =>
+        department.kpiIndicators.map((indicator) => indicator.id),
+      ),
+    );
+
+    const deputyTaskIds = loader
+      .getAllPersonalTaskTemplates()
+      .filter(
+        (task) =>
+          !task.prerequisites?.allowedLeadershipRanks ||
+          task.prerequisites.allowedLeadershipRanks.includes('township_deputy'),
+      )
+      .map((task) => task.id);
+    expect(deputyTaskIds).toEqual(['task_team_sync', 'task_policy_study']);
+  });
 });

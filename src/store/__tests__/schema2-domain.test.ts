@@ -487,6 +487,30 @@ describe('Schema 2 存档', () => {
     expect(result.state?.world.metrics['rank_quota.clerk_1']).toBe(1);
   });
 
+  it('Schema 10 乡镇治理内容迁移保留预算和在途执行快照', () => {
+    const state = createInitialState();
+    const store = createTestStore(state);
+    store.dispatch({
+      type: 'START_PERSONAL_TASK',
+      taskId: 'task_policy_study',
+      tierKey: 'primary',
+      _idFactory: () => 'governance-migration-task',
+    });
+    const before = store.getRawState();
+    const envelope = {
+      ...wrapSaveEnvelope(before),
+      contentVersion: '2026.08.4',
+    };
+
+    const result = decodeCurrentSave(JSON.stringify(envelope));
+
+    expect(result.success).toBe(true);
+    expect(result.state?.remainingBudget).toBe(before.remainingBudget);
+    expect(result.state?.actions.slots.primary.occupants[0]).toEqual(
+      before.actions.slots.primary.occupants[0],
+    );
+  });
+
   it('Schema 10 旧副职流程被取消并保留审计，其他机会不受影响', () => {
     const state = createInitialState();
     state.time.totalDaysPlayed = 600;

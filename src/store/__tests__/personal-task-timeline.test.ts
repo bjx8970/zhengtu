@@ -68,7 +68,7 @@ describe('personal task start', () => {
     expect(store.getRawState().remainingBudget).toBe(budgetBefore - 10);
   });
 
-  it('领导职务只能承接不限阶段的本人任务', () => {
+  it('领导职务只能承接协调与政策学习任务', () => {
     const state = createInitialState();
     state.career.appointment.leadershipRank = 'township_deputy';
     const store = createTestStore(state);
@@ -78,10 +78,27 @@ describe('personal task start', () => {
 
     store.dispatch({
       type: 'START_PERSONAL_TASK',
+      taskId: 'task_draft_material',
+      tierKey: 'primary',
+    });
+    expect(store.getRawState().actions.slots.primary.occupants[0]).toBeNull();
+
+    store.dispatch({
+      type: 'START_PERSONAL_TASK',
       taskId: 'task_policy_study',
       tierKey: 'primary',
     });
-    expect(store.getRawState().actions.slots.primary.occupants[0]).not.toBeNull();
+    store.dispatch({
+      type: 'START_PERSONAL_TASK',
+      taskId: 'task_team_sync',
+      tierKey: 'secondary',
+    });
+    expect(store.getRawState().actions.slots.primary.occupants[0]?.actionId).toBe(
+      'task_policy_study',
+    );
+    expect(store.getRawState().actions.slots.secondary.occupants[0]?.actionId).toBe(
+      'task_team_sync',
+    );
   });
 
   it('前置条件未满足时拒绝承接', () => {
