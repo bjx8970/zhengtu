@@ -1900,6 +1900,7 @@ function backfillCareerExperienceAssessments(
 function restoreMissedTownshipChiefOpportunity(
   state: Record<string, unknown>,
   currentDay: number,
+  ignoredOpportunityIds: ReadonlySet<string>,
 ): void {
   const typedState = state as unknown as PlayerSave;
   const appointment = typedState.career.appointment;
@@ -1931,6 +1932,7 @@ function restoreMissedTownshipChiefOpportunity(
   if (
     typedState.career.opportunities.some(
       (opportunity) =>
+        !ignoredOpportunityIds.has(opportunity.id) &&
         opportunity.definitionId === 'township_chief_leadership_vacancy' &&
         opportunity.source.sourceId === sourceId,
     )
@@ -1939,6 +1941,11 @@ function restoreMissedTownshipChiefOpportunity(
 
   // 历史信号只能读取当时已经完成的治理证据和任内考核，不能借用迁移日之后的成果。
   const historicalState = structuredClone(typedState);
+  // opportunity orchestrator 自身也会按 definition/source 去重，因此只在重放快照中
+  // 隐藏本轮刚取消的旧内容机会；真实 state 仍完整保留这些 cancelled 审计记录。
+  historicalState.career.opportunities = historicalState.career.opportunities.filter(
+    (opportunity) => !ignoredOpportunityIds.has(opportunity.id),
+  );
   historicalState.events.history = historicalState.events.history.filter(
     (record) => record.completedAtDay <= source.absoluteDay,
   );
@@ -2050,7 +2057,10 @@ export function migrateSchema10TownshipChiefContent(
       career.activeProcess = null;
     }
   }
-  restoreMissedTownshipChiefOpportunity(state, currentDay);
+  // 本轮刚取消的旧内容机会不能充当正式机会的去重凭据；否则同一考核源下的
+  // 30 天旧窗口会反过来阻止 270 天正式窗口恢复。迁移前已终结的记录仍参与去重，
+  // 防止已经消费过的来源被再次开放。
+  restoreMissedTownshipChiefOpportunity(state, currentDay, cancelledOpportunityIds);
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }

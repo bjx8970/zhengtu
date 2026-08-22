@@ -841,6 +841,83 @@ describe('Schema 2 存档', () => {
         (opportunity) => opportunity.definitionId === 'township_chief_leadership_vacancy',
       ),
     ).toBe(false);
+
+    const sameSourceState = structuredClone(state);
+    sameSourceState.assessments.annualAssessments = [
+      { year: 2014, score: 85, tier: '称职' },
+      { year: 2015, score: 55, tier: '不称职' },
+      { year: 2016, score: 90, tier: '优秀' },
+    ];
+    Object.assign(sameSourceState.time, {
+      year: 2017,
+      month: 1,
+      day: 11,
+      totalDaysPlayed: 1630,
+    });
+    const restoredTemplate = result.state?.career.opportunities.find(
+      (opportunity) => opportunity.definitionId === 'township_chief_leadership_vacancy',
+    );
+    if (!restoredTemplate) throw new Error('Expected restored chief opportunity template');
+    const legacySameSourceOpportunity = structuredClone(restoredTemplate);
+    legacySameSourceOpportunity.id = 'legacy-chief-same-assessment-source';
+    legacySameSourceOpportunity.source.sourceId = 'assessment:2016';
+    legacySameSourceOpportunity.source.signalId = 'legacy-chief-2016-signal';
+    if (!legacySameSourceOpportunity.sourceSignal)
+      throw new Error('Expected assessment source signal');
+    legacySameSourceOpportunity.sourceSignal.signalId = 'legacy-chief-2016-signal';
+    legacySameSourceOpportunity.sourceSignal.occurredAtDay = 1620;
+    legacySameSourceOpportunity.sourceSignal.data = {
+      year: 2016,
+      score: 90,
+      tier: '优秀',
+    };
+    legacySameSourceOpportunity.appearedAtDay = 1620;
+    legacySameSourceOpportunity.expiresAtDay = 1650;
+    sameSourceState.career.opportunities = [legacySameSourceOpportunity];
+
+    const sameSourceResult = decodeCurrentSave(
+      JSON.stringify({
+        ...wrapSaveEnvelope(sameSourceState),
+        contentVersion: '2026.08.5',
+      }),
+    );
+    expect(sameSourceResult.success).toBe(true);
+    expect(sameSourceResult.state?.career.opportunities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'legacy-chief-same-assessment-source',
+          status: 'cancelled',
+          appearedAtDay: 1620,
+          expiresAtDay: 1650,
+        }),
+        expect.objectContaining({
+          id: 'content-migration-chief-legacy-deputy-appointment-2016',
+          status: 'available',
+          appearedAtDay: 1620,
+          expiresAtDay: 1890,
+          source: expect.objectContaining({ sourceId: 'assessment:2016' }),
+        }),
+      ]),
+    );
+
+    const consumedSourceState = structuredClone(sameSourceState);
+    const consumedOpportunity = consumedSourceState.career.opportunities[0];
+    if (!consumedOpportunity) throw new Error('Expected consumed source fixture');
+    consumedOpportunity.status = 'rejected';
+    consumedOpportunity.rejectedAtDay = 1625;
+    const consumedSourceResult = decodeCurrentSave(
+      JSON.stringify({
+        ...wrapSaveEnvelope(consumedSourceState),
+        contentVersion: '2026.08.5',
+      }),
+    );
+    expect(consumedSourceResult.success).toBe(true);
+    expect(consumedSourceResult.state?.career.opportunities).toHaveLength(1);
+    expect(consumedSourceResult.state?.career.opportunities[0]).toMatchObject({
+      id: 'legacy-chief-same-assessment-source',
+      status: 'rejected',
+      source: { sourceId: 'assessment:2016' },
+    });
   });
 
   it('Schema 9 旧内容迁移在覆盖内容版本前清除预置未来职数', () => {
