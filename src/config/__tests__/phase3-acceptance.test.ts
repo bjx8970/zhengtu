@@ -78,12 +78,18 @@ describe('Phase 3 acceptance config', () => {
     const chief = loader.getPositionById('admin_l3_0');
     expect(deputy?.annualBudget).toBe(6000);
     expect(chief?.annualBudget).toBe(7500);
-    expect(
-      loader
-        .resolvePositionDepartments('admin_l2_0')
-        .flatMap((department) => department.actions)
-        .map((action) => action.id),
-    ).toContain('township_investment_promotion');
+    const deputyDepartments = loader.resolvePositionDepartments('admin_l2_0');
+    const deputyActionIds = deputyDepartments
+      .flatMap((department) => department.actions)
+      .map((action) => action.id);
+    expect(deputyActionIds).toEqual(
+      expect.arrayContaining(['township_investment_promotion', 'township_priority_delivery']),
+    );
+    expect(loader.resolvePositionKpis('admin_l2_0').map((indicator) => indicator.id)).toEqual(
+      deputyDepartments.flatMap((department) =>
+        department.kpiIndicators.map((indicator) => indicator.id),
+      ),
+    );
 
     const deputyTaskIds = loader
       .getAllPersonalTaskTemplates()

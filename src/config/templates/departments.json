@@ -36,6 +36,19 @@
           { "target": "dept.kpi.project_completion", "operation": "add", "value": 8 },
           { "target": "player.performance", "operation": "add", "value": 3 }
         ]
+      },
+      {
+        "id": "township_priority_delivery",
+        "name": "上级重点事项攻坚",
+        "description": "统筹部门资源落实上级交办重点事项，在限定周期内形成可考核的项目成果",
+        "durationDays": 14,
+        "category": "major",
+        "cooldownDays": 28,
+        "budgetDelta": 260,
+        "effects": [
+          { "target": "dept.kpi.project_completion", "operation": "add", "value": 10 },
+          { "target": "player.competence", "operation": "add", "value": 2 }
+        ]
       }
     ],
     "kpiTemplateIds": ["project_completion", "planning_score"]

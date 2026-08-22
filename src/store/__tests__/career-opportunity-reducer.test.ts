@@ -8,6 +8,7 @@ import type {
   TrainingCareerOpportunity,
 } from '../../domain/career/state';
 import * as effectExecutor from '../../engine/events/effect-executor';
+import { calculateKPI } from '../../engine/governance/kpi';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
 
 function createAvailableOpportunity(id = 'opportunity-1'): AppointmentCareerOpportunity {
@@ -135,13 +136,13 @@ describe('career opportunity reducer', () => {
     Object.assign(initial.time, {
       year: 2012,
       month: 12,
-      day: 25,
-      totalDaysPlayed: 354,
+      day: 21,
+      totalDaysPlayed: 350,
     });
-    opportunity.appearedAtDay = 354;
-    opportunity.expiresAtDay = 624;
+    opportunity.appearedAtDay = 350;
+    opportunity.expiresAtDay = 620;
     if (!opportunity.sourceSignal) throw new Error('Expected appointment trigger signal');
-    opportunity.sourceSignal.occurredAtDay = 354;
+    opportunity.sourceSignal.occurredAtDay = 350;
     initial.career.opportunities = [opportunity];
     const store = createTestStore(initial);
     let sequence = 0;
@@ -163,7 +164,7 @@ describe('career opportunity reducer', () => {
     expect(state.career.appointment.positionId).toBe('admin_l2_0');
     expect(state.career.civilServiceRank).toBe(rank);
     expect(state.career.experiences.filter((item) => item.endedAtDay === null)).toHaveLength(1);
-    expect(state.career.experiences[0]?.endedAtDay).toBe(354);
+    expect(state.career.experiences[0]?.endedAtDay).toBe(350);
     expect(state.career.opportunities[0]?.finalOutcome).toBe('appointed');
     expect(state.career.completedProcesses).toMatchObject([
       { status: 'completed', opportunityId: opportunity.id },
@@ -206,7 +207,23 @@ describe('career opportunity reducer', () => {
     expect(governed.actions.departmentStates.admin_l2_0_dept_0?.kpiValues).toMatchObject({
       project_completion: 8,
     });
-    expect(governed.assessments.annualAssessments).toHaveLength(1);
+    const displayedKpi = calculateKPI(
+      getConfigLoader().resolvePositionKpis('admin_l2_0'),
+      governed.actions.departmentStates,
+      getConfigLoader().getGameConfig(),
+    );
+    expect(
+      displayedKpi.indicators.find((item) => item.indicatorId === 'project_completion'),
+    ).toMatchObject({ currentValue: 8 });
+    expect(governed.assessments.annualAssessments).toHaveLength(0);
+    for (let day = 0; day < 3; day++)
+      store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day', _rng: () => 0 });
+    const assessed = store.getRawState();
+    expect(assessed.assessments.annualAssessments).toHaveLength(1);
+    expect(assessed.assessments.annualAssessments[0]?.dimensions?.achievement).toBeCloseTo(
+      displayedKpi.totalScore,
+    );
+
     store.dispatch({
       type: 'START_ACTION',
       deptId: 'admin_l2_0_dept_0',
@@ -214,6 +231,45 @@ describe('career opportunity reducer', () => {
       tierKey: 'primary',
     });
     expect(store.getRawState().actions.totalActions).toBe(1);
+
+    const lowBudgetState = structuredClone(store.getRawState());
+    lowBudgetState.remainingBudget = 259;
+    const lowBudgetStore = createTestStore(lowBudgetState);
+    lowBudgetStore.dispatch({
+      type: 'START_ACTION',
+      deptId: 'admin_l2_0_dept_0',
+      actionId: 'township_priority_delivery',
+      tierKey: 'primary',
+    });
+    expect(lowBudgetStore.getRawState().actions.totalActions).toBe(1);
+    expect(lowBudgetStore.getRawState().remainingBudget).toBe(259);
+
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: 'admin_l2_0_dept_0',
+      actionId: 'township_priority_delivery',
+      tierKey: 'secondary',
+    });
+    expect(store.getRawState().actions.totalActions).toBe(1);
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: 'admin_l2_0_dept_0',
+      actionId: 'township_priority_delivery',
+      tierKey: 'primary',
+      _idFactory: () => 'deputy-priority-action',
+    });
+    expect(store.getRawState().remainingBudget).toBe(5740);
+    store.dispatch({ type: 'ADVANCE_TIME', granularity: 'month', _rng: () => 0 });
+    expect(store.getRawState().actions.departmentStates.admin_l2_0_dept_0?.kpiValues).toMatchObject(
+      { project_completion: 18 },
+    );
+    store.dispatch({
+      type: 'START_ACTION',
+      deptId: 'admin_l2_0_dept_0',
+      actionId: 'township_priority_delivery',
+      tierKey: 'primary',
+    });
+    expect(store.getRawState().actions.totalActions).toBe(2);
   });
 
   it('rejects an available opportunity through store dispatch', () => {

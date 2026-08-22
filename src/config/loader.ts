@@ -310,15 +310,19 @@ class ConfigLoader {
     );
   }
 
-  /** 展开职位的 KPI 配置 */
+  /**
+   * 展开职位的考核 KPI 配置。
+   *
+   * 当前职位所辖部门是治理行动和运行态的权威责任范围；展示与年终结算
+   * 必须共同使用本入口，避免职位摘要字段与部门实际 producer 漂移。
+   *
+   * @param positionId 稳定职位 ID
+   * @returns 按职位部门顺序展开的考核指标
+   */
   resolvePositionKpis(positionId: string): KPITemplate[] {
-    const pos = this.positions.get(positionId);
-    if (!pos) throw new Error(`Unknown position: ${positionId}`);
-    return pos.kpiTemplateIds.map((kpiId) => {
-      const kpi = this.kpiTemplates[kpiId];
-      if (!kpi) throw new Error(`Unknown KPI template: ${kpiId}`);
-      return { ...kpi };
-    });
+    return this.resolvePositionDepartments(positionId).flatMap((department) =>
+      department.kpiIndicators.map((indicator) => ({ ...indicator })),
+    );
   }
 
   /** 按 ID 查询 KPI 模板 */
