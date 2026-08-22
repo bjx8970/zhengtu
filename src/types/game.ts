@@ -9,8 +9,104 @@
 
 import type { FileType, FileCategory, SentimentType, InvestigationEvidence } from './enums';
 import type { KPITier } from './enums';
-import type { SlotTierKey, SlotOccupant, SlotState } from './player';
+import type { PlayerSave, SlotTierKey, SlotOccupant, SlotState } from './player';
 import type { ActionTemplate, PersonalTaskTemplate } from './config';
+
+/** Store 可接受的全部游戏动作。 */
+export type GameAction =
+  | { type: 'NEW_GAME'; data: Record<string, unknown> }
+  | { type: 'LOAD_SAVE'; save: PlayerSave }
+  | {
+      type: 'START_ACTION';
+      deptId: string;
+      actionId: string;
+      tierKey: 'primary' | 'secondary' | 'reserve';
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'START_PERSONAL_TASK';
+      taskId: string;
+      tierKey: 'primary' | 'secondary' | 'reserve';
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'ADVANCE_TIME';
+      granularity: 'day' | 'week' | 'month';
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'CHOOSE_EVENT_OPTION';
+      eventInstanceId: string;
+      optionId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'PROPOSE_POLICY';
+      policyId: string;
+      regionId?: string;
+      institutionId?: string;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'APPROVE_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'ACTIVATE_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'SUSPEND_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'RESUME_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'FAIL_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'REPEAL_POLICY';
+      policyInstanceId: string;
+      _rng?: () => number;
+      _idFactory?: () => string;
+    }
+  | {
+      type: 'ADVANCE_CIVIL_SERVICE_RANK';
+      sourceType?: 'assessment' | 'event' | 'policy' | 'system';
+      sourceId?: string | null;
+      sourceAssessmentYear?: number | null;
+      _idFactory?: () => string;
+      _rng?: () => number;
+    }
+  | {
+      type: 'ACCEPT_CAREER_OPPORTUNITY';
+      opportunityId: string;
+      _idFactory?: () => string;
+      _rng?: () => number;
+    }
+  | { type: 'REJECT_CAREER_OPPORTUNITY'; opportunityId: string }
+  | { type: 'CANCEL_CAREER_OPPORTUNITY'; opportunityId: string }
+  | {
+      type: 'ADVANCE_CAREER_PROCESS';
+      opportunityId: string;
+      _idFactory?: () => string;
+      _rng?: () => number;
+    };
 
 /** 时间推进后触发的周期事件 */
 export interface TimeTrigger {

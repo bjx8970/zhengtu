@@ -109,6 +109,7 @@ export function calculateKPI(
  *
  * @param score      综合评分
  * @param thresholds 等次阈值配置
+ * @returns 对应的年度考核等次
  */
 export function scoreToKPITier(
   score: number,

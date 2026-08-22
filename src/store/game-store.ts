@@ -11,6 +11,7 @@
 
 import { createStore, produce, unwrap } from 'solid-js/store';
 import type { PlayerSave } from '../types/player';
+import type { GameAction } from '../types/game';
 import type { GovernanceState } from '../domain/governance/state';
 import type { EventRuntimeState } from '../domain/events/state';
 import type { WorldState } from '../domain/world-state';
@@ -40,102 +41,6 @@ import {
   reduceCancelCareerOpportunity,
   reduceRejectCareerOpportunity,
 } from './reducers/career-opportunity-reducer';
-
-/** 游戏动作联合类型 */
-export type GameAction =
-  | { type: 'NEW_GAME'; data: Record<string, unknown> }
-  | { type: 'LOAD_SAVE'; save: PlayerSave }
-  | {
-      type: 'START_ACTION';
-      deptId: string;
-      actionId: string;
-      tierKey: 'primary' | 'secondary' | 'reserve';
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'START_PERSONAL_TASK';
-      taskId: string;
-      tierKey: 'primary' | 'secondary' | 'reserve';
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'ADVANCE_TIME';
-      granularity: 'day' | 'week' | 'month';
-      _rng?: () => number;
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'CHOOSE_EVENT_OPTION';
-      eventInstanceId: string;
-      optionId: string;
-      _rng?: () => number;
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'PROPOSE_POLICY';
-      policyId: string;
-      regionId?: string;
-      institutionId?: string;
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'APPROVE_POLICY';
-      policyInstanceId: string;
-      _rng?: () => number;
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'ACTIVATE_POLICY';
-      policyInstanceId: string;
-      _rng?: () => number;
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'SUSPEND_POLICY';
-      policyInstanceId: string;
-      _rng?: () => number;
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'RESUME_POLICY';
-      policyInstanceId: string;
-      _rng?: () => number;
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'FAIL_POLICY';
-      policyInstanceId: string;
-      _rng?: () => number;
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'REPEAL_POLICY';
-      policyInstanceId: string;
-      _rng?: () => number;
-      _idFactory?: () => string;
-    }
-  | {
-      type: 'ADVANCE_CIVIL_SERVICE_RANK';
-      sourceType?: 'assessment' | 'event' | 'policy' | 'system';
-      sourceId?: string | null;
-      sourceAssessmentYear?: number | null;
-      _idFactory?: () => string;
-      _rng?: () => number;
-    }
-  | {
-      type: 'ACCEPT_CAREER_OPPORTUNITY';
-      opportunityId: string;
-      _idFactory?: () => string;
-      _rng?: () => number;
-    }
-  | { type: 'REJECT_CAREER_OPPORTUNITY'; opportunityId: string }
-  | { type: 'CANCEL_CAREER_OPPORTUNITY'; opportunityId: string }
-  | {
-      type: 'ADVANCE_CAREER_PROCESS';
-      opportunityId: string;
-      _idFactory?: () => string;
-      _rng?: () => number;
-    };
 
 /** 创建默认治理状态 */
 function createDefaultGovernanceState(): GovernanceState {

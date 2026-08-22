@@ -11,7 +11,9 @@ import type { ActionEffectDef } from '../../types/config';
 
 /**
  * 计算单个效果的变动量（处理随机范围）。
- * 返回 delta（正数增加，负数减少）。
+ *
+ * @param effect 效果定义
+ * @returns 变动量（正数增加，负数减少）
  */
 export function computeEffectDelta(effect: ActionEffectDef): number {
   if (effect.range) {
