@@ -27,6 +27,7 @@ import type {
   PersonalTaskTemplate,
 } from '../types/config';
 import type { PositionConfigV2, InstitutionConfig } from '../types/position-v2';
+import type { Phase3AcceptanceConfig } from '../types/phase3';
 import type { CivilServiceRank, InstitutionLevel } from '../domain/career/types';
 import type { EventDefinition } from '../domain/events/definition';
 import type { DomainSignal } from '../domain/governance/types';
@@ -41,6 +42,7 @@ import {
   PersonalTaskTemplateArraySchema,
 } from './schemas';
 import { EventDefinitionArraySchema } from '../domain/events/definition';
+import { PHASE3_ACCEPTANCE_CONFIG } from './phase3-acceptance';
 import deptTemplateData from './templates/departments.json' with { type: 'json' };
 import deptExtraData from './templates/departments-extra.json' with { type: 'json' };
 import kpiData from './templates/kpis.json' with { type: 'json' };
@@ -143,6 +145,7 @@ class ConfigLoader {
   private careerOpportunities: CareerOpportunityDefinition[];
   private experienceQualificationRules: CareerExperienceQualificationRules;
   private personalTasks: PersonalTaskTemplate[];
+  private phase3AcceptanceConfig: Phase3AcceptanceConfig;
   private regionConfig: RegionConfig;
   private universityConfig: UniversityConfig;
   private backgroundConfig: BackgroundConfig;
@@ -169,6 +172,7 @@ class ConfigLoader {
     this.careerOpportunities = parsedCareerOpportunities;
     this.experienceQualificationRules = parsedExperienceQualificationRules;
     this.personalTasks = parsedPersonalTasks;
+    this.phase3AcceptanceConfig = PHASE3_ACCEPTANCE_CONFIG;
     this.gameConfig = constantsData as unknown as GameConfig;
     this.regionConfig = regionData as unknown as RegionConfig;
     this.universityConfig = universityData as unknown as UniversityConfig;
@@ -249,6 +253,11 @@ class ConfigLoader {
   getPersonalTaskTemplate(taskId: string): PersonalTaskTemplate | null {
     const task = this.personalTasks.find((item) => item.id === taskId);
     return task ? structuredClone(task) : null;
+  }
+
+  /** 获取 Phase 3 验收配置的防御性副本。 */
+  getPhase3AcceptanceConfig(): Phase3AcceptanceConfig {
+    return structuredClone(this.phase3AcceptanceConfig);
   }
 
   /** 按领域信号查询职业机会定义（深拷贝）。 */

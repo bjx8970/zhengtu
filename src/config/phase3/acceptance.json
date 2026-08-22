@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "phaseId": "phase3_township_vertical_slice",
+  "saveSchemaVersion": 10,
+  "targetContentVersion": "2026.08.7",
+  "stagePositionIds": {
+    "clerk": "admin_l1_0",
+    "townshipDeputy": "admin_l2_0",
+    "townshipChief": "admin_l3_0"
+  },
+  "milestones": {
+    "probationPassed": { "minDay": 360, "maxDay": 450 },
+    "firstRankPromotion": { "minDay": 360, "maxDay": 450 },
+    "townshipDeputyAppointment": { "minDay": 720, "maxDay": 810 },
+    "sectionMember4Promotion": { "minDay": 1080, "maxDay": 1170 },
+    "townshipChiefOpportunity": { "minDay": 1440, "maxDay": 1530 }
+  },
+  "entrypoints": [
+    {
+      "role": "producer",
+      "kind": "personal_task",
+      "contentId": "task_induction_training",
+      "purpose": "通过正常个人任务产生试用期工作完成记录"
+    },
+    {
+      "role": "consumer",
+      "kind": "timeline_node",
+      "contentId": "probation_evaluation",
+      "purpose": "在统一时间轴结算试用期"
+    },
+    {
+      "role": "consumer",
+      "kind": "rank_progression",
+      "contentId": "clerk_2_to_clerk_1",
+      "purpose": "消费年度考核与职数结果完成首次职级晋升"
+    },
+    {
+      "role": "producer",
+      "kind": "personal_task",
+      "contentId": "task_assigned_special",
+      "purpose": "产生乡科级副职机会要求的交办专项履历事实"
+    },
+    {
+      "role": "consumer",
+      "kind": "career_opportunity",
+      "contentId": "township_deputy_leadership_vacancy",
+      "purpose": "年度考核后生成乡科级副职选拔机会"
+    },
+    {
+      "role": "producer",
+      "kind": "event",
+      "contentId": "flood_preparation_metrics",
+      "purpose": "记录乡科级正职路径要求的防汛准备链"
+    },
+    {
+      "role": "producer",
+      "kind": "event",
+      "contentId": "industrial_park_progress_crisis",
+      "purpose": "记录乡科级正职路径要求的产业政策链"
+    },
+    {
+      "role": "producer",
+      "kind": "policy",
+      "contentId": "industrial_park_support",
+      "purpose": "承接招商事件并形成产业园政策实例"
+    },
+    {
+      "role": "consumer",
+      "kind": "career_opportunity",
+      "contentId": "township_chief_leadership_vacancy",
+      "purpose": "消费副职任期、考核和治理链成果生成正职机会"
+    }
+  ],
+  "requiredKpiProducers": [
+    {
+      "positionId": "admin_l1_0",
+      "kpiId": "office_efficiency",
+      "personalTaskIds": ["task_draft_material", "task_policy_brief"]
+    },
+    {
+      "positionId": "admin_l1_0",
+      "kpiId": "livelihood_score",
+      "personalTaskIds": ["task_village_research", "task_poverty_visit"]
+    },
+    {
+      "positionId": "admin_l1_0",
+      "kpiId": "agricultural_output",
+      "personalTaskIds": ["task_agri_walk"]
+    }
+  ]
+}
