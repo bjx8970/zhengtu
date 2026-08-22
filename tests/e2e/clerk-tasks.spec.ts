@@ -70,6 +70,16 @@ test('科员以个人任务完成工作循环且看不到部门治理行动', as
 
   // 承接 3 天日常任务（政策解读简报 → 办公效率 +3）
   await page.goto('/#/tasks');
+  const inductionTraining = page.getByTestId('personal-task-task_induction_training');
+  await inductionTraining.getByTestId('start-task-task_induction_training-primary').click();
+  await expect(inductionTraining).toContainText('该任务已在执行中');
+  await expect(
+    inductionTraining.getByTestId('start-task-task_induction_training-secondary'),
+  ).toBeDisabled();
+  await expect(
+    inductionTraining.getByTestId('start-task-task_induction_training-secondary'),
+  ).toHaveAttribute('title', '该任务已在执行中');
+
   await expect(page.getByTestId('personal-task-task_policy_brief')).toBeVisible();
   await expect(page.getByTestId('task-cost-task_policy_brief')).toHaveText('成本 5万');
   const budgetBefore = Number((await savedState(page)).remainingBudget);

@@ -10,7 +10,10 @@ import { createMemo, For, Show } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
 import { PageHeader } from '../../components/page-header';
 import { getConfigLoader } from '../../config/loader';
-import { describePersonalTaskAvailability } from '../../engine/tasks/personal-task';
+import {
+  describePersonalTaskAvailability,
+  taskAllowsParallel,
+} from '../../engine/tasks/personal-task';
 import { PERSONAL_TASK_LEDGER_ID, type SlotOccupant, type SlotTierKey } from '../../types/player';
 import {
   PERSONAL_TASK_TYPES,
@@ -194,6 +197,7 @@ function TaskCard(props: {
   /** 禁排原因（供按钮 title 与卡片提示共用） */
   function blockReason(): string | null {
     if (!availability().available) return availability().reason ?? '不满足承接条件';
+    if (props.running && !taskAllowsParallel(props.task)) return '该任务已在执行中';
     if (onceDone()) return '该任务已完成后不可再次承接';
     if (onCooldown()) return `任务冷却中（剩 ${cooldownUntil() - state.time.totalDaysPlayed} 天）`;
     if (state.remainingBudget < props.task.budgetDelta) return '预算不足';
@@ -236,27 +240,24 @@ function TaskCard(props: {
           <For each={TIER_BUTTONS}>
             {(tb) => {
               if (props.task.category === 'major' && tb.key !== 'primary') return null;
-              const tierGroup = state.actions.slots[tb.key];
-              const hasFree = tierGroup.occupants.some((o: SlotOccupant | null) => o === null);
-              const insufficientBudget = state.remainingBudget < props.task.budgetDelta;
-              const disabled = Boolean(blockReason()) || !hasFree || insufficientBudget;
+              const hasFree = () =>
+                state.actions.slots[tb.key].occupants.some(
+                  (occupant: SlotOccupant | null) => occupant === null,
+                );
+              const tierBlockReason = () => blockReason() ?? (!hasFree() ? '该档位已无空槽' : null);
               return (
                 <button
                   data-testid={`start-task-${props.task.id}-${tb.key}`}
                   class={
-                    disabled
+                    tierBlockReason()
                       ? 'btn flex-1'
                       : tb.key === 'reserve'
                         ? 'btn btn-danger flex-1'
                         : 'btn btn-primary flex-1'
                   }
                   onClick={() => props.onStart(tb.key)}
-                  disabled={disabled}
-                  title={
-                    disabled
-                      ? (blockReason() ?? (!hasFree ? '该档位已无空槽' : '预算不足'))
-                      : undefined
-                  }
+                  disabled={Boolean(tierBlockReason())}
+                  title={tierBlockReason() ?? undefined}
                 >
                   {tb.label}槽
                 </button>
