@@ -29,15 +29,32 @@
     "triggerSignals": ["assessment.completed"],
     "conditions": [
       { "careerCheck": "leadership_rank", "value": "township_deputy", "op": "eq" },
-      { "careerCheck": "years_in_position", "value": 2, "op": "gte" },
-      { "signalField": "score", "op": "gte", "value": 60 },
-      { "signalField": "tier", "op": "neq", "value": "不称职" }
+      {
+        "careerCheck": "assessment_history",
+        "check": "current_appointment_qualified_count",
+        "value": 2,
+        "op": "gte"
+      },
+      { "signalField": "score", "op": "gte", "value": 70 },
+      { "eventHistory": "flood_preparation_metrics", "check": "occurred" },
+      { "eventHistory": "industrial_park_progress_crisis", "check": "occurred" },
+      {
+        "careerCheck": "active_restriction",
+        "value": "appointment_selection_freeze",
+        "op": "neq"
+      },
+      {
+        "careerCheck": "active_restriction",
+        "value": "disciplinary_action",
+        "op": "neq"
+      }
     ],
-    "expiresAfterDays": 30,
+    "acceptanceConditions": [{ "careerCheck": "years_in_position", "value": 2, "op": "gte" }],
+    "expiresAfterDays": 270,
     "repeatPolicy": "once_per_source",
     "cooldownDays": 0,
     "requiresSelection": true,
-    "reasonTemplate": "年度考核达标且已在乡科级副职岗位任职满两年，现出现镇长岗位选拔机会。选拔冻结和处分期间不得进入任职程序。",
+    "reasonTemplate": "副职任内两次考核称职并完成防汛和产业园治理后，进入镇长选拔窗口；副职任满两年后可接受。",
     "targetPositionId": "admin_l3_0",
     "appointmentType": "substantive",
     "appointmentReason": "promotion"

@@ -139,19 +139,36 @@ export function CareerPage() {
       config: getConfigLoader().getGameConfig().probation,
     });
   });
-  const deputyReadiness = createMemo(() => {
+  const leadershipReadiness = createMemo(() => {
+    const leadershipRank = state.career.appointment.leadershipRank;
+    const definitionId =
+      leadershipRank === 'none'
+        ? 'township_deputy_leadership_vacancy'
+        : leadershipRank === 'township_deputy'
+          ? 'township_chief_leadership_vacancy'
+          : null;
+    if (!definitionId) return null;
     const definition = getConfigLoader()
       .getAllCareerOpportunityDefinitions()
-      .find((item) => item.id === 'township_deputy_leadership_vacancy');
+      .find((item) => item.id === definitionId);
     if (!definition) return null;
     const config = getConfigLoader().getGameConfig();
-    return evaluateCareerOpportunityDefinitionReadiness({
-      definition,
-      state,
-      currentDay: currentDay(),
-      daysPerYear: config.daysPerMonth * config.monthsPerYear,
-      careerExperienceQualificationRules: getConfigLoader().getCareerExperienceQualificationRules(),
-    });
+    const isDeputy = definitionId === 'township_deputy_leadership_vacancy';
+    return {
+      testId: isDeputy ? 'township-deputy-readiness' : 'township-chief-readiness',
+      title: isDeputy ? '乡科级副职准备度' : '乡科级正职准备度',
+      description: isDeputy
+        ? '合格年度考核触发选拔窗口；机会出现后仍须满足服务年限，并先完成在途工作。'
+        : '副职任内考核和治理成果触发选拔窗口；任满两年后可接受，并须先完成在途工作。',
+      result: evaluateCareerOpportunityDefinitionReadiness({
+        definition,
+        state,
+        currentDay: currentDay(),
+        daysPerYear: config.daysPerMonth * config.monthsPerYear,
+        careerExperienceQualificationRules:
+          getConfigLoader().getCareerExperienceQualificationRules(),
+      }),
+    };
   });
   const latestAppointedOpportunity = createMemo(() =>
     [...state.career.opportunities]
@@ -375,23 +392,25 @@ export function CareerPage() {
           </div>
           <div class="card-pad flex-col gap-md">
             <p class="doc-meta">岗位变动需接受机会并按流程完成选拔；职级不会由此自动变化。</p>
-            <article class="card" data-testid="township-deputy-readiness">
-              <div class="card-pad flex-col gap-sm">
-                <h3 class="serif" style={{ 'font-size': '1.05rem' }}>
-                  乡科级副职准备度
-                </h3>
-                <p class="text-xs secondary-text">
-                  合格年度考核触发选拔窗口；机会出现后仍须满足服务年限，并先完成在途工作。
-                </p>
-                <For each={deputyReadiness()?.items ?? []}>
-                  {(requirement) => (
-                    <p class="text-sm secondary-text">
-                      {requirement.satisfied ? '✓' : '○'} {requirement.detail}
-                    </p>
-                  )}
-                </For>
-              </div>
-            </article>
+            <Show when={leadershipReadiness()}>
+              {(readiness) => (
+                <article class="card" data-testid={readiness().testId}>
+                  <div class="card-pad flex-col gap-sm">
+                    <h3 class="serif" style={{ 'font-size': '1.05rem' }}>
+                      {readiness().title}
+                    </h3>
+                    <p class="text-xs secondary-text">{readiness().description}</p>
+                    <For each={readiness().result.items}>
+                      {(requirement) => (
+                        <p class="text-sm secondary-text">
+                          {requirement.satisfied ? '✓' : '○'} {requirement.detail}
+                        </p>
+                      )}
+                    </For>
+                  </div>
+                </article>
+              )}
+            </Show>
             <Show when={latestAppointedOpportunity()}>
               <p class="banner banner-success" data-testid="appointment-change-feedback">
                 已完成岗位任职：旧履历已关闭，新履历已建立；公务员职级保持

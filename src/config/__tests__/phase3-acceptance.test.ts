@@ -101,4 +101,44 @@ describe('Phase 3 acceptance config', () => {
       .map((task) => task.id);
     expect(deputyTaskIds).toEqual(['task_team_sync', 'task_policy_study']);
   });
+
+  it('locks the township chief window to deputy governance evidence and two-year acceptance', () => {
+    const definition = getConfigLoader()
+      .getAllCareerOpportunityDefinitions()
+      .find((item) => item.id === 'township_chief_leadership_vacancy');
+    if (!definition) throw new Error('Expected township chief definition');
+
+    expect(definition.expiresAfterDays).toBe(270);
+    expect(definition.conditions).toEqual(
+      expect.arrayContaining([
+        {
+          careerCheck: 'leadership_rank',
+          value: 'township_deputy',
+          op: 'eq',
+        },
+        {
+          careerCheck: 'assessment_history',
+          check: 'current_appointment_qualified_count',
+          value: 2,
+          op: 'gte',
+        },
+        { signalField: 'score', op: 'gte', value: 70 },
+        { eventHistory: 'flood_preparation_metrics', check: 'occurred' },
+        { eventHistory: 'industrial_park_progress_crisis', check: 'occurred' },
+        {
+          careerCheck: 'active_restriction',
+          value: 'appointment_selection_freeze',
+          op: 'neq',
+        },
+        {
+          careerCheck: 'active_restriction',
+          value: 'disciplinary_action',
+          op: 'neq',
+        },
+      ]),
+    );
+    expect(definition.acceptanceConditions).toEqual([
+      { careerCheck: 'years_in_position', value: 2, op: 'gte' },
+    ]);
+  });
 });

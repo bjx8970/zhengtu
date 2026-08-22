@@ -15,6 +15,11 @@ const RESTRICTION_LABELS = {
   disciplinary_action: '处分限制',
 } as const;
 
+const EVENT_HISTORY_LABELS: Record<string, string> = {
+  flood_preparation_metrics: '防汛准备度量',
+  industrial_park_progress_crisis: '产业园进度危机',
+};
+
 function comparisonLabel(op: string): string {
   return (
     { eq: '等于', neq: '不等于', gt: '高于', gte: '不少于', lt: '低于', lte: '不多于' }[op] ?? op
@@ -64,7 +69,8 @@ function describeCondition(condition: ConditionExpression): string {
   }
   if ('worldMetric' in condition)
     return `世界指标 ${condition.worldMetric}${comparisonLabel(condition.op)} ${condition.value}`;
-  if ('eventHistory' in condition) return `事件经历 ${condition.eventHistory}：${condition.check}`;
+  if ('eventHistory' in condition)
+    return `事件经历 ${EVENT_HISTORY_LABELS[condition.eventHistory] ?? condition.eventHistory}：${condition.check}`;
   if ('experience' in condition) return `履历 ${condition.experience}：${condition.op}`;
   if ('policyRef' in condition) return `政策状态：${condition.check}`;
   return '未识别条件';

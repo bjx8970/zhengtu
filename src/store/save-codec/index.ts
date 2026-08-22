@@ -45,6 +45,7 @@ import {
 } from '../../domain/events/definition';
 import { getConfigLoader } from '../../config/loader';
 import { PersonalTaskTemplateSchema } from '../../config/schemas';
+import { processCareerOpportunitySignal } from '../../engine/career/opportunity-orchestrator';
 import { createActionExecutableSnapshot } from '../action-executable-snapshot';
 
 /** 不兼容存档备份的 localStorage key 前缀 */
@@ -1827,6 +1828,242 @@ export function migrateSchema10TownshipGovernanceContent(
 ): Record<string, unknown> {
   if (prev.contentVersion !== '2026.08.4') return prev;
   const migrated = structuredClone(prev);
+  migrated.contentVersion = '2026.08.5';
+  return migrated;
+}
+
+function backfillCareerExperienceAssessments(
+  state: Record<string, unknown>,
+  currentDay: number,
+): void {
+  const career = state.career as Record<string, unknown> | undefined;
+  const assessmentState = state.assessments as Record<string, unknown> | undefined;
+  const time = state.time as Record<string, unknown> | undefined;
+  const experiences = career?.experiences;
+  const annualAssessments = assessmentState?.annualAssessments;
+  if (
+    !Array.isArray(experiences) ||
+    !Array.isArray(annualAssessments) ||
+    typeof time?.year !== 'number' ||
+    typeof time.month !== 'number' ||
+    typeof time.day !== 'number'
+  )
+    throw new Error('Legacy save is missing assessment history for chief content migration');
+
+  // 2026.08.5 使用固定的 30 日月、360 日年。以当前日历锚点反推每次年结的绝对日，
+  // 避免把玩家全局已有成绩错误归入尚未开始或已经结束的任职履历。
+  const currentYearStartDay = currentDay - ((time.month - 1) * 30 + time.day - 1);
+  for (const value of annualAssessments) {
+    if (!value || typeof value !== 'object') continue;
+    const assessment = value as Record<string, unknown>;
+    if (
+      typeof assessment.year !== 'number' ||
+      typeof assessment.score !== 'number' ||
+      typeof assessment.tier !== 'string'
+    )
+      continue;
+    const assessmentDay = currentYearStartDay + (assessment.year + 1 - time.year) * 360;
+    if (assessmentDay < 0 || assessmentDay > currentDay) continue;
+    const candidates = experiences
+      .filter((experience): experience is Record<string, unknown> => {
+        if (!experience || typeof experience !== 'object') return false;
+        const record = experience as Record<string, unknown>;
+        return (
+          typeof record.startedAtDay === 'number' &&
+          record.startedAtDay <= assessmentDay &&
+          (record.endedAtDay === null ||
+            (typeof record.endedAtDay === 'number' && record.endedAtDay >= assessmentDay))
+        );
+      })
+      .sort((left, right) => {
+        const leftEndedToday = left.endedAtDay === assessmentDay ? 1 : 0;
+        const rightEndedToday = right.endedAtDay === assessmentDay ? 1 : 0;
+        if (leftEndedToday !== rightEndedToday) return rightEndedToday - leftEndedToday;
+        return Number(right.startedAtDay) - Number(left.startedAtDay);
+      });
+    const experience = candidates[0];
+    if (!experience) continue;
+    const results = Array.isArray(experience.assessmentResults) ? experience.assessmentResults : [];
+    if (
+      !results.some(
+        (result) =>
+          result &&
+          typeof result === 'object' &&
+          (result as Record<string, unknown>).year === assessment.year,
+      )
+    )
+      results.push({ year: assessment.year, score: assessment.score, tier: assessment.tier });
+    experience.assessmentResults = results;
+  }
+}
+
+function restoreMissedTownshipChiefOpportunity(
+  state: Record<string, unknown>,
+  currentDay: number,
+  ignoredOpportunityIds: ReadonlySet<string>,
+): void {
+  const typedState = state as unknown as PlayerSave;
+  const appointment = typedState.career.appointment;
+  if (appointment.leadershipRank !== 'township_deputy' || appointment.status !== 'active') return;
+  const experience = typedState.career.experiences.find(
+    (item) => item.appointmentId === appointment.appointmentId && item.endedAtDay === null,
+  );
+  if (!experience) return;
+  const time = typedState.time;
+  const currentYearStartDay = currentDay - ((time.month - 1) * 30 + time.day - 1);
+  const qualified = experience.assessmentResults
+    .filter((assessment) => assessment.tier === '优秀' || assessment.tier === '称职')
+    .map((assessment) => ({
+      assessment,
+      absoluteDay: currentYearStartDay + (assessment.year + 1 - time.year) * 360,
+    }))
+    .filter(
+      (item) =>
+        item.absoluteDay >= experience.startedAtDay &&
+        item.absoluteDay <= currentDay &&
+        (experience.endedAtDay === null || item.absoluteDay <= experience.endedAtDay),
+    )
+    .sort((left, right) => left.absoluteDay - right.absoluteDay);
+  const source = qualified[1];
+  if (!source) return;
+  const expiresAtDay = source.absoluteDay + 270;
+  if (currentDay >= expiresAtDay) return;
+  const sourceId = `assessment:${source.assessment.year}`;
+  if (
+    typedState.career.opportunities.some(
+      (opportunity) =>
+        !ignoredOpportunityIds.has(opportunity.id) &&
+        opportunity.definitionId === 'township_chief_leadership_vacancy' &&
+        opportunity.source.sourceId === sourceId,
+    )
+  )
+    return;
+
+  // 历史信号只能读取当时已经完成的治理证据和任内考核，不能借用迁移日之后的成果。
+  const historicalState = structuredClone(typedState);
+  // opportunity orchestrator 自身也会按 definition/source 去重，因此只在重放快照中
+  // 隐藏本轮刚取消的旧内容机会；真实 state 仍完整保留这些 cancelled 审计记录。
+  historicalState.career.opportunities = historicalState.career.opportunities.filter(
+    (opportunity) => !ignoredOpportunityIds.has(opportunity.id),
+  );
+  historicalState.events.history = historicalState.events.history.filter(
+    (record) => record.completedAtDay <= source.absoluteDay,
+  );
+  const historicalExperience = historicalState.career.experiences.find(
+    (item) => item.appointmentId === appointment.appointmentId && item.endedAtDay === null,
+  );
+  if (!historicalExperience) return;
+  historicalExperience.assessmentResults = historicalExperience.assessmentResults.filter(
+    (assessment) => assessment.year <= source.assessment.year,
+  );
+  const signal = {
+    signalId: `content-migration-assessment-${appointment.appointmentId}-${source.assessment.year}`,
+    signalType: 'assessment.completed' as const,
+    occurredAtDay: source.absoluteDay,
+    data: {
+      year: source.assessment.year,
+      score: source.assessment.score,
+      tier: source.assessment.tier,
+    },
+  };
+  const loader = getConfigLoader();
+  const result = processCareerOpportunitySignal({
+    state: historicalState,
+    signal,
+    currentDay: source.absoluteDay,
+    definitions: loader
+      .getCareerOpportunityDefinitionsBySignal('assessment.completed')
+      .filter((definition) => definition.id === 'township_chief_leadership_vacancy'),
+    positions: loader.getAllPositions(),
+    institutions: loader.getAllInstitutions(),
+    daysPerYear: 360,
+    careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
+    idFactory: () =>
+      `content-migration-chief-${appointment.appointmentId}-${source.assessment.year}`,
+  });
+  const restored = result.created[0];
+  if (restored) typedState.career.opportunities.push(restored);
+}
+
+/**
+ * 取消旧版宽松正职机会并升级乡镇正职内容语义。
+ *
+ * 已终结机会作为历史保留；采用旧条件生成且仍可处理的正职机会会被取消，
+ * 对应运行中选拔以可审计阶段归档。治理事件、政策、预算和在途快照均原样保留。
+ *
+ * @param prev Schema 10、内容版本 2026.08.5 的存档
+ * @returns 已应用正式正职资格语义的存档
+ */
+export function migrateSchema10TownshipChiefContent(
+  prev: Record<string, unknown>,
+): Record<string, unknown> {
+  if (prev.contentVersion !== '2026.08.5') return prev;
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const career = state?.career as Record<string, unknown> | undefined;
+  const time = state?.time as Record<string, unknown> | undefined;
+  const opportunities = career?.opportunities;
+  if (
+    !state ||
+    !career ||
+    !Array.isArray(opportunities) ||
+    typeof time?.totalDaysPlayed !== 'number'
+  )
+    throw new Error('Legacy save is missing career opportunity state for chief content migration');
+  const currentDay = time.totalDaysPlayed;
+  backfillCareerExperienceAssessments(state, currentDay);
+  const cancelledOpportunityIds = new Set<string>();
+  const replaceableOpportunityIds = new Set<string>();
+  for (const value of opportunities) {
+    if (!value || typeof value !== 'object') continue;
+    const opportunity = value as Record<string, unknown>;
+    if (opportunity.definitionId !== 'township_chief_leadership_vacancy') continue;
+    const status = String(opportunity.status);
+    if (!['available', 'accepted', 'in_process', 'expired'].includes(status)) continue;
+    if (typeof opportunity.id !== 'string')
+      throw new Error('Legacy chief opportunity has no stable ID');
+    replaceableOpportunityIds.add(opportunity.id);
+    // 旧窗口自然过期只说明 30 天时限已结束，保留原 expired 记录并让下方按
+    // 正式 270 天时限判断是否恢复；活动机会才需要在内容切换时显式取消。
+    if (status === 'expired') continue;
+    cancelledOpportunityIds.add(opportunity.id);
+    opportunity.status = 'cancelled';
+    opportunity.acceptedAtDay = null;
+    opportunity.rejectedAtDay = null;
+    opportunity.resolvedAtDay = null;
+    opportunity.cancelledAtDay = currentDay;
+    opportunity.finalOutcome = null;
+  }
+  const activeProcess = career.activeProcess;
+  if (activeProcess && typeof activeProcess === 'object') {
+    const process = activeProcess as Record<string, unknown>;
+    if (
+      typeof process.opportunityId === 'string' &&
+      cancelledOpportunityIds.has(process.opportunityId)
+    ) {
+      const stageResults = Array.isArray(process.stageResults) ? process.stageResults : [];
+      stageResults.push({
+        stage: process.currentStage,
+        resolvedAtDay: currentDay,
+        outcome: 'cancelled',
+        score: null,
+        detail: '内容更新后按正式正职资格重新等待机会',
+      });
+      process.stageResults = stageResults;
+      process.status = 'cancelled';
+      process.completedAtDay = currentDay;
+      const completedProcesses = Array.isArray(career.completedProcesses)
+        ? career.completedProcesses
+        : [];
+      completedProcesses.push(process);
+      career.completedProcesses = completedProcesses;
+      career.activeProcess = null;
+    }
+  }
+  // 本轮刚取消的旧内容机会不能充当正式机会的去重凭据；否则同一考核源下的
+  // 30 天旧窗口会反过来阻止 270 天正式窗口恢复。迁移前已终结的记录仍参与去重，
+  // 防止已经消费过的来源被再次开放。
+  restoreMissedTownshipChiefOpportunity(state, currentDay, replaceableOpportunityIds);
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
@@ -1936,6 +2173,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     target = migrateSchema10RankQuotaContent(target as Record<string, unknown>);
     target = migrateSchema10DeputyOpportunityContent(target as Record<string, unknown>);
     target = migrateSchema10TownshipGovernanceContent(target as Record<string, unknown>);
+    target = migrateSchema10TownshipChiefContent(target as Record<string, unknown>);
   } catch (e) {
     return {
       success: false,
