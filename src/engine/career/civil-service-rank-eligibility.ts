@@ -5,34 +5,12 @@ import type {
   CareerRestriction,
   CurrentAppointment,
 } from '../../domain/career/state';
-import type { CivilServiceRank } from '../../domain/career/types';
 import { CIVIL_SERVICE_RANKS } from '../../domain/career/types';
 import { evaluateCondition } from '../events/condition-interpreter';
 import type { PlayerSave } from '../../types/player';
 import type { CivilServiceRankProgressionRule } from '../../config/schemas';
 import type { CareerExperienceQualificationRules } from '../../types/config';
-
-export type RankEligibilityFailure =
-  | 'no_progression_rule'
-  | 'already_highest_rank'
-  | 'rule_source_mismatch'
-  | 'insufficient_days_in_rank'
-  | 'insufficient_service_days'
-  | 'insufficient_assessments'
-  | 'insufficient_qualified_assessments'
-  | 'insufficient_excellent_assessments'
-  | 'rank_advancement_frozen'
-  | 'disciplinary_restriction'
-  | 'quota_unavailable'
-  | 'additional_condition_failed';
-
-export interface RankEligibilityResult {
-  eligible: boolean;
-  fromRank: CivilServiceRank;
-  toRank: CivilServiceRank | null;
-  failures: { reason: RankEligibilityFailure; detail: string }[];
-  evaluatedAtDay: number;
-}
+import type { RankEligibilityFailure, RankEligibilityResult } from '../../types/career';
 
 /** @param restrictions 全部持久化限制 @param currentDay 当前绝对日 @returns 当前有效的限制。 */
 export function getActiveCareerRestrictions(
@@ -124,36 +102,54 @@ export function evaluateCivilServiceRankEligibility(
       evaluatedAtDay: currentDay,
     };
   const add = (reason: RankEligibilityFailure, detail: string) => failures.push({ reason, detail });
-  if (currentDay - state.career.civilServiceRankStartedAtDay < rule.minDaysInRank)
-    add('insufficient_days_in_rank', 'Insufficient days in rank');
-  if (
-    calculateCareerServiceDays(state.career.appointment, state.career.experiences, currentDay) <
-    rule.minServiceDays
-  )
-    add('insufficient_service_days', 'Insufficient career service days');
+  const probation = state.career.appointment.probation;
+  if (probation?.status === 'active') add('probation_active', '录用试用期尚未结束');
+  if (probation?.status === 'failed') add('probation_failed', '录用试用期未通过');
+  const daysInRank = Math.max(currentDay - state.career.civilServiceRankStartedAtDay, 0);
+  if (daysInRank < rule.minDaysInRank)
+    add('insufficient_days_in_rank', `当前 ${daysInRank} 天，要求 ${rule.minDaysInRank} 天`);
+  const serviceDays = calculateCareerServiceDays(
+    state.career.appointment,
+    state.career.experiences,
+    currentDay,
+  );
+  if (serviceDays < rule.minServiceDays)
+    add('insufficient_service_days', `当前 ${serviceDays} 天，要求 ${rule.minServiceDays} 天`);
   const assessments = state.assessments.annualAssessments;
+  const qualifiedAssessments = assessments.filter((item) =>
+    isQualifiedAssessmentTier(item.tier),
+  ).length;
+  const excellentAssessments = assessments.filter((item) =>
+    isExcellentAssessmentTier(item.tier),
+  ).length;
   if (assessments.length < rule.minAssessmentCount)
-    add('insufficient_assessments', 'Insufficient assessments');
-  if (
-    assessments.filter((item) => isQualifiedAssessmentTier(item.tier)).length <
-    rule.minQualifiedAssessmentCount
-  )
-    add('insufficient_qualified_assessments', 'Insufficient qualified assessments');
-  if (
-    assessments.filter((item) => isExcellentAssessmentTier(item.tier)).length <
-    rule.minExcellentAssessmentCount
-  )
-    add('insufficient_excellent_assessments', 'Insufficient excellent assessments');
+    add(
+      'insufficient_assessments',
+      `当前 ${assessments.length} 次，要求 ${rule.minAssessmentCount} 次`,
+    );
+  if (qualifiedAssessments < rule.minQualifiedAssessmentCount)
+    add(
+      'insufficient_qualified_assessments',
+      `当前 ${qualifiedAssessments} 次，要求 ${rule.minQualifiedAssessmentCount} 次`,
+    );
+  if (excellentAssessments < rule.minExcellentAssessmentCount)
+    add(
+      'insufficient_excellent_assessments',
+      `当前 ${excellentAssessments} 次，要求 ${rule.minExcellentAssessmentCount} 次`,
+    );
   const restrictions = getActiveCareerRestrictions(state.career.restrictions, currentDay);
   if (restrictions.some((item) => item.type === 'rank_advancement_freeze'))
-    add('rank_advancement_frozen', 'Rank advancement is frozen');
+    add('rank_advancement_frozen', '存在生效中的职级晋升冻结');
   if (restrictions.some((item) => item.type === 'disciplinary_action'))
-    add('disciplinary_restriction', 'An active disciplinary restriction exists');
-  if (
-    rule.quotaRequirement &&
-    (state.world.metrics[rule.quotaRequirement.metricId] ?? 0) < rule.quotaRequirement.requiredValue
-  )
-    add('quota_unavailable', 'Rank quota unavailable');
+    add('disciplinary_restriction', '存在生效中的处分限制');
+  if (rule.quotaRequirement) {
+    const quotaValue = state.world.metrics[rule.quotaRequirement.metricId] ?? 0;
+    if (quotaValue < rule.quotaRequirement.requiredValue)
+      add(
+        'quota_unavailable',
+        `当前库存 ${quotaValue}，要求 ${rule.quotaRequirement.requiredValue}`,
+      );
+  }
   // Rank rules intentionally reject signalField conditions: eligibility is derived
   // from durable career and assessment state, not a transient event payload.
   const signal = {
@@ -173,7 +169,7 @@ export function evaluateCivilServiceRankEligibility(
       }),
     )
   )
-    add('additional_condition_failed', 'Additional conditions failed');
+    add('additional_condition_failed', '未满足配置的附加晋升条件');
   return {
     eligible: failures.length === 0,
     fromRank,

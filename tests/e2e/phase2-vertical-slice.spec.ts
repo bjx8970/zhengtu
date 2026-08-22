@@ -230,6 +230,11 @@ test('职业链：年度考核生成机会，职级与两次任职独立变化',
   await createCharacter(page);
   await page.goto('/#/career');
   await expect(page.getByTestId('advance-civil-service-rank')).toHaveCount(0);
+  await expect(page.getByText(/录用试用期尚未结束/).first()).toBeVisible();
+  await expect(
+    page.getByText('职数库存', { exact: true }).locator('..').getByText('0/1', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/优秀或称职年度考核补充 1/)).toBeVisible();
   await page.goto('/#/main');
   await changeSave(page, (state) => {
     seedYearEnd(state);
@@ -240,6 +245,9 @@ test('职业链：年度考核生成机会，职级与两次任职独立变化',
   await expect(page.getByTestId('advance-civil-service-rank')).toBeVisible();
   const deputyId = selectOpportunityId(await savedState(page), 'admin_l2_0');
   await page.getByTestId('advance-civil-service-rank').click();
+  await expect(page.getByTestId('rank-change-feedback')).toContainText(
+    '仅职级发生变化，具体职位、所属机构和领导职务均未变化',
+  );
   await page.getByTestId(`accept-opportunity-${deputyId}`).click();
   await advanceCareerProcess(page, deputyId);
 

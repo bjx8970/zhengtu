@@ -112,9 +112,15 @@ export function CareerPage() {
   );
   const quotaState = createMemo(() => {
     const quota = rankRule()?.quotaRequirement;
-    if (!quota) return '不适用';
-    return `${state.world.metrics[quota.metricId] ?? 0}/${quota.requiredValue} 可用`;
+    if (!quota) return { inventory: '不适用', source: '当前职级无需职数' };
+    return {
+      inventory: `${state.world.metrics[quota.metricId] ?? 0}/${quota.maxValue}`,
+      source: `${quota.grantAssessmentTiers.join('或')}年度考核补充 ${quota.annualGrant}，晋升消耗 ${quota.consumeValue}`,
+    };
   });
+  const latestRankChange = createMemo(
+    () => state.career.civilServiceRankHistory[state.career.civilServiceRankHistory.length - 1],
+  );
   const sortedExperiences = createMemo(() =>
     [...state.career.experiences].sort((left, right) => right.startedAtDay - left.startedAtDay),
   );
@@ -272,7 +278,7 @@ export function CareerPage() {
                 class="btn btn-primary btn-sm"
                 onClick={() => dispatch({ type: 'ADVANCE_CIVIL_SERVICE_RANK' })}
               >
-                正式晋升至 {nextRankName()}
+                办理职级晋升至 {nextRankName()}
               </button>
             </Show>
           </div>
@@ -290,8 +296,19 @@ export function CareerPage() {
               />
               <CareerFact label="总服务天数" value={`${serviceDays()} 天`} />
               <CareerFact label="考核要求" value={formatAssessmentRequirement(rankRule())} />
-              <CareerFact label="职数状态" value={quotaState()} />
+              <CareerFact label="职数库存" value={quotaState().inventory} />
+              <CareerFact label="职数来源" value={quotaState().source} />
             </div>
+
+            <Show when={latestRankChange()}>
+              {(change) => (
+                <p class="banner banner-success" data-testid="rank-change-feedback">
+                  最近一次职级晋升：{CIVIL_SERVICE_RANK_LABELS[change().previousRank]} →{' '}
+                  {CIVIL_SERVICE_RANK_LABELS[change().currentRank]}
+                  。仅职级发生变化，具体职位、所属机构和领导职务均未变化。
+                </p>
+              )}
+            </Show>
 
             <div class="flex-col gap-sm">
               <h3 class="text-sm">晋升资格</h3>
@@ -304,7 +321,7 @@ export function CareerPage() {
                     {(failure) => (
                       <li>
                         {'· '}
-                        {formatRankFailure(failure.reason)}
+                        {formatRankFailure(failure.reason)}：{failure.detail}
                       </li>
                     )}
                   </For>

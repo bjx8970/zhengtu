@@ -7,7 +7,7 @@
 
 import type { CareerProcessStage } from '../../domain/career/state';
 import type { CareerOpportunityStatus, CareerRestrictionType } from '../../domain/career/types';
-import type { RankEligibilityFailure } from '../../engine/career/civil-service-rank-eligibility';
+import type { RankEligibilityFailure } from '../../types/career';
 import type { CareerOpportunityEligibilityFailure } from '../../engine/career/career-opportunity-eligibility';
 
 /** 机构配置中使用的虚构地区标识的显示名称。 */
@@ -61,6 +61,8 @@ const RANK_FAILURE_LABELS: Record<RankEligibilityFailure, string> = {
   no_progression_rule: '当前职级尚未配置晋升规则',
   already_highest_rank: '已处于最高职级',
   rule_source_mismatch: '当前职级与晋升规则不一致',
+  probation_active: '录用试用期尚未结束',
+  probation_failed: '录用试用期未通过',
   insufficient_days_in_rank: '当前职级任职天数不足',
   insufficient_service_days: '累计服务天数不足',
   insufficient_assessments: '年度考核次数不足',

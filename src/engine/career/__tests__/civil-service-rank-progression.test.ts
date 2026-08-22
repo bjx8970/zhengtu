@@ -5,12 +5,12 @@ import { createInitialState } from '../../../store/game-store';
 import { advanceCivilServiceRank } from '../civil-service-rank-progression';
 
 describe('advanceCivilServiceRank', () => {
-  it('provisions every configured rank quota in a normal new game', () => {
+  it('initializes every configured quota from explicit zero-stock config', () => {
     const state = createInitialState();
     for (const rule of getConfigLoader().getAllCivilServiceRankProgressionRules()) {
       const quota = rule.quotaRequirement;
       if (!quota) continue;
-      expect(state.world.metrics[quota.metricId]).toBeGreaterThanOrEqual(quota.requiredValue);
+      expect(state.world.metrics[quota.metricId]).toBe(quota.initialValue);
     }
   });
 

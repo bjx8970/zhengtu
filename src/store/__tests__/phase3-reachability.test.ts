@@ -49,20 +49,56 @@ function advanceToDay(store: TestStore, targetDay: number, idFactory: () => stri
   resolveBlockingEvents(store, idFactory);
 }
 
+function createPhase3Game(store: TestStore): void {
+  store.dispatch({
+    type: 'NEW_GAME',
+    data: {
+      characterName: '可达性测试员',
+      familyBackground: 'peasant',
+      promotionPath: 'gongwuyuan',
+    },
+  });
+}
+
+function completeQualifiedClerkHalfYear(
+  store: TestStore,
+  targetDay: number,
+  idFactory: () => string,
+): void {
+  store.dispatch({
+    type: 'START_PERSONAL_TASK',
+    taskId: 'task_induction_training',
+    tierKey: 'primary',
+    _idFactory: idFactory,
+  });
+  while (store.getRawState().time.totalDaysPlayed < targetDay) {
+    store.dispatch({
+      type: 'START_PERSONAL_TASK',
+      taskId: 'task_policy_brief',
+      tierKey: 'secondary',
+      _idFactory: idFactory,
+    });
+    store.dispatch({
+      type: 'START_PERSONAL_TASK',
+      taskId: 'task_social_security_promotion',
+      tierKey: 'primary',
+      _idFactory: idFactory,
+    });
+    advanceToDay(
+      store,
+      Math.min(store.getRawState().time.totalDaysPlayed + 7, targetDay),
+      idFactory,
+    );
+  }
+}
+
 describe('Phase 3 reachability foundation', () => {
   it('reaches annual assessment and probation through public Store actions only', () => {
     const loader = getConfigLoader();
     const acceptance = loader.getPhase3AcceptanceConfig();
     const idFactory = createIdFactory();
     const store = createTestStore();
-    store.dispatch({
-      type: 'NEW_GAME',
-      data: {
-        characterName: '可达性测试员',
-        familyBackground: 'peasant',
-        promotionPath: 'gongwuyuan',
-      },
-    });
+    createPhase3Game(store);
 
     const initial = store.getRawState();
     expect(initial.career.appointment.positionId).toBe(acceptance.stagePositionIds.clerk);
@@ -104,5 +140,45 @@ describe('Phase 3 reachability foundation', () => {
       resolvedAtDay: acceptance.milestones.probationPassed.minDay,
       completedActionCount: 1,
     });
+  });
+
+  it('earns and consumes annual quotas at the locked rank milestones without changing appointment', () => {
+    const loader = getConfigLoader();
+    const acceptance = loader.getPhase3AcceptanceConfig();
+    const idFactory = createIdFactory();
+    const store = createTestStore();
+    createPhase3Game(store);
+
+    expect(store.getRawState().world.metrics['rank_quota.clerk_1']).toBe(0);
+    expect(store.getRawState().world.metrics['rank_quota.section_member_4']).toBe(0);
+    completeQualifiedClerkHalfYear(store, 180, idFactory);
+    expect(store.getRawState().assessments.annualAssessments[0]?.tier).toMatch(/优秀|称职/);
+    expect(store.getRawState().world.metrics['rank_quota.clerk_1']).toBe(1);
+
+    store.dispatch({ type: 'ADVANCE_CIVIL_SERVICE_RANK', _idFactory: idFactory });
+    expect(store.getRawState().career.civilServiceRank).toBe('clerk_2');
+
+    advanceToDay(store, acceptance.milestones.firstRankPromotion.minDay, idFactory);
+    expect(store.getRawState().career.appointment.probation?.status).toBe('passed');
+    const appointmentIdentity = structuredClone(store.getRawState().career.appointment);
+    const openExperience = structuredClone(store.getRawState().career.experiences[0]);
+    store.dispatch({ type: 'ADVANCE_CIVIL_SERVICE_RANK', _idFactory: idFactory });
+    expect(store.getRawState().career.civilServiceRank).toBe('clerk_1');
+    expect(store.getRawState().world.metrics['rank_quota.clerk_1']).toBe(0);
+    expect(store.getRawState().career.appointment).toEqual(appointmentIdentity);
+    expect(store.getRawState().career.experiences[0]).toEqual(openExperience);
+
+    advanceToDay(store, 540, idFactory);
+    expect(store.getRawState().world.metrics['rank_quota.section_member_4']).toBe(1);
+    advanceToDay(store, acceptance.milestones.sectionMember4Promotion.minDay, idFactory);
+    store.dispatch({ type: 'ADVANCE_CIVIL_SERVICE_RANK', _idFactory: idFactory });
+    expect(store.getRawState().career.civilServiceRank).toBe('section_member_4');
+    expect(store.getRawState().world.metrics['rank_quota.section_member_4']).toBe(0);
+    expect(store.getRawState().career.appointment).toEqual(appointmentIdentity);
+    expect(store.getRawState().career.experiences[0]).toEqual(openExperience);
+    expect(store.getRawState().career.civilServiceRankHistory).toHaveLength(2);
+    expect(store.getRawState().time.totalDaysPlayed).toBe(
+      acceptance.milestones.sectionMember4Promotion.minDay,
+    );
   });
 });

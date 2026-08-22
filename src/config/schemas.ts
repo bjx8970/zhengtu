@@ -20,6 +20,7 @@ import { ConditionExpressionSchema } from '../domain/conditions';
 import { EffectDefinitionSchema } from '../domain/conditions';
 import { DomainSignalSchema, PolicyCategorySchema } from '../domain/governance/types';
 import { PERSONAL_TASK_TYPES } from '../types/config';
+import { KPITier } from '../types/enums';
 
 /** 机构配置 Schema */
 export const InstitutionConfigSchema = z
@@ -135,12 +136,30 @@ export const CivilServiceRankDefinitionSchema = z
 export const RankQuotaRequirementSchema = z
   .object({
     metricId: z.string().min(1),
-    requiredValue: z.number().nonnegative(),
-    consumeValue: z.number().nonnegative(),
+    initialValue: z.number().int().nonnegative(),
+    requiredValue: z.number().int().nonnegative(),
+    consumeValue: z.number().int().nonnegative(),
+    annualGrant: z.number().int().positive(),
+    maxValue: z.number().int().positive(),
+    grantAssessmentTiers: z.array(z.nativeEnum(KPITier)).min(1),
   })
   .strict()
-  .refine((quota) => quota.consumeValue <= quota.requiredValue, {
-    message: 'Quota consume value cannot exceed its required value',
+  .superRefine((quota, ctx) => {
+    if (quota.consumeValue > quota.requiredValue)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Quota consume value cannot exceed its required value',
+      });
+    if (quota.initialValue > quota.maxValue || quota.requiredValue > quota.maxValue)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Quota initial and required values cannot exceed maxValue',
+      });
+    if (new Set(quota.grantAssessmentTiers).size !== quota.grantAssessmentTiers.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Quota grant assessment tiers must be unique',
+      });
   });
 export const CivilServiceRankProgressionRuleSchema = z
   .object({
@@ -206,6 +225,11 @@ export const CivilServiceRankConfigSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Progression must be to the adjacent rank',
+        });
+      if (rule.quotaRequirement && rule.quotaRequirement.metricId !== `rank_quota.${rule.toRank}`)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Rank ${rule.fromRank} quota metric must target ${rule.toRank}`,
         });
       if (rule.additionalConditions.some(hasSignalDependentCondition))
         ctx.addIssue({
