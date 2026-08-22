@@ -145,6 +145,30 @@ describe('event timeline integration', () => {
   it('自动激活政策、推进里程碑，并在存档恢复后补做同日月结', () => {
     const loader = getConfigLoader();
     const state = createInitialState();
+    const leaderPosition = loader.getPositionById('admin_l2_0');
+    expect(leaderPosition).toBeDefined();
+    if (!leaderPosition) return;
+    Object.assign(state.career.appointment, {
+      positionId: leaderPosition.id,
+      institutionId: leaderPosition.institutionId,
+      regionId: leaderPosition.regionId,
+      institutionLevel: leaderPosition.institutionLevel,
+      positionDomain: leaderPosition.positionDomain,
+      leadershipRank: leaderPosition.leadershipRank,
+      probation: null,
+    });
+    const openExperience = state.career.experiences[0];
+    expect(openExperience).toBeDefined();
+    if (!openExperience) return;
+    Object.assign(openExperience, {
+      positionId: leaderPosition.id,
+      positionNameSnapshot: leaderPosition.name,
+      institutionId: leaderPosition.institutionId,
+      regionId: leaderPosition.regionId,
+      institutionLevel: leaderPosition.institutionLevel,
+      positionDomain: leaderPosition.positionDomain,
+      leadershipRank: leaderPosition.leadershipRank,
+    });
     state.world.facts.industrial_park_policy_proposed = true;
     const department = loader
       .resolvePositionDepartments(state.career.appointment.positionId)
@@ -260,6 +284,76 @@ describe('event timeline integration', () => {
         (record) => record.eventId === 'industrial_park_progress_crisis',
       ),
     ).toHaveLength(1);
+  });
+
+  it('年度考核提交后按当前领导职位补充年度预算并清零消费台账', () => {
+    const loader = getConfigLoader();
+    const state = createInitialState();
+    const leaderPosition = loader.getPositionById('admin_l2_0');
+    expect(leaderPosition).toBeDefined();
+    if (!leaderPosition) return;
+    Object.assign(state.career.appointment, {
+      positionId: leaderPosition.id,
+      institutionId: leaderPosition.institutionId,
+      regionId: leaderPosition.regionId,
+      institutionLevel: leaderPosition.institutionLevel,
+      positionDomain: leaderPosition.positionDomain,
+      leadershipRank: leaderPosition.leadershipRank,
+      probation: null,
+    });
+    const openExperience = state.career.experiences[0];
+    expect(openExperience).toBeDefined();
+    if (!openExperience) return;
+    Object.assign(openExperience, {
+      positionId: leaderPosition.id,
+      positionNameSnapshot: leaderPosition.name,
+      institutionId: leaderPosition.institutionId,
+      regionId: leaderPosition.regionId,
+      institutionLevel: leaderPosition.institutionLevel,
+      positionDomain: leaderPosition.positionDomain,
+      leadershipRank: leaderPosition.leadershipRank,
+    });
+    state.actions.departmentStates = Object.fromEntries(
+      loader.resolvePositionDepartments(leaderPosition.id).map((department) => [
+        department.id,
+        {
+          id: department.id,
+          kpiValues: {},
+          monthlyConsumption: 17,
+          cumulativeConsumption: 123,
+          lastActionDay: 0,
+          actionCooldownUntilDays: {},
+        },
+      ]),
+    );
+    state.remainingBudget = 500;
+    Object.assign(state.time, {
+      year: 2012,
+      month: 12,
+      day: 30,
+      totalDaysPlayed: 179,
+      pendingContinuation: null,
+    });
+    const store = createTestStore(state);
+    let sequence = 0;
+
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0.99,
+      _idFactory: () => `annual-budget-reset-${sequence++}`,
+    });
+
+    const assessed = store.getRawState();
+    expect(assessed.time.totalDaysPlayed).toBe(180);
+    expect(assessed.assessments.annualAssessments).toHaveLength(1);
+    expect(assessed.remainingBudget).toBe(leaderPosition.annualBudget);
+    expect(
+      Object.values(assessed.actions.departmentStates).every(
+        (department) =>
+          department.monthlyConsumption === 0 && department.cumulativeConsumption === 0,
+      ),
+    ).toBe(true);
   });
 
   it('stops a long advance on the exact day a blocking event activates', () => {

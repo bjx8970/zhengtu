@@ -29,9 +29,25 @@ import positionsData from '../src/config/positions/positions.json' with { type: 
 import institutionsData from '../src/config/institutions/institutions.json' with { type: 'json' };
 import policiesData from '../src/config/templates/policies.json' with { type: 'json' };
 import personalTasksData from '../src/config/templates/personal-tasks.json' with { type: 'json' };
+import careerOpportunitiesData from '../src/config/career/opportunities.json' with { type: 'json' };
+import civilServiceRanksData from '../src/config/career/civil-service-ranks.json' with { type: 'json' };
 import { EventDefinitionArraySchema } from '../src/domain/events/definition';
 import type { EventDefinition } from '../src/domain/events/definition';
 import { validateEventDefinitions } from '../src/domain/events/validation';
+import {
+  PHASE3_ACCEPTANCE_CONFIG,
+  validatePhase3AcceptanceReferences,
+} from '../src/config/phase3-acceptance';
+import {
+  CareerOpportunityDefinitionArraySchema,
+  CivilServiceRankConfigSchema,
+  InstitutionConfigMapSchema,
+  PersonalTaskTemplateArraySchema,
+  PolicyDefinitionArraySchema,
+  PositionConfigArraySchema,
+  validatePositionInstitutionConsistency,
+} from '../src/config/schemas';
+import { validatePolicyEffectReferences } from '../src/config/policy-reference-validation';
 
 const departments = { ...deptCore, ...deptExtra };
 const departmentsLookup = departments as Record<string, unknown>;
@@ -644,14 +660,6 @@ if (!lsResult.success) {
 // ===== 新版职位配置校验（复用正式 Schema 单一事实来源） =====
 console.log('\n--- 新版职位配置校验 (positions.json) ---\n');
 
-import {
-  PositionConfigArraySchema,
-  InstitutionConfigMapSchema,
-  validatePositionInstitutionConsistency,
-  PolicyDefinitionArraySchema,
-} from '../src/config/schemas';
-import { validatePolicyEffectReferences } from '../src/config/policy-reference-validation';
-
 // 使用正式 Schema 解析（与 ConfigLoader 共用同一入口）
 const parsedPositionsResult = PositionConfigArraySchema.safeParse(positionsData);
 if (!parsedPositionsResult.success) {
@@ -790,8 +798,6 @@ if (!parsedPoliciesResult.success) {
 // ===== 个人任务配置校验 =====
 console.log('\n--- 个人任务配置校验 (personal-tasks.json) ---\n');
 
-import { PersonalTaskTemplateArraySchema } from '../src/config/schemas';
-
 const parsedPersonalTasksResult = PersonalTaskTemplateArraySchema.safeParse(personalTasksData);
 if (!parsedPersonalTasksResult.success) {
   console.error('❌ personal-tasks.json 未通过 PersonalTaskTemplateSchema 校验：');
@@ -854,6 +860,52 @@ if (!parsedPersonalTasksResult.success) {
   if (errors === 0) {
     console.log(`   ✅ ${validTasks.length} 个个人任务模板全部通过校验`);
     console.log('   ✅ KPI 台账引用完整，初始岗位指标覆盖检查通过');
+  }
+}
+
+// ===== Phase 3 验收配置 =====
+console.log('\n--- Phase 3 可达性验收配置 ---\n');
+
+const parsedCareerOpportunities =
+  CareerOpportunityDefinitionArraySchema.safeParse(careerOpportunitiesData);
+const parsedCivilServiceRanks = CivilServiceRankConfigSchema.safeParse(civilServiceRanksData);
+if (!parsedCareerOpportunities.success) {
+  console.error('❌ Phase 3 无法读取职业机会目录');
+  errors++;
+}
+if (!parsedCivilServiceRanks.success) {
+  console.error('❌ Phase 3 无法读取职级晋升目录');
+  errors++;
+}
+if (
+  parsedEventsResult.success &&
+  parsedPoliciesResult.success &&
+  parsedPersonalTasksResult.success &&
+  parsedCareerOpportunities.success &&
+  parsedCivilServiceRanks.success
+) {
+  const referenceErrors = validatePhase3AcceptanceReferences(PHASE3_ACCEPTANCE_CONFIG, {
+    positions: PositionConfigArraySchema.parse(positionsData),
+    personalTasks: parsedPersonalTasksResult.data,
+    careerOpportunities: parsedCareerOpportunities.data,
+    events: parsedEventsResult.data,
+    policies: parsedPoliciesResult.data,
+    rankProgressionRuleIds: parsedCivilServiceRanks.data.progressionRules.map((rule) => rule.id),
+  });
+  for (const error of referenceErrors) {
+    console.error(`❌ ${error}`);
+    errors++;
+  }
+  if (referenceErrors.length === 0) {
+    const config = PHASE3_ACCEPTANCE_CONFIG;
+    console.log(`   ✅ 阶段职位: ${Object.values(config.stagePositionIds).join(' → ')}`);
+    console.log(
+      `   ✅ 关键入口: ${config.entrypoints.length}（producer ${config.entrypoints.filter((item) => item.role === 'producer').length} / consumer ${config.entrypoints.filter((item) => item.role === 'consumer').length}）`,
+    );
+    console.log(`   ✅ 初始科员正向 KPI producer: ${config.requiredKpiProducers.length}`);
+    console.log(
+      `   ✅ 里程碑: 转正 ${config.milestones.probationPassed.minDay}~${config.milestones.probationPassed.maxDay} 天，副职 ${config.milestones.townshipDeputyAppointment.minDay}~${config.milestones.townshipDeputyAppointment.maxDay} 天，正职机会 ${config.milestones.townshipChiefOpportunity.minDay}~${config.milestones.townshipChiefOpportunity.maxDay} 天`,
+    );
   }
 }
 

@@ -461,15 +461,19 @@ function processMonthlySettlement(
 ): DomainSignalSnapshot | null {
   const loader = getConfigLoader();
   const departments = loader.resolvePositionDepartments(draft.career.appointment.positionId);
+  // 无领导职务阶段无法操作这些部门，也不掌握部门运转预算；个人任务成本已在
+  // START_PERSONAL_TASK 时独立扣除，不能再让只读部门产生隐性月度开支。
+  const chargedDepartments = draft.career.appointment.leadershipRank === 'none' ? [] : departments;
   const result = monthlySettlement(
     draft.actions.departmentStates,
-    departments,
+    chargedDepartments,
     draft.remainingBudget,
   );
   draft.remainingBudget = result.newRemaining;
-  for (const [deptId, consumption] of Object.entries(result.deptConsumptions)) {
-    const state = draft.actions.departmentStates[deptId];
+  for (const department of departments) {
+    const state = draft.actions.departmentStates[department.id];
     if (!state) continue;
+    const consumption = result.deptConsumptions[department.id] ?? 0;
     state.monthlyConsumption = consumption;
     state.cumulativeConsumption += consumption;
   }
@@ -582,6 +586,19 @@ function processAnnualAssessment(
     occurredAtDay: absoluteDay,
     data: { metricId: 'corruption_report', value: newReport },
   });
+
+  // 年度考核是财政年度提交点：下一年度重新取得当前职位年度预算，同时清零
+  // 部门运转消费台账。KPI、行动冷却和个人任务完成记录属于持续进度，不重置。
+  const position = loader.getPositionById(draft.career.appointment.positionId);
+  if (!position)
+    throw new Error(
+      `Cannot reset annual budget for unknown position ${draft.career.appointment.positionId}`,
+    );
+  draft.remainingBudget = position.annualBudget;
+  for (const departmentState of Object.values(draft.actions.departmentStates)) {
+    departmentState.monthlyConsumption = 0;
+    departmentState.cumulativeConsumption = 0;
+  }
 
   return signals;
 }
