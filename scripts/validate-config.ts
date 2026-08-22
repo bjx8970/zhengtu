@@ -48,6 +48,8 @@ import {
   validatePositionInstitutionConsistency,
 } from '../src/config/schemas';
 import { validatePolicyEffectReferences } from '../src/config/policy-reference-validation';
+import { getConfigLoader } from '../src/config/loader';
+import { auditPhase3Reachability } from '../src/config/phase3-reachability';
 
 const departments = { ...deptCore, ...deptExtra };
 const departmentsLookup = departments as Record<string, unknown>;
@@ -75,7 +77,7 @@ const ActionSchema = z
     durationDays: z.number().int().min(1),
     category: z.enum(['major', 'minor', 'routine']),
     cooldownDays: z.number().int().min(0),
-    budgetDelta: z.number(),
+    budgetDelta: z.number().nonnegative(),
     effects: z.array(EffectSchema).min(1),
     unlockLevel: z.number().optional(),
   })
@@ -884,27 +886,77 @@ if (
   parsedCareerOpportunities.success &&
   parsedCivilServiceRanks.success
 ) {
-  const referenceErrors = validatePhase3AcceptanceReferences(PHASE3_ACCEPTANCE_CONFIG, {
+  const phase3Loader = getConfigLoader();
+  const phase3Catalog = {
     positions: PositionConfigArraySchema.parse(positionsData),
     personalTasks: parsedPersonalTasksResult.data,
     careerOpportunities: parsedCareerOpportunities.data,
     events: parsedEventsResult.data,
     policies: parsedPoliciesResult.data,
-    rankProgressionRuleIds: parsedCivilServiceRanks.data.progressionRules.map((rule) => rule.id),
-  });
+    rankProgressionRules: parsedCivilServiceRanks.data.progressionRules,
+    departmentsByPosition: Object.fromEntries(
+      phase3Loader
+        .getAllPositions()
+        .map((position) => [position.id, phase3Loader.resolvePositionDepartments(position.id)]),
+    ),
+  };
+  const referenceErrors = validatePhase3AcceptanceReferences(
+    PHASE3_ACCEPTANCE_CONFIG,
+    phase3Catalog,
+  );
   for (const error of referenceErrors) {
     console.error(`❌ ${error}`);
     errors++;
   }
   if (referenceErrors.length === 0) {
     const config = PHASE3_ACCEPTANCE_CONFIG;
+    const summary = auditPhase3Reachability(config, phase3Catalog).summary;
     console.log(`   ✅ 阶段职位: ${Object.values(config.stagePositionIds).join(' → ')}`);
     console.log(
       `   ✅ 关键入口: ${config.entrypoints.length}（producer ${config.entrypoints.filter((item) => item.role === 'producer').length} / consumer ${config.entrypoints.filter((item) => item.role === 'consumer').length}）`,
     );
     console.log(`   ✅ 初始科员正向 KPI producer: ${config.requiredKpiProducers.length}`);
     console.log(
-      `   ✅ 里程碑: 转正 ${config.milestones.probationPassed.minDay}~${config.milestones.probationPassed.maxDay} 天，副职 ${config.milestones.townshipDeputyAppointment.minDay}~${config.milestones.townshipDeputyAppointment.maxDay} 天，正职机会 ${config.milestones.townshipChiefOpportunity.minDay}~${config.milestones.townshipChiefOpportunity.maxDay} 天`,
+      `   ✅ 正常可达任务: ${summary.personalTaskCount}（${Object.entries(summary.personalTaskTypes)
+        .map(([type, count]) => `${type} ${count}`)
+        .join(' / ')}）`,
+    );
+    console.log(
+      `   ✅ 关键 producer: world fact ${summary.factProducerCount} / world metric ${summary.metricProducerCount}；可达事件 ${summary.reachableEventCount} / 政策 ${summary.reachablePolicyCount}`,
+    );
+    for (const stage of summary.stages)
+      console.log(
+        `   ✅ ${stage.stage} ${stage.positionId}: 个人任务 ${stage.personalTaskCount} / 治理行动 ${stage.actionIds.length} / 年预算 ${stage.annualBudget} / 固定运转 ${stage.annualBaseConsumption}`,
+      );
+    for (const entrypoint of config.entrypoints.filter(
+      (item) => item.kind === 'rank_progression',
+    )) {
+      const rule = phase3Catalog.rankProgressionRules.find(
+        (item) => item.id === entrypoint.contentId,
+      );
+      if (!rule) continue;
+      console.log(
+        `   ✅ 职级 ${rule.id}: ${rule.fromRank} → ${rule.toRank} / 当前职级 ${rule.minDaysInRank} 天 / 工龄 ${rule.minServiceDays} 天 / 考核 ${rule.minQualifiedAssessmentCount}/${rule.minAssessmentCount} / 职数 ${rule.quotaRequirement?.metricId ?? '无'}`,
+      );
+    }
+    for (const entrypoint of config.entrypoints.filter(
+      (item) => item.kind === 'career_opportunity',
+    )) {
+      const opportunity = phase3Catalog.careerOpportunities.find(
+        (item) => item.id === entrypoint.contentId,
+      );
+      if (!opportunity) continue;
+      console.log(
+        `   ✅ 机会 ${opportunity.id}: trigger ${opportunity.triggerSignals.join(',')} / 生成条件 ${opportunity.conditions.length} / 接受条件 ${opportunity.acceptanceConditions?.length ?? 0} / 窗口 ${opportunity.expiresAfterDays ?? '永久'} 天 / 目标 ${opportunity.type === 'training' ? opportunity.trainingDefinitionId : opportunity.targetPositionId}`,
+      );
+    }
+    console.log(
+      `   ✅ 里程碑: 转正 ${config.milestones.probationPassed.minDay}~${config.milestones.probationPassed.maxDay} 天，副职机会 ${config.milestones.townshipDeputyOpportunity.minDay}~${config.milestones.townshipDeputyOpportunity.maxDay} 天，副职任职 ${config.milestones.townshipDeputyAppointment.minDay}~${config.milestones.townshipDeputyAppointment.maxDay} 天，正职机会 ${config.milestones.townshipChiefOpportunity.minDay}~${config.milestones.townshipChiefOpportunity.maxDay} 天，正职任职 ${config.milestones.townshipChiefAppointment.minDay}~${config.milestones.townshipChiefAppointment.maxDay} 天`,
+    );
+    console.log(
+      `   ✅ 确定性场景日: ${Object.entries(config.deterministicScenarioDays)
+        .map(([milestone, day]) => `${milestone}=${day}`)
+        .join(' / ')}`,
     );
   }
 }

@@ -6,6 +6,7 @@ import {
   Phase3AcceptanceConfigSchema,
   validatePhase3AcceptanceReferences,
 } from '../phase3-acceptance';
+import { auditPhase3Reachability } from '../phase3-reachability';
 
 function createCatalog() {
   const loader = getConfigLoader();
@@ -15,13 +16,19 @@ function createCatalog() {
     careerOpportunities: loader.getAllCareerOpportunityDefinitions(),
     events: loader.getAllEventDefinitions(),
     policies: loader.getAllPolicyDefinitions(),
-    rankProgressionRuleIds: loader.getAllCivilServiceRankProgressionRules().map((rule) => rule.id),
+    rankProgressionRules: loader.getAllCivilServiceRankProgressionRules(),
+    departmentsByPosition: Object.fromEntries(
+      loader
+        .getAllPositions()
+        .map((position) => [position.id, loader.resolvePositionDepartments(position.id)]),
+    ),
   };
 }
 
 describe('Phase 3 acceptance config', () => {
   it('strictly records the locked stage positions and milestone windows', () => {
     const config = getConfigLoader().getPhase3AcceptanceConfig();
+    expect(config.schemaVersion).toBe(2);
     expect(config.stagePositionIds).toEqual({
       clerk: 'admin_l1_0',
       townshipDeputy: 'admin_l2_0',
@@ -30,12 +37,34 @@ describe('Phase 3 acceptance config', () => {
     expect(config.milestones).toEqual({
       probationPassed: { minDay: 360, maxDay: 450 },
       firstRankPromotion: { minDay: 360, maxDay: 450 },
+      townshipDeputyOpportunity: { minDay: 540, maxDay: 630 },
       townshipDeputyAppointment: { minDay: 720, maxDay: 810 },
+      townshipDeputyGovernance: { minDay: 720, maxDay: 900 },
       sectionMember4Promotion: { minDay: 1080, maxDay: 1170 },
-      townshipChiefOpportunity: { minDay: 1440, maxDay: 1530 },
+      townshipChiefOpportunity: { minDay: 1260, maxDay: 1350 },
+      townshipChiefAppointment: { minDay: 1440, maxDay: 1530 },
+    });
+    expect(config.deterministicScenarioDays).toEqual({
+      probationPassed: 360,
+      firstRankPromotion: 360,
+      townshipDeputyOpportunity: 540,
+      townshipDeputyAppointment: 720,
+      townshipDeputyGovernance: 757,
+      sectionMember4Promotion: 1080,
+      townshipChiefOpportunity: 1260,
+      townshipChiefAppointment: 1440,
     });
     expect(
       Phase3AcceptanceConfigSchema.safeParse({ ...config, unexpectedField: true }).success,
+    ).toBe(false);
+    expect(
+      Phase3AcceptanceConfigSchema.safeParse({
+        ...config,
+        deterministicScenarioDays: {
+          ...config.deterministicScenarioDays,
+          townshipChiefAppointment: 100,
+        },
+      }).success,
     ).toBe(false);
   });
 
@@ -65,6 +94,100 @@ describe('Phase 3 acceptance config', () => {
     );
   });
 
+  it('rejects enumerable facts without producers and contradictory stage conditions', () => {
+    const config = getConfigLoader().getPhase3AcceptanceConfig();
+    const catalog = createCatalog();
+    const deputyOpportunity = catalog.careerOpportunities.find(
+      (item) => item.id === 'township_deputy_leadership_vacancy',
+    );
+    const chiefOpportunity = catalog.careerOpportunities.find(
+      (item) => item.id === 'township_chief_leadership_vacancy',
+    );
+    if (!deputyOpportunity || !chiefOpportunity)
+      throw new Error('Expected leadership opportunity fixtures');
+    const factCondition = deputyOpportunity.conditions.find((condition) => 'fact' in condition);
+    if (!factCondition || !('fact' in factCondition))
+      throw new Error('Expected deputy fact condition');
+    factCondition.fact = 'missing_phase3_fact';
+    deputyOpportunity.conditions.push({
+      careerCheck: 'leadership_rank',
+      value: 'township_deputy',
+      op: 'eq',
+    });
+    chiefOpportunity.conditions.push({
+      worldMetric: 'missing_phase3_metric',
+      op: 'gte',
+      value: 1,
+    });
+
+    expect(auditPhase3Reachability(config, catalog).errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          'world fact missing_phase3_fact without a reachable gameplay producer',
+        ),
+        expect.stringContaining(
+          'world metric missing_phase3_metric without a reachable gameplay producer',
+        ),
+        expect.stringContaining('contradictory career.leadership_rank'),
+      ]),
+    );
+  });
+
+  it('rejects missing leadership KPI producers, wrong targets and impossible milestone order', () => {
+    const config = getConfigLoader().getPhase3AcceptanceConfig();
+    const catalog = createCatalog();
+    const deputyDepartments = catalog.departmentsByPosition.admin_l2_0;
+    const safetyInspection = deputyDepartments
+      ?.flatMap((department) => department.actions)
+      .find((action) => action.id === 'safety_inspection');
+    const deputyOpportunity = catalog.careerOpportunities.find(
+      (item) => item.id === 'township_deputy_leadership_vacancy',
+    );
+    if (!safetyInspection || !deputyOpportunity || deputyOpportunity.type === 'training')
+      throw new Error('Expected Phase 3 negative fixtures');
+    safetyInspection.effects = safetyInspection.effects.filter(
+      (effect) => effect.target !== 'dept.kpi.resident_satisfaction',
+    );
+    deputyOpportunity.targetPositionId = 'admin_l3_0';
+    config.milestones.townshipChiefAppointment.minDay = 700;
+
+    expect(auditPhase3Reachability(config, catalog).errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('KPI resident_satisfaction has no action producer'),
+        expect.stringContaining('targets admin_l3_0 instead of admin_l2_0'),
+        expect.stringContaining('townshipChiefAppointment occurs before townshipChiefOpportunity'),
+      ]),
+    );
+  });
+
+  it('summarizes formal tasks, real stage actions, producers and sustainable budgets', () => {
+    const config = getConfigLoader().getPhase3AcceptanceConfig();
+    const report = auditPhase3Reachability(config, createCatalog());
+    expect(report.errors).toEqual([]);
+    expect(report.summary).toMatchObject({
+      formalEntrypointCount: 15,
+      personalTaskCount: 19,
+      reachablePolicyCount: 1,
+    });
+    expect(report.summary.factProducerCount).toBeGreaterThanOrEqual(3);
+    expect(report.summary.metricProducerCount).toBeGreaterThanOrEqual(2);
+    expect(report.summary.stages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: 'clerk', actionIds: [], annualBaseConsumption: 0 }),
+        expect.objectContaining({
+          stage: 'townshipDeputy',
+          annualBudget: 6000,
+          annualBaseConsumption: 4368,
+        }),
+        expect.objectContaining({
+          stage: 'townshipChief',
+          annualBudget: 7500,
+          annualBaseConsumption: 5016,
+        }),
+      ]),
+    );
+  });
+
   it('returns a defensive copy from ConfigLoader', () => {
     const loader = getConfigLoader();
     const first = loader.getPhase3AcceptanceConfig();
@@ -90,6 +213,27 @@ describe('Phase 3 acceptance config', () => {
         department.kpiIndicators.map((indicator) => indicator.id),
       ),
     );
+    const positiveKpiIds = new Set(
+      deputyDepartments.flatMap((department) =>
+        department.kpiIndicators
+          .filter((indicator) => indicator.calcType !== 'inverse')
+          .map((indicator) => indicator.id),
+      ),
+    );
+    const actionCoverage = deputyDepartments
+      .flatMap((department) => department.actions)
+      .map(
+        (action) =>
+          new Set(
+            action.effects
+              .map((effect) => effect.target.replace(/^dept\.kpi\./, ''))
+              .filter((indicatorId) => positiveKpiIds.has(indicatorId)),
+          ),
+      );
+    expect(Math.max(...actionCoverage.map((coverage) => coverage.size))).toBeLessThan(
+      positiveKpiIds.size,
+    );
+    expect(new Set(actionCoverage.flatMap((coverage) => [...coverage]))).toEqual(positiveKpiIds);
 
     const deputyTaskIds = loader
       .getAllPersonalTaskTemplates()

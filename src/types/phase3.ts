@@ -8,6 +8,7 @@
 /** Phase 3 验收入口支持的内容种类。 */
 export type Phase3EntrypointKind =
   | 'personal_task'
+  | 'department_action'
   | 'career_opportunity'
   | 'event'
   | 'policy'
@@ -41,7 +42,7 @@ export interface Phase3KpiProducerRequirement {
 
 /** Phase 3 乡镇纵向切片的验收配置。 */
 export interface Phase3AcceptanceConfig {
-  schemaVersion: 1;
+  schemaVersion: 2;
   phaseId: 'phase3_township_vertical_slice';
   saveSchemaVersion: 10;
   targetContentVersion: string;
@@ -53,9 +54,23 @@ export interface Phase3AcceptanceConfig {
   milestones: {
     probationPassed: Phase3MilestoneRange;
     firstRankPromotion: Phase3MilestoneRange;
+    townshipDeputyOpportunity: Phase3MilestoneRange;
     townshipDeputyAppointment: Phase3MilestoneRange;
+    townshipDeputyGovernance: Phase3MilestoneRange;
     sectionMember4Promotion: Phase3MilestoneRange;
     townshipChiefOpportunity: Phase3MilestoneRange;
+    townshipChiefAppointment: Phase3MilestoneRange;
+  };
+  /** 正常 Store 场景锁定的精确回归日期，必须落在对应里程碑区间内。 */
+  deterministicScenarioDays: {
+    probationPassed: number;
+    firstRankPromotion: number;
+    townshipDeputyOpportunity: number;
+    townshipDeputyAppointment: number;
+    townshipDeputyGovernance: number;
+    sectionMember4Promotion: number;
+    townshipChiefOpportunity: number;
+    townshipChiefAppointment: number;
   };
   entrypoints: Phase3Entrypoint[];
   requiredKpiProducers: Phase3KpiProducerRequirement[];

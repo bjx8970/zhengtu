@@ -5,14 +5,8 @@
  */
 
 import { z } from 'zod';
-import type { EventDefinition } from '../domain/events/definition';
-import type {
-  CareerOpportunityDefinition,
-  PersonalTaskTemplate,
-  PolicyDefinitionConfig,
-} from '../types/config';
-import type { PositionConfigV2 } from '../types/position-v2';
 import type { Phase3AcceptanceConfig } from '../types/phase3';
+import { auditPhase3Reachability, type Phase3ReachabilityCatalog } from './phase3-reachability';
 import acceptanceData from './phase3/acceptance.json' with { type: 'json' };
 
 const DayRangeSchema = z
@@ -27,6 +21,7 @@ const EntrypointSchema = z
     role: z.enum(['producer', 'consumer']),
     kind: z.enum([
       'personal_task',
+      'department_action',
       'career_opportunity',
       'event',
       'policy',
@@ -46,10 +41,34 @@ const KpiProducerRequirementSchema = z
   })
   .strict();
 
+const MilestoneDayKeys = [
+  'probationPassed',
+  'firstRankPromotion',
+  'townshipDeputyOpportunity',
+  'townshipDeputyAppointment',
+  'townshipDeputyGovernance',
+  'sectionMember4Promotion',
+  'townshipChiefOpportunity',
+  'townshipChiefAppointment',
+] as const;
+
+const DeterministicScenarioDaysSchema = z
+  .object({
+    probationPassed: z.number().int().nonnegative(),
+    firstRankPromotion: z.number().int().nonnegative(),
+    townshipDeputyOpportunity: z.number().int().nonnegative(),
+    townshipDeputyAppointment: z.number().int().nonnegative(),
+    townshipDeputyGovernance: z.number().int().nonnegative(),
+    sectionMember4Promotion: z.number().int().nonnegative(),
+    townshipChiefOpportunity: z.number().int().nonnegative(),
+    townshipChiefAppointment: z.number().int().nonnegative(),
+  })
+  .strict();
+
 /** Phase 3 验收配置的严格 Schema。 */
 export const Phase3AcceptanceConfigSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     phaseId: z.literal('phase3_township_vertical_slice'),
     saveSchemaVersion: z.literal(10),
     targetContentVersion: z.string().regex(/^\d{4}\.\d{2}\.\d+$/),
@@ -64,11 +83,15 @@ export const Phase3AcceptanceConfigSchema = z
       .object({
         probationPassed: DayRangeSchema,
         firstRankPromotion: DayRangeSchema,
+        townshipDeputyOpportunity: DayRangeSchema,
         townshipDeputyAppointment: DayRangeSchema,
+        townshipDeputyGovernance: DayRangeSchema,
         sectionMember4Promotion: DayRangeSchema,
         townshipChiefOpportunity: DayRangeSchema,
+        townshipChiefAppointment: DayRangeSchema,
       })
       .strict(),
+    deterministicScenarioDays: DeterministicScenarioDaysSchema,
     entrypoints: z.array(EntrypointSchema).min(1),
     requiredKpiProducers: z.array(KpiProducerRequirementSchema).min(1),
   })
@@ -87,6 +110,16 @@ export const Phase3AcceptanceConfigSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Phase 3 KPI producer requirements must be unique',
       });
+    for (const key of MilestoneDayKeys) {
+      const range = config.milestones[key];
+      const day = config.deterministicScenarioDays[key];
+      if (day < range.minDay || day > range.maxDay)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['deterministicScenarioDays', key],
+          message: `Scenario day ${day} must be within ${range.minDay}~${range.maxDay}`,
+        });
+    }
   });
 
 /** 经过严格 Schema 解析的 Phase 3 验收配置。 */
@@ -95,14 +128,7 @@ export const PHASE3_ACCEPTANCE_CONFIG = Phase3AcceptanceConfigSchema.parse(
 ) as Phase3AcceptanceConfig;
 
 /** Phase 3 引用验证所需的可枚举内容目录。 */
-export interface Phase3ReferenceCatalog {
-  positions: readonly PositionConfigV2[];
-  personalTasks: readonly PersonalTaskTemplate[];
-  careerOpportunities: readonly CareerOpportunityDefinition[];
-  events: readonly EventDefinition[];
-  policies: readonly PolicyDefinitionConfig[];
-  rankProgressionRuleIds: readonly string[];
-}
+export type Phase3ReferenceCatalog = Phase3ReachabilityCatalog;
 
 const TIMELINE_NODE_IDS = new Set([
   'probation_evaluation',
@@ -131,10 +157,16 @@ export function validatePhase3AcceptanceReferences(
   const tasks = new Map(catalog.personalTasks.map((item) => [item.id, item]));
   const idsByKind = {
     personal_task: new Set(tasks.keys()),
+    department_action: new Set(
+      Object.values(catalog.departmentsByPosition)
+        .flatMap((departments) => departments)
+        .flatMap((department) => department.actions)
+        .map((action) => action.id),
+    ),
     career_opportunity: new Set(catalog.careerOpportunities.map((item) => item.id)),
     event: new Set(catalog.events.map((item) => item.id)),
     policy: new Set(catalog.policies.map((item) => item.id)),
-    rank_progression: new Set(catalog.rankProgressionRuleIds),
+    rank_progression: new Set(catalog.rankProgressionRules.map((rule) => rule.id)),
     timeline_node: TIMELINE_NODE_IDS,
   };
 
@@ -171,5 +203,6 @@ export function validatePhase3AcceptanceReferences(
         errors.push(`Phase 3 KPI producer ${taskId} does not produce ${requirement.kpiId}`);
     }
   }
+  errors.push(...auditPhase3Reachability(config, catalog).errors);
   return errors;
 }

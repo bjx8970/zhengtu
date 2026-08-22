@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "phaseId": "phase3_township_vertical_slice",
   "saveSchemaVersion": 10,
   "targetContentVersion": "2026.08.7",
@@ -11,11 +11,30 @@
   "milestones": {
     "probationPassed": { "minDay": 360, "maxDay": 450 },
     "firstRankPromotion": { "minDay": 360, "maxDay": 450 },
+    "townshipDeputyOpportunity": { "minDay": 540, "maxDay": 630 },
     "townshipDeputyAppointment": { "minDay": 720, "maxDay": 810 },
+    "townshipDeputyGovernance": { "minDay": 720, "maxDay": 900 },
     "sectionMember4Promotion": { "minDay": 1080, "maxDay": 1170 },
-    "townshipChiefOpportunity": { "minDay": 1440, "maxDay": 1530 }
+    "townshipChiefOpportunity": { "minDay": 1260, "maxDay": 1350 },
+    "townshipChiefAppointment": { "minDay": 1440, "maxDay": 1530 }
+  },
+  "deterministicScenarioDays": {
+    "probationPassed": 360,
+    "firstRankPromotion": 360,
+    "townshipDeputyOpportunity": 540,
+    "townshipDeputyAppointment": 720,
+    "townshipDeputyGovernance": 757,
+    "sectionMember4Promotion": 1080,
+    "townshipChiefOpportunity": 1260,
+    "townshipChiefAppointment": 1440
   },
   "entrypoints": [
+    {
+      "role": "producer",
+      "kind": "timeline_node",
+      "contentId": "annual_assessment",
+      "purpose": "正常时间推进产生年度考核、职数与职业机会信号"
+    },
     {
       "role": "producer",
       "kind": "personal_task",
@@ -48,6 +67,30 @@
     },
     {
       "role": "producer",
+      "kind": "department_action",
+      "contentId": "township_investment_promotion",
+      "purpose": "副职基层招商行动产生正式招商事件链信号"
+    },
+    {
+      "role": "producer",
+      "kind": "event",
+      "contentId": "investment_promotion_completed",
+      "purpose": "招商行动完成后调度产业园政策提议事件"
+    },
+    {
+      "role": "producer",
+      "kind": "event",
+      "contentId": "industrial_park_policy_proposal",
+      "purpose": "玩家提交方案后产生产业园政策可用事实"
+    },
+    {
+      "role": "producer",
+      "kind": "department_action",
+      "contentId": "flood_preparation",
+      "purpose": "副职防汛行动产生正式防汛事件链信号"
+    },
+    {
+      "role": "producer",
       "kind": "event",
       "contentId": "flood_preparation_metrics",
       "purpose": "记录乡科级正职路径要求的防汛准备链"
@@ -63,6 +106,12 @@
       "kind": "policy",
       "contentId": "industrial_park_support",
       "purpose": "承接招商事件并形成产业园政策实例"
+    },
+    {
+      "role": "consumer",
+      "kind": "rank_progression",
+      "contentId": "clerk_1_to_section_member_4",
+      "purpose": "消费年度考核职数与任职时长完成第二次职级晋升"
     },
     {
       "role": "consumer",

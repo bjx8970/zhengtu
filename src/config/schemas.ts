@@ -397,7 +397,7 @@ export const PersonalTaskTemplateSchema = z
     durationDays: z.number().int().min(1),
     category: z.enum(['major', 'minor', 'routine']),
     cooldownDays: z.number().int().min(0),
-    budgetDelta: z.number(),
+    budgetDelta: z.number().nonnegative(),
     effects: z.array(EffectDefinitionSchema),
     kpiEffects: z.array(PersonalTaskKpiEffectSchema).min(1).optional(),
     prerequisites: PersonalTaskPreconditionSchema.optional(),
