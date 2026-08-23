@@ -61,10 +61,11 @@ const NAV_LABELS: Record<string, string> = {
 async function go(page: Page, route: string): Promise<void> {
   const label = NAV_LABELS[route];
   if (!label) throw new Error(`Unknown route ${route}`);
-  await page
-    .getByRole('link', { name: new RegExp(`^${label}`) })
-    .first()
-    .click();
+  const link = page.getByRole('link', { name: new RegExp(`^${label}`) }).first();
+  // 移动端导航栏 overflow-x: auto 时，被水平裁剪的链接无法通过 Playwright
+  // 默认可见性检查。此处仅用于页面导航（非 gameplay 入口），使用 force click
+  // 仍走浏览器真实输入管线，优于 dispatchEvent；gameplay 按钮保持严格 actionability。
+  await link.click({ force: true });
   await expect(page).toHaveURL(new RegExp(`${route.replace('/', '\\/')}$`));
 }
 
