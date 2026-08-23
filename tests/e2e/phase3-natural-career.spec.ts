@@ -39,13 +39,28 @@ async function setRng(page: Page, value: number): Promise<void> {
   await page.evaluate((next) => sessionStorage.setItem('phase3-e2e-rng', String(next)), value);
 }
 
+/**
+ * 读取某档位中指定 actionId 的占用数（个人任务与部门行动共用槽位）。
+ *
+ * @param page Playwright 页面
+ * @param tier 槽位档位（primary/secondary/reserve）
+ * @param actionId 任务 ID 或行动 ID
+ * @returns 该档位下该 actionId 的 occupant 数量
+ */
+async function tierOccupiedCount(page: Page, tier: string, actionId: string): Promise<number> {
+  const state = await savedState(page);
+  const slots = asRecord(asRecord(state.actions, 'actions').slots, 'slots');
+  const occupants = (asRecord(slots[tier], `slots.${tier}`).occupants ?? []) as JsonRecord[];
+  return occupants.filter((o) => o && o.actionId === actionId).length;
+}
+
 /** 路由到全局导航链接文案的映射（与 AppShell NAV_ITEMS 保持一致） */
 const NAV_LABELS: Record<string, string> = {
   '#/main': '工作台',
   '#/tasks': '任务',
   '#/departments': '部门治理',
   '#/assessment': '年度考核',
-  '#/career': '职务与职级',
+  '#/career': '职务职级',
   '#/policies': '政策',
   '#/events': '事件',
 };
@@ -62,11 +77,13 @@ async function go(page: Page, route: string): Promise<void> {
   const label = NAV_LABELS[route];
   if (!label) throw new Error(`Unknown route ${route}`);
   const link = page.getByRole('link', { name: new RegExp(`^${label}`) }).first();
-  // 移动端导航栏 overflow-x: auto 时，被水平裁剪的链接无法通过 Playwright
-  // 默认可见性检查。此处仅用于页面导航（非 gameplay 入口），使用 force click
-  // 仍走浏览器真实输入管线，优于 dispatchEvent；gameplay 按钮保持严格 actionability。
-  await link.click({ force: true });
+  // 真实点击导航链接（满足 actionability 检查）。点击后 hash 变化，
+  // 但 SolidJS 路由组件在微任务中才重渲染；若不等待，紧跟其后的推进/任务
+  // 点击会落在未稳定渲染的 DOM 上，导致时间推进结算被截断、任务完成数漂移。
+  // 这里用固定短等待让路由渲染与浏览器滚动稳定，消除 click 导航的竞态。
+  await link.click();
   await expect(page).toHaveURL(new RegExp(`${route.replace('/', '\\/')}$`));
+  await page.waitForTimeout(100);
 }
 
 async function createCharacter(page: Page): Promise<void> {
@@ -97,7 +114,11 @@ async function createCharacter(page: Page): Promise<void> {
 }
 
 /**
- * 在按钮真实可见、可用且未被遮挡时以真实用户点击启动。
+ * 在按钮可用时以真实用户点击启动，并确定性确认任务真正进入槽位。
+ *
+ * 点击后轮询存档确认对应档位的 occupant 数 +1，直接验证 store 状态而非依赖
+ * UI disabled 表现，避免 SolidJS 响应式重渲染滞后使 reducer 静默拒绝
+ * （点击了但任务未启动）导致的非确定性漏启动。
  *
  * @param page Playwright 页面
  * @param testId 启动按钮 data-testid
@@ -106,8 +127,36 @@ async function createCharacter(page: Page): Promise<void> {
 async function startIfEnabled(page: Page, testId: string): Promise<boolean> {
   const button = page.getByTestId(testId);
   if ((await button.count()) === 0) return false;
-  if (!(await button.isVisible()) || !(await button.isEnabled())) return false;
+  if (!(await button.isEnabled())) return false;
+
+  // 仅对个人任务解析档位与任务 ID，用于点击后确定性确认槽位真正被占用。
+  // 部门行动 testId 格式不同（含 deptId），保持简单真实点击。
+  const match = testId.match(/^start-task-(.+)-(primary|secondary|reserve)$/);
+  if (!match) {
+    await button.click();
+    return true;
+  }
+  // 正则已匹配成功，捕获组必为字符串；非空断言在此安全。
+  const taskId = match[1]!;
+  const tier = match[2]!;
+
+  const before = await tierOccupiedCount(page, tier, taskId);
   await button.click();
+
+  // 确定性确认：该任务在对应档位的占用数 +1（真正进入槽位）。
+  // 若 SolidJS 重渲染滞后使 reducer 静默拒绝（点击了但未启动），重读按钮状态重试一次。
+  const started = await expect
+    .poll(async () => (await tierOccupiedCount(page, tier, taskId)) > before, {
+      timeout: 2_000,
+    })
+    .toBe(true)
+    .catch(() => false);
+  if (!started && (await button.isEnabled())) {
+    await button.click();
+    await expect
+      .poll(async () => (await tierOccupiedCount(page, tier, taskId)) > before, { timeout: 2_000 })
+      .toBe(true);
+  }
   return true;
 }
 
@@ -130,8 +179,12 @@ async function resumeBlockingContinuations(page: Page): Promise<void> {
 async function advanceOnce(page: Page, granularity: 'day' | 'week' | 'month'): Promise<void> {
   await go(page, '#/main');
   await setRng(page, 0.99);
+  const before = await currentDay(page);
   await page.getByTestId(`advance-${granularity}`).click();
   await resumeBlockingContinuations(page);
+  // 确定性确认：推进后时间应真增（至少 +1 天），避免推进按钮点击与
+  // store 结算脱节导致循环空转。
+  await expect.poll(async () => (await currentDay(page)) > before, { timeout: 5_000 }).toBe(true);
 }
 
 async function startClerkBatch(page: Page, includeReserve: boolean): Promise<void> {
