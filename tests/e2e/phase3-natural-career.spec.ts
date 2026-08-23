@@ -39,10 +39,32 @@ async function setRng(page: Page, value: number): Promise<void> {
   await page.evaluate((next) => sessionStorage.setItem('phase3-e2e-rng', String(next)), value);
 }
 
+/** 路由到全局导航链接文案的映射（与 AppShell NAV_ITEMS 保持一致） */
+const NAV_LABELS: Record<string, string> = {
+  '#/main': '工作台',
+  '#/tasks': '任务',
+  '#/departments': '部门治理',
+  '#/assessment': '年度考核',
+  '#/career': '职务与职级',
+  '#/policies': '政策',
+  '#/events': '事件',
+};
+
+/**
+ * 通过点击全局导航链接切换路由。
+ *
+ * 不直接修改 location.hash：链接可能带有角标数字，因此按前缀匹配可访问名称。
+ *
+ * @param page Playwright 页面
+ * @param route 目标 hash 路由，如 '#/tasks'
+ */
 async function go(page: Page, route: string): Promise<void> {
-  await page.evaluate((nextRoute) => {
-    window.location.hash = nextRoute;
-  }, route);
+  const label = NAV_LABELS[route];
+  if (!label) throw new Error(`Unknown route ${route}`);
+  await page
+    .getByRole('link', { name: new RegExp(`^${label}`) })
+    .first()
+    .click();
   await expect(page).toHaveURL(new RegExp(`${route.replace('/', '\\/')}$`));
 }
 
@@ -73,10 +95,18 @@ async function createCharacter(page: Page): Promise<void> {
   await expect(page).toHaveURL(/#\/main$/);
 }
 
+/**
+ * 在按钮真实可见、可用且未被遮挡时以真实用户点击启动。
+ *
+ * @param page Playwright 页面
+ * @param testId 启动按钮 data-testid
+ * @returns 是否实际完成了点击启动
+ */
 async function startIfEnabled(page: Page, testId: string): Promise<boolean> {
   const button = page.getByTestId(testId);
-  if ((await button.count()) === 0 || !(await button.isEnabled())) return false;
-  await button.dispatchEvent('click');
+  if ((await button.count()) === 0) return false;
+  if (!(await button.isVisible()) || !(await button.isEnabled())) return false;
+  await button.click();
   return true;
 }
 
@@ -99,7 +129,7 @@ async function resumeBlockingContinuations(page: Page): Promise<void> {
 async function advanceOnce(page: Page, granularity: 'day' | 'week' | 'month'): Promise<void> {
   await go(page, '#/main');
   await setRng(page, 0.99);
-  await page.getByTestId(`advance-${granularity}`).dispatchEvent('click');
+  await page.getByTestId(`advance-${granularity}`).click();
   await resumeBlockingContinuations(page);
 }
 
@@ -133,8 +163,8 @@ async function startDepartmentAction(
 ): Promise<boolean> {
   await go(page, '#/departments');
   const backButton = page.getByRole('button', { name: '返回部门列表' });
-  if (await backButton.isVisible()) await backButton.dispatchEvent('click');
-  await page.getByTestId(`department-${departmentId}`).dispatchEvent('click');
+  if (await backButton.isVisible()) await backButton.click();
+  await page.getByTestId(`department-${departmentId}`).click();
   return startIfEnabled(page, `start-action-${departmentId}-${actionId}-${tier}`);
 }
 
