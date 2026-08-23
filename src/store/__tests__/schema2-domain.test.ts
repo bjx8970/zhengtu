@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createInitialState, createTestStore } from '../game-store';
 import {
   decodeCurrentSave,
+  migrateSchema10Phase3ReleaseContent,
   migrateSchema10TownshipChiefContent,
   wrapSaveEnvelope,
   validatePlayerSave,
@@ -490,6 +491,30 @@ describe('Schema 2 存档', () => {
 
     expect(result.success).toBe(true);
     expect(result.state?.world.metrics['rank_quota.clerk_1']).toBe(1);
+  });
+
+  it('Schema 10 Phase 3 发布内容迁移只更新版本并保留全部运行时状态', () => {
+    const store = createTestStore(createInitialState());
+    store.dispatch({
+      type: 'START_PERSONAL_TASK',
+      taskId: 'task_policy_study',
+      tierKey: 'primary',
+      _idFactory: () => 'phase3-release-running-task',
+    });
+    const before = store.getRawState();
+    const envelope = {
+      ...wrapSaveEnvelope(before),
+      contentVersion: '2026.08.6',
+    } as Record<string, unknown>;
+
+    const migrated = migrateSchema10Phase3ReleaseContent(envelope);
+    expect(migrated.contentVersion).toBe(CURRENT_CONTENT_VERSION);
+    expect(migrated.state).toEqual(before);
+    expect(migrateSchema10Phase3ReleaseContent(migrated)).toEqual(migrated);
+
+    const result = decodeCurrentSave(JSON.stringify(envelope));
+    expect(result.success).toBe(true);
+    expect(result.state).toEqual(before);
   });
 
   it('Schema 10 乡镇治理内容迁移保留预算和在途执行快照', () => {
