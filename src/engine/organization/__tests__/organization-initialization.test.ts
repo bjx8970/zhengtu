@@ -37,7 +37,9 @@ describe('createOrganizationState', () => {
     expect(first.cadres.filter((cadre) => cadre.currentAppointment === null)).toHaveLength(2);
     expect(hasVacantOrganizationSeat(first, 'admin_l2_0')).toBe(true);
     expect(hasVacantOrganizationSeat(first, 'admin_l1_0')).toBe(false);
-    expect(validateOrganizationInvariants(first, 'initial-appointment-admin_l1_0')).toEqual([]);
+    expect(validateOrganizationInvariants(first, createInitialState().career.appointment)).toEqual(
+      [],
+    );
   });
 
   it('玩家占据配置 NPC 职位时不会制造双 occupant', () => {
@@ -63,7 +65,7 @@ describe('createOrganizationState', () => {
       experiences: [],
     });
     expect(organization.seats.filter((seat) => seat.positionId === 'admin_l2_0')).toHaveLength(1);
-    expect(validateOrganizationInvariants(organization, 'player-promoted')).toEqual([]);
+    expect(validateOrganizationInvariants(organization, playerAppointment)).toEqual([]);
   });
 });
 
@@ -77,9 +79,9 @@ describe('validateOrganizationInvariants', () => {
     targetSeat.currentAppointmentId = cadre.currentAppointment.appointmentId;
     targetSeat.occupiedAtDay = cadre.currentAppointment.startedAtDay;
 
-    expect(validateOrganizationInvariants(organization, null)).toContain(
-      `Cadre ${cadre.cadreId} must occupy exactly one seat`,
-    );
+    expect(
+      validateOrganizationInvariants(organization, createInitialState().career.appointment),
+    ).toContain(`Cadre ${cadre.cadreId} must occupy exactly one seat`);
   });
 
   it('拒绝 occupied seat 上的活动 Vacancy', () => {
@@ -108,7 +110,7 @@ describe('validateOrganizationInvariants', () => {
     });
 
     expect(
-      validateOrganizationInvariants(organization, 'initial-appointment-admin_l1_0'),
+      validateOrganizationInvariants(organization, createInitialState().career.appointment),
     ).toContain('Active vacancy vacancy:test has an occupied seat');
   });
 
@@ -131,7 +133,10 @@ describe('validateOrganizationInvariants', () => {
     };
     organization.selections.push(selection);
 
-    const errors = validateOrganizationInvariants(organization, 'initial-appointment-admin_l1_0');
+    const errors = validateOrganizationInvariants(
+      organization,
+      createInitialState().career.appointment,
+    );
     expect(errors).toContain('Selection selection:test references unknown vacancy');
     expect(errors).toContain('Selection selection:test winner is not a candidate');
   });

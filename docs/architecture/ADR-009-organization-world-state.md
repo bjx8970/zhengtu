@@ -43,6 +43,7 @@ Seat ID 从职位 ID 和序号稳定派生。`PositionConfig.vacancyCount` 在�
 ## 一致性约束
 
 - 一个 Seat 最多一个 occupant；占用元数据必须完整出现或完整为空。
+- 玩家 active 任职必须恰好占据一个与完整任职事实一致的 Seat；任职结束后不得占席。
 - 一个 NPC 最多一个 active appointment 和一条开放履历，并占据一个 Seat。
 - open/selecting Vacancy 的 Seat 必须为空，同一 Seat 最多一个活动 Vacancy。
 - Selection 必须引用正式 Vacancy；活动 Selection 对应 selecting Vacancy。

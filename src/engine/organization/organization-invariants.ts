@@ -4,18 +4,19 @@
  * 校验器保持纯函数，可同时供存档解码、测试和后续事务提交前复核使用。
  */
 
+import type { CurrentAppointment } from '../../domain/career/state';
 import type { OrganizationState } from '../../types/organization';
 
 /**
  * 审计干部、席位、空缺和世界选拔之间的不变量。
  *
  * @param state 待审计的组织世界状态
- * @param playerAppointmentId 玩家当前有效任职 ID；职业已结束时为 null
+ * @param playerAppointment 玩家当前任职事实；已结束任职用于断言玩家不再占席
  * @returns 可读错误列表，空数组表示一致
  */
 export function validateOrganizationInvariants(
   state: Readonly<OrganizationState>,
-  playerAppointmentId: string | null,
+  playerAppointment: Readonly<CurrentAppointment>,
 ): string[] {
   const errors: string[] = [];
   const cadreIds = state.cadres.map((cadre) => cadre.cadreId);
@@ -35,11 +36,26 @@ export function validateOrganizationInvariants(
   const seats = new Map(state.seats.map((seat) => [seat.seatId, seat]));
   const vacancies = new Map(state.vacancies.map((vacancy) => [vacancy.vacancyId, vacancy]));
   const activeVacancySeats = new Set<string>();
+  const playerSeats = state.seats.filter((seat) => seat.occupant?.type === 'player');
+  if (playerAppointment.status === 'active' && playerSeats.length !== 1)
+    errors.push('Active player appointment must occupy exactly one organization seat');
+  if (playerAppointment.status !== 'active' && playerSeats.length !== 0)
+    errors.push('Ended player appointment cannot occupy an organization seat');
   for (const seat of state.seats) {
     const occupied = seat.occupant !== null;
     if (occupied !== (seat.currentAppointmentId !== null && seat.occupiedAtDay !== null))
       errors.push(`Seat ${seat.seatId} occupancy metadata is inconsistent`);
-    if (seat.occupant?.type === 'player' && seat.currentAppointmentId !== playerAppointmentId)
+    if (
+      seat.occupant?.type === 'player' &&
+      (playerAppointment.status !== 'active' ||
+        seat.currentAppointmentId !== playerAppointment.appointmentId ||
+        seat.positionId !== playerAppointment.positionId ||
+        seat.institutionId !== playerAppointment.institutionId ||
+        seat.regionId !== playerAppointment.regionId ||
+        seat.institutionLevel !== playerAppointment.institutionLevel ||
+        seat.positionDomain !== playerAppointment.positionDomain ||
+        seat.leadershipRank !== playerAppointment.leadershipRank)
+    )
       errors.push(`Player seat ${seat.seatId} does not match the active player appointment`);
     if (seat.occupant?.type === 'npc') {
       const cadre = cadres.get(seat.occupant.id);

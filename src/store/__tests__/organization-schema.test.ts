@@ -93,4 +93,42 @@ describe('Schema 11 organization state', () => {
     expect(validation.error).toContain('references unknown position');
     expect(validation.error).toContain('references unknown institution');
   });
+
+  it('拒绝 active 玩家任职没有对应 player Seat', () => {
+    const state = createInitialState();
+    const playerSeat = state.organization.seats.find((seat) => seat.occupant?.type === 'player');
+    if (!playerSeat) throw new Error('Expected initialized player seat');
+    playerSeat.occupant = null;
+    playerSeat.currentAppointmentId = null;
+    playerSeat.occupiedAtDay = null;
+
+    const validation = validatePlayerSave(state);
+
+    expect(validation.valid).toBe(false);
+    expect(validation.error).toContain(
+      'Active player appointment must occupy exactly one organization seat',
+    );
+  });
+
+  it('拒绝 player Seat 指向与当前任职不同的正式职位', () => {
+    const state = createInitialState();
+    const playerSeat = state.organization.seats.find((seat) => seat.occupant?.type === 'player');
+    const wrongSeat = state.organization.seats.find(
+      (seat) => seat.positionId !== state.career.appointment.positionId && seat.occupant === null,
+    );
+    if (!playerSeat || !wrongSeat) throw new Error('Expected player and vacant organization seats');
+    playerSeat.occupant = null;
+    playerSeat.currentAppointmentId = null;
+    playerSeat.occupiedAtDay = null;
+    wrongSeat.occupant = { type: 'player', id: 'player' };
+    wrongSeat.currentAppointmentId = state.career.appointment.appointmentId;
+    wrongSeat.occupiedAtDay = state.career.appointment.startedAtDay;
+
+    const validation = validatePlayerSave(state);
+
+    expect(validation.valid).toBe(false);
+    expect(validation.error).toContain(
+      `Player seat ${wrongSeat.seatId} does not match the active player appointment`,
+    );
+  });
 });

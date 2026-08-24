@@ -1175,9 +1175,7 @@ const PlayerSaveSchema = z
   })
   .strict()
   .superRefine((save, ctx) => {
-    const appointmentId =
-      save.career.appointment.status === 'active' ? save.career.appointment.appointmentId : null;
-    for (const error of validateOrganizationInvariants(save.organization, appointmentId))
+    for (const error of validateOrganizationInvariants(save.organization, save.career.appointment))
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['organization'], message: error });
     const loader = getConfigLoader();
     for (const seat of save.organization.seats) {
@@ -1189,11 +1187,34 @@ const PlayerSaveSchema = z
           path: ['organization', 'seats'],
           message: `Seat ${seat.seatId} references unknown position`,
         });
+      else if (
+        seat.positionNameSnapshot !== position.name ||
+        seat.institutionId !== position.institutionId ||
+        seat.regionId !== position.regionId ||
+        seat.institutionLevel !== position.institutionLevel ||
+        seat.positionDomain !== position.positionDomain ||
+        seat.leadershipRank !== position.leadershipRank
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['organization', 'seats'],
+          message: `Seat ${seat.seatId} does not match its position catalog snapshot`,
+        });
       if (!institution)
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['organization', 'seats'],
           message: `Seat ${seat.seatId} references unknown institution`,
+        });
+      else if (
+        seat.institutionNameSnapshot !== institution.name ||
+        seat.regionId !== institution.regionId ||
+        seat.institutionLevel !== institution.level
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['organization', 'seats'],
+          message: `Seat ${seat.seatId} does not match its institution catalog snapshot`,
         });
     }
   });
