@@ -1,6 +1,6 @@
 # 政途人生 — 架构文档
 
-> 当前版本：0.3.0-alpha.1 | 存档 Schema：10 | 内容版本：2026.08.7
+> 当前版本：0.3.0-alpha.1 | 存档 Schema：11 | 内容版本：2026.08.8
 
 ## 当前范围
 
@@ -16,7 +16,13 @@
 
 ## 岗位机会与任职事务
 
-职业机会由领域信号驱动并冻结目标快照；生成、接受及最终任职前都复查配置和硬性条件。职业经历资格统一从 `career.experiences` 的单条 `[startedAtDay, endedAtDay)` 记录派生：正式、挂职、临时与代理分别遵循配置化最小时长，地区与机构经历独立统计，当前开放履历按当前绝对日实时计算。领导岗位走最小选拔状态机，training 使用独立判别联合且不改变任职。任职事务在完整状态副本中原子关闭旧履历、创建新任职和开放履历、重建部门运行时并产生 `appointment.changed`；执行中行动会阻止最终任职。机会过期是可恢复统一时间轴节点。职业仪表盘（`/career`）已随 #98 接入；NPC 候选池竞争仍属 Phase 4。
+职业机会由领域信号驱动并冻结目标快照；生成、接受及最终任职前都复查配置和硬性条件。职业经历资格统一从 `career.experiences` 的单条 `[startedAtDay, endedAtDay)` 记录派生：正式、挂职、临时与代理分别遵循配置化最小时长，地区与机构经历独立统计，当前开放履历按当前绝对日实时计算。领导岗位走最小选拔状态机，training 使用独立判别联合且不改变任职。任职事务在完整状态副本中原子关闭旧履历、创建新任职和开放履历、重建部门运行时、移动玩家 Seat occupant 并产生 `appointment.changed`；执行中行动会阻止最终任职。机会过期是可恢复统一时间轴节点。职业仪表盘（`/career`）已随 #98 接入；NPC 候选池竞争仍属 Phase 4 后续任务。
+
+## Phase 4 组织世界底座
+
+`PlayerSave.organization` 是 NPC 干部、实际岗位席位、动态空缺和世界级选拔的唯一持久化容器；玩家自己的任职、履历与机会继续由 `CareerState` 表达。组织世界只以固定 player occupant 引用接入玩家，NPC 复用任职、履历和职业限制契约，不复制玩家行动、治理或事件运行时。
+
+新游戏和 Schema 10→11 迁移均通过纯函数确定性实例化有限干部池与 Seat。职位配置的 `vacancyCount` 在该入口只表示 Seat 模板容量，不等于运行时开放 Vacancy 数。严格解码会校验唯一身份、Seat occupant、NPC 任职/开放履历、Vacancy/Seat、Selection/Vacancy 与赢家候选引用；具体生命周期、producer 和相对竞争由 Phase 4 后续任务接入。
 
 政策列表、事件收件箱与 blocking 弹窗 UI 已随 #98 交付，配合 Store 集成测试与 Playwright 端到端验收共同验证运行时。
 
@@ -97,9 +103,11 @@ src/
 │   │   └── shared.ts            # 共享辅助函数
 │   ├── transactions/
 │   │   ├── timeline-day-transaction.ts
+│   │   ├── organization-seat-transaction.ts
 │   │   └── policy-transition-transaction.ts
 │   └── save-codec/
-│       └── index.ts             # 严格存档解码器（Zod Schema 10，支持 Schema 2→10 迁移）
+│       ├── index.ts             # 严格存档解码器（Zod Schema 11，支持 Schema 2→11 迁移）
+│       └── organization-schema.ts
 └── services/
     ├── save-repo.ts             # 本地/远程存档读写
     ├── startup-save-state.ts    # 启动存档状态服务
@@ -154,8 +162,8 @@ UI（页面/组件） → Store（dispatch/reducer） → Engine（纯函数） 
 
 ```typescript
 interface SaveEnvelope {
-  schemaVersion: number; // 存档结构版本（当前：10）
-  contentVersion: string; // 内容配置版本（当前：2026.08.7）
+  schemaVersion: number; // 存档结构版本（当前：11）
+  contentVersion: string; // 内容配置版本（当前：2026.08.8）
   revision: number; // 同一存档的逻辑修订号
   savedAt: number; // 保存时间戳
   state: PlayerSave; // 实际游戏状态
@@ -164,8 +172,8 @@ interface SaveEnvelope {
 
 ### 严格解码行为
 
-- 当前 Schema 10 的完整 SaveEnvelope 直接进入严格结构解码
-- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
+- 当前 Schema 11 的完整 SaveEnvelope 直接进入严格结构解码
+- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11
 - `schemaVersion < 2` → 拒绝（`legacy_save_unsupported`）
 - `schemaVersion > CURRENT` → 拒绝（`future_version`）
 - 结构验证失败 → 拒绝（`invalid_envelope`）
@@ -175,7 +183,7 @@ interface SaveEnvelope {
 
 ### 兼容性说明
 
-解码器以 `schemaVersion` 决定结构兼容性；迁移步骤会在需要可靠重建运行时快照时校验对应的历史 `contentVersion`。Schema 2–9 通过确定性迁移链升级至 Schema 10；Schema 10 内再按 `2026.08.2→.3→.4→.5→.6→.7` 应用内容迁移。Schema 1 和缺少 Envelope 的裸 PlayerSave 被拒绝并保留只读备份。
+解码器以 `schemaVersion` 决定结构兼容性；迁移步骤会在需要可靠重建运行时快照时校验对应的历史 `contentVersion`。Schema 2–9 先通过确定性迁移链升级至 Schema 10；Schema 10 内按 `2026.08.2→.3→.4→.5→.6→.7` 应用内容迁移，再于当前绝对日初始化 Schema 11 组织世界。Schema 1 和缺少 Envelope 的裸 PlayerSave 被拒绝并保留只读备份。
 
 ### revision 和 updatedAt
 

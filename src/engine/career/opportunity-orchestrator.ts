@@ -13,6 +13,7 @@ import type {
 } from '../../types/config';
 import type { InstitutionConfig, PositionConfigV2 } from '../../types/position-v2';
 import { evaluateCondition } from '../events/condition-interpreter';
+import { hasVacantOrganizationSeat } from '../organization/organization-selectors';
 
 /** 机会生成输入。 */
 export interface ProcessCareerOpportunitySignalParams {
@@ -216,7 +217,8 @@ export function processCareerOpportunitySignal(
     if (
       !position ||
       !institution ||
-      (definition.type === 'leadership_vacancy' && position.vacancyCount <= 0)
+      (definition.type === 'leadership_vacancy' &&
+        !hasVacantOrganizationSeat(params.state.organization, position.id))
     ) {
       skipped.push({
         definitionId: definition.id,

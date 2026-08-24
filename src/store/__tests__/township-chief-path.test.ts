@@ -6,6 +6,7 @@ import type { EventHistoryRecord } from '../../domain/events/state';
 import type { PlayerSave } from '../../types/player';
 import { createInitialState, createTestStore } from '../game-store';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
+import { transitionPlayerSeat } from '../transactions/organization-seat-transaction';
 
 function historyRecord(eventId: string, day: number): EventHistoryRecord {
   return {
@@ -50,6 +51,10 @@ function createDeputyYearEndState(): PlayerSave {
     endReason: null,
     probation: null,
   };
+  if (
+    !transitionPlayerSeat(state.organization, oldExperience.appointmentId, state.career.appointment)
+  )
+    throw new Error('Expected player organization seat transition');
   state.career.experiences.push({
     id: 'deputy-experience',
     appointmentId: 'deputy-appointment',

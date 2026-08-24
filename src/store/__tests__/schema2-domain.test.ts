@@ -36,6 +36,17 @@ import { POLICY_STATUSES, DOMAIN_SIGNALS } from '../../domain/governance/types';
 import { EVENT_PRIORITIES, EVENT_PRESENTATIONS } from '../../domain/events/types';
 import { EFFECT_TARGET_DISCRIMINANTS } from '../../domain/conditions';
 
+function wrapLegacySchema10(state: ReturnType<typeof createInitialState>, contentVersion: string) {
+  const legacyState = structuredClone(state);
+  const envelope = {
+    ...wrapSaveEnvelope(legacyState),
+    schemaVersion: 10,
+    contentVersion,
+  } as Record<string, unknown>;
+  delete (envelope.state as Record<string, unknown>).organization;
+  return envelope;
+}
+
 describe('Schema 2 存档', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -685,7 +696,7 @@ describe('Schema 2 存档', () => {
     };
     state.world.facts.industrial_park_policy_proposed = true;
     state.remainingBudget = 4321;
-    const envelope = { ...wrapSaveEnvelope(state), contentVersion: '2026.08.5' };
+    const envelope = wrapLegacySchema10(state, '2026.08.5');
 
     const result = decodeCurrentSave(JSON.stringify(envelope));
 
@@ -793,10 +804,7 @@ describe('Schema 2 存档', () => {
       totalDaysPlayed: 1260,
       pendingContinuation: null,
     });
-    const legacyEnvelope = {
-      ...wrapSaveEnvelope(state),
-      contentVersion: '2026.08.5',
-    } as Record<string, unknown>;
+    const legacyEnvelope = wrapLegacySchema10(state, '2026.08.5');
 
     const migratedOnce = migrateSchema10TownshipChiefContent(legacyEnvelope);
     expect(migrateSchema10TownshipChiefContent(migratedOnce)).toEqual(migratedOnce);
@@ -835,10 +843,7 @@ describe('Schema 2 存档', () => {
       totalDaysPlayed: 1440,
     });
     const lateEvidenceResult = decodeCurrentSave(
-      JSON.stringify({
-        ...wrapSaveEnvelope(lateEvidenceState),
-        contentVersion: '2026.08.5',
-      }),
+      JSON.stringify(wrapLegacySchema10(lateEvidenceState, '2026.08.5')),
     );
     expect(lateEvidenceResult.success).toBe(true);
     expect(
@@ -855,10 +860,7 @@ describe('Schema 2 存档', () => {
       totalDaysPlayed: 1531,
     });
     const expiredResult = decodeCurrentSave(
-      JSON.stringify({
-        ...wrapSaveEnvelope(expiredState),
-        contentVersion: '2026.08.5',
-      }),
+      JSON.stringify(wrapLegacySchema10(expiredState, '2026.08.5')),
     );
     expect(expiredResult.success).toBe(true);
     expect(
@@ -901,10 +903,7 @@ describe('Schema 2 存档', () => {
     sameSourceState.career.opportunities = [legacySameSourceOpportunity];
 
     const sameSourceResult = decodeCurrentSave(
-      JSON.stringify({
-        ...wrapSaveEnvelope(sameSourceState),
-        contentVersion: '2026.08.5',
-      }),
+      JSON.stringify(wrapLegacySchema10(sameSourceState, '2026.08.5')),
     );
     expect(sameSourceResult.success).toBe(true);
     expect(sameSourceResult.state?.career.opportunities).toEqual(
@@ -936,10 +935,7 @@ describe('Schema 2 存档', () => {
     if (!expiredLegacyOpportunity) throw new Error('Expected expired legacy window fixture');
     expiredLegacyOpportunity.status = 'expired';
     const expiredLegacyWindowResult = decodeCurrentSave(
-      JSON.stringify({
-        ...wrapSaveEnvelope(expiredLegacyWindowState),
-        contentVersion: '2026.08.5',
-      }),
+      JSON.stringify(wrapLegacySchema10(expiredLegacyWindowState, '2026.08.5')),
     );
     expect(expiredLegacyWindowResult.success).toBe(true);
     expect(expiredLegacyWindowResult.state?.career.opportunities).toEqual(
@@ -966,10 +962,7 @@ describe('Schema 2 存档', () => {
     consumedOpportunity.status = 'rejected';
     consumedOpportunity.rejectedAtDay = 1625;
     const consumedSourceResult = decodeCurrentSave(
-      JSON.stringify({
-        ...wrapSaveEnvelope(consumedSourceState),
-        contentVersion: '2026.08.5',
-      }),
+      JSON.stringify(wrapLegacySchema10(consumedSourceState, '2026.08.5')),
     );
     expect(consumedSourceResult.success).toBe(true);
     expect(consumedSourceResult.state?.career.opportunities).toHaveLength(1);

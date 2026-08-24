@@ -38,6 +38,7 @@ import type {
 } from '../../types/player';
 import { getConfigLoader } from '../../config/loader';
 import { clampAttr } from '../../utils/math';
+import { releasePlayerSeat } from './organization-seat-transaction';
 import {
   advanceBlockingPointer,
   applyEventInstances,
@@ -251,6 +252,8 @@ function processProbationEvaluation(draft: PlayerSave, currentDay: number): void
     openExperiences[0]?.appointmentId !== draft.career.appointment.appointmentId
   )
     throw new Error('Probation failure cannot close an inconsistent appointment experience');
+  if (!releasePlayerSeat(draft.organization, draft.career.appointment.appointmentId))
+    throw new Error('Probation failure cannot release the player organization seat');
   openExperiences[0].endedAtDay = currentDay;
   openExperiences[0].endReason = 'probation_failed';
   draft.career.appointment.status = 'ended';

@@ -1,0 +1,85 @@
+[
+  {
+    "cadreId": "cadre_he_yu",
+    "name": "何宇",
+    "gender": "男",
+    "birthYear": 1988,
+    "civilServiceRank": "clerk_1",
+    "positionId": "admin_l1_1",
+    "specialties": { "local_governance": 58, "public_service": 62 }
+  },
+  {
+    "cadreId": "cadre_luo_xia",
+    "name": "罗霞",
+    "gender": "女",
+    "birthYear": 1986,
+    "civilServiceRank": "section_member_4",
+    "positionId": "admin_l1_2",
+    "specialties": { "local_governance": 64, "rural_affairs": 68 }
+  },
+  {
+    "cadreId": "cadre_chen_ming",
+    "name": "陈明",
+    "gender": "男",
+    "birthYear": 1981,
+    "civilServiceRank": "section_member_2",
+    "positionId": "admin_l2_0",
+    "initiallyUnassigned": true,
+    "specialties": { "local_governance": 76, "economic_development": 70 }
+  },
+  {
+    "cadreId": "cadre_zhou_lan",
+    "name": "周岚",
+    "gender": "女",
+    "birthYear": 1983,
+    "civilServiceRank": "section_member_3",
+    "positionId": "admin_l2_1",
+    "specialties": { "government_general": 74, "local_governance": 66 }
+  },
+  {
+    "cadreId": "cadre_sun_qiang",
+    "name": "孙强",
+    "gender": "男",
+    "birthYear": 1984,
+    "civilServiceRank": "section_member_3",
+    "positionId": "admin_l2_2",
+    "specialties": { "public_service": 78, "local_governance": 65 }
+  },
+  {
+    "cadreId": "cadre_wang_jun",
+    "name": "王峻",
+    "gender": "男",
+    "birthYear": 1975,
+    "civilServiceRank": "section_member_1",
+    "positionId": "admin_l3_0",
+    "initiallyUnassigned": true,
+    "specialties": { "local_governance": 84, "economic_development": 77 }
+  },
+  {
+    "cadreId": "cadre_li_mei",
+    "name": "李梅",
+    "gender": "女",
+    "birthYear": 1978,
+    "civilServiceRank": "section_member_1",
+    "positionId": "admin_l3_1",
+    "specialties": { "party_organs": 83, "organization_work": 79 }
+  },
+  {
+    "cadreId": "cadre_zhao_hai",
+    "name": "赵海",
+    "gender": "男",
+    "birthYear": 1977,
+    "civilServiceRank": "researcher_4",
+    "positionId": "admin_l3_2",
+    "specialties": { "local_governance": 80, "government_general": 75 }
+  },
+  {
+    "cadreId": "cadre_qian_yi",
+    "name": "钱怡",
+    "gender": "女",
+    "birthYear": 1979,
+    "civilServiceRank": "section_member_1",
+    "positionId": "admin_l3_3",
+    "specialties": { "party_organs": 81, "local_governance": 72 }
+  }
+]

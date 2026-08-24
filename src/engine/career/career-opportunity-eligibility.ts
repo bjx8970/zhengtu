@@ -14,6 +14,7 @@ import type {
 } from '../../types/career';
 import { getActiveCareerRestrictions } from './civil-service-rank-eligibility';
 import { evaluateCondition } from '../events/condition-interpreter';
+import { hasVacantOrganizationSeat } from '../organization/organization-selectors';
 
 const ELIGIBLE: CareerOpportunityEligibilityResult = { eligible: true, failure: null };
 
@@ -93,7 +94,8 @@ function evaluateOpportunityEligibility(
     targetPosition.regionId !== opportunity.target.regionId
   )
     return { eligible: false, failure: 'target_snapshot_mismatch' };
-  if (targetPosition.vacancyCount <= 0) return { eligible: false, failure: 'target_vacant' };
+  if (!hasVacantOrganizationSeat(state.organization, targetPosition.id))
+    return { eligible: false, failure: 'target_vacant' };
   if (state.career.appointment.positionId === targetPosition.id)
     return { eligible: false, failure: 'same_position' };
   if (

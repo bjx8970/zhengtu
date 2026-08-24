@@ -1,12 +1,12 @@
 /**
- * 游戏状态管理（Schema 10）
+ * 游戏状态管理（Schema 11）
  *
  * 核心设计：
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 仅在实际状态变化时写入 localStorage
  *
- * 当前持久化结构为 Schema 10，包含政策/事件运行时、时间轴 continuation、职级履历、试用期审计与个人任务状态。
+ * 当前持久化结构为 Schema 11，新增有限干部、岗位席位、动态空缺和世界级选拔状态。
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';
@@ -18,6 +18,8 @@ import type { WorldState } from '../domain/world-state';
 import { getConfigLoader } from '../config/loader';
 import { writeLocalSave } from '../services/save-repo';
 import { createAppointmentProbation } from '../engine/career/probation-evaluation';
+import { createOrganizationState } from '../engine/organization/organization-initialization';
+import type { CurrentAppointment } from '../domain/career/state';
 
 // Reducer 模块
 import { reduceStartAction } from './reducers/action-reducer';
@@ -96,6 +98,23 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     throw new Error(`Initial institution "${initialPosition.institutionId}" not found in config`);
   }
   const initialAppointmentId = `initial-appointment-${initialPosition.id}`;
+  const initialAppointment: CurrentAppointment = {
+    appointmentId: initialAppointmentId,
+    positionId: initialPosition.id,
+    institutionId: initialPosition.institutionId,
+    regionId: initialPosition.regionId,
+    institutionLevel: initialPosition.institutionLevel,
+    positionDomain: initialPosition.positionDomain,
+    leadershipRank: initialPosition.leadershipRank,
+    startedAtDay: 0,
+    appointmentType: 'substantive',
+    appointmentReason: 'initial_assignment',
+    sourceOpportunityId: null,
+    status: 'active',
+    endedAtDay: null,
+    endReason: null,
+    probation: createAppointmentProbation(0, cfg.probation),
+  };
 
   // 属性初始值从 constants.json.initialAttributes 读取
   const initAttrs = cfg.initialAttributes;
@@ -146,23 +165,7 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
       pendingContinuation: null,
     },
     career: {
-      appointment: {
-        appointmentId: initialAppointmentId,
-        positionId: initialPosition.id,
-        institutionId: initialPosition.institutionId,
-        regionId: initialPosition.regionId,
-        institutionLevel: initialPosition.institutionLevel,
-        positionDomain: initialPosition.positionDomain,
-        leadershipRank: initialPosition.leadershipRank,
-        startedAtDay: 0,
-        appointmentType: 'substantive',
-        appointmentReason: 'initial_assignment',
-        sourceOpportunityId: null,
-        status: 'active',
-        endedAtDay: null,
-        endReason: null,
-        probation: createAppointmentProbation(0, cfg.probation),
-      },
+      appointment: structuredClone(initialAppointment),
       civilServiceRank: 'clerk_2',
       civilServiceRankStartedAtDay: 0,
       civilServiceRankHistory: [],
@@ -196,6 +199,13 @@ export function createInitialState(overrides?: Partial<PlayerSave>): PlayerSave 
     governance: createDefaultGovernanceState(),
     events: createDefaultEventRuntimeState(),
     world: createDefaultWorldState(),
+    organization: createOrganizationState({
+      initializedAtDay: 0,
+      playerAppointment: initialAppointment,
+      cadreTemplates: loader.getCadreTemplates(),
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+    }),
     actions: {
       slots: {
         primary: {

@@ -26,6 +26,7 @@ import { deriveMetricSignalsFromEffects } from '../../engine/events/metric-signa
 import { settleCareerSelectionStage } from '../../engine/career/selection-settlement';
 import { processCascadeSignalsInTransaction } from './event-reducer';
 import { createRuntimeIdFactory } from '../runtime-id';
+import { transitionPlayerSeat } from '../transactions/organization-seat-transaction';
 
 export interface CareerOpportunityPayload {
   opportunityId: string;
@@ -205,6 +206,14 @@ function appointmentTransition(
     endReason: null,
     probation: null,
   };
+  if (
+    !transitionPlayerSeat(
+      transaction.organization,
+      previous.appointmentId,
+      transaction.career.appointment,
+    )
+  )
+    return false;
   transaction.career.experiences.push({
     id: experienceId,
     appointmentId,

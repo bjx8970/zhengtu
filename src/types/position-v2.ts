@@ -25,7 +25,7 @@ export interface PositionConfigV2 {
   leadershipRank: LeadershipRank;
   /** 内容阶段（仅用于难度和解锁，不是职业事实） */
   contentTier: number;
-  /** 编制空缺数 */
+  /** 模板席位容量（历史字段名）；运行时空缺必须读取 OrganizationState。 */
   vacancyCount: number;
   /** 任职条件（条件表达式树） */
   requirements: ConditionExpression[];
