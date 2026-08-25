@@ -2,6 +2,10 @@
 
 import type { CadreDepartureFact, CadreProfile, OrganizationState } from '../../types/organization';
 
+function departureId(cadreId: string, appointmentId: string | null, day: number): string {
+  return `departure:${cadreId}:${appointmentId ?? 'unassigned'}:${day}`;
+}
+
 /**
  * 原子关闭 NPC 当前任职、履历与 Seat，并建立供 Vacancy producer 消费的事实。
  *
@@ -41,7 +45,7 @@ export function closeNpcAppointment(
   seat.occupiedAtDay = null;
   seat.sourceTransitionId = appointment.appointmentId;
   return {
-    departureId: `departure:${cadre.cadreId}:${appointment.appointmentId}`,
+    departureId: departureId(cadre.cadreId, appointment.appointmentId, currentDay),
     cadreId: cadre.cadreId,
     appointmentId: appointment.appointmentId,
     experienceId: experience.id,
@@ -49,6 +53,37 @@ export function closeNpcAppointment(
     positionId: appointment.positionId,
     institutionId: appointment.institutionId,
     regionId: appointment.regionId,
+    occurredAtDay: currentDay,
+    reason,
+    sourceType: 'cadre_lifecycle',
+  };
+}
+
+/**
+ * 记录没有当前任职的 NPC 退出事实；该事实不会释放或伪造 Seat。
+ *
+ * @param cadre 待退出的干部
+ * @param currentDay 离任绝对日
+ * @param reason 离任原因
+ * @returns 不带任职引用的不可变生命周期事实
+ */
+export function recordUnassignedNpcDeparture(
+  cadre: CadreProfile,
+  currentDay: number,
+  reason: CadreDepartureFact['reason'],
+): CadreDepartureFact {
+  cadre.status = reason === 'retirement' ? 'retired' : 'exited';
+  cadre.exitedAtDay = currentDay;
+  cadre.exitReason = reason;
+  return {
+    departureId: departureId(cadre.cadreId, null, currentDay),
+    cadreId: cadre.cadreId,
+    appointmentId: null,
+    experienceId: null,
+    seatId: null,
+    positionId: null,
+    institutionId: null,
+    regionId: null,
     occurredAtDay: currentDay,
     reason,
     sourceType: 'cadre_lifecycle',

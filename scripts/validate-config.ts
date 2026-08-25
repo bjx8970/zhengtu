@@ -469,6 +469,59 @@ const ConstantsSchema = z.object({
     .refine((probation) => probation.extensionScoreThreshold <= probation.passScoreThreshold, {
       message: 'probation.extensionScoreThreshold 不能高于 passScoreThreshold',
     }),
+  npcLifecycle: z
+    .object({
+      annualAssessment: z
+        .object({
+          baseScore: z.number().min(0).max(100),
+          specialtyWeight: z.number().min(0),
+          tenureBonusPerYear: z.number().min(0),
+          historyWeight: z.number().min(0),
+          randomSpread: z.number().min(0),
+          excellentThreshold: z.number().min(0).max(100),
+          competentThreshold: z.number().min(0).max(100),
+          basicThreshold: z.number().min(0).max(100),
+        })
+        .refine(
+          (assessment) =>
+            assessment.excellentThreshold >= assessment.competentThreshold &&
+            assessment.competentThreshold >= assessment.basicThreshold,
+          { message: 'npcLifecycle 年度考核阈值必须按优秀 >= 称职 >= 基本称职排列' },
+        ),
+      rankProgression: z.object({
+        minAssessmentCount: z.number().int().nonnegative(),
+        minQualifiedAssessmentCount: z.number().int().nonnegative(),
+        minExcellentAssessmentCount: z.number().int().nonnegative(),
+        minDaysInRank: z.number().int().nonnegative(),
+        minServiceDays: z.number().int().nonnegative(),
+        blockedRestrictionTypes: z.array(
+          z.enum([
+            'rank_advancement_freeze',
+            'appointment_selection_freeze',
+            'disciplinary_action',
+          ]),
+        ),
+      }),
+      retirement: z.object({ minimumAge: z.number().int().min(1).max(120) }),
+      exit: z.object({ consecutiveFailureThreshold: z.number().int().min(1) }),
+    })
+    .superRefine((npc, ctx) => {
+      if (npc.rankProgression.minQualifiedAssessmentCount > npc.rankProgression.minAssessmentCount)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rankProgression', 'minQualifiedAssessmentCount'],
+          message: 'NPC 称职考核次数不能高于总考核次数',
+        });
+      if (
+        npc.rankProgression.minExcellentAssessmentCount >
+        npc.rankProgression.minQualifiedAssessmentCount
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['rankProgression', 'minExcellentAssessmentCount'],
+          message: 'NPC 优秀考核次数不能高于称职考核次数',
+        });
+    }),
 });
 
 const ExtremeActionSchema = z.object({

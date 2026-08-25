@@ -2140,7 +2140,7 @@ export function migrateSchema10TownshipChiefContent(
   // 30 天旧窗口会反过来阻止 270 天正式窗口恢复。迁移前已终结的记录仍参与去重，
   // 防止已经消费过的来源被再次开放。
   // Schema 10 尚无组织世界，但当前机会编排只认实际空席；先建立迁移日快照供
-  // 历史信号重放使用，最终 Schema 11 迁移会基于同一输入重新确定性落盘。
+  // 历史信号重放使用，最终 Schema 12 迁移会基于同一输入重新确定性落盘。
   state.organization = createMigrationOrganizationState(state, currentDay);
   restoreMissedTownshipChiefOpportunity(state, currentDay, replaceableOpportunityIds);
   migrated.contentVersion = '2026.08.6';
@@ -2187,13 +2187,13 @@ export function migrateSchema10RankQuotaContent(
 }
 
 /**
- * 将 Schema 10 存档迁移至 Schema 11。
+ * 将 Schema 10 存档迁移至当前 Schema 12（函数名保留以兼容既有调用方）。
  *
  * 旧存档没有可恢复的 NPC 历史，因此只在迁移日确定性建立配置干部池；不会
  * 伪造迁移日前的 NPC 考核或任职年限。玩家当前有效任职映射到唯一实际 Seat。
  *
  * @param prev 已完成 Schema 10 内容迁移的 SaveEnvelope
- * @returns 包含组织世界状态的 Schema 11 SaveEnvelope
+ * @returns 包含组织世界状态和离任账本的 Schema 12 SaveEnvelope
  */
 export function migrateSchema10To11(prev: Record<string, unknown>): Record<string, unknown> {
   if (prev.schemaVersion !== 10) return prev;
@@ -2224,7 +2224,9 @@ export function migrateSchema11To12(prev: Record<string, unknown>): Record<strin
   if (!state || !state.organization || typeof state.organization !== 'object')
     throw new Error('Schema 11 save is missing organization state');
   const organization = state.organization as Record<string, unknown>;
-  if (!Array.isArray(organization.departures)) organization.departures = [];
+  if (organization.departures === undefined) organization.departures = [];
+  else if (!Array.isArray(organization.departures))
+    throw new Error('Schema 11 organization departures must be an array');
   migrated.schemaVersion = 12;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
@@ -2235,8 +2237,9 @@ export function migrateSchema11To12(prev: Record<string, unknown>): Record<strin
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
- * - Schema 2–10：按版本顺序链式迁移至 Schema 11；
- * - 当前版本（Schema 11）：直接解码；
+ * - Schema 2–10：按版本顺序链式迁移至 Schema 12；
+ * - Schema 11：补齐离任事实账本后迁移至 Schema 12；
+ * - 当前版本（Schema 12）：直接解码；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据

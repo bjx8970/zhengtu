@@ -88,29 +88,61 @@ export function validateOrganizationInvariants(
       errors.push(`Cadre ${cadre.cadreId} has an appointment after exit`);
     if (cadre.status === 'active' && cadre.exitedAtDay !== null)
       errors.push(`Active cadre ${cadre.cadreId} has an exit day`);
+    if (cadre.status !== 'active' && cadre.exitedAtDay === null)
+      errors.push(`Exited cadre ${cadre.cadreId} is missing exit day`);
   }
   for (const departure of state.departures) {
-    if (departureAppointments.has(departure.appointmentId))
-      errors.push(`Duplicate departure appointment ${departure.appointmentId}`);
-    departureAppointments.add(departure.appointmentId);
+    if (departure.appointmentId !== null) {
+      if (departureAppointments.has(departure.appointmentId))
+        errors.push(`Duplicate departure appointment ${departure.appointmentId}`);
+      departureAppointments.add(departure.appointmentId);
+    }
     const cadre = cadres.get(departure.cadreId);
     if (!cadre) errors.push(`Departure ${departure.departureId} references unknown cadre`);
-    else if (
-      !cadre.experiences.some(
-        (experience) =>
-          experience.id === departure.experienceId &&
-          experience.appointmentId === departure.appointmentId &&
-          experience.endedAtDay === departure.occurredAtDay,
+    if (departure.appointmentId === null) {
+      if (departure.experienceId !== null || departure.seatId !== null)
+        errors.push(`Unassigned departure ${departure.departureId} has an appointment reference`);
+      if (
+        departure.positionId !== null ||
+        departure.institutionId !== null ||
+        departure.regionId !== null
       )
-    )
-      errors.push(`Departure ${departure.departureId} does not match a closed experience`);
-    const seat = seats.get(departure.seatId);
-    if (!seat) errors.push(`Departure ${departure.departureId} references unknown seat`);
+        errors.push(`Unassigned departure ${departure.departureId} has a Seat target`);
+    } else {
+      if (departure.experienceId === null || departure.seatId === null)
+        errors.push(`Seated departure ${departure.departureId} is missing an appointment target`);
+      else {
+        if (
+          !cadre?.experiences.some(
+            (experience) =>
+              experience.id === departure.experienceId &&
+              experience.appointmentId === departure.appointmentId &&
+              experience.endedAtDay === departure.occurredAtDay &&
+              experience.endReason === departure.reason,
+          )
+        )
+          errors.push(`Departure ${departure.departureId} does not match a closed experience`);
+        const seat = seats.get(departure.seatId);
+        if (!seat) errors.push(`Departure ${departure.departureId} references unknown seat`);
+        if (
+          seat &&
+          (seat.positionId !== departure.positionId ||
+            seat.institutionId !== departure.institutionId ||
+            seat.regionId !== departure.regionId)
+        )
+          errors.push(`Departure ${departure.departureId} target does not match its seat`);
+        if (seat?.occupant?.type === 'npc' && seat.occupant.id === departure.cadreId)
+          errors.push(`Departure ${departure.departureId} Seat is still occupied by the cadre`);
+      }
+    }
     if (
-      seat &&
-      (seat.positionId !== departure.positionId || seat.institutionId !== departure.institutionId)
+      cadre &&
+      cadre.currentAppointment?.appointmentId === departure.appointmentId &&
+      departure.appointmentId !== null
     )
-      errors.push(`Departure ${departure.departureId} target does not match its seat`);
+      errors.push(`Departure ${departure.departureId} still matches current appointment`);
+    if (cadre && cadre.exitedAtDay !== null && cadre.exitedAtDay < departure.occurredAtDay)
+      errors.push(`Departure ${departure.departureId} occurs after cadre exit day`);
   }
   for (const vacancy of state.vacancies) {
     const seat = seats.get(vacancy.seatId);

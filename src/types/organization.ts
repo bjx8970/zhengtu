@@ -109,12 +109,15 @@ export interface VacancyInstance {
 export interface CadreDepartureFact {
   departureId: string;
   cadreId: string;
-  appointmentId: string;
-  experienceId: string;
-  seatId: string;
-  positionId: string;
-  institutionId: string;
-  regionId: string;
+  /** 未任职退出时为空；此事实不产生 Vacancy。 */
+  appointmentId: string | null;
+  /** 未任职退出时为空。 */
+  experienceId: string | null;
+  /** 未任职退出时为空；消费者必须以此字段区分是否释放 Seat。 */
+  seatId: string | null;
+  positionId: string | null;
+  institutionId: string | null;
+  regionId: string | null;
   occurredAtDay: number;
   reason: 'retirement' | 'disciplinary_exit';
   sourceType: 'cadre_lifecycle';

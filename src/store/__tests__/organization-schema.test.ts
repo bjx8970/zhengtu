@@ -1,18 +1,19 @@
 /**
- * Schema 11 组织世界 round-trip、迁移与严格一致性测试。
+ * Schema 12 组织世界 round-trip、迁移与严格一致性测试。
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createInitialState } from '../game-store';
 import {
   decodeCurrentSave,
+  migrateSchema11To12,
   migrateSchema10To11,
   validatePlayerSave,
   wrapSaveEnvelope,
 } from '../save-codec';
 import { CURRENT_CONTENT_VERSION, CURRENT_SCHEMA_VERSION } from '../../types/save';
 
-describe('Schema 11 organization state', () => {
+describe('Schema 12 organization state', () => {
   beforeEach(() => localStorage.clear());
 
   it('严格 round-trip 保留所有稳定身份与引用', () => {
@@ -65,6 +66,27 @@ describe('Schema 11 organization state', () => {
     const result = decodeCurrentSave(JSON.stringify(legacy));
 
     expect(result).toMatchObject({ success: false, error: 'migration_failed' });
+  });
+
+  it('Schema 11 → 12 仅补缺失 departures，非数组字段明确失败', () => {
+    const state = createInitialState();
+    const organization = state.organization;
+    const withMissing = wrapSaveEnvelope({
+      ...state,
+      organization: { ...organization },
+    }) as unknown as Record<string, unknown>;
+    withMissing.schemaVersion = 11;
+    delete ((withMissing.state as Record<string, unknown>).organization as Record<string, unknown>)
+      .departures;
+    expect(migrateSchema11To12(withMissing)).toMatchObject({
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+    });
+
+    const malformed = structuredClone(withMissing);
+    (
+      (malformed.state as Record<string, unknown>).organization as Record<string, unknown>
+    ).departures = {};
+    expect(() => migrateSchema11To12(malformed)).toThrow(/departures must be an array/);
   });
 
   it('拒绝重复 Seat ID、双占用和 active Vacancy/Seat 冲突', () => {

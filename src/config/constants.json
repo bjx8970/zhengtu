@@ -181,7 +181,10 @@
     "rankProgression": {
       "minAssessmentCount": 1,
       "minQualifiedAssessmentCount": 1,
-      "minExcellentAssessmentCount": 0
+      "minExcellentAssessmentCount": 0,
+      "minDaysInRank": 360,
+      "minServiceDays": 360,
+      "blockedRestrictionTypes": ["rank_advancement_freeze", "disciplinary_action"]
     },
     "retirement": { "minimumAge": 65 },
     "exit": { "consecutiveFailureThreshold": 2 }

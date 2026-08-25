@@ -5,11 +5,10 @@
  * 同时返回可供统一信号管道消费的审计信号。它不读取 Store、配置单例或页面状态。
  */
 
-import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { CivilServiceRankProgressionRule } from '../../config/schemas';
 import type { NpcLifecycleConfig } from '../../types/config';
 import type { CadreProfile, OrganizationState } from '../../types/organization';
-import { closeNpcAppointment } from './npc-lifecycle-departure';
+import { closeNpcAppointment, recordUnassignedNpcDeparture } from './npc-lifecycle-departure';
 
 /** NPC 年度结算的全部显式依赖。 */
 export interface NpcLifecycleSettlementInput {
@@ -20,14 +19,17 @@ export interface NpcLifecycleSettlementInput {
   config: NpcLifecycleConfig;
   rankProgressionRules: readonly CivilServiceRankProgressionRule[];
   rng: () => number;
-  idFactory: () => string;
+  /** NPC 世界指标快照；用于消费 progression rule 的 quotaRequirement。 */
+  rankQuotaValues?: Readonly<Record<string, number>>;
 }
 
 /** NPC 年度结算结果，不包含任何 Store 副作用。 */
 export interface NpcLifecycleSettlementResult {
   organization: OrganizationState;
-  signals: DomainSignalSnapshot[];
   settledCadreIds: string[];
+  assessments: Array<{ cadreId: string; year: number; score: number; tier: string }>;
+  rankChanges: Array<{ cadreId: string; previousRank: string; currentRank: string }>;
+  quotaChanges: Array<{ metricId: string; consumedValue: number }>;
   departureIds: string[];
 }
 
@@ -56,14 +58,16 @@ function specialtyScore(cadre: CadreProfile): number {
  * 结算一个年度的 NPC 生命周期；同一年度调用必须由调用方以 producer key 去重。
  *
  * @param input 显式组织快照、结算日、配置、规则和 RNG
- * @returns 新组织快照、年度信号及离任事实
+ * @returns 新组织快照、年度审计结果及离任事实
  */
 export function settleNpcLifecycle(
   input: NpcLifecycleSettlementInput,
 ): NpcLifecycleSettlementResult {
   const organization = structuredClone(input.organization);
-  const signals: DomainSignalSnapshot[] = [];
   const settledCadreIds: string[] = [];
+  const assessments: NpcLifecycleSettlementResult['assessments'] = [];
+  const rankChanges: NpcLifecycleSettlementResult['rankChanges'] = [];
+  const quotaChanges: NpcLifecycleSettlementResult['quotaChanges'] = [];
   const departureIds: string[] = [];
   const assessmentConfig = input.config.annualAssessment;
   const rules = new Map(input.rankProgressionRules.map((rule) => [rule.fromRank, rule]));
@@ -96,12 +100,7 @@ export function settleNpcLifecycle(
     const openExperience = cadre.experiences.find((experience) => experience.endedAtDay === null);
     if (openExperience) openExperience.assessmentResults.push({ ...assessment });
     settledCadreIds.push(cadre.cadreId);
-    signals.push({
-      signalId: input.idFactory(),
-      signalType: 'assessment.completed',
-      occurredAtDay: input.currentDay,
-      data: { year: input.currentYear, score, tier },
-    });
+    assessments.push({ cadreId: cadre.cadreId, ...assessment });
 
     const rankRule = rules.get(cadre.civilServiceRank);
     const qualifiedCount = cadre.assessments.filter(
@@ -122,25 +121,34 @@ export function settleNpcLifecycle(
           rankRule.minExcellentAssessmentCount,
           input.config.rankProgression.minExcellentAssessmentCount,
         ) &&
-      input.currentDay - cadre.civilServiceRankStartedAtDay >= rankRule.minDaysInRank &&
-      serviceDays(cadre, input.currentDay) >= rankRule.minServiceDays
+      input.currentDay - cadre.civilServiceRankStartedAtDay >=
+        Math.max(rankRule.minDaysInRank, input.config.rankProgression.minDaysInRank) &&
+      serviceDays(cadre, input.currentDay) >=
+        Math.max(rankRule.minServiceDays, input.config.rankProgression.minServiceDays) &&
+      (rankRule.quotaRequirement === null ||
+        (input.rankQuotaValues?.[rankRule.quotaRequirement.metricId] ?? 0) >=
+          rankRule.quotaRequirement.requiredValue) &&
+      rankRule.additionalConditions.length === 0 &&
+      !cadre.restrictions.some(
+        (restriction) =>
+          input.config.rankProgression.blockedRestrictionTypes.includes(restriction.type) &&
+          restriction.startedAtDay <= input.currentDay &&
+          (restriction.endsAtDay === null || input.currentDay < restriction.endsAtDay),
+      )
     ) {
       const previousRank = cadre.civilServiceRank;
       cadre.civilServiceRank = rankRule.toRank;
       cadre.civilServiceRankStartedAtDay = input.currentDay;
-      signals.push({
-        signalId: input.idFactory(),
-        signalType: 'civil_service_rank.changed',
-        occurredAtDay: input.currentDay,
-        data: {
-          rankChangeId: `npc-rank:${cadre.cadreId}:${input.currentYear}`,
-          previousRank,
-          currentRank: rankRule.toRank,
-          reason: 'regular_advancement',
-          sourceType: 'system',
-          sourceId: `npc-annual:${input.currentYear}:${cadre.cadreId}`,
-        },
+      rankChanges.push({
+        cadreId: cadre.cadreId,
+        previousRank,
+        currentRank: rankRule.toRank,
       });
+      if (rankRule.quotaRequirement)
+        quotaChanges.push({
+          metricId: rankRule.quotaRequirement.metricId,
+          consumedValue: rankRule.quotaRequirement.consumeValue,
+        });
     }
 
     const age = input.currentYear - cadre.birthYear;
@@ -152,23 +160,20 @@ export function settleNpcLifecycle(
         : consecutiveFailures >= input.config.exit.consecutiveFailureThreshold
           ? 'disciplinary_exit'
           : null;
-    if (departureReason && cadre.currentAppointment) {
-      const departure = closeNpcAppointment(organization, cadre, input.currentDay, departureReason);
+    if (departureReason) {
+      const departure = cadre.currentAppointment
+        ? closeNpcAppointment(organization, cadre, input.currentDay, departureReason)
+        : recordUnassignedNpcDeparture(cadre, input.currentDay, departureReason);
       organization.departures.push(departure);
       departureIds.push(departure.departureId);
-      signals.push({
-        signalId: input.idFactory(),
-        signalType: 'appointment.changed',
-        occurredAtDay: input.currentDay,
-        data: {
-          experienceId: departure.experienceId,
-          positionId: departure.positionId,
-          institutionId: departure.institutionId,
-          regionId: departure.regionId,
-          previousPositionId: departure.positionId,
-        },
-      });
     }
   }
-  return { organization, signals, settledCadreIds, departureIds };
+  return {
+    organization,
+    settledCadreIds,
+    assessments,
+    rankChanges,
+    quotaChanges,
+    departureIds,
+  };
 }

@@ -331,6 +331,11 @@ export interface NpcLifecycleConfig {
     minAssessmentCount: number;
     minQualifiedAssessmentCount: number;
     minExcellentAssessmentCount: number;
+    /** NPC 独立资格规则使用的在级和服务年限门槛。 */
+    minDaysInRank: number;
+    minServiceDays: number;
+    /** NPC 不能在冻结或处分期间晋升。 */
+    blockedRestrictionTypes: CareerRestrictionType[];
   };
   retirement: {
     minimumAge: number;

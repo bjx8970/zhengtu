@@ -227,6 +227,9 @@ describe('domain signal production', () => {
       lastActionDay: 0,
       actionCooldownUntilDays: {},
     };
+    const npcAssessmentCounts = new Map(
+      state.organization.cadres.map((cadre) => [cadre.cadreId, cadre.assessments.length]),
+    );
     const store = createTestStore(state);
     let sequence = 0;
     const nextId = () => `assessment-signal-${sequence++}`;
@@ -247,6 +250,13 @@ describe('domain signal production', () => {
     });
     expect(blocked.time.pendingContinuation).not.toBeNull();
     expect(blocked.assessments.annualAssessments).toHaveLength(1);
+    // 年度 blocker 发生前，NPC 年度事实已完整写入；NPC assessment 不会伪造玩家信号。
+    for (const cadre of blocked.organization.cadres) {
+      expect(cadre.assessments.length).toBe((npcAssessmentCounts.get(cadre.cadreId) ?? 0) + 1);
+    }
+    expect(
+      blocked.events.pending.filter((item) => item.eventId === assessmentEvent.id),
+    ).toHaveLength(1);
     const budgetAfterSettlement = blocked.remainingBudget;
     expect(budgetAfterSettlement).toBeLessThan(10_000);
     if (!event) return;
@@ -268,6 +278,13 @@ describe('domain signal production', () => {
       config.monthsPerYear * config.daysPerMonth,
     );
     expect(store.getRawState().assessments.annualAssessments).toHaveLength(1);
+    expect(
+      store
+        .getRawState()
+        .organization.cadres.every(
+          (cadre) => cadre.assessments.length === (npcAssessmentCounts.get(cadre.cadreId) ?? 0) + 1,
+        ),
+    ).toBe(true);
     expect(store.getRawState().remainingBudget).toBe(budgetAfterSettlement);
     store.dispatch({ type: 'ADVANCE_TIME', granularity: 'day' });
     expect(store.getRawState().assessments.annualAssessments).toHaveLength(1);
