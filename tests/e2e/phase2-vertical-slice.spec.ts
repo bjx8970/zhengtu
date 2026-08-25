@@ -27,6 +27,13 @@ interface PositionFixture {
   annualBudget: number;
 }
 
+interface InstitutionFixture {
+  id: string;
+  name: string;
+  level: string;
+  regionId: string;
+}
+
 interface KpiFixture {
   targetValue: number;
   calcType: 'absolute' | 'inverse' | 'ratio';
@@ -35,6 +42,9 @@ interface KpiFixture {
 const positions = JSON.parse(
   readFileSync(resolve(process.cwd(), 'src/config/positions/positions.json'), 'utf8'),
 ) as PositionFixture[];
+const institutions = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'src/config/institutions/institutions.json'), 'utf8'),
+) as Record<string, InstitutionFixture>;
 const kpiTemplates = JSON.parse(
   readFileSync(resolve(process.cwd(), 'src/config/templates/kpis.json'), 'utf8'),
 ) as Record<string, KpiFixture>;
@@ -54,6 +64,68 @@ function position(id: string): PositionFixture {
   const target = positions.find((item) => item.id === id);
   if (!target) throw new Error(`Missing position definition: ${id}`);
   return target;
+}
+
+function seedPlayerOrganizationSeat(
+  state: JsonRecord,
+  target: PositionFixture,
+  appointment: JsonRecord,
+): void {
+  const organization = asRecord(state.organization, 'organization');
+  const seats = asRecords(organization.seats, 'organization seats');
+  const playerSeats = seats.filter((seat) => {
+    const occupant = seat.occupant;
+    return (
+      occupant !== null &&
+      typeof occupant === 'object' &&
+      !Array.isArray(occupant) &&
+      occupant.type === 'player'
+    );
+  });
+  if (playerSeats.length !== 1) throw new Error('Expected exactly one initialized player seat');
+  const previousSeat = playerSeats[0];
+  if (!previousSeat) throw new Error('Expected initialized player seat');
+  Object.assign(previousSeat, {
+    occupant: null,
+    currentAppointmentId: null,
+    occupiedAtDay: null,
+    sourceTransitionId: String(appointment.appointmentId),
+  });
+
+  const institution = institutions[target.institutionId];
+  if (!institution) throw new Error(`Missing institution definition: ${target.institutionId}`);
+  let targetSeat = seats.find((seat) => seat.positionId === target.id);
+  if (!targetSeat) {
+    targetSeat = {
+      seatId: `seat:${target.id}:1`,
+      positionId: target.id,
+      positionNameSnapshot: target.name,
+      institutionId: target.institutionId,
+      institutionNameSnapshot: institution.name,
+      regionId: target.regionId,
+      institutionLevel: target.institutionLevel,
+      positionDomain: target.positionDomain,
+      leadershipRank: target.leadershipRank,
+      occupant: null,
+      currentAppointmentId: null,
+      occupiedAtDay: null,
+      sourceTransitionId: null,
+    };
+    seats.push(targetSeat);
+  }
+  if (targetSeat.occupant !== null)
+    throw new Error(`Expected target organization seat ${target.id} to be vacant`);
+  if (typeof appointment.appointmentId !== 'string')
+    throw new Error('Expected stable player appointment ID');
+  if (typeof appointment.startedAtDay !== 'number')
+    throw new Error('Expected player appointment start day');
+  Object.assign(targetSeat, {
+    occupant: { type: 'player', id: 'player' },
+    currentAppointmentId: appointment.appointmentId,
+    occupiedAtDay: appointment.startedAtDay,
+    sourceTransitionId: appointment.appointmentId,
+  });
+  organization.seats = seats;
 }
 
 async function createCharacter(page: Page): Promise<void> {
@@ -196,6 +268,7 @@ function seedEconomicDevelopmentPost(state: JsonRecord): void {
     positionDomain: target.positionDomain,
     leadershipRank: target.leadershipRank,
   });
+  seedPlayerOrganizationSeat(state, target, appointment);
   const experience = asRecords(career.experiences, 'career experiences')[0];
   if (!experience) throw new Error('Expected initial career experience');
   Object.assign(experience, {

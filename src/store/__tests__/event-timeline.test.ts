@@ -11,6 +11,7 @@ import { getConfigLoader } from '../../config/loader';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { EventInstance } from '../../domain/events/state';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
+import { transitionPlayerSeat } from '../transactions/organization-seat-transaction';
 
 function makeSignal(signalId: string, occurredAtDay = 0): DomainSignalSnapshot {
   return {
@@ -157,6 +158,13 @@ describe('event timeline integration', () => {
       leadershipRank: leaderPosition.leadershipRank,
       probation: null,
     });
+    expect(
+      transitionPlayerSeat(
+        state.organization,
+        state.career.appointment.appointmentId,
+        state.career.appointment,
+      ),
+    ).toBe(true);
     const openExperience = state.career.experiences[0];
     expect(openExperience).toBeDefined();
     if (!openExperience) return;
@@ -301,6 +309,13 @@ describe('event timeline integration', () => {
       leadershipRank: leaderPosition.leadershipRank,
       probation: null,
     });
+    expect(
+      transitionPlayerSeat(
+        state.organization,
+        state.career.appointment.appointmentId,
+        state.career.appointment,
+      ),
+    ).toBe(true);
     const openExperience = state.career.experiences[0];
     expect(openExperience).toBeDefined();
     if (!openExperience) return;

@@ -28,6 +28,7 @@ import type {
 } from '../types/config';
 import type { PositionConfigV2, InstitutionConfig } from '../types/position-v2';
 import type { Phase3AcceptanceConfig } from '../types/phase3';
+import type { CadreTemplate } from '../types/organization';
 import type { CivilServiceRank, InstitutionLevel } from '../domain/career/types';
 import type { EventDefinition } from '../domain/events/definition';
 import type { DomainSignal } from '../domain/governance/types';
@@ -40,6 +41,8 @@ import {
   CareerOpportunityDefinitionArraySchema,
   CareerExperienceQualificationRulesSchema,
   PersonalTaskTemplateArraySchema,
+  CadreTemplateArraySchema,
+  validateCadreTemplateReferences,
 } from './schemas';
 import { EventDefinitionArraySchema } from '../domain/events/definition';
 import { PHASE3_ACCEPTANCE_CONFIG } from './phase3-acceptance';
@@ -59,6 +62,7 @@ import policiesData from './templates/policies.json' with { type: 'json' };
 import civilServiceRanksData from './career/civil-service-ranks.json' with { type: 'json' };
 import careerOpportunitiesData from './career/opportunities.json' with { type: 'json' };
 import experienceQualificationData from './career/experience-qualification.json' with { type: 'json' };
+import cadreTemplatesData from './organization/cadres.json' with { type: 'json' };
 
 type RawDeptMap = Record<string, DepartmentTemplate>;
 
@@ -81,6 +85,7 @@ const parsedExperienceQualificationRules = CareerExperienceQualificationRulesSch
   experienceQualificationData,
 );
 const parsedPersonalTasks = PersonalTaskTemplateArraySchema.parse(personalTasksData);
+const parsedCadreTemplates = CadreTemplateArraySchema.parse(cadreTemplatesData);
 const ALL_POSITIONS = parsedPositions;
 const ALL_INSTITUTIONS = parsedInstitutions;
 const ALL_EVENTS = parsedEvents;
@@ -101,6 +106,9 @@ function validatePersonalTaskReferences(tasks: readonly PersonalTaskTemplate[]):
 }
 
 validatePersonalTaskReferences(parsedPersonalTasks);
+
+const cadreReferenceErrors = validateCadreTemplateReferences(parsedCadreTemplates, ALL_POSITIONS);
+if (cadreReferenceErrors.length > 0) throw new Error(cadreReferenceErrors.join('; '));
 
 function validateCareerOpportunityReferences(
   definitions: readonly CareerOpportunityDefinition[],
@@ -145,6 +153,7 @@ class ConfigLoader {
   private careerOpportunities: CareerOpportunityDefinition[];
   private experienceQualificationRules: CareerExperienceQualificationRules;
   private personalTasks: PersonalTaskTemplate[];
+  private cadreTemplates: CadreTemplate[];
   private phase3AcceptanceConfig: Phase3AcceptanceConfig;
   private regionConfig: RegionConfig;
   private universityConfig: UniversityConfig;
@@ -172,6 +181,7 @@ class ConfigLoader {
     this.careerOpportunities = parsedCareerOpportunities;
     this.experienceQualificationRules = parsedExperienceQualificationRules;
     this.personalTasks = parsedPersonalTasks;
+    this.cadreTemplates = parsedCadreTemplates;
     this.phase3AcceptanceConfig = PHASE3_ACCEPTANCE_CONFIG;
     this.gameConfig = constantsData as unknown as GameConfig;
     this.regionConfig = regionData as unknown as RegionConfig;
@@ -253,6 +263,15 @@ class ConfigLoader {
   getPersonalTaskTemplate(taskId: string): PersonalTaskTemplate | null {
     const task = this.personalTasks.find((item) => item.id === taskId);
     return task ? structuredClone(task) : null;
+  }
+
+  /**
+   * 获取 Phase 4 初始 NPC 干部模板。
+   *
+   * @returns 不可污染全局配置的干部模板副本
+   */
+  getCadreTemplates(): CadreTemplate[] {
+    return this.cadreTemplates.map((template) => structuredClone(template));
   }
 
   /** 获取 Phase 3 验收配置的防御性副本。 */

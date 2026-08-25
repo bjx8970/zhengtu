@@ -21,6 +21,7 @@ import { EffectDefinitionSchema } from '../domain/conditions';
 import { DomainSignalSchema, PolicyCategorySchema } from '../domain/governance/types';
 import { PERSONAL_TASK_TYPES } from '../types/config';
 import { KPITier } from '../types/enums';
+import type { PositionConfigV2 } from '../types/position-v2';
 
 /** 机构配置 Schema */
 export const InstitutionConfigSchema = z
@@ -56,6 +57,62 @@ export const PositionConfigArraySchema = z.array(PositionConfigSchema);
 
 /** 机构配置字典 Schema */
 export const InstitutionConfigMapSchema = z.record(InstitutionConfigSchema);
+
+/** Phase 4 初始 NPC 干部模板 Schema。 */
+export const CadreTemplateSchema = z
+  .object({
+    cadreId: z.string().min(1),
+    name: z.string().min(1),
+    gender: z.enum(['男', '女']),
+    birthYear: z.number().int().min(1900),
+    civilServiceRank: z.enum(CIVIL_SERVICE_RANKS),
+    positionId: z.string().min(1),
+    initiallyUnassigned: z.boolean().optional(),
+    specialties: z.record(z.number().min(0).max(100)),
+  })
+  .strict();
+
+/** 有限相关干部池配置；加上玩家后总规模保持在 Phase 4 的 10–30 人边界。 */
+export const CadreTemplateArraySchema = z
+  .array(CadreTemplateSchema)
+  .min(9)
+  .max(29)
+  .superRefine((templates, ctx) => {
+    const ids = templates.map((template) => template.cadreId);
+    if (new Set(ids).size !== ids.length)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Cadre template IDs must be unique' });
+    const positions = templates.map((template) => template.positionId);
+    if (new Set(positions).size !== positions.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Initial cadre templates cannot share the same single-seat position',
+      });
+  });
+
+/**
+ * 校验初始干部模板对职位目录的引用。
+ *
+ * @param templates 已通过结构校验的干部模板
+ * @param positions 正式职位目录
+ * @returns 未知职位或无席位职位错误
+ */
+export function validateCadreTemplateReferences(
+  templates: readonly z.infer<typeof CadreTemplateSchema>[],
+  positions: readonly PositionConfigV2[],
+): string[] {
+  const catalog = new Map(positions.map((position) => [position.id, position]));
+  const errors: string[] = [];
+  for (const template of templates) {
+    const position = catalog.get(template.positionId);
+    if (!position)
+      errors.push(`Cadre ${template.cadreId} references unknown position ${template.positionId}`);
+    else if (position.vacancyCount < 1)
+      errors.push(
+        `Cadre ${template.cadreId} references position ${template.positionId} without a seat`,
+      );
+  }
+  return errors;
+}
 
 /**
  * 校验职位与机构的一致性。

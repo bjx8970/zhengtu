@@ -31,6 +31,7 @@ import policiesData from '../src/config/templates/policies.json' with { type: 'j
 import personalTasksData from '../src/config/templates/personal-tasks.json' with { type: 'json' };
 import careerOpportunitiesData from '../src/config/career/opportunities.json' with { type: 'json' };
 import civilServiceRanksData from '../src/config/career/civil-service-ranks.json' with { type: 'json' };
+import cadreTemplatesData from '../src/config/organization/cadres.json' with { type: 'json' };
 import { EventDefinitionArraySchema } from '../src/domain/events/definition';
 import type { EventDefinition } from '../src/domain/events/definition';
 import { validateEventDefinitions } from '../src/domain/events/validation';
@@ -46,6 +47,8 @@ import {
   PolicyDefinitionArraySchema,
   PositionConfigArraySchema,
   validatePositionInstitutionConsistency,
+  CadreTemplateArraySchema,
+  validateCadreTemplateReferences,
 } from '../src/config/schemas';
 import { validatePolicyEffectReferences } from '../src/config/policy-reference-validation';
 import { getConfigLoader } from '../src/config/loader';
@@ -53,6 +56,26 @@ import { auditPhase3Reachability } from '../src/config/phase3-reachability';
 
 const departments = { ...deptCore, ...deptExtra };
 const departmentsLookup = departments as Record<string, unknown>;
+let errors = 0;
+
+const parsedCadresResult = CadreTemplateArraySchema.safeParse(cadreTemplatesData);
+if (!parsedCadresResult.success) {
+  console.error('❌ cadres.json 未通过 CadreTemplateSchema 校验：');
+  for (const issue of parsedCadresResult.error.issues)
+    console.error(`   ${issue.path.join('.')}: ${issue.message}`);
+  errors++;
+} else {
+  const cadreErrors = validateCadreTemplateReferences(
+    parsedCadresResult.data,
+    PositionConfigArraySchema.parse(positionsData),
+  );
+  for (const error of cadreErrors) {
+    console.error(`❌ ${error}`);
+    errors++;
+  }
+  if (cadreErrors.length === 0)
+    console.log(`   ✅ Phase 4 初始干部模板: ${parsedCadresResult.data.length} NPC + 玩家`);
+}
 
 /** 所有职业线配置 */
 const ALL_CAREER_LINES: { id: string; name: string; data: typeof admin }[] = [
@@ -143,8 +166,6 @@ const LevelSchema = z.object({
     canBreakRules: z.boolean().optional(),
   }),
 });
-
-let errors = 0;
 
 function validateRecord<T>(
   label: string,

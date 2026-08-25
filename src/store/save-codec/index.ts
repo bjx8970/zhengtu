@@ -1,9 +1,9 @@
 /**
- * 存档严格解码器（Schema 10）
+ * 存档严格解码器（Schema 11）
  *
- * 只接受当前版本（Schema 10）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 11）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -47,6 +47,9 @@ import { getConfigLoader } from '../../config/loader';
 import { PersonalTaskTemplateSchema } from '../../config/schemas';
 import { processCareerOpportunitySignal } from '../../engine/career/opportunity-orchestrator';
 import { createActionExecutableSnapshot } from '../action-executable-snapshot';
+import { createOrganizationStateSchema } from './organization-schema';
+import { validateOrganizationInvariants } from '../../engine/organization/organization-invariants';
+import { createOrganizationState } from '../../engine/organization/organization-initialization';
 
 /** 不兼容存档备份的 localStorage key 前缀 */
 const BACKUP_KEY_PREFIX = 'zhengtu_incompatible_save';
@@ -204,6 +207,15 @@ const CurrentAppointmentSchema = z
     }
   });
 
+/** 履历考核记录 Schema。 */
+const CareerAssessmentRecordSchema = z
+  .object({
+    year: z.number(),
+    score: z.number(),
+    tier: z.string(),
+  })
+  .strict();
+
 /** CareerExperience Schema */
 const CareerExperienceSchema = z
   .object({
@@ -234,15 +246,7 @@ const CareerExperienceSchema = z
         'probation_failed',
       ])
       .nullable(),
-    assessmentResults: z.array(
-      z
-        .object({
-          year: z.number(),
-          score: z.number(),
-          tier: z.string(),
-        })
-        .strict(),
-    ),
+    assessmentResults: z.array(CareerAssessmentRecordSchema),
   })
   .strict();
 
@@ -458,6 +462,23 @@ const CareerProcessSchema = z
       });
   });
 
+/** 持久化职业限制 Schema。 */
+const CareerRestrictionSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.enum([
+      'rank_advancement_freeze',
+      'appointment_selection_freeze',
+      'disciplinary_action',
+    ]),
+    startedAtDay: z.number().int().nonnegative(),
+    endsAtDay: z.number().int().nullable(),
+    reason: z.string(),
+    sourceType: z.enum(['assessment', 'event', 'policy', 'system']),
+    sourceId: z.string().nullable(),
+  })
+  .strict();
+
 /** CareerState Schema */
 const CareerStateSchema = z
   .object({
@@ -478,23 +499,7 @@ const CareerStateSchema = z
         })
         .strict(),
     ),
-    restrictions: z.array(
-      z
-        .object({
-          id: z.string().min(1),
-          type: z.enum([
-            'rank_advancement_freeze',
-            'appointment_selection_freeze',
-            'disciplinary_action',
-          ]),
-          startedAtDay: z.number().int().nonnegative(),
-          endsAtDay: z.number().int().nullable(),
-          reason: z.string(),
-          sourceType: z.enum(['assessment', 'event', 'policy', 'system']),
-          sourceId: z.string().nullable(),
-        })
-        .strict(),
-    ),
+    restrictions: z.array(CareerRestrictionSchema),
     experiences: z.array(CareerExperienceSchema),
     specialties: z.record(z.number()),
     opportunities: z.array(CareerOpportunitySchema),
@@ -773,6 +778,13 @@ const WorldStateSchema = z
     ),
   })
   .strict();
+
+const OrganizationStateSchema = createOrganizationStateSchema({
+  currentAppointment: CurrentAppointmentSchema,
+  careerExperience: CareerExperienceSchema,
+  careerRestriction: CareerRestrictionSchema,
+  careerAssessmentRecord: CareerAssessmentRecordSchema,
+});
 
 /** 部门行动可执行快照 Schema */
 const DepartmentActionExecutableSnapshotSchema = z
@@ -1132,6 +1144,7 @@ const PlayerSaveSchema = z
     governance: GovernanceStateSchema,
     events: EventRuntimeStateSchema,
     world: WorldStateSchema,
+    organization: OrganizationStateSchema,
     actions: ActionRuntimeStateSchema,
     assessments: z
       .object({
@@ -1160,7 +1173,51 @@ const PlayerSaveSchema = z
     remainingBudget: z.number(),
     updatedAt: z.number(),
   })
-  .strict();
+  .strict()
+  .superRefine((save, ctx) => {
+    for (const error of validateOrganizationInvariants(save.organization, save.career.appointment))
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['organization'], message: error });
+    const loader = getConfigLoader();
+    for (const seat of save.organization.seats) {
+      const position = loader.getPositionById(seat.positionId);
+      const institution = loader.getInstitutionById(seat.institutionId);
+      if (!position)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['organization', 'seats'],
+          message: `Seat ${seat.seatId} references unknown position`,
+        });
+      else if (
+        seat.positionNameSnapshot !== position.name ||
+        seat.institutionId !== position.institutionId ||
+        seat.regionId !== position.regionId ||
+        seat.institutionLevel !== position.institutionLevel ||
+        seat.positionDomain !== position.positionDomain ||
+        seat.leadershipRank !== position.leadershipRank
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['organization', 'seats'],
+          message: `Seat ${seat.seatId} does not match its position catalog snapshot`,
+        });
+      if (!institution)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['organization', 'seats'],
+          message: `Seat ${seat.seatId} references unknown institution`,
+        });
+      else if (
+        seat.institutionNameSnapshot !== institution.name ||
+        seat.regionId !== institution.regionId ||
+        seat.institutionLevel !== institution.level
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['organization', 'seats'],
+          message: `Seat ${seat.seatId} does not match its institution catalog snapshot`,
+        });
+    }
+  });
 
 /** SaveEnvelope Schema（当前版本） */
 const SaveEnvelopeSchema = z
@@ -1985,6 +2042,23 @@ function restoreMissedTownshipChiefOpportunity(
   if (restored) typedState.career.opportunities.push(restored);
 }
 
+function createMigrationOrganizationState(
+  state: Record<string, unknown>,
+  initializedAtDay: number,
+) {
+  const career = state.career as Record<string, unknown> | undefined;
+  if (!career) throw new Error('Legacy save is missing career state for organization migration');
+  const appointment = CurrentAppointmentSchema.parse(career.appointment);
+  const loader = getConfigLoader();
+  return createOrganizationState({
+    initializedAtDay,
+    playerAppointment: appointment,
+    cadreTemplates: loader.getCadreTemplates(),
+    positions: loader.getAllPositions(),
+    institutions: loader.getAllInstitutions(),
+  });
+}
+
 /**
  * 取消旧版宽松正职机会并升级乡镇正职内容语义。
  *
@@ -2063,6 +2137,9 @@ export function migrateSchema10TownshipChiefContent(
   // 本轮刚取消的旧内容机会不能充当正式机会的去重凭据；否则同一考核源下的
   // 30 天旧窗口会反过来阻止 270 天正式窗口恢复。迁移前已终结的记录仍参与去重，
   // 防止已经消费过的来源被再次开放。
+  // Schema 10 尚无组织世界，但当前机会编排只认实际空席；先建立迁移日快照供
+  // 历史信号重放使用，最终 Schema 11 迁移会基于同一输入重新确定性落盘。
+  state.organization = createMigrationOrganizationState(state, currentDay);
   restoreMissedTownshipChiefOpportunity(state, currentDay, replaceableOpportunityIds);
   migrated.contentVersion = '2026.08.6';
   return migrated;
@@ -2108,12 +2185,41 @@ export function migrateSchema10RankQuotaContent(
 }
 
 /**
+ * 将 Schema 10 存档迁移至 Schema 11。
+ *
+ * 旧存档没有可恢复的 NPC 历史，因此只在迁移日确定性建立配置干部池；不会
+ * 伪造迁移日前的 NPC 考核或任职年限。玩家当前有效任职映射到唯一实际 Seat。
+ *
+ * @param prev 已完成 Schema 10 内容迁移的 SaveEnvelope
+ * @returns 包含组织世界状态的 Schema 11 SaveEnvelope
+ */
+export function migrateSchema10To11(prev: Record<string, unknown>): Record<string, unknown> {
+  if (prev.schemaVersion !== 10) return prev;
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  const career = state?.career as Record<string, unknown> | undefined;
+  const time = state?.time as Record<string, unknown> | undefined;
+  if (!state || !career || !time) throw new Error('Schema 10 save is missing migration state');
+  const initializedAtDay = time.totalDaysPlayed;
+  if (
+    typeof initializedAtDay !== 'number' ||
+    !Number.isInteger(initializedAtDay) ||
+    initializedAtDay < 0
+  )
+    throw new Error('Schema 10 save has invalid totalDaysPlayed');
+  state.organization = createMigrationOrganizationState(state, initializedAtDay);
+  migrated.schemaVersion = 11;
+  migrated.contentVersion = CURRENT_CONTENT_VERSION;
+  return migrated;
+}
+
+/**
  * 严格解码存档数据（已解析的对象）。
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
- * - Schema 2–9：按版本顺序链式迁移至 Schema 10；
- * - 当前版本（Schema 10）：直接解码；
+ * - Schema 2–10：按版本顺序链式迁移至 Schema 11；
+ * - 当前版本（Schema 11）：直接解码；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
@@ -2194,6 +2300,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     target = migrateSchema10TownshipGovernanceContent(target as Record<string, unknown>);
     target = migrateSchema10TownshipChiefContent(target as Record<string, unknown>);
     target = migrateSchema10Phase3ReleaseContent(target as Record<string, unknown>);
+    target = migrateSchema10To11(target as Record<string, unknown>);
   } catch (e) {
     return {
       success: false,

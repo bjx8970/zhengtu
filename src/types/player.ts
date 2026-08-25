@@ -1,5 +1,5 @@
 /**
- * 玩家存档类型定义（Schema 10）
+ * 玩家存档类型定义（Schema 11）
  *
  * PlayerSave 重构为正式子状态结构：
  * - character：角色基础信息和属性
@@ -8,6 +8,7 @@
  * - governance：政策与治理
  * - events：事件运行时
  * - world：世界状态
+ * - organization：NPC 干部、实际席位、动态空缺与世界级选拔
  * - actions：行动运行时（保留）
  * - assessments：考核（保留）
  *
@@ -21,6 +22,7 @@ import type { TimeGranularity } from './enums';
 import type { FiveDimensionScore, ActionRuntimeSnapshot } from './game';
 import type { ActionCategory, ActionTemplate, GameConfig, PersonalTaskTemplate } from './config';
 import type { CareerState } from '../domain/career/state';
+import type { OrganizationState } from './organization';
 import type { GovernanceState } from '../domain/governance/state';
 import type { EventRuntimeState } from '../domain/events/state';
 import type { WorldState } from '../domain/world-state';
@@ -254,7 +256,7 @@ export interface TimelineContinuation {
 // ===== 新版 PlayerSave =====
 
 /**
- * 玩家存档（Schema 10）
+ * 玩家存档（Schema 11）
  *
  * 重构为正式子状态结构，删除旧职业事实来源。
  */
@@ -271,6 +273,8 @@ export interface PlayerSave {
   events: EventRuntimeState;
   /** 世界状态 */
   world: WorldState;
+  /** NPC 干部、实际席位、动态空缺与世界级选拔。 */
+  organization: OrganizationState;
   /** 行动运行时 */
   actions: ActionRuntimeState;
   /** 考核 */

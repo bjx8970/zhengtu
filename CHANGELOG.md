@@ -6,6 +6,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- Phase 4 组织世界持久化底座：有限 NPC 干部档案、实际岗位席位、动态 Vacancy、世界级 StaffingSelection 与 producer 幂等键。
+- 配置驱动的 9 名初始 NPC 干部池（与玩家合计 10 人）、确定性 Seat 初始化、组织跨引用不变量和 ADR-009。
+
+### Changed
+
+- 玩家既有任职变更与试用期失败同步更新实际 Seat occupant，保持 CareerState 与组织世界原子一致。
+
+### Save compatibility
+
+- 存档 Schema 提升至 11，内容版本提升至 `2026.08.8`；Schema 10 存档在迁移日确定性建立组织世界，不伪造迁移日前的 NPC 考核或任职历史。
+
 ## [0.3.0-alpha.1] - 2026-08-23
 
 完成 Phase 3 基层纵向切片：从新录用科员自然运行至乡科级正职，并以产品级 Store、配置与浏览器验收锁定可达性。
