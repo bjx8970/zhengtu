@@ -54,6 +54,7 @@ import { commitPolicyTransitionInTransaction } from './policy-transition-transac
 import { expireCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
 import { evaluateProbation } from '../../engine/career/probation-evaluation';
 import { grantAnnualCivilServiceRankQuota } from '../../engine/career/rank-quota';
+import { settleNpcLifecycle } from '../../engine/organization/npc-lifecycle';
 
 /**
  * 结算当日行动与到期政策，再统一处理它们产生的领域信号。
@@ -197,7 +198,30 @@ export function processTimelineNodes(
         break;
       }
       case 'annual_assessment': {
-        const signals = processAnnualAssessment(draft, node.year, node.absoluteDay, idFactory);
+        const npcSignals: DomainSignalSnapshot[] = [];
+        const producerKey = `npc-annual:${node.year}`;
+        if (!draft.organization.processedProducerKeys.includes(producerKey)) {
+          const npcSettlement = settleNpcLifecycle({
+            organization: draft.organization,
+            currentDay: node.absoluteDay,
+            currentYear: node.year,
+            daysPerYear:
+              getConfigLoader().getGameConfig().daysPerMonth *
+              getConfigLoader().getGameConfig().monthsPerYear,
+            config: getConfigLoader().getGameConfig().npcLifecycle,
+            rankProgressionRules: getConfigLoader().getAllCivilServiceRankProgressionRules(),
+            rng,
+            idFactory,
+          });
+          draft.organization = npcSettlement.organization;
+          draft.organization.processedProducerKeys.push(producerKey);
+          npcSignals.push(...npcSettlement.signals);
+        }
+        // 玩家年度信号保持既有优先级；NPC 事实已经完整落盘，随后再消费其信号。
+        const signals = [
+          ...processAnnualAssessment(draft, node.year, node.absoluteDay, idFactory),
+          ...npcSignals,
+        ];
         processCascadeSignalsInTransaction(
           draft,
           signals,

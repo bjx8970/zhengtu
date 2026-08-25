@@ -150,7 +150,10 @@ export interface CareerExperience {
 
 /** 任职区间结束原因。 */
 export type AppointmentEndReason =
-  Exclude<AppointmentReason, 'initial_assignment'> | 'retirement' | 'probation_failed';
+  | Exclude<AppointmentReason, 'initial_assignment'>
+  | 'retirement'
+  | 'disciplinary_exit'
+  | 'probation_failed';
 
 /** 职业机会共享字段。 */
 export interface CareerOpportunityBase {

@@ -1,9 +1,9 @@
 /**
- * 存档严格解码器（Schema 11）
+ * 存档严格解码器（Schema 12）
  *
- * 只接受当前版本（Schema 11）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 12）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -161,6 +161,7 @@ const CurrentAppointmentSchema = z
         'secondment',
         'demotion',
         'retirement',
+        'disciplinary_exit',
         'probation_failed',
       ])
       .nullable(),
@@ -243,6 +244,7 @@ const CareerExperienceSchema = z
         'secondment',
         'demotion',
         'retirement',
+        'disciplinary_exit',
         'probation_failed',
       ])
       .nullable(),
@@ -2210,6 +2212,21 @@ export function migrateSchema10To11(prev: Record<string, unknown>): Record<strin
   state.organization = createMigrationOrganizationState(state, initializedAtDay);
   migrated.schemaVersion = 11;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
+  // 保持该公开迁移入口对旧调用方的“迁移到当前版本”语义。
+  return migrateSchema11To12(migrated);
+}
+
+/** 将 Schema 11 的组织世界升级为 Schema 12，并建立空的离任事实账本。 */
+export function migrateSchema11To12(prev: Record<string, unknown>): Record<string, unknown> {
+  if (prev.schemaVersion !== 11) return prev;
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  if (!state || !state.organization || typeof state.organization !== 'object')
+    throw new Error('Schema 11 save is missing organization state');
+  const organization = state.organization as Record<string, unknown>;
+  if (!Array.isArray(organization.departures)) organization.departures = [];
+  migrated.schemaVersion = 12;
+  migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
 
@@ -2301,6 +2318,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     target = migrateSchema10TownshipChiefContent(target as Record<string, unknown>);
     target = migrateSchema10Phase3ReleaseContent(target as Record<string, unknown>);
     target = migrateSchema10To11(target as Record<string, unknown>);
+    target = migrateSchema11To12(target as Record<string, unknown>);
   } catch (e) {
     return {
       success: false,

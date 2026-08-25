@@ -147,6 +147,7 @@ export function createOrganizationState(input: OrganizationInitializationInput):
     seats,
     vacancies: [],
     selections: [],
+    departures: [],
     processedProducerKeys: [],
   };
 }

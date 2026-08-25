@@ -315,6 +315,31 @@ export interface ProbationConfig {
   disqualifyingRestrictionTypes: CareerRestrictionType[];
 }
 
+/** NPC 年度生命周期配置。数值由内容包提供，Engine 不内置业务阈值。 */
+export interface NpcLifecycleConfig {
+  annualAssessment: {
+    baseScore: number;
+    specialtyWeight: number;
+    tenureBonusPerYear: number;
+    historyWeight: number;
+    randomSpread: number;
+    excellentThreshold: number;
+    competentThreshold: number;
+    basicThreshold: number;
+  };
+  rankProgression: {
+    minAssessmentCount: number;
+    minQualifiedAssessmentCount: number;
+    minExcellentAssessmentCount: number;
+  };
+  retirement: {
+    minimumAge: number;
+  };
+  exit: {
+    consecutiveFailureThreshold: number;
+  };
+}
+
 /** 全局游戏配置常量（从 constants.json 读取） */
 export interface GameConfig {
   slotTiers: SlotTiersConfig;
@@ -377,6 +402,8 @@ export interface GameConfig {
   promotion: PromotionConfig;
   /** 新录用公务员试用期生命周期配置。 */
   probation: ProbationConfig;
+  /** 有限 NPC 干部的年度生命周期规则。 */
+  npcLifecycle: NpcLifecycleConfig;
   /** 月度防汛风险自动变化参数 */
   floodRiskByMonth: { rainyMonths: number[]; monthlyRise: number; monthlyFall: number };
 }

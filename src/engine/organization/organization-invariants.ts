@@ -23,11 +23,13 @@ export function validateOrganizationInvariants(
   const seatIds = state.seats.map((seat) => seat.seatId);
   const vacancyIds = state.vacancies.map((vacancy) => vacancy.vacancyId);
   const selectionIds = state.selections.map((selection) => selection.selectionId);
+  const departureIds = state.departures.map((departure) => departure.departureId);
   for (const [label, ids] of [
     ['cadre', cadreIds],
     ['seat', seatIds],
     ['vacancy', vacancyIds],
     ['selection', selectionIds],
+    ['departure', departureIds],
   ] as const) {
     if (new Set(ids).size !== ids.length) errors.push(`Duplicate ${label} identity`);
   }
@@ -35,6 +37,7 @@ export function validateOrganizationInvariants(
   const cadres = new Map(state.cadres.map((cadre) => [cadre.cadreId, cadre]));
   const seats = new Map(state.seats.map((seat) => [seat.seatId, seat]));
   const vacancies = new Map(state.vacancies.map((vacancy) => [vacancy.vacancyId, vacancy]));
+  const departureAppointments = new Set<string>();
   const activeVacancySeats = new Set<string>();
   const playerSeats = state.seats.filter((seat) => seat.occupant?.type === 'player');
   if (playerAppointment.status === 'active' && playerSeats.length !== 1)
@@ -81,6 +84,33 @@ export function validateOrganizationInvariants(
     );
     if (cadre.currentAppointment !== null && occupiedSeats.length !== 1)
       errors.push(`Cadre ${cadre.cadreId} must occupy exactly one seat`);
+    if (cadre.status !== 'active' && cadre.currentAppointment !== null)
+      errors.push(`Cadre ${cadre.cadreId} has an appointment after exit`);
+    if (cadre.status === 'active' && cadre.exitedAtDay !== null)
+      errors.push(`Active cadre ${cadre.cadreId} has an exit day`);
+  }
+  for (const departure of state.departures) {
+    if (departureAppointments.has(departure.appointmentId))
+      errors.push(`Duplicate departure appointment ${departure.appointmentId}`);
+    departureAppointments.add(departure.appointmentId);
+    const cadre = cadres.get(departure.cadreId);
+    if (!cadre) errors.push(`Departure ${departure.departureId} references unknown cadre`);
+    else if (
+      !cadre.experiences.some(
+        (experience) =>
+          experience.id === departure.experienceId &&
+          experience.appointmentId === departure.appointmentId &&
+          experience.endedAtDay === departure.occurredAtDay,
+      )
+    )
+      errors.push(`Departure ${departure.departureId} does not match a closed experience`);
+    const seat = seats.get(departure.seatId);
+    if (!seat) errors.push(`Departure ${departure.departureId} references unknown seat`);
+    if (
+      seat &&
+      (seat.positionId !== departure.positionId || seat.institutionId !== departure.institutionId)
+    )
+      errors.push(`Departure ${departure.departureId} target does not match its seat`);
   }
   for (const vacancy of state.vacancies) {
     const seat = seats.get(vacancy.seatId);

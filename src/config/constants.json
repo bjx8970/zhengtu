@@ -167,6 +167,25 @@
     },
     "disqualifyingRestrictionTypes": ["disciplinary_action"]
   },
+  "npcLifecycle": {
+    "annualAssessment": {
+      "baseScore": 56,
+      "specialtyWeight": 0.38,
+      "tenureBonusPerYear": 1.2,
+      "historyWeight": 0.24,
+      "randomSpread": 5,
+      "excellentThreshold": 90,
+      "competentThreshold": 75,
+      "basicThreshold": 60
+    },
+    "rankProgression": {
+      "minAssessmentCount": 1,
+      "minQualifiedAssessmentCount": 1,
+      "minExcellentAssessmentCount": 0
+    },
+    "retirement": { "minimumAge": 65 },
+    "exit": { "consecutiveFailureThreshold": 2 }
+  },
   "initialPositionId": "admin_l1_0",
   "floodRiskByMonth": {
     "rainyMonths": [5, 6, 7, 8],

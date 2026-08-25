@@ -2,7 +2,7 @@
  * 玩家任职事实与组织 Seat 占用的原子事务辅助函数。
  *
  * Phase 4 后续 Vacancy 事务会扩展离任后的 producer；本模块先保证任何既有
- * 玩家任职变化都不会让 Schema 11 的 CareerState 与 Seat occupant 漂移。
+ * 玩家任职变化都不会让 Schema 12 的 CareerState 与 Seat occupant 漂移。
  */
 
 import type { CurrentAppointment } from '../../domain/career/state';
