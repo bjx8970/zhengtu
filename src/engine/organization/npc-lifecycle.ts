@@ -69,6 +69,9 @@ export function settleNpcLifecycle(
   const rankChanges: NpcLifecycleSettlementResult['rankChanges'] = [];
   const quotaChanges: NpcLifecycleSettlementResult['quotaChanges'] = [];
   const departureIds: string[] = [];
+  // 晋升按稳定 cadreId 串行结算；内部账本让同一年度后续干部看到前序消费。
+  // 浅拷贝保证 Engine 不会修改调用方传入的世界指标快照。
+  const remainingRankQuotaValues = { ...(input.rankQuotaValues ?? {}) };
   const assessmentConfig = input.config.annualAssessment;
   const rules = new Map(input.rankProgressionRules.map((rule) => [rule.fromRank, rule]));
 
@@ -126,8 +129,10 @@ export function settleNpcLifecycle(
       serviceDays(cadre, input.currentDay) >=
         Math.max(rankRule.minServiceDays, input.config.rankProgression.minServiceDays) &&
       (rankRule.quotaRequirement === null ||
-        (input.rankQuotaValues?.[rankRule.quotaRequirement.metricId] ?? 0) >=
-          rankRule.quotaRequirement.requiredValue) &&
+        ((remainingRankQuotaValues[rankRule.quotaRequirement.metricId] ?? 0) >=
+          rankRule.quotaRequirement.requiredValue &&
+          (remainingRankQuotaValues[rankRule.quotaRequirement.metricId] ?? 0) >=
+            rankRule.quotaRequirement.consumeValue)) &&
       rankRule.additionalConditions.length === 0 &&
       !cadre.restrictions.some(
         (restriction) =>
@@ -144,6 +149,10 @@ export function settleNpcLifecycle(
         previousRank,
         currentRank: rankRule.toRank,
       });
+      if (rankRule.quotaRequirement)
+        remainingRankQuotaValues[rankRule.quotaRequirement.metricId] =
+          (remainingRankQuotaValues[rankRule.quotaRequirement.metricId] ?? 0) -
+          rankRule.quotaRequirement.consumeValue;
       if (rankRule.quotaRequirement)
         quotaChanges.push({
           metricId: rankRule.quotaRequirement.metricId,

@@ -147,6 +147,54 @@ describe('settleNpcLifecycle', () => {
     ).toBe('clerk_1');
   });
 
+  it('同一年度共享职数时按 cadreId 稳定顺序只晋升一名 NPC', () => {
+    const state = createInitialState();
+    const first = state.organization.cadres.find(
+      (item) => item.currentAppointment && item.civilServiceRank === 'clerk_1',
+    );
+    if (!first) throw new Error('Expected assigned clerk_1 NPC');
+    first.civilServiceRankStartedAtDay = 0;
+    first.assessments.push({ year: 2011, score: 90, tier: '优秀' });
+    first.assessments.push({ year: 2012, score: 90, tier: '优秀' });
+    const second = structuredClone(first);
+    second.cadreId = `${first.cadreId}-z`;
+    second.name = `${first.name}（副本）`;
+    if (second.currentAppointment) {
+      second.currentAppointment = {
+        ...second.currentAppointment,
+        appointmentId: `${second.currentAppointment.appointmentId}-z`,
+      };
+    }
+    for (const experience of second.experiences) {
+      experience.id = `${experience.id}-z`;
+      experience.appointmentId = `${experience.appointmentId}-z`;
+    }
+    state.organization.cadres.push(second);
+    const loader = getConfigLoader();
+    const rankQuotaValues = { 'rank_quota.section_member_4': 1 };
+    const result = settleNpcLifecycle({
+      organization: state.organization,
+      currentDay: 1080,
+      currentYear: 2014,
+      daysPerYear: 360,
+      config: loader.getGameConfig().npcLifecycle,
+      rankProgressionRules: loader.getAllCivilServiceRankProgressionRules(),
+      rankQuotaValues,
+      rng: () => 0.5,
+    });
+
+    const changes = result.rankChanges.filter((change) => change.previousRank === 'clerk_1');
+    expect(changes).toHaveLength(1);
+    expect(changes[0]?.cadreId).toBe(first.cadreId);
+    expect(
+      result.organization.cadres.find((item) => item.cadreId === second.cadreId)?.civilServiceRank,
+    ).toBe('clerk_1');
+    expect(
+      result.quotaChanges.filter((change) => change.metricId === 'rank_quota.section_member_4'),
+    ).toEqual([{ metricId: 'rank_quota.section_member_4', consumedValue: 1 }]);
+    expect(rankQuotaValues).toEqual({ 'rank_quota.section_member_4': 1 });
+  });
+
   it('跨两年时间推进每年只结算一次 NPC 年度事实', () => {
     const first = settle();
     first.organization.processedProducerKeys.push('npc-annual:2012');
