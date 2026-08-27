@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 14,
+  "rulesVersion": "relative-selection-v1",
+  "eligibility": {
+    "minimumCivilServiceRank": "clerk_2",
+    "allowedLeadershipRanks": [
+      "none",
+      "township_deputy",
+      "township_chief",
+      "county_deputy",
+      "county_chief",
+      "prefecture_deputy",
+      "prefecture_chief",
+      "province_deputy",
+      "province_chief",
+      "national_deputy",
+      "national_chief"
+    ],
+    "minimumServiceDays": 0,
+    "excludedRestrictionTypes": ["disciplinary_action"]
+  },
+  "stages": [
+    {
+      "id": "eligibility_review",
+      "label": "资格审查",
+      "scoreWeights": { "assessment": 0.6, "service": 0.4 },
+      "randomWeight": 0,
+      "eliminationThreshold": 50,
+      "requiresUniqueWinner": false
+    },
+    {
+      "id": "democratic_recommendation",
+      "label": "民主推荐",
+      "scoreWeights": { "assessment": 0.45, "specialty": 0.35, "network": 0.2 },
+      "randomWeight": 10,
+      "eliminationThreshold": 45,
+      "requiresUniqueWinner": false
+    },
+    {
+      "id": "organization_inspection",
+      "label": "组织考察",
+      "scoreWeights": { "assessment": 0.4, "specialty": 0.35, "service": 0.25 },
+      "randomWeight": 8,
+      "eliminationThreshold": 45,
+      "requiresUniqueWinner": false
+    },
+    {
+      "id": "collective_decision",
+      "label": "集体决定",
+      "scoreWeights": { "assessment": 0.5, "integrity": 0.3, "specialty": 0.2 },
+      "randomWeight": 6,
+      "eliminationThreshold": 45,
+      "requiresUniqueWinner": false
+    },
+    {
+      "id": "public_notice",
+      "label": "公示",
+      "scoreWeights": { "assessment": 0.5, "integrity": 0.5 },
+      "randomWeight": 5,
+      "eliminationThreshold": 40,
+      "requiresUniqueWinner": false
+    },
+    {
+      "id": "appointment",
+      "label": "任职决定",
+      "scoreWeights": { "assessment": 0.45, "specialty": 0.3, "service": 0.25 },
+      "randomWeight": 4,
+      "eliminationThreshold": 40,
+      "requiresUniqueWinner": true
+    }
+  ]
+}

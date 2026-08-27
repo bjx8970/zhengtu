@@ -60,6 +60,25 @@ function createPhase3Game(store: TestStore): void {
   });
 }
 
+/** 为新相对选拔提供可审计且严格领先 NPC 的阶段事实。 */
+function configureRelativeSelectionFacts(store: TestStore): void {
+  const state = store.getRawState();
+  const experience = state.career.experiences.find((item) => item.endedAtDay === null);
+  if (!experience) throw new Error('Expected current career experience');
+  experience.assessmentResults = [
+    ...experience.assessmentResults,
+    { year: state.time.year, score: 100, tier: '优秀' },
+  ];
+  state.career.specialties = { public_management: 100 };
+  state.character.integrity = 100;
+  state.character.network = 100;
+  for (const cadre of state.organization.cadres) {
+    cadre.assessments = [{ year: state.time.year, score: 0, tier: '不称职' }];
+    cadre.specialties = { public_management: 0 };
+    cadre.restrictions = [];
+  }
+}
+
 function completeQualifiedClerkHalfYear(
   store: TestStore,
   targetDay: number,
@@ -314,6 +333,7 @@ describe('Phase 3 reachability foundation', () => {
     advanceToDay(store, acceptance.milestones.townshipDeputyAppointment.minDay, idFactory);
     const previousAppointment = structuredClone(store.getRawState().career.appointment);
     const previousRank = store.getRawState().career.civilServiceRank;
+    configureRelativeSelectionFacts(store);
     store.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
       opportunityId: opportunity.id,
@@ -429,6 +449,7 @@ describe('Phase 3 reachability foundation', () => {
     expect(deputyOpportunity.appearedAtDay).toBe(days.townshipDeputyOpportunity);
 
     advanceToDay(store, days.townshipDeputyAppointment, idFactory);
+    configureRelativeSelectionFacts(store);
     completeSelection(store, deputyOpportunity.id, idFactory);
     expect(store.getRawState().career.appointment.positionId).toBe(
       acceptance.stagePositionIds.townshipDeputy,
@@ -497,6 +518,7 @@ describe('Phase 3 reachability foundation', () => {
     expect(store.getRawState().remainingBudget).toBeGreaterThanOrEqual(0);
 
     advanceToDay(store, days.townshipChiefAppointment, idFactory);
+    configureRelativeSelectionFacts(store);
     const rankBefore = store.getRawState().career.civilServiceRank;
     completeSelection(store, chiefOpportunity.id, idFactory);
     const completed = store.getRawState();

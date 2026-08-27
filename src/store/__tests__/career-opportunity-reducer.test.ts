@@ -102,6 +102,35 @@ function addTestVacancy(state: PlayerSave, opportunity: AppointmentCareerOpportu
   state.organization.vacancies.push(vacancy);
 }
 
+/** 为相对选拔测试显式冻结玩家高分、NPC 低分事实，避免依赖旧单候选语义。 */
+function configureRelativeScores(state: PlayerSave): void {
+  const experience = state.career.experiences.find((item) => item.endedAtDay === null);
+  if (!experience) throw new Error('Expected an open player career experience');
+  experience.assessmentResults = [{ year: 2026, score: 100, tier: '优秀' }];
+  state.career.specialties = { public_management: 100 };
+  for (const [index, cadre] of state.organization.cadres.entries()) {
+    cadre.assessments = [{ year: 2026, score: 0, tier: '不称职' }];
+    cadre.specialties = { public_management: 0 };
+    cadre.restrictions = [];
+    if (cadre.status === 'active') cadre.civilServiceRankStartedAtDay = index;
+  }
+}
+
+function makeAllCandidatesIneligible(state: PlayerSave, day: number): void {
+  const restriction = {
+    id: 'test-disciplinary-freeze',
+    type: 'disciplinary_action' as const,
+    startedAtDay: day,
+    endsAtDay: null,
+    reason: 'test',
+    sourceType: 'system' as const,
+    sourceId: null,
+  };
+  state.career.restrictions = [structuredClone(restriction)];
+  for (const cadre of state.organization.cadres)
+    cadre.restrictions = [structuredClone(restriction)];
+}
+
 function createTrainingOpportunity(id = 'training-opportunity-1'): TrainingCareerOpportunity {
   return {
     id,
@@ -200,6 +229,7 @@ describe('career opportunity reducer', () => {
     opportunity.sourceSignal.occurredAtDay = 350;
     initial.career.opportunities = [opportunity];
     addTestVacancy(initial, opportunity);
+    configureRelativeScores(initial);
     const store = createTestStore(initial);
     let sequence = 0;
     const ids = () => `id-${++sequence}`;
@@ -460,6 +490,7 @@ describe('career opportunity reducer', () => {
     const clear = createInitialState();
     clear.career.opportunities = [opportunity];
     addTestVacancy(clear, opportunity);
+    configureRelativeScores(clear);
     const finalStore = createTestStore(clear);
     finalStore.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
@@ -479,46 +510,56 @@ describe('career opportunity reducer', () => {
         _rng: () => 0,
       });
     expect(finalStore.getRawState().career.activeProcess?.currentStage).toBe('appointment');
-    const before = structuredClone(finalStore.getRawState());
     finalStore.dispatch({
       type: 'ADVANCE_CAREER_PROCESS',
       opportunityId: opportunity.id,
       _rng: () => 0,
     });
+    expect(finalStore.getRawState().organization.selections[0]?.status).toBe('completed');
+    expect(finalStore.getRawState().career.activeProcess?.status).toBe('active');
+    const before = structuredClone(finalStore.getRawState());
+    finalStore.dispatch({
+      type: 'ADVANCE_CAREER_PROCESS',
+      opportunityId: opportunity.id,
+      _rng: () => {
+        throw new Error('blocked continuation must not redraw RNG');
+      },
+    });
     expect(finalStore.getRawState()).toEqual(before);
   });
 
-  it('archives a failed process when eligibility review no longer passes', () => {
+  it('archives a failed process when the frozen relative pool has no qualified candidates', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();
     opportunity.eligibilityConditions = [{ worldMetric: 'selection_ready', op: 'gte', value: 1 }];
     initial.world.metrics.selection_ready = 1;
     initial.career.opportunities = [opportunity];
     addTestVacancy(initial, opportunity);
+    makeAllCandidatesIneligible(initial, 0);
     const acceptedStore = createTestStore(initial);
     acceptedStore.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
       opportunityId: opportunity.id,
       _idFactory: () => 'selection-process',
     });
-    const changed = structuredClone(acceptedStore.getRawState());
-    changed.world.metrics.selection_ready = 0;
-    const store = createTestStore(changed);
-
-    store.dispatch({ type: 'ADVANCE_CAREER_PROCESS', opportunityId: opportunity.id });
-
-    expect(store.getRawState().career.activeProcess).toBeNull();
-    expect(store.getRawState().career.opportunities[0]).toMatchObject({
+    const state = acceptedStore.getRawState();
+    expect(state.career.activeProcess).toBeNull();
+    expect(state.career.opportunities[0]).toMatchObject({
       status: 'resolved',
       finalOutcome: 'not_selected',
     });
-    expect(store.getRawState().career.completedProcesses.at(-1)).toMatchObject({
+    expect(state.career.completedProcesses.at(-1)).toMatchObject({
       status: 'failed',
-      stageResults: [{ stage: 'eligibility_review', outcome: 'failed' }],
+      failure: { code: 'no_qualified_candidates', stage: null },
     });
-    expect(store.getRawState().organization.vacancies[0]).toMatchObject({
+    expect(state.organization.selections[0]).toMatchObject({
+      status: 'failed',
+      failure: { code: 'no_qualified_candidates', stage: null },
+    });
+    expect(state.organization.vacancies[0]).toMatchObject({
       vacancyId: opportunity.vacancyId,
       status: 'open',
+      selectionId: null,
     });
   });
 
@@ -528,6 +569,7 @@ describe('career opportunity reducer', () => {
     opportunity.expiresAtDay = 1;
     initial.career.opportunities = [opportunity];
     addTestVacancy(initial, opportunity);
+    configureRelativeScores(initial);
     const beforeDeadline = createTestStore(initial);
     let sequence = 0;
     const ids = () => `deadline-id-${sequence++}`;
@@ -566,6 +608,7 @@ describe('career opportunity reducer', () => {
     const opportunity = createAvailableOpportunity();
     initial.career.opportunities = [opportunity];
     addTestVacancy(initial, opportunity);
+    configureRelativeScores(initial);
     const store = createTestStore(initial);
     store.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
@@ -583,16 +626,22 @@ describe('career opportunity reducer', () => {
         _rng: () => 0,
       });
     expect(blockedStore.getRawState().career.activeProcess?.currentStage).toBe('appointment');
+    blockedStore.dispatch({
+      type: 'ADVANCE_CAREER_PROCESS',
+      opportunityId: opportunity.id,
+      _idFactory: () => 'unused-id',
+      _rng: () => 0,
+    });
+    expect(blockedStore.getRawState().organization.selections[0]?.status).toBe('completed');
     const before = structuredClone(blockedStore.getRawState());
-
-    expect(() =>
-      blockedStore.dispatch({
-        type: 'ADVANCE_CAREER_PROCESS',
-        opportunityId: opportunity.id,
-        _idFactory: () => 'unused-id',
-        _rng: () => 0,
-      }),
-    ).not.toThrow();
+    blockedStore.dispatch({
+      type: 'ADVANCE_CAREER_PROCESS',
+      opportunityId: opportunity.id,
+      _idFactory: () => 'unused-id',
+      _rng: () => {
+        throw new Error('blocked continuation must not redraw RNG');
+      },
+    });
     expect(blockedStore.getRawState()).toEqual(before);
   });
 
@@ -601,6 +650,7 @@ describe('career opportunity reducer', () => {
     const opportunity = createAvailableOpportunity();
     initial.career.opportunities = [opportunity];
     addTestVacancy(initial, opportunity);
+    configureRelativeScores(initial);
     const store = createTestStore(initial);
     store.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
@@ -637,6 +687,7 @@ describe('career opportunity reducer', () => {
     const opportunity = createAvailableOpportunity();
     initial.career.opportunities = [opportunity];
     addTestVacancy(initial, opportunity);
+    configureRelativeScores(initial);
     const store = createTestStore(initial);
     store.dispatch({ type: 'ACCEPT_CAREER_OPPORTUNITY', opportunityId: opportunity.id });
 

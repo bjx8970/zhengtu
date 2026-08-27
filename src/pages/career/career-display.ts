@@ -5,7 +5,11 @@
  * 不参与资格判断或状态变更。
  */
 
-import type { CareerProcessStage } from '../../domain/career/state';
+import {
+  type CareerProcessStage,
+  type RelativeSelectionStage,
+  type SelectionFailure,
+} from '../../domain/career/state';
 import type { CareerOpportunityStatus, CareerRestrictionType } from '../../domain/career/types';
 import type {
   CareerOpportunityEligibilityFailure,
@@ -48,7 +52,7 @@ const PROCESS_STAGE_LABELS: Record<CareerProcessStage, string> = {
   organization_inspection: '组织考察',
   collective_decision: '集体决定',
   public_notice: '公示',
-  appointment: '任职',
+  appointment: '任职决定',
   probation: '试用',
   finalization: '完成',
 };
@@ -93,6 +97,30 @@ const OPPORTUNITY_ELIGIBILITY_FAILURE_LABELS: Record<CareerOpportunityEligibilit
     target_conditions: '未满足目标岗位任职条件',
   };
 
+/** 固定相对选拔六阶段的中文名称。 */
+export const RELATIVE_SELECTION_STAGE_LABELS: Record<RelativeSelectionStage, string> = {
+  eligibility_review: '资格审查',
+  democratic_recommendation: '民主推荐',
+  organization_inspection: '组织考察',
+  collective_decision: '集体决定',
+  public_notice: '公示',
+  appointment: '任职决定',
+};
+
+const SELECTION_OUTCOME_LABELS = {
+  in_progress: '选拔进行中',
+  appointed: '获选',
+  not_selected: '落选',
+  no_candidates: '无合格候选人',
+  selection_failed: '选拔失败',
+} as const;
+
+const SELECTION_FAILURE_LABELS: Record<SelectionFailure['code'], string> = {
+  no_qualified_candidates: '没有符合资格的候选人',
+  stage_no_survivors: '本阶段没有幸存候选人',
+  no_unique_winner: '最高分候选人并列，无法产生唯一赢家',
+};
+
 /**
  * @param regionId 稳定地区标识
  * @returns 适合界面显示的地区名称；未知标识保留原值以便排查配置。
@@ -125,6 +153,31 @@ export function formatOpportunitySource(
  */
 export function formatCareerProcessStage(stage: CareerProcessStage): string {
   return PROCESS_STAGE_LABELS[stage];
+}
+
+/**
+ * @param stage 固定相对选拔阶段
+ * @returns 阶段中文名称
+ */
+export function formatRelativeSelectionStage(stage: RelativeSelectionStage): string {
+  return RELATIVE_SELECTION_STAGE_LABELS[stage] ?? stage;
+}
+
+/**
+ * @param outcome 相对选拔结果字面量
+ * @returns 结果中文名称
+ */
+export function formatSelectionOutcome(outcome: keyof typeof SELECTION_OUTCOME_LABELS): string {
+  return SELECTION_OUTCOME_LABELS[outcome] ?? outcome;
+}
+
+/**
+ * @param failure 结构化选拔失败原因
+ * @returns 失败原因中文名称；空值返回空字符串
+ */
+export function formatSelectionFailure(failure: SelectionFailure | null | undefined): string {
+  if (!failure) return '';
+  return SELECTION_FAILURE_LABELS[failure.code] ?? failure.detail;
 }
 
 /**

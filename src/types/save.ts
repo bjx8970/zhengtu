@@ -4,7 +4,8 @@
  * 存档外层封装和严格解码基础设施。
  * SaveEnvelope 包裹 PlayerSave，提供 schema 版本追踪和不兼容拒绝能力。
  *
- * Schema 13：当前版本，新增 Vacancy 终态审计字段及 CareerOpportunity vacancyId。
+ * Schema 14：当前版本，冻结相对选拔候选、阶段审计及 CareerProcess 引用。
+ * Schema 13：新增 Vacancy 终态审计字段及 CareerOpportunity vacancyId。
  * Schema 12：新增 NPC 离任事实账本。
  * Schema 10：新增个人任务制运行时状态（actions.personalTasks）。
  * Schema 9：试用期生命周期与评估审计。
@@ -16,7 +17,7 @@
 import type { PlayerSave } from './player';
 
 /** 当前存档 Schema 版本号，每次不兼容变更递增 */
-export const CURRENT_SCHEMA_VERSION = 13;
+export const CURRENT_SCHEMA_VERSION = 14;
 
 /** 受支持可迁移的最低 Schema 版本（低于此版本拒绝） */
 export const MIN_MIGRATABLE_SCHEMA_VERSION = 2;

@@ -35,6 +35,8 @@ import {
 import { POLICY_STATUSES, DOMAIN_SIGNALS } from '../../domain/governance/types';
 import { EVENT_PRIORITIES, EVENT_PRESENTATIONS } from '../../domain/events/types';
 import { EFFECT_TARGET_DISCRIMINANTS } from '../../domain/conditions';
+import { createRelativeSelection } from '../../engine/career/relative-selection-lifecycle';
+import type { SelectionCandidateInput } from '../../types/organization';
 
 function wrapLegacySchema10(state: ReturnType<typeof createInitialState>, contentVersion: string) {
   const legacyState = structuredClone(state);
@@ -124,6 +126,45 @@ describe('Schema 2 存档', () => {
   it('active career opportunity and selection process survive a save/load round trip', () => {
     const state = createInitialState();
     state.time.totalDaysPlayed = 12;
+    const vacancy = state.organization.vacancies.find((item) => item.status === 'open');
+    if (!vacancy) throw new Error('Expected an open Vacancy');
+    const candidate: SelectionCandidateInput = {
+      candidateId: 'player',
+      candidateType: 'player',
+      currentPositionId: state.career.appointment.positionId,
+      institutionId: state.career.appointment.institutionId,
+      regionId: state.career.appointment.regionId,
+      leadershipRank: state.career.appointment.leadershipRank,
+      civilServiceRank: state.career.civilServiceRank,
+      appointmentStartedAtDay: state.career.appointment.startedAtDay,
+      serviceStartedAtDay: 0,
+      assessments: [],
+      specialties: { public_management: 80 },
+      restrictionTypes: [],
+      scoringInputs: { assessment: 90, specialty: 80, service: 50, network: 50, integrity: 80 },
+    };
+    const selectionCreated = createRelativeSelection({
+      selectionId: 'selection-world-1',
+      vacancyId: vacancy.vacancyId,
+      startedAtDay: 10,
+      candidates: [candidate],
+      rules: getConfigLoader().getRelativeSelectionConfig(),
+      randomDraws: Array(6).fill(0.5),
+      playerCareerProcessId: 'selection-process',
+    });
+    if (!selectionCreated.success) throw new Error('Expected Selection fixture');
+    const firstStage = {
+      stage: 'eligibility_review' as const,
+      resolvedAtDay: 11,
+      candidates: [{ candidateId: 'player', score: 74, rank: 1, eliminated: false }],
+      survivingCandidateIds: ['player'],
+    };
+    selectionCreated.selection.stageResults = [firstStage];
+    selectionCreated.selection.stageAudits = [{ ...firstStage, detail: '资格审查通过' }];
+    selectionCreated.selection.currentStage = 'democratic_recommendation';
+    state.organization.selections = [selectionCreated.selection];
+    vacancy.status = 'selecting';
+    vacancy.selectionId = selectionCreated.selection.selectionId;
     state.career.opportunities = [
       {
         id: 'selection-opportunity',
@@ -142,7 +183,7 @@ describe('Schema 2 存档', () => {
           occurredAtDay: 10,
           data: { year: 2026, score: 85, tier: '称职' },
         },
-        vacancyId: null,
+        vacancyId: vacancy.vacancyId,
         target: {
           positionId: 'admin_l2_0',
           positionName: '副镇长',
@@ -182,8 +223,14 @@ describe('Schema 2 存档', () => {
           outcome: 'passed',
           score: 90,
           detail: '资格审查通过',
+          candidateResults: [{ candidateId: 'player', score: 74, rank: 1, eliminated: false }],
+          survivingCandidateIds: ['player'],
         },
       ],
+      selectionId: 'selection-world-1',
+      vacancyId: vacancy.vacancyId,
+      winnerId: null,
+      failure: null,
     };
 
     const result = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(state)));
@@ -199,6 +246,33 @@ describe('Schema 2 存档', () => {
       currentStage: 'democratic_recommendation',
       stageResults: [{ stage: 'eligibility_review', outcome: 'passed' }],
     });
+
+    const invalidCollection = structuredClone(state);
+    const invalidCollectionSelection = invalidCollection.organization.selections[0];
+    if (!invalidCollectionSelection) throw new Error('Expected Selection fixture');
+    invalidCollectionSelection.stageResults = [
+      {
+        ...firstStage,
+        candidates: [],
+        survivingCandidateIds: [],
+      },
+    ];
+    expect(decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(invalidCollection))).success).toBe(
+      false,
+    );
+
+    const invalidSurvivors = structuredClone(state);
+    const invalidSurvivorsSelection = invalidSurvivors.organization.selections[0];
+    if (!invalidSurvivorsSelection) throw new Error('Expected Selection fixture');
+    invalidSurvivorsSelection.stageResults = [
+      {
+        ...firstStage,
+        survivingCandidateIds: [],
+      },
+    ];
+    expect(decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(invalidSurvivors))).success).toBe(
+      false,
+    );
   });
 
   it('Schema 6 非空时间轴 continuation 可完整往返', () => {
@@ -619,9 +693,12 @@ describe('Schema 2 存档', () => {
       stageResults: [],
     };
     const result = decodeCurrentSave(
-      JSON.stringify({ ...wrapSaveEnvelope(state), contentVersion: '2026.08.3' }),
+      JSON.stringify({
+        ...wrapSaveEnvelope(state),
+        schemaVersion: 10,
+        contentVersion: '2026.08.3',
+      }),
     );
-
     expect(result.success).toBe(true);
     expect(result.state?.career.opportunities[0]).toMatchObject({
       status: 'cancelled',

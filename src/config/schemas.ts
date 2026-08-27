@@ -22,6 +22,7 @@ import { DomainSignalSchema, PolicyCategorySchema } from '../domain/governance/t
 import { PERSONAL_TASK_TYPES } from '../types/config';
 import { KPITier } from '../types/enums';
 import type { PositionConfigV2 } from '../types/position-v2';
+import { RELATIVE_SELECTION_STAGES } from '../domain/career/state';
 
 /** 机构配置 Schema */
 export const InstitutionConfigSchema = z
@@ -422,6 +423,53 @@ export const CareerOpportunityDefinitionArraySchema = z
         });
     }
   });
+
+/** Relative-selection stage rules Schema (the six-stage order is immutable). */
+export const RelativeSelectionConfigSchema = z
+  .object({
+    schemaVersion: z.literal(14),
+    rulesVersion: z.string().min(1),
+    eligibility: z
+      .object({
+        minimumCivilServiceRank: CivilServiceRankSchema,
+        allowedLeadershipRanks: z.array(LeadershipRankSchema).min(1),
+        minimumServiceDays: z.number().int().nonnegative(),
+        excludedRestrictionTypes: z.array(z.string().min(1)),
+      })
+      .strict(),
+    stages: z
+      .array(
+        z
+          .object({
+            id: z.enum(RELATIVE_SELECTION_STAGES),
+            label: z.string().min(1),
+            scoreWeights: z.record(z.number().finite()),
+            randomWeight: z.number().nonnegative(),
+            eliminationThreshold: z.number().min(0).max(100),
+            requiresUniqueWinner: z.boolean(),
+          })
+          .strict(),
+      )
+      .length(RELATIVE_SELECTION_STAGES.length)
+      .superRefine((stages, ctx) => {
+        const ids = stages.map((stage) => stage.id);
+        if (ids.some((id, index) => id !== RELATIVE_SELECTION_STAGES[index]))
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Relative-selection stages must use the fixed six-stage order',
+          });
+        stages.forEach((stage, index) => {
+          const expected = index === RELATIVE_SELECTION_STAGES.length - 1;
+          if (stage.requiresUniqueWinner !== expected)
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['stages', index, 'requiresUniqueWinner'],
+              message: 'Only the final relative-selection stage may require a unique winner',
+            });
+        });
+      }),
+  })
+  .strict();
 
 // ===== 个人任务配置 Schema =====
 

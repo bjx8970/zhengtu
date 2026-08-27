@@ -11,12 +11,19 @@ import type {
   CareerRestriction,
   CurrentAppointment,
 } from '../domain/career/state';
+import type { RelativeSelectionConfig } from './config';
 import type {
   CivilServiceRank,
   InstitutionLevel,
   LeadershipRank,
   PositionDomain,
 } from '../domain/career/types';
+import type {
+  RelativeSelectionStage,
+  RelativeSelectionStageResult,
+  SelectionFailure,
+  SelectionCandidateStageResult,
+} from '../domain/career/state';
 import type { InstitutionConfig, PositionConfigV2 } from './position-v2';
 
 /** 组织席位的占用者引用。 */
@@ -227,18 +234,63 @@ export interface SelectionCandidateSnapshot {
   scoringInputs: Record<string, number>;
 }
 
+/** Mutable-world input normalized into the same frozen candidate snapshot. */
+export interface SelectionCandidateInput {
+  candidateId: string;
+  candidateType: 'player' | 'npc';
+  currentPositionId: string | null;
+  institutionId: string | null;
+  regionId: string | null;
+  leadershipRank: LeadershipRank;
+  civilServiceRank: CivilServiceRank;
+  appointmentStartedAtDay: number | null;
+  serviceStartedAtDay: number;
+  assessments: CareerAssessmentRecord[];
+  specialties: Record<string, number>;
+  restrictionTypes: string[];
+  scoringInputs: Record<string, number>;
+}
+
+/** Result of applying the shared candidate qualification rule. */
+export interface CandidateEligibilityResult {
+  eligible: boolean;
+  reason: string | null;
+}
+
+/** Inputs captured once when a Selection is created. */
+export interface CreateRelativeSelectionInput {
+  selectionId: string;
+  vacancyId: string;
+  startedAtDay: number;
+  candidates: readonly SelectionCandidateInput[];
+  rules: RelativeSelectionConfig;
+  randomDraws: readonly number[];
+  playerCareerProcessId?: string | null;
+}
+
+/** Input for one deterministic stage transition. */
+export interface AdvanceRelativeSelectionInput {
+  selection: RelativeStaffingSelection;
+  resolvedAtDay: number;
+  rules: RelativeSelectionConfig;
+}
+
+/** Discriminated result shared by creation and advancement. */
+export type RelativeSelectionLifecycleResult =
+  | { success: true; selection: RelativeStaffingSelection }
+  | {
+      success: false;
+      error: 'invalid_stage' | 'rules_mismatch' | 'invalid_random_draws';
+      detail: string;
+    };
+
 /** 世界级选拔的阶段审计。 */
 export interface StaffingSelectionStageAudit {
-  stage:
-    | 'eligibility_review'
-    | 'democratic_recommendation'
-    | 'organization_inspection'
-    | 'collective_decision'
-    | 'public_notice'
-    | 'appointment';
+  stage: RelativeSelectionStage;
   resolvedAtDay: number;
   survivingCandidateIds: string[];
   detail: string;
+  candidates?: SelectionCandidateStageResult[];
 }
 
 /** 一个 Vacancy 对应的世界级选拔状态。 */
@@ -256,6 +308,22 @@ export interface StaffingSelection {
   playerCareerProcessId: string | null;
   /** 创建选拔时冻结的随机输入，刷新后不得重新抽取。 */
   randomDraws: number[];
+  /** Frozen ruleset identity used to interpret every stage result. */
+  rulesVersion?: string;
+  /** Structured stage audit; present for selections created by the new Engine. */
+  stageResults?: RelativeSelectionStageResult[];
+  /** Stable winner ID, independent of occupant/appointment transactions. */
+  winnerId?: string | null;
+  /** Structured terminal failure when no winner exists. */
+  failure?: SelectionFailure | null;
+}
+
+/** Strong Selection contract emitted and consumed by the relative-selection Engine. */
+export interface RelativeStaffingSelection extends StaffingSelection {
+  rulesVersion: string;
+  stageResults: RelativeSelectionStageResult[];
+  winnerId: string | null;
+  failure: SelectionFailure | null;
 }
 
 /** PlayerSave 中独立于玩家 CareerState 的组织世界状态。 */

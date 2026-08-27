@@ -18,16 +18,22 @@ import {
 import {
   evaluateCareerOpportunityAcceptanceEligibility,
   evaluateCareerOpportunityAppointmentEligibility,
-  evaluateCareerOpportunitySelectionEligibility,
   hasRunningCareerAction,
 } from '../../engine/career/career-opportunity-eligibility';
 import { applyEffects } from '../../engine/events/effect-executor';
 import { deriveMetricSignalsFromEffects } from '../../engine/events/metric-signal-bridge';
-import { settleCareerSelectionStage } from '../../engine/career/selection-settlement';
 import { processCascadeSignalsInTransaction } from './event-reducer';
 import { createRuntimeIdFactory } from '../runtime-id';
 import { fillVacancyInTransaction } from '../transactions/vacancy-transaction';
 import { transitionPlayerSeat } from '../transactions/organization-seat-transaction';
+import {
+  createRelativeSelectionInTransaction,
+  getRelativeSelection,
+  selectionHasPlayer,
+} from '../transactions/selection-transaction';
+import { advanceRelativeSelectionStage } from '../../engine/career/relative-selection-lifecycle';
+import { RELATIVE_SELECTION_STAGES } from '../../domain/career/state';
+import { beginVacancySelection } from '../../engine/organization/vacancy-selection-lifecycle';
 
 export interface CareerOpportunityPayload {
   opportunityId: string;
@@ -74,10 +80,28 @@ export function reduceAcceptCareerOpportunity(
   const original = draft.career.opportunities.find((item) => item.id === payload.opportunityId);
   if (!original) return false;
   const loader = getConfigLoader();
+  // Selection eligibility is frozen from the complete candidate pool at accept
+  // time; a disciplinary restriction excludes the candidate, but must not block
+  // creation of the auditable no-qualified Selection itself.
+  const eligibilityState =
+    original.type !== 'training' && original.requiresSelection
+      ? {
+          ...draft,
+          career: {
+            ...draft.career,
+            // The Selection snapshot records the restriction and can therefore
+            // become a structured no-qualified terminal; only bypass that one
+            // player gate while accepting, preserving unrelated freezes.
+            restrictions: draft.career.restrictions.filter(
+              (restriction) => restriction.type !== 'disciplinary_action',
+            ),
+          },
+        }
+      : draft;
   const config = loader.getGameConfig();
   const eligibility = evaluateCareerOpportunityAcceptanceEligibility({
     opportunity: original,
-    state: draft,
+    state: eligibilityState,
     currentDay,
     daysPerYear: config.daysPerMonth * config.monthsPerYear,
     targetPosition:
@@ -90,8 +114,22 @@ export function reduceAcceptCareerOpportunity(
   const transaction = structuredClone(unwrap(draft));
   replaceOpportunity(transaction, result.opportunity);
   const idFactory = payload._idFactory ?? createRuntimeIdFactory('career');
+  const processId = idFactory();
+  if (result.opportunity.type !== 'training' && result.opportunity.requiresSelection) {
+    const selection = createRelativeSelectionInTransaction(
+      transaction,
+      result.opportunity,
+      processId,
+      currentDay,
+      idFactory,
+      payload._rng ?? Math.random,
+    );
+    if (!selection.success) return false;
+    Object.assign(draft, selection.state);
+    return true;
+  }
   const process: CareerProcess = {
-    id: idFactory(),
+    id: processId,
     type:
       result.opportunity.type === 'training'
         ? 'training'
@@ -105,6 +143,13 @@ export function reduceAcceptCareerOpportunity(
     completedAtDay: null,
     stageResults: [],
   };
+  // Schema 14 persists explicit nulls for processes which do not own a Selection.
+  Object.assign(process, {
+    selectionId: null,
+    vacancyId: result.opportunity.vacancyId,
+    winnerId: null,
+    failure: null,
+  });
   transaction.career.activeProcess = process;
   result.opportunity.status = 'in_process';
   replaceOpportunity(transaction, result.opportunity);
@@ -308,6 +353,212 @@ function appointmentTransition(
   return true;
 }
 
+function appendRelativeStageResult(
+  process: CareerProcess,
+  stage: (typeof RELATIVE_SELECTION_STAGES)[number],
+  resolvedAtDay: number,
+  selection: import('../../types/organization').RelativeStaffingSelection,
+): void {
+  if (process.stageResults.some((result) => result.stage === stage)) return;
+  const result = selection.stageResults.find((item) => item.stage === stage);
+  if (!result) return;
+  const player = result.candidates.find((candidate) => candidate.candidateId === 'player');
+  process.stageResults.push({
+    stage,
+    resolvedAtDay,
+    outcome: player && !player.eliminated ? 'passed' : 'failed',
+    score: player?.score ?? null,
+    detail: player
+      ? player.eliminated
+        ? `玩家在${stage}阶段淘汰（排名 ${player.rank}）`
+        : `玩家在${stage}阶段保留（排名 ${player.rank}）`
+      : '玩家不在本阶段候选结果中',
+    candidateResults: structuredClone(result.candidates),
+    survivingCandidateIds: [...result.survivingCandidateIds],
+  });
+}
+
+function resolveRelativeSelectionFailure(
+  transaction: PlayerSave,
+  opportunity: Exclude<CareerOpportunity, { type: 'training' }>,
+  process: CareerProcess,
+  selection: import('../../types/organization').RelativeStaffingSelection,
+  currentDay: number,
+): void {
+  const vacancy = transaction.organization.vacancies.find(
+    (item) => item.vacancyId === selection.vacancyId,
+  );
+  if (vacancy && (vacancy.status === 'selecting' || vacancy.status === 'open')) {
+    vacancy.status = 'open';
+    vacancy.selectionId = null;
+  }
+  const resolved = resolveCareerOpportunity(opportunity, currentDay, 'not_selected').opportunity;
+  if (resolved) replaceOpportunity(transaction, resolved);
+  process.status = selection.winnerId === null ? 'failed' : 'completed';
+  process.completedAtDay = currentDay;
+  process.winnerId = selection.winnerId;
+  process.failure = selection.failure;
+  archiveCompletedProcess(transaction, process);
+}
+
+function advanceRelativeSelectionProcess(
+  draft: PlayerSave,
+  opportunity: Exclude<CareerOpportunity, { type: 'training' }>,
+  process: CareerProcess,
+  currentDay: number,
+  payload: AdvanceCareerProcessPayload,
+): boolean {
+  if (!process.selectionId || !process.vacancyId) return false;
+  const transaction = structuredClone(unwrap(draft));
+  const txProcess = transaction.career.activeProcess;
+  const txOpportunity = transaction.career.opportunities.find((item) => item.id === opportunity.id);
+  if (!txOpportunity || txOpportunity.type === 'training') return false;
+  const selection = txProcess
+    ? getRelativeSelection(transaction.organization, process.selectionId)
+    : null;
+  if (!txProcess || !selection || selection.vacancyId !== process.vacancyId) return false;
+  if (selection.status === 'active') {
+    const advanced = advanceRelativeSelectionStage({
+      selection,
+      resolvedAtDay: currentDay,
+      rules: getConfigLoader().getRelativeSelectionConfig(),
+    });
+    if (!advanced.success) return false;
+    let updated = advanced.selection;
+    transaction.organization.selections = transaction.organization.selections.map((item) =>
+      item.selectionId === updated.selectionId ? updated : item,
+    );
+    appendRelativeStageResult(
+      txProcess,
+      updated.stageResults.at(-1)?.stage ??
+        (txProcess.currentStage as (typeof RELATIVE_SELECTION_STAGES)[number]),
+      currentDay,
+      updated,
+    );
+    txProcess.currentStage = updated.currentStage;
+    if (updated.status === 'active' && !selectionHasPlayer(updated)) {
+      // 玩家已淘汰：继续有限次数结算剩余固定阶段，避免递归和重复抽签。
+      for (
+        let index = updated.stageResults.length;
+        index < RELATIVE_SELECTION_STAGES.length;
+        index += 1
+      ) {
+        const continued = advanceRelativeSelectionStage({
+          selection: updated,
+          resolvedAtDay: currentDay,
+          rules: getConfigLoader().getRelativeSelectionConfig(),
+        });
+        if (!continued.success) return false;
+        updated = continued.selection;
+        transaction.organization.selections = transaction.organization.selections.map((item) =>
+          item.selectionId === updated.selectionId ? updated : item,
+        );
+        appendRelativeStageResult(
+          txProcess,
+          updated.stageResults.at(-1)?.stage ??
+            (txProcess.currentStage as (typeof RELATIVE_SELECTION_STAGES)[number]),
+          currentDay,
+          updated,
+        );
+        txProcess.currentStage = updated.currentStage;
+        if (updated.status !== 'active') break;
+      }
+    }
+    const finalSelection = getRelativeSelection(transaction.organization, process.selectionId);
+    if (!finalSelection) return false;
+    if (finalSelection.status === 'failed') {
+      resolveRelativeSelectionFailure(
+        transaction,
+        txOpportunity,
+        txProcess,
+        finalSelection,
+        currentDay,
+      );
+      Object.assign(draft, transaction);
+      return true;
+    }
+    if (finalSelection.status === 'completed') {
+      txProcess.winnerId = finalSelection.winnerId;
+      if (finalSelection.winnerId !== 'player') {
+        resolveRelativeSelectionFailure(
+          transaction,
+          txOpportunity,
+          txProcess,
+          finalSelection,
+          currentDay,
+        );
+        Object.assign(draft, transaction);
+        return true;
+      }
+      txProcess.currentStage = 'appointment';
+      if (hasRunningCareerAction(transaction) || transaction.events.activeBlockingEventId) {
+        // Terminal Selection cannot remain attached to a selecting Vacancy: the
+        // vacancy is reopened until the existing appointment continuation can fill it.
+        const vacancy = transaction.organization.vacancies.find(
+          (item) => item.vacancyId === finalSelection.vacancyId,
+        );
+        if (vacancy) {
+          vacancy.status = 'open';
+          vacancy.selectionId = null;
+        }
+        Object.assign(draft, transaction);
+        return true;
+      }
+      finalSelection.status = 'active';
+      if (
+        !appointmentTransition(
+          transaction,
+          txOpportunity,
+          txProcess,
+          currentDay,
+          payload._idFactory ?? createRuntimeIdFactory('career'),
+          payload._rng ?? Math.random,
+        )
+      )
+        return false;
+      Object.assign(draft, transaction);
+      return true;
+    }
+    Object.assign(draft, transaction);
+    return true;
+  }
+  if (selection.status === 'completed' && selection.winnerId === 'player') {
+    txProcess.currentStage = 'appointment';
+    if (hasRunningCareerAction(transaction) || transaction.events.activeBlockingEventId)
+      return false;
+    selection.status = 'active';
+    const vacancy = transaction.organization.vacancies.find(
+      (item) => item.vacancyId === selection.vacancyId,
+    );
+    if (!vacancy) return false;
+    if (vacancy.status === 'open') {
+      const rebound = beginVacancySelection({
+        organization: transaction.organization,
+        currentDay,
+        idFactory: payload._idFactory ?? createRuntimeIdFactory('career'),
+        vacancyId: vacancy.vacancyId,
+        selectionId: selection.selectionId,
+      });
+      if (!rebound.success || !rebound.vacancy) return false;
+      transaction.organization = rebound.organization;
+    }
+    if (
+      !appointmentTransition(
+        transaction,
+        txOpportunity,
+        txProcess,
+        currentDay,
+        payload._idFactory ?? createRuntimeIdFactory('career'),
+        payload._rng ?? Math.random,
+      )
+    )
+      return false;
+    Object.assign(draft, transaction);
+    return true;
+  }
+  return false;
+}
+
 /** @param draft 状态草稿 @param payload 流程推进参数 @param currentDay 当前日 @returns 是否推进成功。 */
 export function reduceAdvanceCareerProcess(
   draft: PlayerSave,
@@ -321,37 +572,12 @@ export function reduceAdvanceCareerProcess(
     !original ||
     process.opportunityId !== original.id ||
     original.status !== 'in_process'
-  )
+  ) {
     return false;
-  const loader = getConfigLoader();
-  const selectionEligibility =
-    original.type !== 'training' &&
-    original.requiresSelection &&
-    process.currentStage === 'eligibility_review'
-      ? evaluateCareerOpportunitySelectionEligibility({
-          opportunity: original,
-          state: draft,
-          currentDay,
-          daysPerYear: loader.getGameConfig().daysPerMonth * loader.getGameConfig().monthsPerYear,
-          targetPosition: loader.getPositionById(original.target.positionId),
-          careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
-        })
-      : null;
-  const settlement =
-    selectionEligibility && !selectionEligibility.eligible
-      ? {
-          outcome: 'failed' as const,
-          score: null,
-          detail: `资格复查未通过：${selectionEligibility.failure ?? 'unknown'}`,
-        }
-      : original.type !== 'training' && original.requiresSelection
-        ? settleCareerSelectionStage(
-            process.currentStage,
-            draft,
-            loader.getGameConfig().promotion,
-            payload._rng ?? Math.random,
-          )
-        : { outcome: 'passed' as const, score: null, detail: '职业流程阶段已完成' };
+  }
+  if (original.type !== 'training' && original.requiresSelection)
+    return advanceRelativeSelectionProcess(draft, original, process, currentDay, payload);
+  const settlement = { outcome: 'passed' as const, score: null, detail: '职业流程阶段已完成' };
   const outcome = settlement.outcome;
   // Only the final appointment commits a job change. Selection stages can run while
   // ordinary actions or blocking events are active; the final transition rechecks it.

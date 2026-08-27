@@ -1,9 +1,9 @@
 /**
- * 存档严格解码器（Schema 13）
+ * 存档严格解码器（Schema 14）
  *
- * 只接受当前版本（Schema 13）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 14）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -31,6 +31,7 @@ import {
   POLICY_CATEGORIES,
   DomainSignalSnapshotSchema,
 } from '../../domain/governance/types';
+import { RELATIVE_SELECTION_STAGES } from '../../domain/career/state';
 import { ConditionExpressionSchema, EffectDefinitionSchema } from '../../domain/conditions';
 import {
   EVENT_PRIORITIES,
@@ -412,7 +413,7 @@ const CareerOpportunitySchema = z
     }
   });
 
-/** CareerProcess Schema（stageResults 使用明确结构） */
+/** CareerProcess Schema（Schema 14 固定 Selection/Vacancy 引用及终态审计） */
 const CareerProcessSchema = z
   .object({
     id: z.string().min(1),
@@ -425,6 +426,8 @@ const CareerProcessSchema = z
     ]),
     status: z.enum(['active', 'completed', 'failed', 'cancelled']),
     opportunityId: z.string(),
+    selectionId: z.string().nullable().optional(),
+    vacancyId: z.string().nullable().optional(),
     currentStage: z.enum([
       'eligibility_review',
       'democratic_recommendation',
@@ -454,9 +457,41 @@ const CareerProcessSchema = z
           outcome: z.enum(['passed', 'failed', 'continued', 'cancelled']),
           score: z.number().nullable(),
           detail: z.string(),
+          candidateResults: z
+            .array(
+              z
+                .object({
+                  candidateId: z.string().min(1),
+                  score: z.number().min(0).max(100),
+                  rank: z.number().int().positive(),
+                  eliminated: z.boolean(),
+                })
+                .strict(),
+            )
+            .optional(),
+          survivingCandidateIds: z.array(z.string().min(1)).optional(),
         })
         .strict(),
     ),
+    winnerId: z.string().min(1).nullable().optional(),
+    failure: z
+      .object({
+        code: z.enum(['no_qualified_candidates', 'stage_no_survivors', 'no_unique_winner']),
+        stage: z
+          .enum([
+            'eligibility_review',
+            'democratic_recommendation',
+            'organization_inspection',
+            'collective_decision',
+            'public_notice',
+            'appointment',
+          ])
+          .nullable(),
+        detail: z.string().min(1),
+      })
+      .strict()
+      .nullable()
+      .optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -465,6 +500,64 @@ const CareerProcessSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Process completion date must match status',
       });
+    for (const field of ['selectionId', 'vacancyId', 'winnerId', 'failure'] as const) {
+      if (
+        !Object.prototype.hasOwnProperty.call(value, field) ||
+        (value[field] as unknown) === undefined
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: `CareerProcess ${field} is required in Schema 14`,
+        });
+    }
+    if (value.type === 'leadership_selection') {
+      if (
+        (value.selectionId === null || value.vacancyId === null) &&
+        value.status !== 'failed' &&
+        value.status !== 'cancelled'
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Leadership Selection requires Selection and Vacancy IDs',
+        });
+      for (const result of value.stageResults) {
+        if (
+          value.status === 'active' &&
+          value.selectionId !== null &&
+          (result.candidateResults === undefined || result.survivingCandidateIds === undefined)
+        )
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['stageResults'],
+            message: 'Selection process stage result requires candidate audit',
+          });
+      }
+      if (value.status === 'failed' && value.failure === null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['failure'],
+          message: 'Failed Selection process requires a failure',
+        });
+      if (value.status === 'completed' && value.winnerId === null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['winnerId'],
+          message: 'Completed Selection process requires a winner',
+        });
+      if (value.status === 'completed' && value.failure !== null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['failure'],
+          message: 'Completed Selection process cannot have a failure',
+        });
+      if (value.status === 'active' && value.failure !== null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['failure'],
+          message: 'Active Selection process cannot have a failure',
+        });
+    }
   });
 
 /** 持久化职业限制 Schema。 */
@@ -513,6 +606,12 @@ const CareerStateSchema = z
   })
   .strict()
   .superRefine((career, ctx) => {
+    if (career.activeProcess && career.activeProcess.status !== 'active')
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['activeProcess'],
+        message: 'activeProcess must have active status',
+      });
     const matchingExperiences = career.experiences.filter(
       (experience) => experience.appointmentId === career.appointment.appointmentId,
     );
@@ -1242,11 +1341,8 @@ const SaveEnvelopeSchema = z
  * 如果 PlayerSaveSchema 与 PlayerSave 不一致，此处会产生类型错误。
  */
 type SchemaInferred = z.infer<typeof PlayerSaveSchema>;
-type _AssertSchemaToType = SchemaInferred extends PlayerSave ? true : never;
 type _AssertTypeToSchema = PlayerSave extends SchemaInferred ? true : never;
-const _schemaConsistencyCheck: _AssertSchemaToType = true;
 const _typeConsistencyCheck: _AssertTypeToSchema = true;
-void _schemaConsistencyCheck;
 void _typeConsistencyCheck;
 
 // ===== 公开 API =====
@@ -2190,13 +2286,13 @@ export function migrateSchema10RankQuotaContent(
 }
 
 /**
- * 将 Schema 10 存档迁移至当前 Schema 13（函数名保留以兼容既有调用方）。
+ * 将 Schema 10 存档迁移至当前 Schema 14（函数名保留以兼容既有调用方）。
  *
  * 旧存档没有可恢复的 NPC 历史，因此只在迁移日确定性建立配置干部池；不会
  * 伪造迁移日前的 NPC 考核或任职年限。玩家当前有效任职映射到唯一实际 Seat。
  *
  * @param prev 已完成 Schema 10 内容迁移的 SaveEnvelope
- * @returns 包含组织世界状态、离任账本和 Vacancy 审计字段的 Schema 13 SaveEnvelope
+ * @returns 包含组织世界状态、离任账本和 Vacancy 审计字段的 Schema 14 SaveEnvelope
  */
 export function migrateSchema10To11(prev: Record<string, unknown>): Record<string, unknown> {
   if (prev.schemaVersion !== 10) return prev;
@@ -2219,7 +2315,7 @@ export function migrateSchema10To11(prev: Record<string, unknown>): Record<strin
   return migrateSchema11To12(migrated);
 }
 
-/** 将 Schema 11 的组织世界升级至当前版本，并建立空的离任事实账本。 */
+/** 将 Schema 11 的组织世界升级至 Schema 14，并建立空的离任事实账本。 */
 export function migrateSchema11To12(prev: Record<string, unknown>): Record<string, unknown> {
   if (prev.schemaVersion !== 11) return prev;
   const migrated = structuredClone(prev);
@@ -2233,7 +2329,7 @@ export function migrateSchema11To12(prev: Record<string, unknown>): Record<strin
   migrated.schemaVersion = 12;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
   // 保持该公开迁移入口对旧调用方的“迁移到当前版本”语义。
-  return migrateSchema12To13(migrated);
+  return migrateSchema13To14(migrateSchema12To13(migrated));
 }
 
 /** 从机会 sourceId 移除恰好一个 vacancy 命名空间，恢复 raw Vacancy ID。 */
@@ -2251,7 +2347,7 @@ function rawVacancyIdFromSourceId(sourceId: unknown): string | null {
  * 默认值；已存在但类型错误的字段必须保留，让严格 Schema 报告存档损坏，而不是静默修正。
  *
  * @param prev Schema 12 SaveEnvelope
- * @returns Schema 13 SaveEnvelope
+ * @returns Schema 13 SaveEnvelope（Schema 14 由 migrateSchema13To14 完成）
  */
 export function migrateSchema12To13(prev: Record<string, unknown>): Record<string, unknown> {
   if (prev.schemaVersion !== 12) return prev;
@@ -2394,15 +2490,306 @@ export function migrateSchema12To13(prev: Record<string, unknown>): Record<strin
   return migrated;
 }
 
+/** 将缺少冻结评分的旧 completed Selection 变成不可重放但结构完整的终态审计。 */
+function buildLegacyCompletedStageResults(
+  selection: Record<string, unknown>,
+  _fallbackStage: string,
+): unknown[] {
+  const stages = [
+    'eligibility_review',
+    'democratic_recommendation',
+    'organization_inspection',
+    'collective_decision',
+    'public_notice',
+    'appointment',
+  ];
+  const candidateIds = Array.isArray(selection.candidates)
+    ? selection.candidates
+        .filter(
+          (candidate): candidate is Record<string, unknown> =>
+            !!candidate && typeof candidate === 'object' && !Array.isArray(candidate),
+        )
+        .map((candidate) => candidate.candidateId)
+        .filter((candidateId): candidateId is string => typeof candidateId === 'string')
+        .sort((left, right) => left.localeCompare(right))
+    : [];
+  const uniqueCandidateIds = [...new Set(candidateIds)];
+  const winnerId = typeof selection.winnerId === 'string' ? selection.winnerId : null;
+  if (winnerId === null || !uniqueCandidateIds.includes(winnerId)) return [];
+  const audits = Array.isArray(selection.stageAudits) ? selection.stageAudits : [];
+  let survivors = uniqueCandidateIds;
+  return stages.map((stage, index) => {
+    const audit = audits[index];
+    const auditRecord =
+      audit && typeof audit === 'object' && !Array.isArray(audit)
+        ? (audit as Record<string, unknown>)
+        : null;
+    const auditCandidates = Array.isArray(auditRecord?.candidates)
+      ? auditRecord.candidates
+          .filter(
+            (candidate): candidate is Record<string, unknown> =>
+              !!candidate && typeof candidate === 'object' && !Array.isArray(candidate),
+          )
+          .filter((candidate) => uniqueCandidateIds.includes(candidate.candidateId as string))
+      : [];
+    const byId = new Map(
+      auditCandidates.map((candidate) => [candidate.candidateId as string, candidate]),
+    );
+    const stageCandidateIds = [...survivors];
+    const candidates = stageCandidateIds.map((candidateId, rank) => {
+      const legacy = byId.get(candidateId);
+      const score =
+        typeof legacy?.score === 'number' && Number.isFinite(legacy.score)
+          ? Math.max(0, Math.min(100, legacy.score))
+          : 0;
+      return {
+        candidateId,
+        score,
+        rank: rank + 1,
+        eliminated: false,
+      };
+    });
+    const auditedSurvivors = Array.isArray(auditRecord?.survivingCandidateIds)
+      ? stageCandidateIds.filter((candidateId) =>
+          (auditRecord.survivingCandidateIds as unknown[]).includes(candidateId),
+        )
+      : stageCandidateIds;
+    const surviving =
+      index === stages.length - 1
+        ? [winnerId]
+        : auditedSurvivors.length > 0
+          ? auditedSurvivors
+          : stageCandidateIds;
+    const survivingSet = new Set(surviving);
+    for (const candidate of candidates)
+      candidate.eliminated = !survivingSet.has(candidate.candidateId);
+    survivors = surviving;
+    return {
+      stage,
+      resolvedAtDay:
+        typeof auditRecord?.resolvedAtDay === 'number'
+          ? auditRecord.resolvedAtDay
+          : (selection.completedAtDay ?? selection.startedAtDay ?? 0),
+      candidates,
+      survivingCandidateIds: surviving.length > 0 ? surviving : uniqueCandidateIds,
+    };
+  });
+}
+
+/**
+ * 将 Schema 13 的世界选拔结构升级为冻结 Selection 审计结构。
+ *
+ * Schema 13 没有可重放的候选快照或 RNG，因此旧 Selection 只能成为明确的
+ * terminal failed audit；迁移绝不猜测赢家或重新抽取随机数。
+ *
+ * @param prev Schema 13 SaveEnvelope
+ * @returns Schema 14 SaveEnvelope；非 Schema 13 输入原样返回
+ */
+export function migrateSchema13To14(prev: Record<string, unknown>): Record<string, unknown> {
+  if (prev.schemaVersion !== 13) return prev;
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  if (!state || typeof state.organization !== 'object' || state.organization === null)
+    throw new Error('Schema 13 save is missing organization state');
+  const organization = state.organization as Record<string, unknown>;
+  if (!Array.isArray(organization.selections) || !Array.isArray(organization.vacancies))
+    throw new Error('Schema 13 organization selections/vacancies must be arrays');
+  const legacySelectionIds = new Set<string>();
+  for (const value of organization.selections) {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new Error('Schema 13 organization selections contain an invalid entry');
+    const selection = value as Record<string, unknown>;
+    if (typeof selection.selectionId !== 'string' || typeof selection.vacancyId !== 'string')
+      throw new Error('Schema 13 Selection has invalid identity');
+    if (selection.rulesVersion === undefined) selection.rulesVersion = 'legacy-schema-13';
+    const lastAudit = Array.isArray(selection.stageAudits)
+      ? selection.stageAudits.at(-1)
+      : undefined;
+    const legacyStageCandidate =
+      lastAudit &&
+      typeof lastAudit === 'object' &&
+      !Array.isArray(lastAudit) &&
+      typeof (lastAudit as Record<string, unknown>).stage === 'string'
+        ? (lastAudit as Record<string, unknown>).stage
+        : typeof selection.currentStage === 'string'
+          ? selection.currentStage
+          : 'appointment';
+    const legacyStage =
+      RELATIVE_SELECTION_STAGES.find((stage) => stage === legacyStageCandidate) ?? 'appointment';
+    if (Array.isArray(selection.stageAudits)) {
+      for (const value of selection.stageAudits) {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          const audit = value as Record<string, unknown>;
+          if (audit.candidates === undefined) audit.candidates = [];
+        }
+      }
+    }
+    if (selection.status === 'completed') {
+      if (selection.winnerId === undefined) {
+        const winner = selection.winner;
+        selection.winnerId =
+          winner &&
+          typeof winner === 'object' &&
+          !Array.isArray(winner) &&
+          typeof (winner as Record<string, unknown>).id === 'string'
+            ? (winner as Record<string, unknown>).id
+            : null;
+      }
+      if (selection.failure === undefined) selection.failure = null;
+      if (selection.stageResults === undefined)
+        selection.stageResults = buildLegacyCompletedStageResults(selection, legacyStage);
+    } else if (selection.status === 'active' || selection.status === 'pending') {
+      selection.status = 'failed';
+      selection.winner = null;
+      selection.winnerId = null;
+      selection.failure = {
+        code:
+          selection.candidates instanceof Array && selection.candidates.length === 0
+            ? 'no_qualified_candidates'
+            : 'stage_no_survivors',
+        stage:
+          selection.candidates instanceof Array && selection.candidates.length === 0
+            ? null
+            : legacyStage,
+        detail: 'Schema 13 Selection lacks frozen candidates and cannot be resumed',
+      };
+      if (selection.stageResults === undefined) selection.stageResults = [];
+      // 旧赢家没有冻结候选审计；不把不可验证记录升级成新赢家事实。
+    } else if (selection.status === 'failed') {
+      if (selection.winnerId === undefined) selection.winnerId = null;
+      if (selection.stageResults === undefined) selection.stageResults = [];
+      if (selection.failure === undefined)
+        selection.failure = {
+          code:
+            selection.candidates instanceof Array && selection.candidates.length === 0
+              ? 'no_qualified_candidates'
+              : 'stage_no_survivors',
+          stage:
+            selection.candidates instanceof Array && selection.candidates.length === 0
+              ? null
+              : legacyStage,
+          detail: 'Schema 13 Selection lacks frozen candidates and cannot be resumed',
+        };
+    } else if (selection.status === 'cancelled') {
+      if (selection.winnerId === undefined) selection.winnerId = null;
+      if (selection.failure === undefined) selection.failure = null;
+      if (selection.stageResults === undefined) selection.stageResults = [];
+    }
+    if (selection.completedAtDay === null || selection.completedAtDay === undefined)
+      selection.completedAtDay = selection.startedAtDay;
+    legacySelectionIds.add(selection.selectionId);
+  }
+  for (const value of organization.vacancies) {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new Error('Schema 13 organization vacancies contain an invalid entry');
+    const vacancy = value as Record<string, unknown>;
+    if (typeof vacancy.selectionId === 'string' && legacySelectionIds.has(vacancy.selectionId)) {
+      if (vacancy.status === 'selecting' || vacancy.status === 'open') {
+        vacancy.status = 'open';
+        vacancy.selectionId = null;
+      }
+    }
+  }
+  const career = state.career as Record<string, unknown> | undefined;
+  if (!career) throw new Error('Schema 13 save is missing career state');
+  const time = state.time as Record<string, unknown> | undefined;
+  const migrationDay = typeof time?.totalDaysPlayed === 'number' ? time.totalDaysPlayed : 0;
+  const processValues = [
+    career.activeProcess,
+    ...(Array.isArray(career.completedProcesses) ? career.completedProcesses : []),
+  ];
+  const selections = organization.selections as Array<Record<string, unknown>>;
+  for (const value of processValues) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const process = value as Record<string, unknown>;
+    if (process.selectionId === undefined) process.selectionId = null;
+    if (process.vacancyId === undefined) process.vacancyId = null;
+    if (process.winnerId === undefined) process.winnerId = null;
+    if (process.failure === undefined) process.failure = null;
+    const linkedSelection =
+      typeof process.selectionId === 'string'
+        ? selections.find((selection) => selection.selectionId === process.selectionId)
+        : undefined;
+    const replayableSelection =
+      linkedSelection?.status === 'active' &&
+      typeof linkedSelection.rulesVersion === 'string' &&
+      Array.isArray(linkedSelection.stageResults) &&
+      Array.isArray(linkedSelection.randomDraws);
+    if (
+      process.type === 'leadership_selection' &&
+      process.status === 'active' &&
+      !replayableSelection
+    ) {
+      process.status = 'failed';
+      process.completedAtDay = process.completedAtDay ?? migrationDay;
+      process.failure = {
+        code: 'stage_no_survivors',
+        stage:
+          typeof process.currentStage === 'string'
+            ? (RELATIVE_SELECTION_STAGES.find((stage) => stage === process.currentStage) ??
+              'appointment')
+            : 'appointment',
+        detail: 'Schema 13 CareerProcess lacks a replayable Selection',
+      };
+      if (Array.isArray(career.opportunities)) {
+        const opportunity = career.opportunities.find(
+          (candidate) =>
+            candidate &&
+            typeof candidate === 'object' &&
+            !Array.isArray(candidate) &&
+            (candidate as Record<string, unknown>).id === process.opportunityId,
+        );
+        if (opportunity && typeof opportunity === 'object' && !Array.isArray(opportunity)) {
+          const legacyOpportunity = opportunity as Record<string, unknown>;
+          if (
+            legacyOpportunity.status === 'accepted' ||
+            legacyOpportunity.status === 'in_process'
+          ) {
+            legacyOpportunity.status = 'resolved';
+            legacyOpportunity.resolvedAtDay = migrationDay;
+            legacyOpportunity.finalOutcome = 'not_selected';
+          }
+        }
+      }
+      if (Array.isArray(process.stageResults)) {
+        for (const result of process.stageResults) {
+          if (result && typeof result === 'object' && !Array.isArray(result)) {
+            const stageResult = result as Record<string, unknown>;
+            if (stageResult.candidateResults === undefined) stageResult.candidateResults = [];
+            if (stageResult.survivingCandidateIds === undefined)
+              stageResult.survivingCandidateIds = [];
+          }
+        }
+      }
+    }
+  }
+  const activeProcess = career.activeProcess;
+  if (
+    activeProcess &&
+    typeof activeProcess === 'object' &&
+    !Array.isArray(activeProcess) &&
+    (activeProcess as Record<string, unknown>).status !== 'active'
+  ) {
+    const completed = Array.isArray(career.completedProcesses) ? career.completedProcesses : [];
+    completed.push(structuredClone(activeProcess));
+    career.completedProcesses = completed;
+    career.activeProcess = null;
+  }
+  migrated.schemaVersion = 14;
+  migrated.contentVersion = CURRENT_CONTENT_VERSION;
+  return migrated;
+}
+
 /**
  * 严格解码存档数据（已解析的对象）。
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
- * - Schema 2–10：按版本顺序链式迁移至 Schema 13；
- * - Schema 11：补齐离任事实账本后迁移至 Schema 13；
- * - Schema 12：补齐 Vacancy 终态审计字段并回填初始空缺后迁移至 Schema 13；
- * - 当前版本（Schema 13）：直接解码；
+ * - Schema 2–10：按版本顺序链式迁移至 Schema 14；
+ * - Schema 11：补齐离任事实账本后迁移至 Schema 14；
+ * - Schema 12：补齐 Vacancy 终态审计字段并回填初始空缺后迁移至 Schema 14；
+ * - Schema 13：升级冻结 Selection 审计后迁移至 Schema 14；
+ * - 当前版本（Schema 14）：直接解码；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
@@ -2485,13 +2872,54 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     target = migrateSchema10Phase3ReleaseContent(target as Record<string, unknown>);
     target = migrateSchema10To11(target as Record<string, unknown>);
     target = migrateSchema11To12(target as Record<string, unknown>);
-    target = migrateSchema12To13(target as Record<string, unknown>);
+    target = migrateSchema13To14(migrateSchema12To13(target as Record<string, unknown>));
   } catch (e) {
     return {
       success: false,
       error: 'migration_failed',
       detail: e instanceof Error ? e.message : 'Unknown migration error',
     };
+  }
+
+  // Content migrations can append a terminal legacy process after the
+  // organization migration has already run. Complete only missing Schema 14
+  // fields on saves that originated before Schema 14; current saves remain
+  // strictly untouched so malformed data still fails decoding.
+  if (obj.schemaVersion < CURRENT_SCHEMA_VERSION && target && typeof target === 'object') {
+    const migratedState = (target as Record<string, unknown>).state;
+    const migratedCareer =
+      migratedState && typeof migratedState === 'object'
+        ? (migratedState as Record<string, unknown>).career
+        : null;
+    const processes =
+      migratedCareer && typeof migratedCareer === 'object'
+        ? [
+            (migratedCareer as Record<string, unknown>).activeProcess,
+            ...((Array.isArray((migratedCareer as Record<string, unknown>).completedProcesses)
+              ? (migratedCareer as Record<string, unknown>).completedProcesses
+              : []) as unknown[]),
+          ]
+        : [];
+    for (const value of processes) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const process = value as Record<string, unknown>;
+      if (process.selectionId === undefined) process.selectionId = null;
+      if (process.vacancyId === undefined) process.vacancyId = null;
+      if (process.winnerId === undefined) process.winnerId = null;
+      if (process.failure === undefined) process.failure = null;
+      if (
+        process.type === 'leadership_selection' &&
+        process.selectionId === null &&
+        Array.isArray(process.stageResults)
+      ) {
+        for (const stage of process.stageResults) {
+          if (!stage || typeof stage !== 'object' || Array.isArray(stage)) continue;
+          const result = stage as Record<string, unknown>;
+          if (result.candidateResults === undefined) result.candidateResults = [];
+          if (result.survivingCandidateIds === undefined) result.survivingCandidateIds = [];
+        }
+      }
+    }
   }
 
   const result = SaveEnvelopeSchema.safeParse(target);

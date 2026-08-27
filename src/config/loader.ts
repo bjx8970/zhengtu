@@ -25,6 +25,7 @@ import type {
   CareerOpportunityDefinition,
   CareerExperienceQualificationRules,
   PersonalTaskTemplate,
+  RelativeSelectionConfig,
 } from '../types/config';
 import type { PositionConfigV2, InstitutionConfig } from '../types/position-v2';
 import type { Phase3AcceptanceConfig } from '../types/phase3';
@@ -43,6 +44,7 @@ import {
   PersonalTaskTemplateArraySchema,
   CadreTemplateArraySchema,
   validateCadreTemplateReferences,
+  RelativeSelectionConfigSchema,
 } from './schemas';
 import { EventDefinitionArraySchema } from '../domain/events/definition';
 import { PHASE3_ACCEPTANCE_CONFIG } from './phase3-acceptance';
@@ -63,6 +65,7 @@ import civilServiceRanksData from './career/civil-service-ranks.json' with { typ
 import careerOpportunitiesData from './career/opportunities.json' with { type: 'json' };
 import experienceQualificationData from './career/experience-qualification.json' with { type: 'json' };
 import cadreTemplatesData from './organization/cadres.json' with { type: 'json' };
+import relativeSelectionData from './career/relative-selection.json' with { type: 'json' };
 
 type RawDeptMap = Record<string, DepartmentTemplate>;
 
@@ -86,6 +89,7 @@ const parsedExperienceQualificationRules = CareerExperienceQualificationRulesSch
 );
 const parsedPersonalTasks = PersonalTaskTemplateArraySchema.parse(personalTasksData);
 const parsedCadreTemplates = CadreTemplateArraySchema.parse(cadreTemplatesData);
+const parsedRelativeSelection = RelativeSelectionConfigSchema.parse(relativeSelectionData);
 const ALL_POSITIONS = parsedPositions;
 const ALL_INSTITUTIONS = parsedInstitutions;
 const ALL_EVENTS = parsedEvents;
@@ -154,6 +158,7 @@ class ConfigLoader {
   private experienceQualificationRules: CareerExperienceQualificationRules;
   private personalTasks: PersonalTaskTemplate[];
   private cadreTemplates: CadreTemplate[];
+  private relativeSelectionConfig: RelativeSelectionConfig;
   private phase3AcceptanceConfig: Phase3AcceptanceConfig;
   private regionConfig: RegionConfig;
   private universityConfig: UniversityConfig;
@@ -182,6 +187,7 @@ class ConfigLoader {
     this.experienceQualificationRules = parsedExperienceQualificationRules;
     this.personalTasks = parsedPersonalTasks;
     this.cadreTemplates = parsedCadreTemplates;
+    this.relativeSelectionConfig = parsedRelativeSelection;
     this.phase3AcceptanceConfig = PHASE3_ACCEPTANCE_CONFIG;
     this.gameConfig = constantsData as unknown as GameConfig;
     this.regionConfig = regionData as unknown as RegionConfig;
@@ -272,6 +278,15 @@ class ConfigLoader {
    */
   getCadreTemplates(): CadreTemplate[] {
     return this.cadreTemplates.map((template) => structuredClone(template));
+  }
+
+  /**
+   * 获取相对选拔规则的防御性副本。
+   *
+   * @returns 已通过严格 Schema 校验的相对选拔配置副本
+   */
+  getRelativeSelectionConfig(): RelativeSelectionConfig {
+    return structuredClone(this.relativeSelectionConfig);
   }
 
   /** 获取 Phase 3 验收配置的防御性副本。 */
