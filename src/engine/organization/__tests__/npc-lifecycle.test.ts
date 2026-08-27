@@ -195,6 +195,57 @@ describe('settleNpcLifecycle', () => {
     expect(rankQuotaValues).toEqual({ 'rank_quota.section_member_4': 1 });
   });
 
+  it('退休 NPC 先离任，不得抢占同年度仍在职 NPC 的晋升职数', () => {
+    const state = createInitialState();
+    const candidates = state.organization.cadres.filter(
+      (item) => item.currentAppointment && item.civilServiceRank === 'section_member_1',
+    );
+    const first = candidates.find((item) => item.cadreId === 'cadre_li_mei');
+    const second = candidates.find((item) => item.cadreId === 'cadre_qian_yi');
+    if (!first || !second) throw new Error('Expected two assigned section_member_1 NPCs');
+    first.birthYear = 1978;
+    second.birthYear = 1979;
+    for (const cadre of [first, second]) {
+      cadre.civilServiceRankStartedAtDay = 0;
+      cadre.restrictions = [];
+      cadre.assessments = Array.from({ length: 9 }, (_, index) => ({
+        year: 2034 + index,
+        score: 95,
+        tier: '优秀',
+      }));
+    }
+    const loader = getConfigLoader();
+    const rankQuotaValues = { 'rank_quota.researcher_4': 1 };
+    const result = settleNpcLifecycle({
+      organization: state.organization,
+      currentDay: 5400,
+      currentYear: 2043,
+      daysPerYear: 360,
+      config: loader.getGameConfig().npcLifecycle,
+      rankProgressionRules: loader.getAllCivilServiceRankProgressionRules(),
+      rankQuotaValues,
+      rng: () => 0.5,
+    });
+    const retired = result.organization.cadres.find((item) => item.cadreId === first.cadreId);
+    const remaining = result.organization.cadres.find((item) => item.cadreId === second.cadreId);
+
+    expect(retired).toMatchObject({ status: 'retired', civilServiceRank: 'section_member_1' });
+    expect(retired?.assessments).toHaveLength(10);
+    expect(result.organization.departures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ cadreId: first.cadreId, reason: 'retirement' }),
+      ]),
+    );
+    expect(remaining?.civilServiceRank).toBe('researcher_4');
+    expect(
+      result.rankChanges.filter((change) => change.previousRank === 'section_member_1'),
+    ).toEqual([expect.objectContaining({ cadreId: second.cadreId, currentRank: 'researcher_4' })]);
+    expect(
+      result.quotaChanges.filter((change) => change.metricId === 'rank_quota.researcher_4'),
+    ).toEqual([{ metricId: 'rank_quota.researcher_4', consumedValue: 1 }]);
+    expect(rankQuotaValues).toEqual({ 'rank_quota.researcher_4': 1 });
+  });
+
   it('跨两年时间推进每年只结算一次 NPC 年度事实', () => {
     const first = settle();
     first.organization.processedProducerKeys.push('npc-annual:2012');

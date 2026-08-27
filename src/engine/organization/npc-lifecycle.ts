@@ -105,6 +105,25 @@ export function settleNpcLifecycle(
     settledCadreIds.push(cadre.cadreId);
     assessments.push({ cadreId: cadre.cadreId, ...assessment });
 
+    // 离任判定紧跟年度考核事实写入；退休或退出干部不得先晋升并抢占同年职数。
+    const age = input.currentYear - cadre.birthYear;
+    const failures = [...cadre.assessments].reverse().findIndex((item) => item.tier !== '不称职');
+    const consecutiveFailures = failures < 0 ? cadre.assessments.length : failures;
+    const departureReason =
+      age >= input.config.retirement.minimumAge
+        ? 'retirement'
+        : consecutiveFailures >= input.config.exit.consecutiveFailureThreshold
+          ? 'disciplinary_exit'
+          : null;
+    if (departureReason) {
+      const departure = cadre.currentAppointment
+        ? closeNpcAppointment(organization, cadre, input.currentDay, departureReason)
+        : recordUnassignedNpcDeparture(cadre, input.currentDay, departureReason);
+      organization.departures.push(departure);
+      departureIds.push(departure.departureId);
+      continue;
+    }
+
     const rankRule = rules.get(cadre.civilServiceRank);
     const qualifiedCount = cadre.assessments.filter(
       (item) => item.tier === '优秀' || item.tier === '称职',
@@ -158,23 +177,6 @@ export function settleNpcLifecycle(
           metricId: rankRule.quotaRequirement.metricId,
           consumedValue: rankRule.quotaRequirement.consumeValue,
         });
-    }
-
-    const age = input.currentYear - cadre.birthYear;
-    const failures = [...cadre.assessments].reverse().findIndex((item) => item.tier !== '不称职');
-    const consecutiveFailures = failures < 0 ? cadre.assessments.length : failures;
-    const departureReason =
-      age >= input.config.retirement.minimumAge
-        ? 'retirement'
-        : consecutiveFailures >= input.config.exit.consecutiveFailureThreshold
-          ? 'disciplinary_exit'
-          : null;
-    if (departureReason) {
-      const departure = cadre.currentAppointment
-        ? closeNpcAppointment(organization, cadre, input.currentDay, departureReason)
-        : recordUnassignedNpcDeparture(cadre, input.currentDay, departureReason);
-      organization.departures.push(departure);
-      departureIds.push(departure.departureId);
     }
   }
   return {
