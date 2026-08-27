@@ -135,11 +135,7 @@ function vacancyForLeadershipDefinition(
   if (signal.signalType !== 'assessment.completed') return null;
   return (
     state.organization.vacancies
-      .filter(
-        (item) =>
-          item.positionId === definition.targetPositionId &&
-          (item.status === 'open' || item.status === 'selecting'),
-      )
+      .filter((item) => item.positionId === definition.targetPositionId && item.status === 'open')
       .sort(
         (left, right) =>
           left.openedAtDay - right.openedAtDay || left.vacancyId.localeCompare(right.vacancyId),

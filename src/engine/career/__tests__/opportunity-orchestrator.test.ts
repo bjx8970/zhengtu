@@ -376,15 +376,16 @@ describe('career opportunity orchestrator', () => {
     });
   });
 
-  it('creates and binds to a selecting Vacancy with a pending Selection on assessment.completed', () => {
+  it('assessment fallback ignores selecting Vacancy and binds the later open Vacancy', () => {
     const state = createInitialState();
     makeDeputyReady(state);
-    const vacancy = addOpenVacancy(state, 'selecting-vacancy-1');
-    vacancy.status = 'selecting';
-    vacancy.selectionId = 'selecting-selection-1';
+    const selectingVacancy = addOpenVacancy(state, 'selecting-vacancy-1');
+    selectingVacancy.openedAtDay = 720;
+    selectingVacancy.status = 'selecting';
+    selectingVacancy.selectionId = 'selecting-selection-1';
     state.organization.selections.push({
       selectionId: 'selecting-selection-1',
-      vacancyId: vacancy.vacancyId,
+      vacancyId: selectingVacancy.vacancyId,
       status: 'pending',
       currentStage: 'eligibility_review',
       startedAtDay: 720,
@@ -401,11 +402,26 @@ describe('career opportunity orchestrator', () => {
       .find((item) => item.id === 'township_deputy_leadership_vacancy');
     if (!definition) throw new Error('Expected deputy definition');
     const signal = {
-      signalId: 'assessment-selecting-vacancy',
+      signalId: 'assessment-open-vacancy',
       signalType: 'assessment.completed' as const,
       occurredAtDay: 720,
       data: { year: 2027, score: 80, tier: '称职' },
     };
+    const selectingOnly = processCareerOpportunitySignal({
+      state,
+      signal: { ...signal, signalId: 'assessment-selecting-vacancy' },
+      currentDay: 720,
+      idFactory: () => 'should-not-create-selecting',
+      definitions: [definition],
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(selectingOnly.created).toHaveLength(0);
+    expect(selectingOnly.skipped[0]?.reason).toBe('vacancy_unavailable');
+
+    const openVacancy = addOpenVacancy(state, 'open-vacancy-2');
+    openVacancy.openedAtDay = 721;
     const result = processCareerOpportunitySignal({
       state,
       signal,
@@ -418,16 +434,16 @@ describe('career opportunity orchestrator', () => {
     });
     expect(result.created).toHaveLength(1);
     expect(result.created[0]).toMatchObject({
-      vacancyId: vacancy.vacancyId,
+      vacancyId: openVacancy.vacancyId,
       source: {
         sourceType: 'vacancy',
-        sourceId: `vacancy:${vacancy.vacancyId}`,
+        sourceId: `vacancy:${openVacancy.vacancyId}`,
       },
     });
     state.career.opportunities.push(...result.created);
     const replay = processCareerOpportunitySignal({
       state,
-      signal: { ...signal, signalId: 'assessment-selecting-vacancy-replay' },
+      signal: { ...signal, signalId: 'assessment-open-vacancy-replay' },
       currentDay: 721,
       idFactory: () => 'should-not-create-again',
       definitions: [definition],
