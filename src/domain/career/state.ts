@@ -166,6 +166,8 @@ export interface CareerOpportunityBase {
   /** 机会状态 */
   status: CareerOpportunityStatus;
   source: CareerOpportunitySource;
+  /** 关联的真实组织 Vacancy；非 Vacancy 机会为 null。 */
+  vacancyId: string | null;
   /**
    * 创建机会时冻结的完整触发信号。后续资格复核和培训效果必须使用此快照，
    * 而不能从可变的当前状态推断一个信号。

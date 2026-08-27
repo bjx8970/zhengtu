@@ -95,6 +95,35 @@ export function cancelCareerOpportunity(
 }
 
 /**
+ * 因关联 Vacancy 关闭而使机会失效。
+ *
+ * 该转换不触碰组织状态；组织 Vacancy 的终态由 Vacancy 事务独立提交。
+ *
+ * @param opportunity 当前机会
+ * @param currentDay 失效绝对日
+ * @returns 失效转换结果
+ */
+export function invalidateCareerOpportunity(
+  opportunity: CareerOpportunity,
+  currentDay: number,
+): CareerOpportunityLifecycleResult {
+  if (
+    opportunity.status !== 'available' &&
+    opportunity.status !== 'accepted' &&
+    opportunity.status !== 'in_process'
+  )
+    return { success: false, opportunity: null };
+  const next = cloneOpportunity(opportunity);
+  next.status = 'cancelled';
+  next.acceptedAtDay = null;
+  next.rejectedAtDay = null;
+  next.resolvedAtDay = null;
+  next.cancelledAtDay = currentDay;
+  next.finalOutcome = null;
+  return { success: true, opportunity: next };
+}
+
+/**
  * 使到期的可用机会失效。
  *
  * @param opportunity 当前机会

@@ -11,7 +11,7 @@ import { getConfigLoader } from '../../config/loader';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { EventInstance } from '../../domain/events/state';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
-import { transitionPlayerSeat } from '../transactions/organization-seat-transaction';
+import { fillVacancyInTransaction } from '../transactions/vacancy-transaction';
 
 function makeSignal(signalId: string, occurredAtDay = 0): DomainSignalSnapshot {
   return {
@@ -158,12 +158,23 @@ describe('event timeline integration', () => {
       leadershipRank: leaderPosition.leadershipRank,
       probation: null,
     });
+    const targetVacancy = state.organization.vacancies.find(
+      (vacancy) => vacancy.positionId === leaderPosition.id && vacancy.status === 'open',
+    );
+    expect(targetVacancy).toBeDefined();
+    if (!targetVacancy) return;
     expect(
-      transitionPlayerSeat(
-        state.organization,
-        state.career.appointment.appointmentId,
-        state.career.appointment,
-      ),
+      fillVacancyInTransaction(state, {
+        vacancyId: targetVacancy.vacancyId,
+        occupant: { type: 'player', id: 'player' },
+        appointmentId: state.career.appointment.appointmentId,
+        selectionId: targetVacancy.selectionId,
+        opportunityId: null,
+        currentDay: state.career.appointment.startedAtDay,
+        idFactory: () => 'timeline-vacancy-id',
+        previousAppointmentId: state.career.appointment.appointmentId,
+        releasedSeatReason: 'promotion',
+      }).success,
     ).toBe(true);
     const openExperience = state.career.experiences[0];
     expect(openExperience).toBeDefined();
@@ -309,12 +320,23 @@ describe('event timeline integration', () => {
       leadershipRank: leaderPosition.leadershipRank,
       probation: null,
     });
+    const targetVacancy = state.organization.vacancies.find(
+      (vacancy) => vacancy.positionId === leaderPosition.id && vacancy.status === 'open',
+    );
+    expect(targetVacancy).toBeDefined();
+    if (!targetVacancy) return;
     expect(
-      transitionPlayerSeat(
-        state.organization,
-        state.career.appointment.appointmentId,
-        state.career.appointment,
-      ),
+      fillVacancyInTransaction(state, {
+        vacancyId: targetVacancy.vacancyId,
+        occupant: { type: 'player', id: 'player' },
+        appointmentId: state.career.appointment.appointmentId,
+        selectionId: targetVacancy.selectionId,
+        opportunityId: null,
+        currentDay: state.career.appointment.startedAtDay,
+        idFactory: () => 'timeline-vacancy-id',
+        previousAppointmentId: state.career.appointment.appointmentId,
+        releasedSeatReason: 'promotion',
+      }).success,
     ).toBe(true);
     const openExperience = state.career.experiences[0];
     expect(openExperience).toBeDefined();

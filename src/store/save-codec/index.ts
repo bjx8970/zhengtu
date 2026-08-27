@@ -1,9 +1,9 @@
 /**
- * 存档严格解码器（Schema 12）
+ * 存档严格解码器（Schema 13）
  *
- * 只接受当前版本（Schema 12）的完整 SaveEnvelope，拒绝所有其他格式。
+ * 只接受当前版本（Schema 13）的完整 SaveEnvelope，拒绝所有其他格式。
  * Schema 1 存档拒绝前保留只读备份。
- * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 链式迁移。
+ * 支持 Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 链式迁移。
  *
  * 领域枚举使用 domain/ 单一事实来源，不重复声明。
  */
@@ -273,6 +273,9 @@ const CareerOpportunityBaseSchema = z
         description: z.string(),
       })
       .strict(),
+    // Schema 13 links leadership opportunities to one real organization Vacancy.
+    // Historical opportunities may not have the link and are deterministically null.
+    vacancyId: z.string().min(1).nullable().default(null),
     // Schema 8 saves predate frozen trigger payloads. Decode them as null rather
     // than fabricating a payload which could accidentally satisfy signal fields.
     sourceSignal: DomainSignalSnapshotSchema.nullable().default(null),
@@ -2187,13 +2190,13 @@ export function migrateSchema10RankQuotaContent(
 }
 
 /**
- * 将 Schema 10 存档迁移至当前 Schema 12（函数名保留以兼容既有调用方）。
+ * 将 Schema 10 存档迁移至当前 Schema 13（函数名保留以兼容既有调用方）。
  *
  * 旧存档没有可恢复的 NPC 历史，因此只在迁移日确定性建立配置干部池；不会
  * 伪造迁移日前的 NPC 考核或任职年限。玩家当前有效任职映射到唯一实际 Seat。
  *
  * @param prev 已完成 Schema 10 内容迁移的 SaveEnvelope
- * @returns 包含组织世界状态和离任账本的 Schema 12 SaveEnvelope
+ * @returns 包含组织世界状态、离任账本和 Vacancy 审计字段的 Schema 13 SaveEnvelope
  */
 export function migrateSchema10To11(prev: Record<string, unknown>): Record<string, unknown> {
   if (prev.schemaVersion !== 10) return prev;
@@ -2216,7 +2219,7 @@ export function migrateSchema10To11(prev: Record<string, unknown>): Record<strin
   return migrateSchema11To12(migrated);
 }
 
-/** 将 Schema 11 的组织世界升级为 Schema 12，并建立空的离任事实账本。 */
+/** 将 Schema 11 的组织世界升级至当前版本，并建立空的离任事实账本。 */
 export function migrateSchema11To12(prev: Record<string, unknown>): Record<string, unknown> {
   if (prev.schemaVersion !== 11) return prev;
   const migrated = structuredClone(prev);
@@ -2229,6 +2232,165 @@ export function migrateSchema11To12(prev: Record<string, unknown>): Record<strin
     throw new Error('Schema 11 organization departures must be an array');
   migrated.schemaVersion = 12;
   migrated.contentVersion = CURRENT_CONTENT_VERSION;
+  // 保持该公开迁移入口对旧调用方的“迁移到当前版本”语义。
+  return migrateSchema12To13(migrated);
+}
+
+/** 从机会 sourceId 移除恰好一个 vacancy 命名空间，恢复 raw Vacancy ID。 */
+function rawVacancyIdFromSourceId(sourceId: unknown): string | null {
+  const prefix = 'vacancy:';
+  if (typeof sourceId !== 'string' || !sourceId.startsWith(prefix)) return null;
+  const rawVacancyId = sourceId.slice(prefix.length);
+  return rawVacancyId.trim().length > 0 ? rawVacancyId : null;
+}
+
+/**
+ * 将 Schema 12 的 Vacancy/机会结构升级至 Schema 13。
+ *
+ * 这是向后兼容的字段补齐与组织事实回填：缺失终态字段才使用确定性的 null
+ * 默认值；已存在但类型错误的字段必须保留，让严格 Schema 报告存档损坏，而不是静默修正。
+ *
+ * @param prev Schema 12 SaveEnvelope
+ * @returns Schema 13 SaveEnvelope
+ */
+export function migrateSchema12To13(prev: Record<string, unknown>): Record<string, unknown> {
+  if (prev.schemaVersion !== 12) return prev;
+  const migrated = structuredClone(prev);
+  const state = migrated.state as Record<string, unknown> | undefined;
+  if (!state || typeof state.organization !== 'object' || state.organization === null)
+    throw new Error('Schema 12 save is missing organization state');
+  const organization = state.organization as Record<string, unknown>;
+  if (!Array.isArray(organization.vacancies))
+    throw new Error('Schema 12 organization vacancies must be an array');
+  if (!Array.isArray(organization.seats))
+    throw new Error('Schema 12 organization seats must be an array');
+  if (!Array.isArray(organization.processedProducerKeys))
+    throw new Error('Schema 12 organization processedProducerKeys must be an array');
+  for (const value of organization.vacancies) {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new Error('Schema 12 organization vacancies contain an invalid entry');
+    const vacancy = value as Record<string, unknown>;
+    if (vacancy.filledBy === undefined) vacancy.filledBy = null;
+    if (vacancy.filledAppointmentId === undefined) vacancy.filledAppointmentId = null;
+    if (vacancy.cancellationReason === undefined) vacancy.cancellationReason = null;
+  }
+
+  const initializedAtDay = organization.initializedAtDay;
+  if (
+    typeof initializedAtDay !== 'number' ||
+    !Number.isInteger(initializedAtDay) ||
+    initializedAtDay < 0
+  ) {
+    throw new Error('Schema 12 organization initializedAtDay must be a non-negative integer');
+  }
+  const vacancies = organization.vacancies as unknown[];
+  const processedProducerKeys = organization.processedProducerKeys as unknown[];
+  const seats = organization.seats
+    .map((value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        throw new Error('Schema 12 organization seats contain an invalid entry');
+      const seat = value as Record<string, unknown>;
+      if (typeof seat.seatId !== 'string' || seat.seatId.length === 0)
+        throw new Error('Schema 12 organization seat has an invalid seatId');
+      return seat;
+    })
+    .sort((left, right) => (left.seatId as string).localeCompare(right.seatId as string));
+  const seatIds = new Set<string>();
+  for (const seat of seats) {
+    const seatId = seat.seatId as string;
+    if (seatIds.has(seatId)) throw new Error(`Schema 12 has duplicate seat identity ${seatId}`);
+    seatIds.add(seatId);
+    if (seat.occupant !== null) continue;
+
+    const vacancyId = `vacancy:initial:${seatId}`;
+    const processedKey = vacancyId;
+    const activeVacancy = vacancies.find((value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+      const vacancy = value as Record<string, unknown>;
+      return (
+        vacancy.seatId === seatId && (vacancy.status === 'open' || vacancy.status === 'selecting')
+      );
+    });
+    const existingById = vacancies.find((value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+      return (value as Record<string, unknown>).vacancyId === vacancyId;
+    });
+    const keyExists = processedProducerKeys.includes(processedKey);
+    const expected = {
+      vacancyId,
+      seatId,
+      positionId: seat.positionId,
+      positionNameSnapshot: seat.positionNameSnapshot,
+      institutionId: seat.institutionId,
+      institutionNameSnapshot: seat.institutionNameSnapshot,
+      regionId: seat.regionId,
+      institutionLevel: seat.institutionLevel,
+      positionDomain: seat.positionDomain,
+      leadershipRank: seat.leadershipRank,
+      openedAtDay: initializedAtDay,
+      reason: 'initial_opening',
+      status: 'open',
+      sourceType: 'system',
+      sourceId: `initial:${seatId}`,
+      closesAtDay: null,
+      closedAtDay: null,
+      selectionId: null,
+      filledBy: null,
+      filledAppointmentId: null,
+      cancellationReason: null,
+    } as const;
+    const matchesExpected =
+      existingById !== undefined &&
+      Object.entries(expected).every(([field, value]) => {
+        return (existingById as Record<string, unknown>)[field] === value;
+      });
+
+    if (existingById && !matchesExpected)
+      throw new Error(`Schema 12 initial Vacancy ID conflict: ${vacancyId}`);
+    if (keyExists && !matchesExpected)
+      throw new Error(`Schema 12 initial Vacancy producer key conflict: ${processedKey}`);
+    if (activeVacancy) {
+      // Existing active vacancies already represent this empty Seat; migration must not fork it.
+      continue;
+    }
+    if (matchesExpected) {
+      if (!keyExists) processedProducerKeys.push(processedKey);
+      continue;
+    }
+
+    vacancies.push(expected);
+    processedProducerKeys.push(processedKey);
+  }
+
+  const career = state.career as Record<string, unknown> | undefined;
+  if (!career || !Array.isArray(career.opportunities))
+    throw new Error('Schema 12 save is missing career opportunities');
+  const vacancyIds = new Set(
+    vacancies.flatMap((value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+      const vacancyId = (value as Record<string, unknown>).vacancyId;
+      return typeof vacancyId === 'string' ? [vacancyId] : [];
+    }),
+  );
+  for (const value of career.opportunities) {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new Error('Schema 12 career opportunities contain an invalid entry');
+    const opportunity = value as Record<string, unknown>;
+    if (opportunity.vacancyId !== undefined) continue;
+    const source = opportunity.source;
+    const sourceRecord =
+      source && typeof source === 'object' && !Array.isArray(source)
+        ? (source as Record<string, unknown>)
+        : null;
+    const candidateVacancyId =
+      sourceRecord?.sourceType === 'vacancy'
+        ? rawVacancyIdFromSourceId(sourceRecord.sourceId)
+        : null;
+    opportunity.vacancyId =
+      candidateVacancyId !== null && vacancyIds.has(candidateVacancyId) ? candidateVacancyId : null;
+  }
+  migrated.schemaVersion = 13;
+  migrated.contentVersion = CURRENT_CONTENT_VERSION;
   return migrated;
 }
 
@@ -2237,9 +2399,10 @@ export function migrateSchema11To12(prev: Record<string, unknown>): Record<strin
  *
  * 支持从 MIN_MIGRATABLE_SCHEMA_VERSION 开始的确定性迁移：
  * - 低于可迁移版本：拒绝为 legacy；
- * - Schema 2–10：按版本顺序链式迁移至 Schema 12；
- * - Schema 11：补齐离任事实账本后迁移至 Schema 12；
- * - 当前版本（Schema 12）：直接解码；
+ * - Schema 2–10：按版本顺序链式迁移至 Schema 13；
+ * - Schema 11：补齐离任事实账本后迁移至 Schema 13；
+ * - Schema 12：补齐 Vacancy 终态审计字段并回填初始空缺后迁移至 Schema 13；
+ * - 当前版本（Schema 13）：直接解码；
  * - 高于当前版本：拒绝为 future。
  *
  * @param data 已解析的存档数据
@@ -2322,6 +2485,7 @@ export function decodeCurrentSaveData(data: unknown): SaveDecodeResult {
     target = migrateSchema10Phase3ReleaseContent(target as Record<string, unknown>);
     target = migrateSchema10To11(target as Record<string, unknown>);
     target = migrateSchema11To12(target as Record<string, unknown>);
+    target = migrateSchema12To13(target as Record<string, unknown>);
   } catch (e) {
     return {
       success: false,
