@@ -38,18 +38,21 @@ describe('App routes', () => {
     const loader = getConfigLoader();
     const definitions = loader.getAllCareerOpportunityDefinitions();
     const deputy = definitions.find((item) => item.id === 'township_deputy_leadership_vacancy');
-    const scoreCondition = deputy?.conditions.find(
-      (condition) => 'signalField' in condition && condition.signalField === 'score',
+    const assessmentCondition = deputy?.conditions.find(
+      (condition) =>
+        'careerCheck' in condition &&
+        condition.careerCheck === 'assessment_history' &&
+        condition.check === 'qualified_count',
     );
-    if (!scoreCondition || !('signalField' in scoreCondition))
-      throw new Error('Expected deputy score condition');
-    scoreCondition.value = 101;
+    if (!assessmentCondition || !('careerCheck' in assessmentCondition))
+      throw new Error('Expected deputy assessment-history condition');
+    assessmentCondition.value = 3;
     vi.spyOn(loader, 'getAllCareerOpportunityDefinitions').mockReturnValue(definitions);
     window.location.hash = '#/career';
 
     render(() => <App />);
 
-    expect(screen.getByTestId('township-deputy-readiness')).toHaveTextContent('不少于 101');
+    expect(screen.getByTestId('township-deputy-readiness')).toHaveTextContent('不少于 3');
   });
 
   it('exposes the policy and event interaction routes', () => {

@@ -100,6 +100,151 @@ describe('domain signal production', () => {
     ]);
   });
 
+  it.each([
+    {
+      signalType: 'vacancy.filled' as const,
+      data: {
+        vacancyId: 'vacancy-close-test',
+        seatId: 'seat:admin_l2_0:1',
+        positionId: 'admin_l2_0',
+        institutionId: 'township_govt_01',
+        regionId: 'region_qingyun_town',
+        selectionId: null,
+        occupantType: 'npc' as const,
+        occupantId: 'cadre-test',
+      },
+    },
+    {
+      signalType: 'vacancy.cancelled' as const,
+      data: {
+        vacancyId: 'vacancy-close-test',
+        seatId: 'seat:admin_l2_0:1',
+        positionId: 'admin_l2_0',
+        institutionId: 'township_govt_01',
+        regionId: 'region_qingyun_town',
+        cancellationReason: 'expired' as const,
+      },
+    },
+  ])(
+    'only invalidates opportunities bound to a closed Vacancy ($signalType)',
+    ({ signalType, data }) => {
+      const loader = getConfigLoader();
+      const definition: CareerOpportunityDefinition = {
+        id: 'vacancy-close-test-opportunity',
+        type: 'leadership_vacancy',
+        triggerSignals: ['vacancy.opened'],
+        conditions: [],
+        expiresAfterDays: null,
+        repeatPolicy: 'once_per_source',
+        cooldownDays: 0,
+        requiresSelection: false,
+        reasonTemplate: '',
+        targetPositionId: 'admin_l2_0',
+        appointmentType: 'substantive',
+        appointmentReason: 'promotion',
+      };
+      vi.spyOn(loader, 'getCareerOpportunityDefinitionsBySignal').mockReturnValue([definition]);
+      const state = createInitialState();
+      const seat = state.organization.seats.find((item) => item.seatId === data.seatId);
+      if (!seat) throw new Error('Expected test Vacancy seat');
+      state.organization.vacancies.push({
+        vacancyId: data.vacancyId,
+        seatId: seat.seatId,
+        positionId: seat.positionId,
+        positionNameSnapshot: seat.positionNameSnapshot,
+        institutionId: seat.institutionId,
+        institutionNameSnapshot: seat.institutionNameSnapshot,
+        regionId: seat.regionId,
+        institutionLevel: seat.institutionLevel,
+        positionDomain: seat.positionDomain,
+        leadershipRank: seat.leadershipRank,
+        openedAtDay: 0,
+        reason: 'promotion',
+        status: 'open',
+        sourceType: 'system',
+        sourceId: 'vacancy-close-test',
+        closesAtDay: null,
+        closedAtDay: null,
+        selectionId: null,
+        filledBy: null,
+        filledAppointmentId: null,
+        cancellationReason: null,
+      });
+      processCascadeSignals(
+        state,
+        [
+          {
+            signalId: 'vacancy-open-test',
+            signalType: 'vacancy.opened',
+            occurredAtDay: 0,
+            data: {
+              vacancyId: data.vacancyId,
+              seatId: data.seatId,
+              positionId: data.positionId,
+              institutionId: data.institutionId,
+              regionId: data.regionId,
+              reason: 'promotion',
+            },
+          },
+        ],
+        0,
+        () => 0,
+        () => 'vacancy-close-opportunity',
+        loader.getAllEventDefinitions(),
+      );
+      const bound = state.career.opportunities[0];
+      if (!bound) throw new Error('Expected Vacancy opportunity');
+      const unrelated = structuredClone(bound);
+      unrelated.id = 'unrelated-vacancy-opportunity';
+      unrelated.vacancyId = 'another-vacancy';
+      state.career.opportunities.push(unrelated);
+
+      const closingSignal: DomainSignalSnapshot =
+        signalType === 'vacancy.filled'
+          ? {
+              signalId: `vacancy-close-${signalType}`,
+              signalType,
+              occurredAtDay: 1,
+              data: {
+                vacancyId: data.vacancyId,
+                seatId: data.seatId,
+                positionId: data.positionId,
+                institutionId: data.institutionId,
+                regionId: data.regionId,
+                selectionId: null,
+                occupantType: 'npc',
+                occupantId: 'cadre-test',
+              },
+            }
+          : {
+              signalId: `vacancy-close-${signalType}`,
+              signalType,
+              occurredAtDay: 1,
+              data: {
+                vacancyId: data.vacancyId,
+                seatId: data.seatId,
+                positionId: data.positionId,
+                institutionId: data.institutionId,
+                regionId: data.regionId,
+                cancellationReason: 'expired',
+              },
+            };
+      processCascadeSignals(
+        state,
+        [closingSignal],
+        1,
+        () => 0,
+        () => 'vacancy-close-signal',
+        loader.getAllEventDefinitions(),
+      );
+
+      expect(state.career.opportunities).toMatchObject([
+        { id: bound.id, vacancyId: data.vacancyId, status: 'cancelled' },
+        { id: unrelated.id, vacancyId: 'another-vacancy', status: 'available' },
+      ]);
+    },
+  );
+
   it('START_ACTION 冻结完整执行快照，配置移除和边界漂移后仍按原语义完成', () => {
     const loader = getConfigLoader();
     const actionEvent = eventDefinition('action-completed-test', 'action.completed');

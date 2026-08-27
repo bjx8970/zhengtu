@@ -17,6 +17,7 @@ function createTrainingOpportunity(): TrainingCareerOpportunity {
     status: 'available',
     source: { sourceType: 'assessment', sourceId: 'assessment-1', signalId: null, description: '' },
     sourceSignal: null,
+    vacancyId: null,
     target: null,
     appointmentType: null,
     appointmentReason: null,

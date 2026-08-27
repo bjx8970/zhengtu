@@ -210,6 +210,12 @@ function signalCanOccur(
       return context.hasRankProgression;
     case 'appointment.changed':
       return context.hasAppointmentOpportunity;
+    case 'vacancy.opened':
+    case 'vacancy.filled':
+    case 'vacancy.cancelled':
+      // Vacancy 信号由动态组织世界 producer 产生；Phase 3 目录只能证明存在
+      // 岗位机会消费者，不能在静态图中展开具体 Seat/干部生命周期。
+      return context.hasAppointmentOpportunity;
   }
 }
 

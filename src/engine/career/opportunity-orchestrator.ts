@@ -7,13 +7,13 @@
 import type { CareerOpportunity, CareerOpportunitySource } from '../../domain/career/state';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type { PlayerSave } from '../../types/player';
+import type { VacancyInstance } from '../../types/organization';
 import type {
   CareerExperienceQualificationRules,
   CareerOpportunityDefinition,
 } from '../../types/config';
 import type { InstitutionConfig, PositionConfigV2 } from '../../types/position-v2';
 import { evaluateCondition } from '../events/condition-interpreter';
-import { hasVacantOrganizationSeat } from '../organization/organization-selectors';
 
 /** 机会生成输入。 */
 export interface ProcessCareerOpportunitySignalParams {
@@ -60,6 +60,10 @@ export function deriveCareerOpportunitySourceKey(signal: DomainSignalSnapshot): 
       return `event:${signal.data.eventInstanceId}`;
     case 'appointment.changed':
       return `appointment:${signal.data.experienceId}`;
+    case 'vacancy.opened':
+    case 'vacancy.filled':
+    case 'vacancy.cancelled':
+      return `vacancy:${signal.data.vacancyId}`;
     case 'civil_service_rank.changed':
       return `rank:${signal.data.rankChangeId}`;
     case 'world.metric_changed':
@@ -74,7 +78,9 @@ function sourceFor(signal: DomainSignalSnapshot): CareerOpportunitySource {
       ? 'policy'
       : signal.signalType.startsWith('event')
         ? 'event'
-        : 'system';
+        : signal.signalType.startsWith('vacancy')
+          ? 'vacancy'
+          : 'system';
   return {
     sourceType,
     sourceId: deriveCareerOpportunitySourceKey(signal),
@@ -93,15 +99,64 @@ function hasOpportunity(
   );
 }
 
-function hasNonTerminalOpportunity(state: Readonly<PlayerSave>, definitionId: string): boolean {
+function hasNonTerminalOpportunity(
+  state: Readonly<PlayerSave>,
+  definitionId: string,
+  vacancyId?: string,
+): boolean {
   return hasOpportunity(
     state,
     definitionId,
     (opportunity) =>
-      opportunity.status === 'available' ||
-      opportunity.status === 'accepted' ||
-      opportunity.status === 'in_process',
+      (vacancyId === undefined || opportunity.vacancyId === vacancyId) &&
+      (opportunity.status === 'available' ||
+        opportunity.status === 'accepted' ||
+        opportunity.status === 'in_process'),
   );
+}
+
+function vacancyForLeadershipDefinition(
+  state: Readonly<PlayerSave>,
+  signal: DomainSignalSnapshot,
+  definition: CareerOpportunityDefinition,
+): VacancyInstance | null {
+  if (definition.type !== 'leadership_vacancy') return null;
+  if (signal.signalType === 'vacancy.opened') {
+    if (definition.targetPositionId !== signal.data.positionId) return null;
+    const vacancy = state.organization.vacancies.find(
+      (item) =>
+        item.vacancyId === signal.data.vacancyId &&
+        item.positionId === signal.data.positionId &&
+        item.institutionId === signal.data.institutionId &&
+        item.regionId === signal.data.regionId,
+    );
+    return vacancy?.status === 'open' ? vacancy : null;
+  }
+  if (signal.signalType !== 'assessment.completed') return null;
+  return (
+    state.organization.vacancies
+      .filter(
+        (item) =>
+          item.positionId === definition.targetPositionId &&
+          (item.status === 'open' || item.status === 'selecting'),
+      )
+      .sort(
+        (left, right) =>
+          left.openedAtDay - right.openedAtDay || left.vacancyId.localeCompare(right.vacancyId),
+      )[0] ?? null
+  );
+}
+
+function sourceForVacancy(
+  signal: DomainSignalSnapshot,
+  vacancy: VacancyInstance,
+): CareerOpportunitySource {
+  return {
+    sourceType: 'vacancy',
+    sourceId: `vacancy:${vacancy.vacancyId}`,
+    signalId: signal.signalId,
+    description: signal.signalType,
+  };
 }
 
 /**
@@ -117,7 +172,12 @@ export function processCareerOpportunitySignal(
   const skipped: CareerOpportunityGenerationResult['skipped'] = [];
   for (const definition of params.definitions) {
     if (!definition.triggerSignals.includes(params.signal.signalType)) continue;
-    const source = sourceFor(params.signal);
+    const vacancy = vacancyForLeadershipDefinition(params.state, params.signal, definition);
+    if (definition.type === 'leadership_vacancy' && !vacancy) {
+      skipped.push({ definitionId: definition.id, reason: 'vacancy_unavailable' });
+      continue;
+    }
+    const source = vacancy ? sourceForVacancy(params.signal, vacancy) : sourceFor(params.signal);
     if (
       !definition.conditions.every((condition) =>
         evaluateCondition(condition, {
@@ -135,11 +195,12 @@ export function processCareerOpportunitySignal(
     // A definition represents one actionable process at a time. This remains true
     // for repeatable definitions with a zero-day cooldown, which may recur only
     // after the prior opportunity reaches a terminal state.
-    if (hasNonTerminalOpportunity(params.state, definition.id)) {
+    if (hasNonTerminalOpportunity(params.state, definition.id, vacancy?.vacancyId)) {
       skipped.push({ definitionId: definition.id, reason: 'duplicate' });
       continue;
     }
     if (
+      !vacancy &&
       definition.repeatPolicy === 'once' &&
       hasOpportunity(params.state, definition.id, () => true)
     ) {
@@ -157,7 +218,7 @@ export function processCareerOpportunitySignal(
       skipped.push({ definitionId: definition.id, reason: 'duplicate' });
       continue;
     }
-    if (definition.repeatPolicy === 'repeatable' && definition.cooldownDays > 0) {
+    if (!vacancy && definition.repeatPolicy === 'repeatable' && definition.cooldownDays > 0) {
       const latestAppearance = params.state.career.opportunities
         .filter((opportunity) => opportunity.definitionId === definition.id)
         .reduce<number | null>(
@@ -179,6 +240,7 @@ export function processCareerOpportunitySignal(
       status: 'available' as const,
       source,
       sourceSignal: structuredClone(params.signal),
+      vacancyId: vacancy?.vacancyId ?? null,
       appearedAtDay: params.currentDay,
       expiresAtDay:
         definition.expiresAfterDays === null
@@ -214,12 +276,7 @@ export function processCareerOpportunitySignal(
     const institution = position
       ? params.institutions.find((item) => item.id === position.institutionId)
       : null;
-    if (
-      !position ||
-      !institution ||
-      (definition.type === 'leadership_vacancy' &&
-        !hasVacantOrganizationSeat(params.state.organization, position.id))
-    ) {
+    if (!position || !institution || (definition.type === 'leadership_vacancy' && !vacancy)) {
       skipped.push({
         definitionId: definition.id,
         reason: !position || !institution ? 'target_not_found' : 'vacancy_unavailable',
@@ -232,14 +289,14 @@ export function processCareerOpportunitySignal(
       appointmentType: definition.appointmentType,
       appointmentReason: definition.appointmentReason,
       target: {
-        positionId: position.id,
-        positionName: position.name,
-        institutionId: institution.id,
-        institutionName: institution.name,
-        regionId: position.regionId,
-        institutionLevel: position.institutionLevel,
-        positionDomain: position.positionDomain,
-        leadershipRank: position.leadershipRank,
+        positionId: vacancy?.positionId ?? position.id,
+        positionName: vacancy?.positionNameSnapshot ?? position.name,
+        institutionId: vacancy?.institutionId ?? institution.id,
+        institutionName: vacancy?.institutionNameSnapshot ?? institution.name,
+        regionId: vacancy?.regionId ?? position.regionId,
+        institutionLevel: vacancy?.institutionLevel ?? position.institutionLevel,
+        positionDomain: vacancy?.positionDomain ?? position.positionDomain,
+        leadershipRank: vacancy?.leadershipRank ?? position.leadershipRank,
       },
     });
   }

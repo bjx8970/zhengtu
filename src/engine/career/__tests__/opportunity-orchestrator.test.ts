@@ -3,10 +3,68 @@
 import { describe, expect, it } from 'vitest';
 import { getConfigLoader } from '../../../config/loader';
 import type { CareerOpportunityDefinition } from '../../../types/config';
+import type { DomainSignalSnapshot } from '../../../domain/governance/types';
+import type { VacancyInstance } from '../../../types/organization';
 import { createInitialState } from '../../../store/game-store';
 import { expireCareerOpportunity } from '../career-opportunity-lifecycle';
-import { processCareerOpportunitySignal } from '../opportunity-orchestrator';
+import {
+  deriveCareerOpportunitySourceKey,
+  processCareerOpportunitySignal,
+} from '../opportunity-orchestrator';
 import { evaluateCareerOpportunityAcceptanceEligibility } from '../career-opportunity-eligibility';
+
+function addOpenVacancy(
+  state: ReturnType<typeof createInitialState>,
+  vacancyId: string,
+  positionId = 'admin_l2_0',
+): VacancyInstance {
+  const existing = state.organization.vacancies.find(
+    (item) => item.positionId === positionId && item.status === 'open',
+  );
+  if (existing) {
+    existing.vacancyId = vacancyId;
+    existing.sourceId = 'departure-1';
+    return existing;
+  }
+  const seat = state.organization.seats.find((item) => item.positionId === positionId);
+  if (!seat) throw new Error(`Expected vacant seat for ${positionId}`);
+  const vacancy: VacancyInstance = {
+    vacancyId,
+    seatId: seat.seatId,
+    positionId: seat.positionId,
+    positionNameSnapshot: seat.positionNameSnapshot,
+    institutionId: seat.institutionId,
+    institutionNameSnapshot: seat.institutionNameSnapshot,
+    regionId: seat.regionId,
+    institutionLevel: seat.institutionLevel,
+    positionDomain: seat.positionDomain,
+    leadershipRank: seat.leadershipRank,
+    openedAtDay: 540,
+    reason: 'retirement',
+    status: 'open',
+    sourceType: 'cadre_lifecycle',
+    sourceId: 'departure-1',
+    closesAtDay: null,
+    closedAtDay: null,
+    selectionId: null,
+    filledBy: null,
+    filledAppointmentId: null,
+    cancellationReason: null,
+  };
+  state.organization.vacancies.push(vacancy);
+  return vacancy;
+}
+
+function makeDeputyReady(state: ReturnType<typeof createInitialState>): void {
+  if (!state.career.appointment.probation) throw new Error('Expected probation');
+  state.career.appointment.probation.status = 'passed';
+  state.career.civilServiceRank = 'clerk_1';
+  state.world.facts.assigned_project_delivered = true;
+  state.assessments.annualAssessments.push(
+    { year: 2026, score: 70, tier: '称职' },
+    { year: 2027, score: 80, tier: '称职' },
+  );
+}
 
 describe('career opportunity orchestrator', () => {
   const assessmentTrainingDefinition: CareerOpportunityDefinition = {
@@ -23,6 +81,60 @@ describe('career opportunity orchestrator', () => {
     trainingDefinitionId: 'training-1',
     effects: [],
   };
+
+  it.each(['vacancy.opened', 'vacancy.filled', 'vacancy.cancelled'] as const)(
+    '%s uses vacancyId as a stable career source key',
+    (signalType) => {
+      const signal: DomainSignalSnapshot =
+        signalType === 'vacancy.opened'
+          ? {
+              signalId: 'signal-1',
+              signalType,
+              occurredAtDay: 1,
+              data: {
+                vacancyId: 'vacancy-1',
+                seatId: 'seat-1',
+                positionId: 'position-1',
+                institutionId: 'institution-1',
+                regionId: 'region-1',
+                reason: 'retirement',
+              },
+            }
+          : signalType === 'vacancy.filled'
+            ? {
+                signalId: 'signal-2',
+                signalType,
+                occurredAtDay: 1,
+                data: {
+                  vacancyId: 'vacancy-1',
+                  seatId: 'seat-1',
+                  positionId: 'position-1',
+                  institutionId: 'institution-1',
+                  regionId: 'region-1',
+                  selectionId: null,
+                  occupantType: 'npc',
+                  occupantId: 'cadre-1',
+                },
+              }
+            : {
+                signalId: 'signal-3',
+                signalType,
+                occurredAtDay: 1,
+                data: {
+                  vacancyId: 'vacancy-1',
+                  seatId: 'seat-1',
+                  positionId: 'position-1',
+                  institutionId: 'institution-1',
+                  regionId: 'region-1',
+                  cancellationReason: 'expired',
+                },
+              };
+      expect(deriveCareerOpportunitySourceKey(signal)).toBe('vacancy:vacancy-1');
+      expect(deriveCareerOpportunitySourceKey({ ...signal, signalId: 'different-signal' })).toBe(
+        'vacancy:vacancy-1',
+      );
+    },
+  );
 
   it('creates an assessment opportunity once per source signal', () => {
     const state = createInitialState();
@@ -94,11 +206,19 @@ describe('career opportunity orchestrator', () => {
       { year: 2026, score: 70, tier: '称职' },
       { year: 2027, score: 80, tier: '称职' },
     );
+    const vacancy = addOpenVacancy(state, 'vacancy-deputy-1');
     const signal = {
-      signalId: 'assessment-2027',
-      signalType: 'assessment.completed' as const,
+      signalId: 'vacancy-deputy-1-opened',
+      signalType: 'vacancy.opened' as const,
       occurredAtDay: 540,
-      data: { year: 2027, score: 80, tier: '称职' },
+      data: {
+        vacancyId: vacancy.vacancyId,
+        seatId: vacancy.seatId,
+        positionId: vacancy.positionId,
+        institutionId: vacancy.institutionId,
+        regionId: vacancy.regionId,
+        reason: vacancy.reason,
+      },
     };
     const result = processCareerOpportunitySignal({
       state,
@@ -137,7 +257,7 @@ describe('career opportunity orchestrator', () => {
     });
     const replay = processCareerOpportunitySignal({
       state,
-      signal: { ...signal, signalId: 'assessment-2027-replay' },
+      signal: { ...signal, signalId: 'vacancy-deputy-1-replay' },
       currentDay: 541,
       idFactory: () => 'duplicate-deputy-window',
       definitions: loader
@@ -149,16 +269,11 @@ describe('career opportunity orchestrator', () => {
     });
     expect(replay.created).toHaveLength(0);
     expect(replay.skipped[0]?.reason).toBe('duplicate');
-    const nextYear = processCareerOpportunitySignal({
+    const sameVacancyLater = processCareerOpportunitySignal({
       state,
-      signal: {
-        ...signal,
-        signalId: 'assessment-2028',
-        occurredAtDay: 900,
-        data: { ...signal.data, year: 2028 },
-      },
+      signal: { ...signal, signalId: 'vacancy-deputy-1-later', occurredAtDay: 900 },
       currentDay: 900,
-      idFactory: () => 'next-deputy-window',
+      idFactory: () => 'duplicate-deputy-window-later',
       definitions: loader
         .getCareerOpportunityDefinitionsBySignal(signal.signalType)
         .filter((item) => item.id === 'township_deputy_leadership_vacancy'),
@@ -166,7 +281,262 @@ describe('career opportunity orchestrator', () => {
       institutions: loader.getAllInstitutions(),
       daysPerYear: 360,
     });
-    expect(nextYear.created).toHaveLength(1);
+    expect(sameVacancyLater.created).toHaveLength(0);
+
+    const secondVacancy = structuredClone(vacancy);
+    secondVacancy.vacancyId = 'vacancy-deputy-2';
+    state.organization.vacancies.push(secondVacancy);
+    const differentVacancy = processCareerOpportunitySignal({
+      state,
+      signal: {
+        ...signal,
+        signalId: 'vacancy-deputy-2-opened',
+        data: {
+          ...signal.data,
+          vacancyId: secondVacancy.vacancyId,
+        },
+      },
+      currentDay: 900,
+      idFactory: () => 'deputy-window-second-vacancy',
+      definitions: loader
+        .getCareerOpportunityDefinitionsBySignal(signal.signalType)
+        .filter((item) => item.id === 'township_deputy_leadership_vacancy'),
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(differentVacancy.created).toHaveLength(1);
+    expect(differentVacancy.created[0]?.vacancyId).toBe(secondVacancy.vacancyId);
+  });
+
+  it('does not create a leadership opportunity for an empty seat without an active Vacancy', () => {
+    const state = createInitialState();
+    const loader = getConfigLoader();
+    const signal: DomainSignalSnapshot = {
+      signalId: 'missing-vacancy-opened',
+      signalType: 'vacancy.opened',
+      occurredAtDay: 10,
+      data: {
+        vacancyId: 'missing-vacancy',
+        seatId: 'seat-admin-l2-1',
+        positionId: 'admin_l2_0',
+        institutionId: 'township_govt_01',
+        regionId: 'region_qingyun_town',
+        reason: 'retirement',
+      },
+    };
+    const result = processCareerOpportunitySignal({
+      state,
+      signal,
+      currentDay: 10,
+      idFactory: () => 'should-not-create',
+      definitions: loader
+        .getCareerOpportunityDefinitionsBySignal(signal.signalType)
+        .filter((item) => item.id === 'township_deputy_leadership_vacancy'),
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(result.created).toHaveLength(0);
+    expect(result.skipped[0]?.reason).toBe('vacancy_unavailable');
+  });
+
+  it('creates a later-qualified opportunity from the first open Vacancy on assessment.completed', () => {
+    const state = createInitialState();
+    makeDeputyReady(state);
+    const vacancy = addOpenVacancy(state, 'assessment-vacancy-1');
+    const loader = getConfigLoader();
+    const definition = loader
+      .getAllCareerOpportunityDefinitions()
+      .find((item) => item.id === 'township_deputy_leadership_vacancy');
+    if (!definition) throw new Error('Expected deputy definition');
+    const result = processCareerOpportunitySignal({
+      state,
+      signal: {
+        signalId: 'assessment-after-vacancy',
+        signalType: 'assessment.completed',
+        occurredAtDay: 720,
+        data: { year: 2027, score: 80, tier: '称职' },
+      },
+      currentDay: 720,
+      idFactory: () => 'assessment-vacancy-opportunity',
+      definitions: [definition],
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(result.created).toHaveLength(1);
+    expect(result.created[0]).toMatchObject({
+      vacancyId: vacancy.vacancyId,
+      source: {
+        sourceType: 'vacancy',
+        sourceId: `vacancy:${vacancy.vacancyId}`,
+        signalId: 'assessment-after-vacancy',
+      },
+    });
+  });
+
+  it('creates and binds to a selecting Vacancy with a pending Selection on assessment.completed', () => {
+    const state = createInitialState();
+    makeDeputyReady(state);
+    const vacancy = addOpenVacancy(state, 'selecting-vacancy-1');
+    vacancy.status = 'selecting';
+    vacancy.selectionId = 'selecting-selection-1';
+    state.organization.selections.push({
+      selectionId: 'selecting-selection-1',
+      vacancyId: vacancy.vacancyId,
+      status: 'pending',
+      currentStage: 'eligibility_review',
+      startedAtDay: 720,
+      completedAtDay: null,
+      candidates: [],
+      stageAudits: [],
+      winner: null,
+      playerCareerProcessId: null,
+      randomDraws: [],
+    });
+    const loader = getConfigLoader();
+    const definition = loader
+      .getAllCareerOpportunityDefinitions()
+      .find((item) => item.id === 'township_deputy_leadership_vacancy');
+    if (!definition) throw new Error('Expected deputy definition');
+    const signal = {
+      signalId: 'assessment-selecting-vacancy',
+      signalType: 'assessment.completed' as const,
+      occurredAtDay: 720,
+      data: { year: 2027, score: 80, tier: '称职' },
+    };
+    const result = processCareerOpportunitySignal({
+      state,
+      signal,
+      currentDay: 720,
+      idFactory: () => 'selecting-vacancy-opportunity',
+      definitions: [definition],
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(result.created).toHaveLength(1);
+    expect(result.created[0]).toMatchObject({
+      vacancyId: vacancy.vacancyId,
+      source: {
+        sourceType: 'vacancy',
+        sourceId: `vacancy:${vacancy.vacancyId}`,
+      },
+    });
+    state.career.opportunities.push(...result.created);
+    const replay = processCareerOpportunitySignal({
+      state,
+      signal: { ...signal, signalId: 'assessment-selecting-vacancy-replay' },
+      currentDay: 721,
+      idFactory: () => 'should-not-create-again',
+      definitions: [definition],
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(replay.created).toHaveLength(0);
+    expect(replay.skipped[0]?.reason).toBe('duplicate');
+  });
+
+  it('retries the same Vacancy after opened-time conditions fail without creating a second opportunity', () => {
+    const state = createInitialState();
+    const vacancy = addOpenVacancy(state, 'recheck-vacancy-1');
+    const loader = getConfigLoader();
+    const definition = loader
+      .getAllCareerOpportunityDefinitions()
+      .find((item) => item.id === 'township_deputy_leadership_vacancy');
+    if (!definition) throw new Error('Expected deputy definition');
+    const opened = processCareerOpportunitySignal({
+      state,
+      signal: {
+        signalId: 'recheck-vacancy-opened',
+        signalType: 'vacancy.opened',
+        occurredAtDay: vacancy.openedAtDay,
+        data: {
+          vacancyId: vacancy.vacancyId,
+          seatId: vacancy.seatId,
+          positionId: vacancy.positionId,
+          institutionId: vacancy.institutionId,
+          regionId: vacancy.regionId,
+          reason: vacancy.reason,
+        },
+      },
+      currentDay: vacancy.openedAtDay,
+      idFactory: () => 'should-not-create',
+      definitions: [definition],
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(opened.created).toHaveLength(0);
+    expect(opened.skipped[0]?.reason).toBe('condition_failed');
+
+    makeDeputyReady(state);
+    const assessment = processCareerOpportunitySignal({
+      state,
+      signal: {
+        signalId: 'recheck-vacancy-assessment',
+        signalType: 'assessment.completed',
+        occurredAtDay: 720,
+        data: { year: 2027, score: 80, tier: '称职' },
+      },
+      currentDay: 720,
+      idFactory: () => 'recheck-vacancy-opportunity',
+      definitions: [definition],
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(assessment.created).toHaveLength(1);
+    state.career.opportunities.push(...assessment.created);
+    const replay = processCareerOpportunitySignal({
+      state,
+      signal: {
+        signalId: 'recheck-vacancy-assessment-replay',
+        signalType: 'assessment.completed',
+        occurredAtDay: 721,
+        data: { year: 2027, score: 80, tier: '称职' },
+      },
+      currentDay: 721,
+      idFactory: () => 'should-not-create-again',
+      definitions: [definition],
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(replay.created).toHaveLength(0);
+    expect(replay.skipped[0]?.reason).toBe('duplicate');
+  });
+
+  it('does not generate a leadership opportunity from assessment without an active Vacancy', () => {
+    const state = createInitialState();
+    makeDeputyReady(state);
+    state.organization.vacancies = state.organization.vacancies.filter(
+      (item) => item.positionId !== 'admin_l2_0',
+    );
+    const loader = getConfigLoader();
+    const definition = loader
+      .getAllCareerOpportunityDefinitions()
+      .find((item) => item.id === 'township_deputy_leadership_vacancy');
+    if (!definition) throw new Error('Expected deputy definition');
+    const result = processCareerOpportunitySignal({
+      state,
+      signal: {
+        signalId: 'assessment-without-vacancy',
+        signalType: 'assessment.completed',
+        occurredAtDay: 720,
+        data: { year: 2027, score: 80, tier: '称职' },
+      },
+      currentDay: 720,
+      idFactory: () => 'should-not-create',
+      definitions: [definition],
+      positions: loader.getAllPositions(),
+      institutions: loader.getAllInstitutions(),
+      daysPerYear: 360,
+    });
+    expect(result.created).toHaveLength(0);
+    expect(result.skipped[0]?.reason).toBe('vacancy_unavailable');
   });
 
   it('uses a stable assessment source and preserves once-per-source history after rejection', () => {

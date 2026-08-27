@@ -7,6 +7,8 @@ import type {
   AppointmentCareerOpportunity,
   TrainingCareerOpportunity,
 } from '../../domain/career/state';
+import type { PlayerSave } from '../../types/player';
+import type { VacancyInstance } from '../../types/organization';
 import * as effectExecutor from '../../engine/events/effect-executor';
 import { calculateKPI } from '../../engine/governance/kpi';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
@@ -29,6 +31,7 @@ function createAvailableOpportunity(id = 'opportunity-1'): AppointmentCareerOppo
       occurredAtDay: 0,
       data: { year: 2026, score: 80, tier: '称职' },
     },
+    vacancyId: 'test-vacancy',
     target: {
       positionId: 'admin_l2_0',
       positionName: 'test position',
@@ -54,6 +57,51 @@ function createAvailableOpportunity(id = 'opportunity-1'): AppointmentCareerOppo
   };
 }
 
+function addTestVacancy(state: PlayerSave, opportunity: AppointmentCareerOpportunity): void {
+  const existing = state.organization.vacancies.find(
+    (item) =>
+      item.positionId === opportunity.target.positionId &&
+      item.institutionId === opportunity.target.institutionId &&
+      item.regionId === opportunity.target.regionId &&
+      item.status === 'open',
+  );
+  if (existing) {
+    existing.vacancyId = opportunity.vacancyId ?? 'test-vacancy';
+    return;
+  }
+  const seat = state.organization.seats.find(
+    (item) =>
+      item.positionId === opportunity.target.positionId &&
+      item.institutionId === opportunity.target.institutionId &&
+      item.regionId === opportunity.target.regionId,
+  );
+  if (!seat) throw new Error('Expected an empty test vacancy seat');
+  const vacancy: VacancyInstance = {
+    vacancyId: opportunity.vacancyId ?? 'test-vacancy',
+    seatId: seat.seatId,
+    positionId: seat.positionId,
+    positionNameSnapshot: seat.positionNameSnapshot,
+    institutionId: seat.institutionId,
+    institutionNameSnapshot: seat.institutionNameSnapshot,
+    regionId: seat.regionId,
+    institutionLevel: seat.institutionLevel,
+    positionDomain: seat.positionDomain,
+    leadershipRank: seat.leadershipRank,
+    openedAtDay: 0,
+    reason: 'promotion',
+    status: 'open',
+    sourceType: 'system',
+    sourceId: 'career-opportunity-test',
+    closesAtDay: null,
+    closedAtDay: null,
+    selectionId: null,
+    filledBy: null,
+    filledAppointmentId: null,
+    cancellationReason: null,
+  };
+  state.organization.vacancies.push(vacancy);
+}
+
 function createTrainingOpportunity(id = 'training-opportunity-1'): TrainingCareerOpportunity {
   return {
     id,
@@ -72,6 +120,7 @@ function createTrainingOpportunity(id = 'training-opportunity-1'): TrainingCaree
       occurredAtDay: 0,
       data: { year: 2026, score: 80, tier: '称职' },
     },
+    vacancyId: null,
     target: null,
     appointmentType: null,
     appointmentReason: null,
@@ -110,6 +159,7 @@ describe('career opportunity reducer', () => {
         occurredAtDay: 0,
         data: { year: 2026, score: 80, tier: '称职' },
       },
+      vacancyId: 'test-vacancy',
       target: {
         positionId: 'admin_l2_0',
         positionName: '副镇长',
@@ -141,9 +191,15 @@ describe('career opportunity reducer', () => {
     });
     opportunity.appearedAtDay = 350;
     opportunity.expiresAtDay = 620;
+    const previousAppointmentId = initial.career.appointment.appointmentId;
+    const previousSeat = initial.organization.seats.find(
+      (seat) => seat.currentAppointmentId === previousAppointmentId,
+    );
+    if (!previousSeat) throw new Error('Expected initial player Seat');
     if (!opportunity.sourceSignal) throw new Error('Expected appointment trigger signal');
     opportunity.sourceSignal.occurredAtDay = 350;
     initial.career.opportunities = [opportunity];
+    addTestVacancy(initial, opportunity);
     const store = createTestStore(initial);
     let sequence = 0;
     const ids = () => `id-${++sequence}`;
@@ -171,6 +227,29 @@ describe('career opportunity reducer', () => {
     ]);
     expect(state.career.completedProcesses[0]?.stageResults).toHaveLength(6);
     expect(state.remainingBudget).toBe(6000);
+    expect(
+      state.organization.seats.filter(
+        (seat) => seat.occupant?.type === 'player' && seat.occupant.id === 'player',
+      ),
+    ).toHaveLength(1);
+    expect(state.organization.vacancies).toContainEqual(
+      expect.objectContaining({ vacancyId: opportunity.vacancyId, status: 'filled' }),
+    );
+    expect(state.organization.vacancies).toContainEqual(
+      expect.objectContaining({
+        seatId: previousSeat.seatId,
+        status: 'open',
+        reason: 'promotion',
+      }),
+    );
+    const afterAppointment = structuredClone(state);
+    store.dispatch({
+      type: 'ADVANCE_CAREER_PROCESS',
+      opportunityId: opportunity.id,
+      _idFactory: ids,
+      _rng: () => 0,
+    });
+    expect(store.getRawState()).toEqual(afterAppointment);
     expect(Object.keys(state.actions.departmentStates)).toEqual([
       'admin_l2_0_dept_0',
       'admin_l2_0_dept_1',
@@ -276,7 +355,8 @@ describe('career opportunity reducer', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();
     initial.career.opportunities = [opportunity];
-    const store = createTestStore({ career: initial.career });
+    addTestVacancy(initial, opportunity);
+    const store = createTestStore(initial);
     const appointmentBefore = structuredClone(store.getRawState().career.appointment);
     const experiencesBefore = structuredClone(store.getRawState().career.experiences);
 
@@ -294,13 +374,18 @@ describe('career opportunity reducer', () => {
     expect(state.career.activeProcess).toBeNull();
     expect(state.career.appointment).toEqual(appointmentBefore);
     expect(state.career.experiences).toEqual(experiencesBefore);
+    expect(state.organization.vacancies[0]).toMatchObject({
+      vacancyId: opportunity.vacancyId,
+      status: 'open',
+    });
   });
 
   it('cancels an available opportunity through store dispatch', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();
     initial.career.opportunities = [opportunity];
-    const store = createTestStore({ career: initial.career });
+    addTestVacancy(initial, opportunity);
+    const store = createTestStore(initial);
     const appointmentBefore = structuredClone(store.getRawState().career.appointment);
     const experiencesBefore = structuredClone(store.getRawState().career.experiences);
 
@@ -318,6 +403,10 @@ describe('career opportunity reducer', () => {
     expect(state.career.activeProcess).toBeNull();
     expect(state.career.appointment).toEqual(appointmentBefore);
     expect(state.career.experiences).toEqual(experiencesBefore);
+    expect(state.organization.vacancies[0]).toMatchObject({
+      vacancyId: opportunity.vacancyId,
+      status: 'open',
+    });
   });
 
   it('rejects acceptance when an opportunity eligibility condition is no longer met', () => {
@@ -325,7 +414,8 @@ describe('career opportunity reducer', () => {
     const opportunity = createAvailableOpportunity();
     opportunity.eligibilityConditions = [{ worldMetric: 'missing_metric', op: 'gte', value: 1 }];
     initial.career.opportunities = [opportunity];
-    const store = createTestStore({ career: initial.career });
+    addTestVacancy(initial, opportunity);
+    const store = createTestStore(initial);
     const before = structuredClone(store.getRawState());
 
     store.dispatch({ type: 'ACCEPT_CAREER_OPPORTUNITY', opportunityId: opportunity.id });
@@ -338,7 +428,8 @@ describe('career opportunity reducer', () => {
     const opportunity = createAvailableOpportunity();
     opportunity.eligibilityConditions = [{ signalField: 'tier', op: 'eq', value: '称职' }];
     initial.career.opportunities = [opportunity];
-    const store = createTestStore({ career: initial.career });
+    addTestVacancy(initial, opportunity);
+    const store = createTestStore(initial);
 
     store.dispatch({ type: 'ACCEPT_CAREER_OPPORTUNITY', opportunityId: opportunity.id });
 
@@ -352,6 +443,7 @@ describe('career opportunity reducer', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();
     initial.career.opportunities = [opportunity];
+    addTestVacancy(initial, opportunity);
     const acceptingStore = createTestStore(initial);
     acceptingStore.dispatch({
       type: 'START_PERSONAL_TASK',
@@ -367,6 +459,7 @@ describe('career opportunity reducer', () => {
 
     const clear = createInitialState();
     clear.career.opportunities = [opportunity];
+    addTestVacancy(clear, opportunity);
     const finalStore = createTestStore(clear);
     finalStore.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
@@ -401,6 +494,7 @@ describe('career opportunity reducer', () => {
     opportunity.eligibilityConditions = [{ worldMetric: 'selection_ready', op: 'gte', value: 1 }];
     initial.world.metrics.selection_ready = 1;
     initial.career.opportunities = [opportunity];
+    addTestVacancy(initial, opportunity);
     const acceptedStore = createTestStore(initial);
     acceptedStore.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
@@ -422,6 +516,10 @@ describe('career opportunity reducer', () => {
       status: 'failed',
       stageResults: [{ stage: 'eligibility_review', outcome: 'failed' }],
     });
+    expect(store.getRawState().organization.vacancies[0]).toMatchObject({
+      vacancyId: opportunity.vacancyId,
+      status: 'open',
+    });
   });
 
   it('continues an accepted selection across its opportunity deadline and save restore', () => {
@@ -429,6 +527,7 @@ describe('career opportunity reducer', () => {
     const opportunity = createAvailableOpportunity('deadline-opportunity');
     opportunity.expiresAtDay = 1;
     initial.career.opportunities = [opportunity];
+    addTestVacancy(initial, opportunity);
     const beforeDeadline = createTestStore(initial);
     let sequence = 0;
     const ids = () => `deadline-id-${sequence++}`;
@@ -459,13 +558,15 @@ describe('career opportunity reducer', () => {
       finalOutcome: 'appointed',
     });
     expect(restored.getRawState().career.appointment.positionId).toBe('admin_l2_0');
+    expect(restored.getRawState().organization.vacancies[0]?.status).toBe('filled');
   });
 
   it('allows selection stages but not final appointment while a blocking event is active', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();
     initial.career.opportunities = [opportunity];
-    const store = createTestStore({ career: initial.career });
+    addTestVacancy(initial, opportunity);
+    const store = createTestStore(initial);
     store.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
       opportunityId: opportunity.id,
@@ -499,7 +600,8 @@ describe('career opportunity reducer', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();
     initial.career.opportunities = [opportunity];
-    const store = createTestStore({ career: initial.career });
+    addTestVacancy(initial, opportunity);
+    const store = createTestStore(initial);
     store.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
       opportunityId: opportunity.id,
@@ -534,7 +636,8 @@ describe('career opportunity reducer', () => {
     const initial = createInitialState();
     const opportunity = createAvailableOpportunity();
     initial.career.opportunities = [opportunity];
-    const store = createTestStore({ career: initial.career });
+    addTestVacancy(initial, opportunity);
+    const store = createTestStore(initial);
     store.dispatch({ type: 'ACCEPT_CAREER_OPPORTUNITY', opportunityId: opportunity.id });
 
     store.dispatch({

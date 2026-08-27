@@ -26,6 +26,7 @@ import { deriveMetricSignalsFromEffects } from '../../engine/events/metric-signa
 import { settleCareerSelectionStage } from '../../engine/career/selection-settlement';
 import { processCascadeSignalsInTransaction } from './event-reducer';
 import { createRuntimeIdFactory } from '../runtime-id';
+import { fillVacancyInTransaction } from '../transactions/vacancy-transaction';
 import { transitionPlayerSeat } from '../transactions/organization-seat-transaction';
 
 export interface CareerOpportunityPayload {
@@ -206,14 +207,42 @@ function appointmentTransition(
     endReason: null,
     probation: null,
   };
-  if (
-    !transitionPlayerSeat(
-      transaction.organization,
-      previous.appointmentId,
-      transaction.career.appointment,
+  let vacancyFilledSignals: DomainSignalSnapshot[] = [];
+  if (opportunity.type === 'leadership_vacancy') {
+    if (!opportunity.vacancyId) return false;
+    const vacancy = transaction.organization.vacancies.find(
+      (item) => item.vacancyId === opportunity.vacancyId,
+    );
+    if (!vacancy) return false;
+    const filled = fillVacancyInTransaction(transaction, {
+      vacancyId: opportunity.vacancyId,
+      occupant: { type: 'player', id: 'player' },
+      appointmentId,
+      previousAppointmentId: previous.appointmentId,
+      releasedSeatReason:
+        opportunity.appointmentReason === 'lateral_transfer'
+          ? 'lateral_transfer'
+          : opportunity.appointmentReason === 'rotation'
+            ? 'rotation'
+            : 'promotion',
+      selectionId: vacancy.selectionId,
+      opportunityId: opportunity.id,
+      currentDay,
+      idFactory,
+    });
+    if (!filled.success) return false;
+    vacancyFilledSignals = filled.emittedSignals;
+  } else {
+    // 非 Vacancy 任职仍沿用玩家 Seat 事务；动态岗位必须走上面的原子消费接口。
+    if (
+      !transitionPlayerSeat(
+        transaction.organization,
+        previous.appointmentId,
+        transaction.career.appointment,
+      )
     )
-  )
-    return false;
+      return false;
+  }
   transaction.career.experiences.push({
     id: experienceId,
     appointmentId,
@@ -247,12 +276,17 @@ function appointmentTransition(
     ]),
   );
   transaction.remainingBudget = target.annualBudget;
-  const resolved = resolveCareerOpportunity(opportunity, currentDay, 'appointed').opportunity;
-  if (!resolved) return false;
-  replaceOpportunity(transaction, resolved);
+  if (opportunity.type !== 'leadership_vacancy') {
+    const resolved = resolveCareerOpportunity(opportunity, currentDay, 'appointed').opportunity;
+    if (!resolved) return false;
+    replaceOpportunity(transaction, resolved);
+  }
   process.status = 'completed';
   process.completedAtDay = currentDay;
   archiveCompletedProcess(transaction, process);
+  for (const signal of vacancyFilledSignals) {
+    orchestrateSignal(transaction, signal, currentDay, rng, idFactory);
+  }
   orchestrateSignal(
     transaction,
     {

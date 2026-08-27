@@ -6,6 +6,8 @@
  */
 
 import type { PlayerSave } from '../../types/player';
+import type { VacancyInstance } from '../../types/organization';
+import type { CareerOpportunity } from '../../domain/career/state';
 import type { ConditionExpression } from '../../domain/conditions';
 import type { DomainSignalSnapshot } from '../../domain/governance/types';
 import type {
@@ -14,7 +16,6 @@ import type {
 } from '../../types/career';
 import { getActiveCareerRestrictions } from './civil-service-rank-eligibility';
 import { evaluateCondition } from '../events/condition-interpreter';
-import { hasVacantOrganizationSeat } from '../organization/organization-selectors';
 
 const ELIGIBLE: CareerOpportunityEligibilityResult = { eligible: true, failure: null };
 
@@ -66,6 +67,27 @@ function satisfiesConditions(
   );
 }
 
+function getOpenOpportunityVacancy(
+  state: Readonly<PlayerSave>,
+  opportunity: CareerOpportunity,
+): VacancyInstance | null {
+  if (opportunity.type !== 'leadership_vacancy' || opportunity.vacancyId === null) return null;
+  const vacancy = state.organization.vacancies.find(
+    (item) => item.vacancyId === opportunity.vacancyId,
+  );
+  if (!vacancy || (vacancy.status !== 'open' && vacancy.status !== 'selecting')) return null;
+  const seat = state.organization.seats.find((item) => item.seatId === vacancy.seatId);
+  if (
+    !seat ||
+    seat.occupant !== null ||
+    seat.positionId !== vacancy.positionId ||
+    seat.institutionId !== vacancy.institutionId ||
+    seat.regionId !== vacancy.regionId
+  )
+    return null;
+  return vacancy;
+}
+
 /**
  * @param input 职业机会资格评估输入
  * @param requireAvailable 是否要求机会仍为待处理状态
@@ -94,8 +116,19 @@ function evaluateOpportunityEligibility(
     targetPosition.regionId !== opportunity.target.regionId
   )
     return { eligible: false, failure: 'target_snapshot_mismatch' };
-  if (!hasVacantOrganizationSeat(state.organization, targetPosition.id))
-    return { eligible: false, failure: 'target_vacant' };
+  if (opportunity.type === 'leadership_vacancy') {
+    const vacancy = getOpenOpportunityVacancy(state, opportunity);
+    if (!vacancy) return { eligible: false, failure: 'target_vacant' };
+    if (
+      opportunity.target.positionId !== vacancy.positionId ||
+      opportunity.target.institutionId !== vacancy.institutionId ||
+      opportunity.target.regionId !== vacancy.regionId ||
+      opportunity.target.institutionLevel !== vacancy.institutionLevel ||
+      opportunity.target.positionDomain !== vacancy.positionDomain ||
+      opportunity.target.leadershipRank !== vacancy.leadershipRank
+    )
+      return { eligible: false, failure: 'target_snapshot_mismatch' };
+  }
   if (state.career.appointment.positionId === targetPosition.id)
     return { eligible: false, failure: 'same_position' };
   if (
