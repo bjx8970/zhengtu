@@ -75,6 +75,7 @@ export interface OrganizationSeat {
 
 /** 动态岗位空缺的来源原因。 */
 export type VacancyReason =
+  | 'initial_opening'
   | 'retirement'
   | 'promotion'
   | 'lateral_transfer'
@@ -82,6 +83,17 @@ export type VacancyReason =
   | 'disciplinary_exit'
   | 'political_cycle'
   | 'organization_change';
+
+/** Vacancy 进入取消终态时的可审计原因。 */
+export type VacancyCancellationReason =
+  'organization_change' | 'selection_cancelled' | 'opportunity_withdrawn' | 'expired' | 'system';
+
+/** Vacancy 生命周期状态。 */
+export type VacancyStatus = 'open' | 'selecting' | 'filled' | 'cancelled' | 'expired';
+
+/** 创建 Vacancy 的正式 producer 类型。 */
+export type VacancySourceType =
+  'appointment' | 'cadre_lifecycle' | 'political_cycle' | 'event' | 'system';
 
 /** 动态岗位空缺实例。 */
 export interface VacancyInstance {
@@ -97,13 +109,87 @@ export interface VacancyInstance {
   leadershipRank: LeadershipRank;
   openedAtDay: number;
   reason: VacancyReason;
-  status: 'open' | 'selecting' | 'filled' | 'cancelled' | 'expired';
-  sourceType: 'appointment' | 'cadre_lifecycle' | 'political_cycle' | 'event' | 'system';
+  status: VacancyStatus;
+  sourceType: VacancySourceType;
   sourceId: string;
   closesAtDay: number | null;
   closedAtDay: number | null;
   selectionId: string | null;
+  /** 进入 filled 终态时实际占用者；其他状态必须为空。 */
+  filledBy: SeatOccupantRef | null;
+  /** 进入 filled 终态时的任职实例；其他状态必须为空。 */
+  filledAppointmentId: string | null;
+  /** 取消/过期终态的原因；open/selecting/filled 必须为空。 */
+  cancellationReason: VacancyCancellationReason | null;
 }
+
+/** Vacancy 生命周期操作的纯 Engine 输入。 */
+export interface VacancyLifecycleInput {
+  organization: Readonly<OrganizationState>;
+  currentDay: number;
+  idFactory: () => string;
+}
+
+/** 创建 Vacancy 的输入；producer 可提供固定 vacancyId 以保证重放稳定。 */
+export interface OpenVacancyInput extends VacancyLifecycleInput {
+  seatId: string;
+  reason: VacancyReason;
+  sourceType: VacancySourceType;
+  sourceId: string;
+  closesAtDay: number | null;
+  vacancyId?: string;
+}
+
+/** 将 Vacancy 置为 selecting 的输入。 */
+export interface BeginVacancySelectionInput extends VacancyLifecycleInput {
+  vacancyId: string;
+  selectionId: string;
+}
+
+/** 将 Vacancy 原子填补的输入。 */
+export interface FillVacancyInput extends VacancyLifecycleInput {
+  vacancyId: string;
+  occupant: SeatOccupantRef;
+  appointmentId: string;
+  transitionId: string;
+}
+
+/** 将 Vacancy 取消的输入。 */
+export interface CancelVacancyInput extends VacancyLifecycleInput {
+  vacancyId: string;
+  cancellationReason: VacancyCancellationReason;
+}
+
+/** 将到期 Vacancy 置为 expired 的输入。 */
+export interface ExpireVacancyInput extends VacancyLifecycleInput {
+  vacancyId: string;
+}
+
+/** Vacancy Engine 的可诊断业务失败。 */
+export type VacancyLifecycleError =
+  | 'seat_not_found'
+  | 'seat_occupied'
+  | 'active_vacancy_exists'
+  | 'vacancy_not_found'
+  | 'vacancy_terminal'
+  | 'selection_not_found'
+  | 'selection_mismatch'
+  | 'selection_required'
+  | 'occupant_missing'
+  | 'appointment_missing'
+  | 'occupant_appointment_mismatch'
+  | 'vacancy_identity_conflict'
+  | 'producer_conflict';
+
+/** Vacancy Engine 的判别联合结果；业务失败不抛异常。 */
+export type VacancyLifecycleResult =
+  | {
+      success: true;
+      organization: OrganizationState;
+      vacancy: VacancyInstance | null;
+      emittedSignals: import('../domain/governance/types').DomainSignalSnapshot[];
+    }
+  | { success: false; error: VacancyLifecycleError; detail: string };
 
 /** NPC 离任事实账本；只追加、不回写，供后续 Vacancy producer 消费。 */
 export interface CadreDepartureFact {

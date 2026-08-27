@@ -6,6 +6,7 @@
 
 import type { CurrentAppointment } from '../../domain/career/state';
 import type { OrganizationState } from '../../types/organization';
+import { collectVacancyInvariantErrors } from './organization-invariant-checks';
 
 /**
  * 审计干部、席位、空缺和世界选拔之间的不变量。
@@ -36,9 +37,7 @@ export function validateOrganizationInvariants(
 
   const cadres = new Map(state.cadres.map((cadre) => [cadre.cadreId, cadre]));
   const seats = new Map(state.seats.map((seat) => [seat.seatId, seat]));
-  const vacancies = new Map(state.vacancies.map((vacancy) => [vacancy.vacancyId, vacancy]));
   const departureAppointments = new Set<string>();
-  const activeVacancySeats = new Set<string>();
   const playerSeats = state.seats.filter((seat) => seat.occupant?.type === 'player');
   if (playerAppointment.status === 'active' && playerSeats.length !== 1)
     errors.push('Active player appointment must occupy exactly one organization seat');
@@ -144,42 +143,7 @@ export function validateOrganizationInvariants(
     if (cadre && cadre.exitedAtDay !== null && cadre.exitedAtDay < departure.occurredAtDay)
       errors.push(`Departure ${departure.departureId} occurs after cadre exit day`);
   }
-  for (const vacancy of state.vacancies) {
-    const seat = seats.get(vacancy.seatId);
-    if (!seat) errors.push(`Vacancy ${vacancy.vacancyId} references unknown seat`);
-    if (seat && seat.positionId !== vacancy.positionId)
-      errors.push(`Vacancy ${vacancy.vacancyId} target does not match its seat`);
-    if (vacancy.status === 'open' || vacancy.status === 'selecting') {
-      if (seat?.occupant) errors.push(`Active vacancy ${vacancy.vacancyId} has an occupied seat`);
-      if (activeVacancySeats.has(vacancy.seatId))
-        errors.push(`Seat ${vacancy.seatId} has multiple active vacancies`);
-      activeVacancySeats.add(vacancy.seatId);
-    }
-    if (
-      vacancy.selectionId &&
-      !state.selections.some((item) => item.selectionId === vacancy.selectionId)
-    )
-      errors.push(`Vacancy ${vacancy.vacancyId} references unknown selection`);
-  }
-  for (const selection of state.selections) {
-    const vacancy = vacancies.get(selection.vacancyId);
-    if (!vacancy) errors.push(`Selection ${selection.selectionId} references unknown vacancy`);
-    if (
-      (selection.status === 'pending' || selection.status === 'active') &&
-      vacancy?.status !== 'selecting'
-    )
-      errors.push(`Active selection ${selection.selectionId} requires a selecting vacancy`);
-    const candidateKeys = selection.candidates.map(
-      (candidate) => `${candidate.candidateType}:${candidate.candidateId}`,
-    );
-    if (new Set(candidateKeys).size !== candidateKeys.length)
-      errors.push(`Selection ${selection.selectionId} has duplicate candidates`);
-    if (selection.winner) {
-      const key = `${selection.winner.type === 'npc' ? 'npc' : 'player'}:${selection.winner.id}`;
-      if (!candidateKeys.includes(key))
-        errors.push(`Selection ${selection.selectionId} winner is not a candidate`);
-    }
-  }
+  errors.push(...collectVacancyInvariantErrors(state));
   if (new Set(state.processedProducerKeys).size !== state.processedProducerKeys.length)
     errors.push('Duplicate organization producer key');
   return errors;

@@ -10,6 +10,7 @@ import type {
   OrganizationInitializationInput,
   OrganizationSeat,
   OrganizationState,
+  VacancyInstance,
 } from '../../types/organization';
 
 function seatId(positionId: string, ordinal: number): string {
@@ -141,13 +142,47 @@ export function createOrganizationState(input: OrganizationInitializationInput):
     };
   });
 
+  // 初始化先完成全部占用，再为真正空置的 Seat 建立正式 Vacancy，避免把已占用席位
+  // 暂时视为空缺，也让后续 producer 能以稳定 key 幂等重放初始化事实。
+  const vacancies: VacancyInstance[] = [];
+  const processedProducerKeys: string[] = [];
+  const emptySeats = seats
+    .filter((seat) => seat.occupant === null)
+    .sort((left, right) => left.seatId.localeCompare(right.seatId));
+  for (const seat of emptySeats) {
+    vacancies.push({
+      vacancyId: `vacancy:initial:${seat.seatId}`,
+      seatId: seat.seatId,
+      positionId: seat.positionId,
+      positionNameSnapshot: seat.positionNameSnapshot,
+      institutionId: seat.institutionId,
+      institutionNameSnapshot: seat.institutionNameSnapshot,
+      regionId: seat.regionId,
+      institutionLevel: seat.institutionLevel,
+      positionDomain: seat.positionDomain,
+      leadershipRank: seat.leadershipRank,
+      openedAtDay: input.initializedAtDay,
+      reason: 'initial_opening',
+      status: 'open',
+      sourceType: 'system',
+      sourceId: `initial:${seat.seatId}`,
+      closesAtDay: null,
+      closedAtDay: null,
+      selectionId: null,
+      filledBy: null,
+      filledAppointmentId: null,
+      cancellationReason: null,
+    });
+    processedProducerKeys.push(`vacancy:initial:${seat.seatId}`);
+  }
+
   return {
     initializedAtDay: input.initializedAtDay,
     cadres,
     seats,
-    vacancies: [],
+    vacancies,
     selections: [],
     departures: [],
-    processedProducerKeys: [],
+    processedProducerKeys,
   };
 }

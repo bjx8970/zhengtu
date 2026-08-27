@@ -5,6 +5,10 @@
  */
 
 import { z } from 'zod';
+import type { VacancyCancellationReason, VacancyReason } from '../../types/organization';
+
+/** Vacancy producer may mark the initial content world opening explicitly. */
+type DomainVacancyReason = VacancyReason | 'initial_opening';
 
 // ===== 政策状态 =====
 
@@ -47,6 +51,9 @@ export const DOMAIN_SIGNALS = [
   'policy.metric_changed',
   'policy.status_changed',
   'appointment.changed',
+  'vacancy.opened',
+  'vacancy.filled',
+  'vacancy.cancelled',
   'civil_service_rank.changed',
   'assessment.completed',
   'world.metric_changed',
@@ -108,6 +115,25 @@ export const SIGNAL_TYPE_PAYLOAD_FIELDS: Record<DomainSignal, readonly string[]>
     'institutionId',
     'regionId',
     'previousPositionId',
+  ],
+  'vacancy.opened': ['vacancyId', 'seatId', 'positionId', 'institutionId', 'regionId', 'reason'],
+  'vacancy.filled': [
+    'vacancyId',
+    'seatId',
+    'positionId',
+    'institutionId',
+    'regionId',
+    'selectionId',
+    'occupantType',
+    'occupantId',
+  ],
+  'vacancy.cancelled': [
+    'vacancyId',
+    'seatId',
+    'positionId',
+    'institutionId',
+    'regionId',
+    'cancellationReason',
   ],
   'civil_service_rank.changed': [
     'rankChangeId',
@@ -213,6 +239,47 @@ export type DomainSignalSnapshot =
         institutionId: string;
         regionId: string;
         previousPositionId: string | null;
+      };
+    }
+  | {
+      signalId: string;
+      signalType: 'vacancy.opened';
+      occurredAtDay: number;
+      data: {
+        vacancyId: string;
+        seatId: string;
+        positionId: string;
+        institutionId: string;
+        regionId: string;
+        reason: DomainVacancyReason;
+      };
+    }
+  | {
+      signalId: string;
+      signalType: 'vacancy.filled';
+      occurredAtDay: number;
+      data: {
+        vacancyId: string;
+        seatId: string;
+        positionId: string;
+        institutionId: string;
+        regionId: string;
+        selectionId: string | null;
+        occupantType: 'player' | 'npc';
+        occupantId: string;
+      };
+    }
+  | {
+      signalId: string;
+      signalType: 'vacancy.cancelled';
+      occurredAtDay: number;
+      data: {
+        vacancyId: string;
+        seatId: string;
+        positionId: string;
+        institutionId: string;
+        regionId: string;
+        cancellationReason: VacancyCancellationReason;
       };
     }
   | {
@@ -411,6 +478,74 @@ export const DomainSignalSnapshotSchema = z.discriminatedUnion('signalType', [
           institutionId: z.string(),
           regionId: z.string(),
           previousPositionId: z.string().nullable(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalId: z.string(),
+      signalType: z.literal('vacancy.opened'),
+      occurredAtDay: z.number(),
+      data: z
+        .object({
+          vacancyId: z.string(),
+          seatId: z.string(),
+          positionId: z.string(),
+          institutionId: z.string(),
+          regionId: z.string(),
+          reason: z.enum([
+            'retirement',
+            'promotion',
+            'lateral_transfer',
+            'rotation',
+            'disciplinary_exit',
+            'political_cycle',
+            'organization_change',
+            'initial_opening',
+          ]),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalId: z.string(),
+      signalType: z.literal('vacancy.filled'),
+      occurredAtDay: z.number(),
+      data: z
+        .object({
+          vacancyId: z.string(),
+          seatId: z.string(),
+          positionId: z.string(),
+          institutionId: z.string(),
+          regionId: z.string(),
+          selectionId: z.string().nullable(),
+          occupantType: z.enum(['player', 'npc']),
+          occupantId: z.string(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      signalId: z.string(),
+      signalType: z.literal('vacancy.cancelled'),
+      occurredAtDay: z.number(),
+      data: z
+        .object({
+          vacancyId: z.string(),
+          seatId: z.string(),
+          positionId: z.string(),
+          institutionId: z.string(),
+          regionId: z.string(),
+          cancellationReason: z.enum([
+            'organization_change',
+            'selection_cancelled',
+            'opportunity_withdrawn',
+            'expired',
+            'system',
+          ]),
         })
         .strict(),
     })
