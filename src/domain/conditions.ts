@@ -35,6 +35,12 @@ export const SIGNAL_STRING_FIELDS = [
   'metricId',
   'experienceId',
   'positionId',
+  'vacancyId',
+  'seatId',
+  'reason',
+  'occupantType',
+  'occupantId',
+  'cancellationReason',
   'eventInstanceId',
   'eventId',
   'tier',
@@ -49,6 +55,7 @@ export const SIGNAL_NULLABLE_FIELDS = [
   'previousPhaseId',
   'currentPhaseId',
   'optionId',
+  'selectionId',
 ] as const;
 
 /** 信号字段条件：按字段类别判别联合，约束操作符和值类型 */

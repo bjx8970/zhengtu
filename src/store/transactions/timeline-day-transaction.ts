@@ -55,6 +55,7 @@ import { expireCareerOpportunity } from '../../engine/career/career-opportunity-
 import { evaluateProbation } from '../../engine/career/probation-evaluation';
 import { grantAnnualCivilServiceRankQuota } from '../../engine/career/rank-quota';
 import { settleNpcLifecycle } from '../../engine/organization/npc-lifecycle';
+import { consumeCadreDeparturesInTransaction } from './vacancy-transaction';
 
 /**
  * 结算当日行动与到期政策，再统一处理它们产生的领域信号。
@@ -214,8 +215,19 @@ export function processTimelineNodes(
           draft.organization = npcSettlement.organization;
           draft.organization.processedProducerKeys.push(producerKey);
         }
-        // NPC 结算只写组织事实和审计结果，不进入玩家 CareerOpportunity/Event 信号管道。
+        // 年度玩家事实先完整落盘；随后消费 departure ledger。两者的信号必须合并到
+        // 一次 cascade，避免 Vacancy blocker 让 annual node 中途恢复而重复生产。
         const signals = processAnnualAssessment(draft, node.year, node.absoluteDay, idFactory);
+        const vacancyProduction = consumeCadreDeparturesInTransaction(
+          draft,
+          node.absoluteDay,
+          idFactory,
+        );
+        if (!vacancyProduction.success)
+          throw new Error(
+            `Vacancy producer failed (${vacancyProduction.error}): ${vacancyProduction.detail}`,
+          );
+        signals.push(...vacancyProduction.emittedSignals);
         processCascadeSignalsInTransaction(
           draft,
           signals,

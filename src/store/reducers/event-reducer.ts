@@ -27,6 +27,7 @@ import { processDomainSignal } from '../../engine/events/event-orchestrator';
 import type { EventOrchestrationResult } from '../../engine/events/event-orchestrator';
 import { planEventFollowups } from '../../engine/events/event-followup-planner';
 import { processCareerOpportunitySignal } from '../../engine/career/opportunity-orchestrator';
+import { invalidateCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
 import { getConfigLoader } from '../../config/loader';
 import { createRuntimeIdFactory } from '../runtime-id';
 
@@ -819,6 +820,7 @@ function dispatchCareerOpportunitiesForSignal(
   currentDay: number,
   idFactory: () => string,
 ): void {
+  invalidateCareerOpportunitiesForClosedVacancy(draft, signal, currentDay);
   const loader = getConfigLoader();
   const result = processCareerOpportunitySignal({
     state: draft,
@@ -832,6 +834,61 @@ function dispatchCareerOpportunitiesForSignal(
     careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
   });
   draft.career.opportunities.push(...result.created);
+}
+
+function invalidateCareerOpportunitiesForClosedVacancy(
+  draft: PlayerSave,
+  signal: DomainSignalSnapshot,
+  currentDay: number,
+): void {
+  if (signal.signalType !== 'vacancy.filled' && signal.signalType !== 'vacancy.cancelled') return;
+  const vacancyId = signal.data.vacancyId;
+  const affected = draft.career.opportunities.filter(
+    (opportunity) =>
+      opportunity.vacancyId === vacancyId &&
+      (opportunity.status === 'available' ||
+        opportunity.status === 'accepted' ||
+        opportunity.status === 'in_process'),
+  );
+  for (const opportunity of affected) {
+    const result = invalidateCareerOpportunity(opportunity, currentDay);
+    if (!result.success || !result.opportunity) continue;
+    const index = draft.career.opportunities.findIndex((item) => item.id === opportunity.id);
+    if (index >= 0) draft.career.opportunities[index] = result.opportunity;
+    if (draft.career.activeProcess?.opportunityId !== opportunity.id) continue;
+    const process = draft.career.activeProcess;
+    process.stageResults.push({
+      stage: process.currentStage,
+      resolvedAtDay: currentDay,
+      outcome: 'cancelled',
+      score: null,
+      detail: `关联 Vacancy ${vacancyId} 已关闭`,
+    });
+    process.status = 'cancelled';
+    process.completedAtDay = currentDay;
+    draft.career.completedProcesses.push(structuredClone(process));
+    draft.career.activeProcess = null;
+  }
+  // Vacancy transactions may already have marked the opportunity cancelled before
+  // dispatching the lifecycle signal.  The signal remains responsible for closing
+  // any still-active player process, even in that ordering.
+  const activeProcess = draft.career.activeProcess;
+  const activeOpportunity = activeProcess
+    ? draft.career.opportunities.find((item) => item.id === activeProcess.opportunityId)
+    : null;
+  if (activeProcess && activeOpportunity?.vacancyId === vacancyId) {
+    activeProcess.stageResults.push({
+      stage: activeProcess.currentStage,
+      resolvedAtDay: currentDay,
+      outcome: 'cancelled',
+      score: null,
+      detail: `关联 Vacancy ${vacancyId} 已关闭`,
+    });
+    activeProcess.status = 'cancelled';
+    activeProcess.completedAtDay = currentDay;
+    draft.career.completedProcesses.push(structuredClone(activeProcess));
+    draft.career.activeProcess = null;
+  }
 }
 
 /**

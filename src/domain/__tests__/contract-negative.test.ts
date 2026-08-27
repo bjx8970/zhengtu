@@ -406,6 +406,95 @@ describe('DomainSignalSnapshot 负向测试', () => {
     expect(DomainSignalSnapshotSchema.safeParse(valid).success).toBe(true);
   });
 
+  it('接受三种 Vacancy 领域信号的完整载荷', () => {
+    const common = {
+      vacancyId: 'v1',
+      seatId: 's1',
+      positionId: 'p1',
+      institutionId: 'i1',
+      regionId: 'r1',
+    };
+    expect(
+      DomainSignalSnapshotSchema.safeParse({
+        signalId: 'opened',
+        signalType: 'vacancy.opened',
+        occurredAtDay: 10,
+        data: { ...common, reason: 'retirement' },
+      }).success,
+    ).toBe(true);
+    expect(
+      DomainSignalSnapshotSchema.safeParse({
+        signalId: 'filled',
+        signalType: 'vacancy.filled',
+        occurredAtDay: 11,
+        data: {
+          ...common,
+          selectionId: null,
+          occupantType: 'npc',
+          occupantId: 'cadre-1',
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      DomainSignalSnapshotSchema.safeParse({
+        signalId: 'cancelled',
+        signalType: 'vacancy.cancelled',
+        occurredAtDay: 12,
+        data: { ...common, cancellationReason: 'expired' },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('拒绝 Vacancy 信号缺失 vacancyId 或携带未知字段', () => {
+    expect(
+      DomainSignalSnapshotSchema.safeParse({
+        signalId: 'opened',
+        signalType: 'vacancy.opened',
+        occurredAtDay: 10,
+        data: {
+          seatId: 's1',
+          positionId: 'p1',
+          institutionId: 'i1',
+          regionId: 'r1',
+          reason: 'retirement',
+          extra: true,
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      DomainSignalSnapshotSchema.safeParse({
+        signalId: 'filled',
+        signalType: 'vacancy.filled',
+        occurredAtDay: 11,
+        data: {
+          vacancyId: 'v1',
+          seatId: 's1',
+          positionId: 'p1',
+          institutionId: 'i1',
+          regionId: 'r1',
+          selectionId: null,
+          occupantType: 'robot',
+          occupantId: 'cadre-1',
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      DomainSignalSnapshotSchema.safeParse({
+        signalId: 'cancelled',
+        signalType: 'vacancy.cancelled',
+        occurredAtDay: 12,
+        data: {
+          vacancyId: 'v1',
+          seatId: 's1',
+          positionId: 'p1',
+          institutionId: 'i1',
+          regionId: 'r1',
+          cancellationReason: 'unknown',
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it('拒绝 event.resolved 缺失 eventInstanceId', () => {
     const invalid = {
       signalId: 's1',

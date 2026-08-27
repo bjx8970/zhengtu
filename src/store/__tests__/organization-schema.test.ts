@@ -8,10 +8,12 @@ import {
   decodeCurrentSave,
   migrateSchema11To12,
   migrateSchema10To11,
+  migrateSchema12To13,
   validatePlayerSave,
   wrapSaveEnvelope,
 } from '../save-codec';
 import { CURRENT_CONTENT_VERSION, CURRENT_SCHEMA_VERSION } from '../../types/save';
+import type { VacancyInstance } from '../../types/organization';
 
 describe('Schema 12 organization state', () => {
   beforeEach(() => localStorage.clear());
@@ -87,6 +89,252 @@ describe('Schema 12 organization state', () => {
       (malformed.state as Record<string, unknown>).organization as Record<string, unknown>
     ).departures = {};
     expect(() => migrateSchema11To12(malformed)).toThrow(/departures must be an array/);
+  });
+
+  it('Schema 12 → 13 仅补齐缺失 Vacancy 审计字段和 vacancyId', () => {
+    const state = createInitialState();
+    const organization = state.organization;
+    const seat = organization.seats.find((item) => item.occupant === null);
+    if (!seat) throw new Error('Expected vacant Seat');
+    const legacyVacancy = {
+      vacancyId: 'vacancy:legacy-departure',
+      seatId: seat.seatId,
+      positionId: seat.positionId,
+      positionNameSnapshot: seat.positionNameSnapshot,
+      institutionId: seat.institutionId,
+      institutionNameSnapshot: seat.institutionNameSnapshot,
+      regionId: seat.regionId,
+      institutionLevel: seat.institutionLevel,
+      positionDomain: seat.positionDomain,
+      leadershipRank: seat.leadershipRank,
+      openedAtDay: 1,
+      reason: 'retirement',
+      status: 'open',
+      sourceType: 'cadre_lifecycle',
+      sourceId: 'departure:legacy-departure',
+      closesAtDay: null,
+      closedAtDay: null,
+      selectionId: null,
+    };
+    const raw = wrapSaveEnvelope({
+      ...state,
+      organization: {
+        ...organization,
+        vacancies: [legacyVacancy as unknown as VacancyInstance],
+      },
+    }) as unknown as Record<string, unknown>;
+    raw.schemaVersion = 12;
+    const rawState = raw.state as Record<string, unknown>;
+    const career = rawState.career as Record<string, unknown>;
+    career.opportunities = [];
+    (rawState.organization as Record<string, unknown>).processedProducerKeys = [];
+
+    const migrated = migrateSchema12To13(raw);
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    const migratedState = migrated.state as Record<string, unknown>;
+    const migratedOrg = migratedState.organization as Record<string, unknown>;
+    expect((migratedOrg.vacancies as Array<Record<string, unknown>>)[0]).toMatchObject({
+      filledBy: null,
+      filledAppointmentId: null,
+      cancellationReason: null,
+    });
+    const decoded = decodeCurrentSave(JSON.stringify(migrated));
+    expect(decoded.success).toBe(true);
+
+    const malformed = structuredClone(raw);
+    const malformedState = malformed.state as Record<string, unknown>;
+    const malformedOrg = malformedState.organization as Record<string, unknown>;
+    const malformedVacancy = (malformedOrg.vacancies as Array<Record<string, unknown>>)[0];
+    if (!malformedVacancy) throw new Error('Expected legacy Vacancy');
+    malformedVacancy.filledBy = 42;
+    const malformedMigrated = migrateSchema12To13(malformed);
+    const malformedVacancies = (
+      (malformedMigrated.state as Record<string, unknown>).organization as Record<string, unknown>
+    ).vacancies as Array<Record<string, unknown>>;
+    expect(
+      malformedVacancies.find((vacancy) => vacancy.vacancyId === malformedVacancy.vacancyId),
+    ).toMatchObject({
+      filledBy: 42,
+    });
+    expect(decodeCurrentSave(JSON.stringify(malformedMigrated)).success).toBe(false);
+  });
+
+  it('Schema 12 空 Seat 按 seatId 稳定迁移为 initial Vacancy 与 producer key', () => {
+    const state = createInitialState();
+    const emptySeats = state.organization.seats.filter((seat) => seat.occupant === null);
+    expect(emptySeats.length).toBeGreaterThanOrEqual(2);
+    const raw = wrapSaveEnvelope({
+      ...state,
+      organization: {
+        ...state.organization,
+        vacancies: [],
+        processedProducerKeys: [],
+      },
+    }) as unknown as Record<string, unknown>;
+    raw.schemaVersion = 12;
+
+    const migrated = migrateSchema12To13(raw);
+    const migratedOrganization = (migrated.state as Record<string, unknown>).organization as Record<
+      string,
+      unknown
+    >;
+    const vacancies = migratedOrganization.vacancies as Array<Record<string, unknown>>;
+    const sortedSeats = [...emptySeats].sort((left, right) =>
+      left.seatId.localeCompare(right.seatId),
+    );
+    expect(vacancies.map((vacancy) => vacancy.seatId)).toEqual(
+      sortedSeats.map((seat) => seat.seatId),
+    );
+    expect(vacancies.every((vacancy) => vacancy.reason === 'initial_opening')).toBe(true);
+    expect(migratedOrganization.processedProducerKeys).toEqual(
+      sortedSeats.map((seat) => `vacancy:initial:${seat.seatId}`),
+    );
+    const decoded = decodeCurrentSave(JSON.stringify(migrated));
+    expect(decoded.success).toBe(true);
+    if (!decoded.success || !decoded.state) return;
+    const roundTrip = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(decoded.state)));
+    expect(roundTrip.success).toBe(true);
+    expect(
+      roundTrip.state?.organization.vacancies.every(
+        (vacancy) => vacancy.reason === 'initial_opening',
+      ),
+    ).toBe(true);
+  });
+
+  it('Schema 12 机会 sourceId 只移除一个 vacancy 前缀并保持迁移幂等', () => {
+    const state = createInitialState();
+    const existingInitial = state.organization.vacancies[0];
+    if (!existingInitial) throw new Error('Expected initial Vacancy');
+    const historicalVacancyId = 'vacancy:departure:1';
+    state.organization.vacancies.push({
+      ...structuredClone(existingInitial),
+      vacancyId: historicalVacancyId,
+      sourceId: 'departure:1',
+    });
+    const sources: Array<{ sourceType: string; sourceId: unknown }> = [
+      { sourceType: 'vacancy', sourceId: `vacancy:${historicalVacancyId}` },
+      { sourceType: 'vacancy', sourceId: `vacancy:${existingInitial.vacancyId}` },
+      { sourceType: 'vacancy', sourceId: 'vacancy:initial:seat:legacy' },
+      { sourceType: 'assessment', sourceId: 'assessment:1' },
+      { sourceType: 'vacancy', sourceId: 'vacancy:' },
+    ];
+    const opportunities: Array<Record<string, unknown>> = sources.map((source, index) => ({
+      id: `migration-source-${index}`,
+      source,
+    }));
+    opportunities.push({
+      id: 'migration-existing-vacancy-id',
+      source: { sourceType: 'assessment', sourceId: 'assessment:existing' },
+      vacancyId: 'vacancy:ghost-existing',
+    });
+    const raw = wrapSaveEnvelope({
+      ...state,
+      career: {
+        ...state.career,
+        opportunities: opportunities as unknown as typeof state.career.opportunities,
+      },
+    }) as unknown as Record<string, unknown>;
+    raw.schemaVersion = 12;
+
+    const migrated = migrateSchema12To13(raw);
+    const migratedOpportunities = (
+      (migrated.state as Record<string, unknown>).career as Record<string, unknown>
+    ).opportunities as Array<Record<string, unknown>>;
+    expect(migratedOpportunities.map((opportunity) => opportunity.vacancyId)).toEqual([
+      historicalVacancyId,
+      existingInitial.vacancyId,
+      null,
+      null,
+      null,
+      'vacancy:ghost-existing',
+    ]);
+    const migratedOrganization = (migrated.state as Record<string, unknown>).organization as Record<
+      string,
+      unknown
+    >;
+    const migratedVacancyIds = (
+      migratedOrganization.vacancies as Array<Record<string, unknown>>
+    ).map((vacancy) => vacancy.vacancyId);
+    expect(migratedVacancyIds).toContain(historicalVacancyId);
+    expect(migratedVacancyIds).not.toContain('initial:seat:legacy');
+    expect(migrateSchema12To13(migrated)).toEqual(migrated);
+  });
+
+  it('已有匹配的 active initial Vacancy 与 key 时迁移幂等，occupied Seat 不新建 Vacancy', () => {
+    const state = createInitialState();
+    const beforeVacancies = structuredClone(state.organization.vacancies);
+    const beforeKeys = [...state.organization.processedProducerKeys];
+    const raw = wrapSaveEnvelope(state) as unknown as Record<string, unknown>;
+    raw.schemaVersion = 12;
+
+    const migrated = migrateSchema12To13(raw);
+    const organization = (migrated.state as Record<string, unknown>).organization as Record<
+      string,
+      unknown
+    >;
+    expect(organization.vacancies).toEqual(beforeVacancies);
+    expect(organization.processedProducerKeys).toEqual(beforeKeys);
+    const occupiedSeatIds = state.organization.seats
+      .filter((seat) => seat.occupant !== null)
+      .map((seat) => seat.seatId);
+    expect(
+      (organization.vacancies as Array<Record<string, unknown>>).every(
+        (vacancy) => !occupiedSeatIds.includes(vacancy.seatId as string),
+      ),
+    ).toBe(true);
+  });
+
+  it('initial Vacancy ID 或 producer key 冲突时迁移明确失败', () => {
+    const state = createInitialState();
+    const seat = state.organization.seats.find((item) => item.occupant === null);
+    if (!seat) throw new Error('Expected empty Seat');
+    const rawWithIdConflict = wrapSaveEnvelope({
+      ...state,
+      organization: {
+        ...state.organization,
+        vacancies: [
+          {
+            vacancyId: `vacancy:initial:${seat.seatId}`,
+            seatId: seat.seatId,
+            positionId: seat.positionId,
+            positionNameSnapshot: seat.positionNameSnapshot,
+            institutionId: seat.institutionId,
+            institutionNameSnapshot: seat.institutionNameSnapshot,
+            regionId: seat.regionId,
+            institutionLevel: seat.institutionLevel,
+            positionDomain: seat.positionDomain,
+            leadershipRank: seat.leadershipRank,
+            openedAtDay: state.organization.initializedAtDay,
+            reason: 'initial_opening',
+            status: 'open',
+            sourceType: 'system',
+            sourceId: 'initial:conflict',
+            closesAtDay: null,
+            closedAtDay: null,
+            selectionId: null,
+            filledBy: null,
+            filledAppointmentId: null,
+            cancellationReason: null,
+          },
+        ],
+        processedProducerKeys: [],
+      },
+    }) as unknown as Record<string, unknown>;
+    rawWithIdConflict.schemaVersion = 12;
+    expect(() => migrateSchema12To13(rawWithIdConflict)).toThrow(/initial Vacancy ID conflict/);
+
+    const rawWithKeyConflict = wrapSaveEnvelope({
+      ...state,
+      organization: {
+        ...state.organization,
+        vacancies: [],
+        processedProducerKeys: [`vacancy:initial:${seat.seatId}`],
+      },
+    }) as unknown as Record<string, unknown>;
+    rawWithKeyConflict.schemaVersion = 12;
+    expect(() => migrateSchema12To13(rawWithKeyConflict)).toThrow(
+      /initial Vacancy producer key conflict/,
+    );
   });
 
   it('拒绝重复 Seat ID、双占用和 active Vacancy/Seat 冲突', () => {

@@ -241,7 +241,14 @@ describe('settleNpcLifecycle', () => {
     expect(
       second.organization.cadres.find((item) => item.currentAppointment)?.assessments,
     ).toHaveLength(2);
-    expect(second.organization.processedProducerKeys).toEqual(['npc-annual:2012']);
+    expect(second.organization.processedProducerKeys).toEqual([
+      'vacancy:initial:seat:admin_l2_0:1',
+      'vacancy:initial:seat:admin_l3_0:1',
+      'npc-annual:2012',
+    ]);
+    expect(new Set(second.organization.processedProducerKeys).size).toBe(
+      second.organization.processedProducerKeys.length,
+    );
   });
 
   it('真实 Store 时间轴跨两年各结算一次，并在重复 continuation 中保持 producer 幂等', () => {

@@ -188,4 +188,57 @@ describe('deriveEventSourceKey', () => {
     const sig = makeEventResolvedSig('sig_009', 'evt_inst_resolved');
     expect(deriveEventSourceKey(sig)).toBe('evt_inst_resolved');
   });
+
+  it('vacancy.opened → data.vacancyId', () => {
+    const signal: DomainSignalSnapshot = {
+      signalId: 'vacancy-opened-signal',
+      signalType: 'vacancy.opened',
+      occurredAtDay: 80,
+      data: {
+        vacancyId: 'vacancy-opened',
+        seatId: 'seat-1',
+        positionId: 'position-1',
+        institutionId: 'institution-1',
+        regionId: 'region-1',
+        reason: 'retirement',
+      },
+    };
+    expect(deriveEventSourceKey(signal)).toBe('vacancy-opened');
+  });
+
+  it('vacancy.filled → data.vacancyId', () => {
+    const signal: DomainSignalSnapshot = {
+      signalId: 'vacancy-filled-signal',
+      signalType: 'vacancy.filled',
+      occurredAtDay: 80,
+      data: {
+        vacancyId: 'vacancy-filled',
+        seatId: 'seat-1',
+        positionId: 'position-1',
+        institutionId: 'institution-1',
+        regionId: 'region-1',
+        selectionId: null,
+        occupantType: 'npc',
+        occupantId: 'cadre-1',
+      },
+    };
+    expect(deriveEventSourceKey(signal)).toBe('vacancy-filled');
+  });
+
+  it('vacancy.cancelled → data.vacancyId', () => {
+    const signal: DomainSignalSnapshot = {
+      signalId: 'vacancy-cancelled-signal',
+      signalType: 'vacancy.cancelled',
+      occurredAtDay: 80,
+      data: {
+        vacancyId: 'vacancy-cancelled',
+        seatId: 'seat-1',
+        positionId: 'position-1',
+        institutionId: 'institution-1',
+        regionId: 'region-1',
+        cancellationReason: 'expired',
+      },
+    };
+    expect(deriveEventSourceKey(signal)).toBe('vacancy-cancelled');
+  });
 });

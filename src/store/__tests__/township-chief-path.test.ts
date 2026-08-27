@@ -6,7 +6,7 @@ import type { EventHistoryRecord } from '../../domain/events/state';
 import type { PlayerSave } from '../../types/player';
 import { createInitialState, createTestStore } from '../game-store';
 import { decodeCurrentSave, wrapSaveEnvelope } from '../save-codec';
-import { transitionPlayerSeat } from '../transactions/organization-seat-transaction';
+import { fillVacancyInTransaction } from '../transactions/vacancy-transaction';
 
 function historyRecord(eventId: string, day: number): EventHistoryRecord {
   return {
@@ -51,10 +51,22 @@ function createDeputyYearEndState(): PlayerSave {
     endReason: null,
     probation: null,
   };
-  if (
-    !transitionPlayerSeat(state.organization, oldExperience.appointmentId, state.career.appointment)
-  )
-    throw new Error('Expected player organization seat transition');
+  const targetVacancy = state.organization.vacancies.find(
+    (vacancy) => vacancy.positionId === deputy.id && vacancy.status === 'open',
+  );
+  if (!targetVacancy) throw new Error('Expected deputy target Vacancy');
+  const filled = fillVacancyInTransaction(state, {
+    vacancyId: targetVacancy.vacancyId,
+    occupant: { type: 'player', id: 'player' },
+    appointmentId: 'deputy-appointment',
+    selectionId: targetVacancy.selectionId,
+    opportunityId: null,
+    currentDay: 720,
+    idFactory: () => 'township-vacancy-id',
+    previousAppointmentId: oldExperience.appointmentId,
+    releasedSeatReason: 'promotion',
+  });
+  if (!filled.success) throw new Error(`Expected player Vacancy transition: ${filled.detail}`);
   state.career.experiences.push({
     id: 'deputy-experience',
     appointmentId: 'deputy-appointment',

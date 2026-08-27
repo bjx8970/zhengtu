@@ -82,6 +82,7 @@ describe('Schema 2 存档', () => {
         description: 'test',
       },
       sourceSignal: null,
+      vacancyId: null,
       target: {
         positionId: 'test-position',
         positionName: 'Test position',
@@ -141,6 +142,7 @@ describe('Schema 2 存档', () => {
           occurredAtDay: 10,
           data: { year: 2026, score: 85, tier: '称职' },
         },
+        vacancyId: null,
         target: {
           positionId: 'admin_l2_0',
           positionName: '副镇长',
@@ -572,6 +574,7 @@ describe('Schema 2 存档', () => {
         occurredAtDay: 540,
         data: { year: 2027, score: 80, tier: '称职' },
       },
+      vacancyId: null,
       target: {
         positionId: 'admin_l2_0',
         positionName: '副镇长',
@@ -655,6 +658,7 @@ describe('Schema 2 存档', () => {
         occurredAtDay: 1260,
         data: { year: 2015, score: 80, tier: '称职' },
       },
+      vacancyId: null,
       target: {
         positionId: 'admin_l3_0',
         positionName: '镇长',
@@ -826,7 +830,11 @@ describe('Schema 2 存档', () => {
       status: 'available',
       appearedAtDay: 1260,
       expiresAtDay: 1530,
-      source: { sourceId: 'assessment:2015' },
+      source: {
+        sourceType: 'vacancy',
+        sourceId: 'vacancy:vacancy:initial:seat:admin_l3_0:1',
+      },
+      vacancyId: 'vacancy:initial:seat:admin_l3_0:1',
     });
 
     const lateEvidenceState = structuredClone(state);
@@ -919,7 +927,11 @@ describe('Schema 2 存档', () => {
           status: 'available',
           appearedAtDay: 1620,
           expiresAtDay: 1890,
-          source: expect.objectContaining({ sourceId: 'assessment:2016' }),
+          source: expect.objectContaining({
+            sourceType: 'vacancy',
+            sourceId: 'vacancy:vacancy:initial:seat:admin_l3_0:1',
+          }),
+          vacancyId: 'vacancy:initial:seat:admin_l3_0:1',
         }),
       ]),
     );
@@ -951,7 +963,11 @@ describe('Schema 2 存档', () => {
           status: 'available',
           appearedAtDay: 1620,
           expiresAtDay: 1890,
-          source: expect.objectContaining({ sourceId: 'assessment:2016' }),
+          source: expect.objectContaining({
+            sourceType: 'vacancy',
+            sourceId: 'vacancy:vacancy:initial:seat:admin_l3_0:1',
+          }),
+          vacancyId: 'vacancy:initial:seat:admin_l3_0:1',
         }),
       ]),
     );
@@ -1027,6 +1043,7 @@ describe('Schema 2 存档', () => {
           description: 'test',
         },
         sourceSignal: null,
+        vacancyId: null,
         target: {
           positionId: 'test-position',
           positionName: 'test position',

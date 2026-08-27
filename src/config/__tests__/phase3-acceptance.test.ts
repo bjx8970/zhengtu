@@ -302,7 +302,6 @@ describe('Phase 3 acceptance config', () => {
           value: 2,
           op: 'gte',
         },
-        { signalField: 'score', op: 'gte', value: 70 },
         { eventHistory: 'flood_preparation_metrics', check: 'occurred' },
         { eventHistory: 'industrial_park_progress_crisis', check: 'occurred' },
         {
@@ -317,6 +316,11 @@ describe('Phase 3 acceptance config', () => {
         },
       ]),
     );
+    expect(
+      definition.conditions.some(
+        (condition) => 'signalField' in condition && condition.signalField === 'score',
+      ),
+    ).toBe(false);
     expect(definition.acceptanceConditions).toEqual([
       { careerCheck: 'years_in_position', value: 2, op: 'gte' },
     ]);

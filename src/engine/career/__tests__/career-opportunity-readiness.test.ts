@@ -12,12 +12,15 @@ describe('career opportunity definition readiness', () => {
       .getAllCareerOpportunityDefinitions()
       .find((item) => item.id === 'township_deputy_leadership_vacancy');
     if (!definition) throw new Error('Expected deputy definition');
-    const scoreCondition = definition.conditions.find(
-      (condition) => 'signalField' in condition && condition.signalField === 'score',
+    const assessmentCondition = definition.conditions.find(
+      (condition) =>
+        'careerCheck' in condition &&
+        condition.careerCheck === 'assessment_history' &&
+        condition.check === 'qualified_count',
     );
-    if (!scoreCondition || !('signalField' in scoreCondition))
-      throw new Error('Expected score condition');
-    scoreCondition.value = 101;
+    if (!assessmentCondition || !('careerCheck' in assessmentCondition))
+      throw new Error('Expected assessment-history condition');
+    assessmentCondition.value = 3;
     const state = createInitialState();
     state.assessments.annualAssessments.push({ year: 2027, score: 100, tier: '优秀' });
     const result = evaluateCareerOpportunityDefinitionReadiness({
@@ -28,10 +31,13 @@ describe('career opportunity definition readiness', () => {
       careerExperienceQualificationRules: loader.getCareerExperienceQualificationRules(),
     });
     const diagnostic = result.items.find(
-      (item) => 'signalField' in item.condition && item.condition.signalField === 'score',
+      (item) =>
+        'careerCheck' in item.condition &&
+        item.condition.careerCheck === 'assessment_history' &&
+        item.condition.check === 'qualified_count',
     );
     expect(diagnostic).toMatchObject({ satisfied: false });
-    expect(diagnostic?.detail).toContain('101');
+    expect(diagnostic?.detail).toContain('3');
   });
 
   it('diagnoses township chief governance evidence separately from two-year acceptance', () => {

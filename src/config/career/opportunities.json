@@ -2,14 +2,13 @@
   {
     "id": "township_deputy_leadership_vacancy",
     "type": "leadership_vacancy",
-    "triggerSignals": ["assessment.completed"],
+    "triggerSignals": ["vacancy.opened", "assessment.completed"],
     "conditions": [
       { "careerCheck": "probation_status", "value": "passed", "op": "eq" },
       { "careerCheck": "leadership_rank", "value": "none", "op": "eq" },
       { "careerCheck": "civil_service_rank", "value": "clerk_1", "op": "gte" },
       { "careerCheck": "assessment_history", "check": "qualified_count", "value": 2, "op": "gte" },
       { "fact": "assigned_project_delivered", "op": "is_true" },
-      { "signalField": "score", "op": "gte", "value": 60 },
       { "careerCheck": "active_restriction", "value": "appointment_selection_freeze", "op": "neq" },
       { "careerCheck": "active_restriction", "value": "disciplinary_action", "op": "neq" }
     ],
@@ -26,7 +25,7 @@
   {
     "id": "township_chief_leadership_vacancy",
     "type": "leadership_vacancy",
-    "triggerSignals": ["assessment.completed"],
+    "triggerSignals": ["vacancy.opened", "assessment.completed"],
     "conditions": [
       { "careerCheck": "leadership_rank", "value": "township_deputy", "op": "eq" },
       {
@@ -35,7 +34,6 @@
         "value": 2,
         "op": "gte"
       },
-      { "signalField": "score", "op": "gte", "value": 70 },
       { "eventHistory": "flood_preparation_metrics", "check": "occurred" },
       { "eventHistory": "industrial_park_progress_crisis", "check": "occurred" },
       {

@@ -37,6 +37,42 @@ describe('createOrganizationState', () => {
     expect(first.cadres.filter((cadre) => cadre.currentAppointment === null)).toHaveLength(2);
     expect(hasVacantOrganizationSeat(first, 'admin_l2_0')).toBe(true);
     expect(hasVacantOrganizationSeat(first, 'admin_l1_0')).toBe(false);
+    const emptySeats = first.seats
+      .filter((seat) => seat.occupant === null)
+      .sort((left, right) => left.seatId.localeCompare(right.seatId));
+    expect(first.vacancies).toHaveLength(emptySeats.length);
+    expect(first.vacancies.map((vacancy) => vacancy.vacancyId)).toEqual(
+      emptySeats.map((seat) => `vacancy:initial:${seat.seatId}`),
+    );
+    expect(first.processedProducerKeys).toEqual(
+      emptySeats.map((seat) => `vacancy:initial:${seat.seatId}`),
+    );
+    expect(first.vacancies.every((vacancy) => vacancy.status === 'open')).toBe(true);
+    expect(first.vacancies.every((vacancy) => vacancy.reason === 'initial_opening')).toBe(true);
+    expect(first.vacancies.every((vacancy) => vacancy.sourceType === 'system')).toBe(true);
+    expect(
+      first.seats
+        .filter((seat) => seat.occupant !== null)
+        .every(
+          (seat) =>
+            !first.vacancies.some(
+              (vacancy) =>
+                vacancy.seatId === seat.seatId &&
+                (vacancy.status === 'open' || vacancy.status === 'selecting'),
+            ),
+        ),
+    ).toBe(true);
+    const adminL2Vacancy = first.vacancies.find((vacancy) => vacancy.positionId === 'admin_l2_0');
+    expect(adminL2Vacancy).toMatchObject({
+      vacancyId: 'vacancy:initial:seat:admin_l2_0:1',
+      sourceId: 'initial:seat:admin_l2_0:1',
+      openedAtDay: 0,
+    });
+    expect(first.vacancies.find((vacancy) => vacancy.positionId === 'admin_l3_0')).toMatchObject({
+      vacancyId: 'vacancy:initial:seat:admin_l3_0:1',
+    });
+    expect(second.vacancies).toEqual(first.vacancies);
+    expect(second.processedProducerKeys).toEqual(first.processedProducerKeys);
     expect(validateOrganizationInvariants(first, createInitialState().career.appointment)).toEqual(
       [],
     );
@@ -107,11 +143,22 @@ describe('validateOrganizationInvariants', () => {
       closesAtDay: null,
       closedAtDay: null,
       selectionId: null,
+      filledBy: null,
+      filledAppointmentId: null,
+      cancellationReason: null,
     });
 
     expect(
       validateOrganizationInvariants(organization, createInitialState().career.appointment),
     ).toContain('Active vacancy vacancy:test has an occupied seat');
+
+    const vacancy = organization.vacancies.find((item) => item.vacancyId === 'vacancy:test');
+    if (!vacancy) throw new Error('Expected test Vacancy');
+    vacancy.status = 'filled';
+    vacancy.closedAtDay = 2;
+    expect(
+      validateOrganizationInvariants(organization, createInitialState().career.appointment),
+    ).toContain('Filled vacancy vacancy:test is missing occupant snapshot');
   });
 
   it('拒绝不存在 Vacancy 的世界级选拔和非候选赢家', () => {

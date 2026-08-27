@@ -89,6 +89,7 @@ export function createOrganizationStateSchema(dependencies: {
       leadershipRank: z.enum(LEADERSHIP_RANKS),
       openedAtDay: z.number().int().nonnegative(),
       reason: z.enum([
+        'initial_opening',
         'retirement',
         'promotion',
         'lateral_transfer',
@@ -103,8 +104,45 @@ export function createOrganizationStateSchema(dependencies: {
       closesAtDay: z.number().int().nonnegative().nullable(),
       closedAtDay: z.number().int().nonnegative().nullable(),
       selectionId: z.string().min(1).nullable(),
+      /** Schema 12 had no terminal occupant/cancellation audit fields. */
+      filledBy: SeatOccupantRefSchema.nullable().default(null),
+      filledAppointmentId: z.string().min(1).nullable().default(null),
+      cancellationReason: z
+        .enum([
+          'organization_change',
+          'selection_cancelled',
+          'opportunity_withdrawn',
+          'expired',
+          'system',
+        ])
+        .nullable()
+        .default(null),
     })
-    .strict();
+    .strict()
+    .superRefine((value, ctx) => {
+      const filled = value.status === 'filled';
+      const terminalCancellation = value.status === 'cancelled' || value.status === 'expired';
+      if (filled !== (value.filledBy !== null && value.filledAppointmentId !== null))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Filled Vacancy must retain its occupant and appointment audit fields',
+        });
+      if (terminalCancellation !== (value.cancellationReason !== null))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Cancelled or expired Vacancy must retain a cancellation reason',
+        });
+      if ((value.status === 'open' || value.status === 'selecting') && value.closedAtDay !== null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Active Vacancy cannot have a closedAtDay',
+        });
+      if (terminalCancellation && value.closedAtDay === null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Cancelled or expired Vacancy requires a closedAtDay',
+        });
+    });
   const candidate = z
     .object({
       candidateId: z.string().min(1),
