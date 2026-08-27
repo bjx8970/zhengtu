@@ -122,6 +122,21 @@ export function createOrganizationStateSchema(dependencies: {
       scoringInputs: z.record(z.number()),
     })
     .strict();
+  const departure = z
+    .object({
+      departureId: z.string().min(1),
+      cadreId: z.string().min(1),
+      appointmentId: z.string().min(1).nullable(),
+      experienceId: z.string().min(1).nullable(),
+      seatId: z.string().min(1).nullable(),
+      positionId: z.string().min(1).nullable(),
+      institutionId: z.string().min(1).nullable(),
+      regionId: z.string().min(1).nullable(),
+      occurredAtDay: z.number().int().nonnegative(),
+      reason: z.enum(['retirement', 'disciplinary_exit']),
+      sourceType: z.literal('cadre_lifecycle'),
+    })
+    .strict();
   const selection = z
     .object({
       selectionId: z.string().min(1),
@@ -153,6 +168,7 @@ export function createOrganizationStateSchema(dependencies: {
       seats: z.array(seat),
       vacancies: z.array(vacancy),
       selections: z.array(selection),
+      departures: z.array(departure),
       processedProducerKeys: z.array(z.string().min(1)),
     })
     .strict() as z.ZodType<OrganizationState>;

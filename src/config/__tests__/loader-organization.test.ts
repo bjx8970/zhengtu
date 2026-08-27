@@ -8,6 +8,12 @@ import { getConfigLoader } from '../loader';
 describe('ConfigLoader organization config', () => {
   const loader = getConfigLoader();
 
+  it('加载 NPC 每年度每职级独立晋升预算', () => {
+    expect(loader.getGameConfig().npcLifecycle.rankProgression.maxAdvancementsPerRankPerYear).toBe(
+      1,
+    );
+  });
+
   it('加载有限、引用完整且身份唯一的 NPC 模板', () => {
     const cadres = loader.getCadreTemplates();
     const positions = new Set(loader.getAllPositions().map((position) => position.id));

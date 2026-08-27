@@ -54,6 +54,7 @@ import { commitPolicyTransitionInTransaction } from './policy-transition-transac
 import { expireCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
 import { evaluateProbation } from '../../engine/career/probation-evaluation';
 import { grantAnnualCivilServiceRankQuota } from '../../engine/career/rank-quota';
+import { settleNpcLifecycle } from '../../engine/organization/npc-lifecycle';
 
 /**
  * 结算当日行动与到期政策，再统一处理它们产生的领域信号。
@@ -197,6 +198,23 @@ export function processTimelineNodes(
         break;
       }
       case 'annual_assessment': {
+        const producerKey = `npc-annual:${node.year}`;
+        if (!draft.organization.processedProducerKeys.includes(producerKey)) {
+          const npcSettlement = settleNpcLifecycle({
+            organization: draft.organization,
+            currentDay: node.absoluteDay,
+            currentYear: node.year,
+            daysPerYear:
+              getConfigLoader().getGameConfig().daysPerMonth *
+              getConfigLoader().getGameConfig().monthsPerYear,
+            config: getConfigLoader().getGameConfig().npcLifecycle,
+            rankProgressionRules: getConfigLoader().getAllCivilServiceRankProgressionRules(),
+            rng,
+          });
+          draft.organization = npcSettlement.organization;
+          draft.organization.processedProducerKeys.push(producerKey);
+        }
+        // NPC 结算只写组织事实和审计结果，不进入玩家 CareerOpportunity/Event 信号管道。
         const signals = processAnnualAssessment(draft, node.year, node.absoluteDay, idFactory);
         processCascadeSignalsInTransaction(
           draft,
@@ -217,7 +235,8 @@ export function processTimelineNodes(
       }
       case 'political_cycle':
       case 'retirement_check':
-        // 当前阶段仅保证节点顺序与可恢复性；具体职业循环由 #95 接入。
+        // NPC 退休已在同年 annual_assessment 内结算；保留该兼容节点为无副作用占位，
+        // 避免旧存档 continuation 改变顺序，也避免未来重复关闭任职。
         break;
     }
   }

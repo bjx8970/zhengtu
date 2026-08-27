@@ -1,12 +1,12 @@
 /**
- * 游戏状态管理（Schema 11）
+ * 游戏状态管理（Schema 12）
  *
  * 核心设计：
  * 1. 单一 createStore<PlayerSave> 管理全部游戏状态
  * 2. 通过 dispatch(action) 修改状态，produce() 追踪变更
  * 3. 仅在实际状态变化时写入 localStorage
  *
- * 当前持久化结构为 Schema 11，新增有限干部、岗位席位、动态空缺和世界级选拔状态。
+ * 当前持久化结构为 Schema 12，新增 NPC 离任事实账本。
  */
 
 import { createStore, produce, unwrap } from 'solid-js/store';

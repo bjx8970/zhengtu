@@ -1,5 +1,5 @@
 /**
- * 玩家存档类型定义（Schema 11）
+ * 玩家存档类型定义（Schema 12）
  *
  * PlayerSave 重构为正式子状态结构：
  * - character：角色基础信息和属性
@@ -256,7 +256,7 @@ export interface TimelineContinuation {
 // ===== 新版 PlayerSave =====
 
 /**
- * 玩家存档（Schema 11）
+ * 玩家存档（Schema 12）
  *
  * 重构为正式子状态结构，删除旧职业事实来源。
  */

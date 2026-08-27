@@ -105,6 +105,24 @@ export interface VacancyInstance {
   selectionId: string | null;
 }
 
+/** NPC 离任事实账本；只追加、不回写，供后续 Vacancy producer 消费。 */
+export interface CadreDepartureFact {
+  departureId: string;
+  cadreId: string;
+  /** 未任职退出时为空；此事实不产生 Vacancy。 */
+  appointmentId: string | null;
+  /** 未任职退出时为空。 */
+  experienceId: string | null;
+  /** 未任职退出时为空；消费者必须以此字段区分是否释放 Seat。 */
+  seatId: string | null;
+  positionId: string | null;
+  institutionId: string | null;
+  regionId: string | null;
+  occurredAtDay: number;
+  reason: 'retirement' | 'disciplinary_exit';
+  sourceType: 'cadre_lifecycle';
+}
+
 /** 选拔开始时冻结的玩家或 NPC 候选职业事实。 */
 export interface SelectionCandidateSnapshot {
   candidateId: string;
@@ -161,6 +179,8 @@ export interface OrganizationState {
   seats: OrganizationSeat[];
   vacancies: VacancyInstance[];
   selections: StaffingSelection[];
+  /** 已结束任职的不可变事实；后续 Vacancy producer 以 departureId/appointmentId 去重。 */
+  departures: CadreDepartureFact[];
   /** producer 幂等键；防止 continuation 或刷新后重复创建世界事实。 */
   processedProducerKeys: string[];
 }
