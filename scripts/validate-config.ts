@@ -489,6 +489,7 @@ const ConstantsSchema = z.object({
           { message: 'npcLifecycle 年度考核阈值必须按优秀 >= 称职 >= 基本称职排列' },
         ),
       rankProgression: z.object({
+        maxAdvancementsPerRankPerYear: z.number().int().positive(),
         minAssessmentCount: z.number().int().nonnegative(),
         minQualifiedAssessmentCount: z.number().int().nonnegative(),
         minExcellentAssessmentCount: z.number().int().nonnegative(),

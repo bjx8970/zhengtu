@@ -179,6 +179,7 @@
       "basicThreshold": 60
     },
     "rankProgression": {
+      "maxAdvancementsPerRankPerYear": 1,
       "minAssessmentCount": 1,
       "minQualifiedAssessmentCount": 1,
       "minExcellentAssessmentCount": 0,

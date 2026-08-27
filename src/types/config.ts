@@ -328,6 +328,8 @@ export interface NpcLifecycleConfig {
     basicThreshold: number;
   };
   rankProgression: {
+    /** 同一 fromRank 每个年度允许晋升的 NPC 人数。 */
+    maxAdvancementsPerRankPerYear: number;
     minAssessmentCount: number;
     minQualifiedAssessmentCount: number;
     minExcellentAssessmentCount: number;

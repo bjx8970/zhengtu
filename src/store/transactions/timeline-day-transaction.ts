@@ -210,15 +210,8 @@ export function processTimelineNodes(
             config: getConfigLoader().getGameConfig().npcLifecycle,
             rankProgressionRules: getConfigLoader().getAllCivilServiceRankProgressionRules(),
             rng,
-            rankQuotaValues: draft.world.metrics,
           });
           draft.organization = npcSettlement.organization;
-          for (const quotaChange of npcSettlement.quotaChanges) {
-            draft.world.metrics[quotaChange.metricId] = Math.max(
-              0,
-              (draft.world.metrics[quotaChange.metricId] ?? 0) - quotaChange.consumedValue,
-            );
-          }
           draft.organization.processedProducerKeys.push(producerKey);
         }
         // NPC 结算只写组织事实和审计结果，不进入玩家 CareerOpportunity/Event 信号管道。

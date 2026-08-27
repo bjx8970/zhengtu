@@ -16,7 +16,6 @@ function settle(state = createInitialState(), currentDay = 360, currentYear = 20
     config: loader.getGameConfig().npcLifecycle,
     rankProgressionRules: loader.getAllCivilServiceRankProgressionRules(),
     rng: () => 0.5,
-    rankQuotaValues: {},
   });
 }
 
@@ -94,7 +93,6 @@ describe('settleNpcLifecycle', () => {
       daysPerYear: 360,
       config,
       rankProgressionRules: loader.getAllCivilServiceRankProgressionRules(),
-      rankQuotaValues: {},
       rng: () => 0.5,
     });
     const exited = result.organization.cadres.find((item) => item.cadreId === cadre.cadreId);
@@ -112,7 +110,7 @@ describe('settleNpcLifecycle', () => {
     });
   });
 
-  it('冻结或处分限制与缺失职数会阻止 NPC 职级资格', () => {
+  it('冻结或处分限制会阻止 NPC 职级资格', () => {
     const state = createInitialState();
     const cadre = state.organization.cadres.find(
       (item) => item.currentAppointment && item.civilServiceRank === 'clerk_1',
@@ -138,7 +136,6 @@ describe('settleNpcLifecycle', () => {
       daysPerYear: 360,
       config: loader.getGameConfig().npcLifecycle,
       rankProgressionRules: loader.getAllCivilServiceRankProgressionRules(),
-      rankQuotaValues: { 'rank_quota.section_member_4': 1 },
       rng: () => 0.5,
     });
 
@@ -171,15 +168,15 @@ describe('settleNpcLifecycle', () => {
     }
     state.organization.cadres.push(second);
     const loader = getConfigLoader();
-    const rankQuotaValues = { 'rank_quota.section_member_4': 1 };
+    const config = structuredClone(loader.getGameConfig().npcLifecycle);
+    config.rankProgression.maxAdvancementsPerRankPerYear = 1;
     const result = settleNpcLifecycle({
       organization: state.organization,
       currentDay: 1080,
       currentYear: 2014,
       daysPerYear: 360,
-      config: loader.getGameConfig().npcLifecycle,
+      config,
       rankProgressionRules: loader.getAllCivilServiceRankProgressionRules(),
-      rankQuotaValues,
       rng: () => 0.5,
     });
 
@@ -189,10 +186,6 @@ describe('settleNpcLifecycle', () => {
     expect(
       result.organization.cadres.find((item) => item.cadreId === second.cadreId)?.civilServiceRank,
     ).toBe('clerk_1');
-    expect(
-      result.quotaChanges.filter((change) => change.metricId === 'rank_quota.section_member_4'),
-    ).toEqual([{ metricId: 'rank_quota.section_member_4', consumedValue: 1 }]);
-    expect(rankQuotaValues).toEqual({ 'rank_quota.section_member_4': 1 });
   });
 
   it('退休 NPC 先离任，不得抢占同年度仍在职 NPC 的晋升职数', () => {
@@ -215,7 +208,6 @@ describe('settleNpcLifecycle', () => {
       }));
     }
     const loader = getConfigLoader();
-    const rankQuotaValues = { 'rank_quota.researcher_4': 1 };
     const result = settleNpcLifecycle({
       organization: state.organization,
       currentDay: 5400,
@@ -223,7 +215,6 @@ describe('settleNpcLifecycle', () => {
       daysPerYear: 360,
       config: loader.getGameConfig().npcLifecycle,
       rankProgressionRules: loader.getAllCivilServiceRankProgressionRules(),
-      rankQuotaValues,
       rng: () => 0.5,
     });
     const retired = result.organization.cadres.find((item) => item.cadreId === first.cadreId);
@@ -240,10 +231,6 @@ describe('settleNpcLifecycle', () => {
     expect(
       result.rankChanges.filter((change) => change.previousRank === 'section_member_1'),
     ).toEqual([expect.objectContaining({ cadreId: second.cadreId, currentRank: 'researcher_4' })]);
-    expect(
-      result.quotaChanges.filter((change) => change.metricId === 'rank_quota.researcher_4'),
-    ).toEqual([{ metricId: 'rank_quota.researcher_4', consumedValue: 1 }]);
-    expect(rankQuotaValues).toEqual({ 'rank_quota.researcher_4': 1 });
   });
 
   it('跨两年时间推进每年只结算一次 NPC 年度事实', () => {

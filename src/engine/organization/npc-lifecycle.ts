@@ -19,8 +19,6 @@ export interface NpcLifecycleSettlementInput {
   config: NpcLifecycleConfig;
   rankProgressionRules: readonly CivilServiceRankProgressionRule[];
   rng: () => number;
-  /** NPC 世界指标快照；用于消费 progression rule 的 quotaRequirement。 */
-  rankQuotaValues?: Readonly<Record<string, number>>;
 }
 
 /** NPC 年度结算结果，不包含任何 Store 副作用。 */
@@ -29,7 +27,6 @@ export interface NpcLifecycleSettlementResult {
   settledCadreIds: string[];
   assessments: Array<{ cadreId: string; year: number; score: number; tier: string }>;
   rankChanges: Array<{ cadreId: string; previousRank: string; currentRank: string }>;
-  quotaChanges: Array<{ metricId: string; consumedValue: number }>;
   departureIds: string[];
 }
 
@@ -67,11 +64,9 @@ export function settleNpcLifecycle(
   const settledCadreIds: string[] = [];
   const assessments: NpcLifecycleSettlementResult['assessments'] = [];
   const rankChanges: NpcLifecycleSettlementResult['rankChanges'] = [];
-  const quotaChanges: NpcLifecycleSettlementResult['quotaChanges'] = [];
   const departureIds: string[] = [];
-  // 晋升按稳定 cadreId 串行结算；内部账本让同一年度后续干部看到前序消费。
-  // 浅拷贝保证 Engine 不会修改调用方传入的世界指标快照。
-  const remainingRankQuotaValues = { ...(input.rankQuotaValues ?? {}) };
+  // NPC 年度晋升预算独立于玩家职数指标，并按 fromRank 分桶，避免跨领域资源耦合。
+  const remainingAdvancementsByFromRank = new Map<string, number>();
   const assessmentConfig = input.config.annualAssessment;
   const rules = new Map(input.rankProgressionRules.map((rule) => [rule.fromRank, rule]));
 
@@ -125,6 +120,9 @@ export function settleNpcLifecycle(
     }
 
     const rankRule = rules.get(cadre.civilServiceRank);
+    const remainingAdvancements =
+      remainingAdvancementsByFromRank.get(cadre.civilServiceRank) ??
+      input.config.rankProgression.maxAdvancementsPerRankPerYear;
     const qualifiedCount = cadre.assessments.filter(
       (item) => item.tier === '优秀' || item.tier === '称职',
     ).length;
@@ -147,11 +145,7 @@ export function settleNpcLifecycle(
         Math.max(rankRule.minDaysInRank, input.config.rankProgression.minDaysInRank) &&
       serviceDays(cadre, input.currentDay) >=
         Math.max(rankRule.minServiceDays, input.config.rankProgression.minServiceDays) &&
-      (rankRule.quotaRequirement === null ||
-        ((remainingRankQuotaValues[rankRule.quotaRequirement.metricId] ?? 0) >=
-          rankRule.quotaRequirement.requiredValue &&
-          (remainingRankQuotaValues[rankRule.quotaRequirement.metricId] ?? 0) >=
-            rankRule.quotaRequirement.consumeValue)) &&
+      remainingAdvancements > 0 &&
       rankRule.additionalConditions.length === 0 &&
       !cadre.restrictions.some(
         (restriction) =>
@@ -168,15 +162,7 @@ export function settleNpcLifecycle(
         previousRank,
         currentRank: rankRule.toRank,
       });
-      if (rankRule.quotaRequirement)
-        remainingRankQuotaValues[rankRule.quotaRequirement.metricId] =
-          (remainingRankQuotaValues[rankRule.quotaRequirement.metricId] ?? 0) -
-          rankRule.quotaRequirement.consumeValue;
-      if (rankRule.quotaRequirement)
-        quotaChanges.push({
-          metricId: rankRule.quotaRequirement.metricId,
-          consumedValue: rankRule.quotaRequirement.consumeValue,
-        });
+      remainingAdvancementsByFromRank.set(previousRank, remainingAdvancements - 1);
     }
   }
   return {
@@ -184,7 +170,6 @@ export function settleNpcLifecycle(
     settledCadreIds,
     assessments,
     rankChanges,
-    quotaChanges,
     departureIds,
   };
 }

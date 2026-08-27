@@ -291,6 +291,45 @@ describe('domain signal production', () => {
     expect(store.getRawState().remainingBudget).toBe(budgetAfterSettlement);
   });
 
+  it('NPC 年度晋升使用独立预算，不消费玩家职级职数指标', () => {
+    const loader = getConfigLoader();
+    const config = loader.getGameConfig();
+    const state = createInitialState();
+    const candidate = state.organization.cadres.find(
+      (cadre) => cadre.currentAppointment && cadre.cadreId === 'cadre_he_yu',
+    );
+    if (!candidate) throw new Error('Expected assigned NPC candidate');
+    candidate.civilServiceRank = 'clerk_1';
+    candidate.civilServiceRankStartedAtDay = 0;
+    candidate.assessments.push({ year: config.startYear, score: 90, tier: '优秀' });
+    state.world.metrics['rank_quota.section_member_4'] = 1;
+    state.time = {
+      year: config.startYear + 2,
+      month: config.monthsPerYear,
+      day: config.daysPerMonth,
+      granularity: 'day',
+      totalDaysPlayed: 3 * config.monthsPerYear * config.daysPerMonth - 1,
+      pendingContinuation: null,
+    };
+
+    // 目标 metric 属于 NPC 的 fromRank=clerk_1→section_member_4；玩家当前为 clerk_2，
+    // 本年度只会生产 rank_quota.clerk_1，因此该值可证明 NPC 未改写玩家指标。
+    const store = createTestStore(state);
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 0.99,
+      _idFactory: () => 'npc-budget-isolation',
+    });
+
+    const settled = store.getRawState();
+    const settledCandidate = settled.organization.cadres.find(
+      (cadre) => cadre.cadreId === candidate.cadreId,
+    );
+    expect(settledCandidate?.civilServiceRank).toBe('section_member_4');
+    expect(settled.world.metrics['rank_quota.section_member_4']).toBe(1);
+  });
+
   it('称职年度考核生产下一职级职数并发出精确 world.metric_changed 信号', () => {
     const loader = getConfigLoader();
     const rankQuotaEvent: EventDefinition = {
