@@ -1,9 +1,10 @@
 /**
  * Browser acceptance coverage for the playable Phase 2/3 vertical slice.
  *
- * Saves only accelerate to legal pre-trigger states. Opportunities, policy
- * facts, blocking events and delayed follow-ups must be produced by UI actions
- * and the production time pipeline under test.
+ * Saves only accelerate to legal pre-trigger states. Time, opportunities, policy
+ * facts, blocking events and appointments remain produced by UI actions and the
+ * production pipeline; only deterministic Selection competition facts are frozen
+ * before acceptance.
  */
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -214,6 +215,39 @@ function seedHighAssessmentPreconditions(state: JsonRecord): void {
   }
 }
 
+/**
+ * Freeze deterministic, auditable candidate facts before a Selection is created.
+ * This helper intentionally writes no opportunity, Selection, process, Vacancy,
+ * Appointment or Seat facts.
+ *
+ * @param state persisted test state
+ */
+function freezeRelativeSelectionCompetitionFacts(state: JsonRecord): void {
+  const time = asRecord(state.time, 'time');
+  const year = time.year;
+  if (typeof year !== 'number') throw new Error('Expected numeric current year');
+  const career = asRecord(state.career, 'career');
+  const openExperiences = asRecords(career.experiences, 'career experiences').filter(
+    (experience) => experience.endedAtDay === null,
+  );
+  if (openExperiences.length !== 1) throw new Error('Expected exactly one open career experience');
+  const openExperience = openExperiences[0];
+  if (!openExperience) throw new Error('Expected open career experience');
+  const assessments = asRecords(openExperience.assessmentResults, 'assessment results');
+  assessments.push({ year, score: 100, tier: '优秀' });
+  openExperience.assessmentResults = assessments;
+  career.specialties = { public_management: 100 };
+  const character = asRecord(state.character, 'character');
+  character.integrity = 100;
+  character.network = 100;
+  const organization = asRecord(state.organization, 'organization');
+  for (const cadre of asRecords(organization.cadres, 'cadres')) {
+    cadre.assessments = [{ year, score: 0, tier: '不称职' }];
+    cadre.specialties = { public_management: 0 };
+    cadre.restrictions = [];
+  }
+}
+
 function selectOpportunityId(state: JsonRecord, targetPositionId: string): string {
   const career = asRecord(state.career, 'career');
   const opportunity = asRecords(career.opportunities, 'career opportunities').find(
@@ -343,6 +377,8 @@ test('职业链：副职治理成果生成正职机会，职级与两次任职�
   await page.getByTestId('advance-day').click();
   await page.goto('/#/career');
   const deputyId = selectOpportunityId(await savedState(page), 'admin_l2_0');
+  await changeSave(page, freezeRelativeSelectionCompetitionFacts);
+  await page.goto('/#/career');
   await page.getByTestId(`accept-opportunity-${deputyId}`).click();
   await advanceCareerProcess(page, deputyId);
 
@@ -398,6 +434,8 @@ test('职业链：副职治理成果生成正职机会，职级与两次任职�
     '当前任职内称职及以上考核次数不少于 2 次',
   );
   const chiefId = selectOpportunityId(await savedState(page), 'admin_l3_0');
+  await changeSave(page, freezeRelativeSelectionCompetitionFacts);
+  await page.goto('/#/career');
   await page.getByTestId(`accept-opportunity-${chiefId}`).click();
   await advanceCareerProcess(page, chiefId);
 
