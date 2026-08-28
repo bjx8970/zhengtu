@@ -17,7 +17,37 @@
       "national_chief"
     ],
     "minimumServiceDays": 0,
-    "excludedRestrictionTypes": ["disciplinary_action"]
+    "excludedRestrictionTypes": ["disciplinary_action"],
+    "vacancyScopes": [
+      {
+        "targetPositionId": "admin_l2_0",
+        "allowedCurrentPositionIds": ["admin_l1_0"],
+        "requireSameInstitution": true,
+        "requireSameRegion": true,
+        "requireSamePositionDomain": true,
+        "minimumInstitutionExperienceDays": 180,
+        "minimumRegionExperienceDays": 180,
+        "minimumDomainExperienceDays": 180,
+        "minimumQualifiedAssessmentCount": 1,
+        "qualifiedAssessmentMinimumScore": 60,
+        "minimumLatestAssessmentScore": 60,
+        "requiredSpecialties": [{ "specialtyId": "public_management", "minimumScore": 60 }]
+      },
+      {
+        "targetPositionId": "admin_l3_0",
+        "allowedCurrentPositionIds": ["admin_l2_0"],
+        "requireSameInstitution": true,
+        "requireSameRegion": true,
+        "requireSamePositionDomain": true,
+        "minimumInstitutionExperienceDays": 180,
+        "minimumRegionExperienceDays": 180,
+        "minimumDomainExperienceDays": 180,
+        "minimumQualifiedAssessmentCount": 1,
+        "qualifiedAssessmentMinimumScore": 60,
+        "minimumLatestAssessmentScore": 60,
+        "requiredSpecialties": [{ "specialtyId": "public_management", "minimumScore": 60 }]
+      }
+    ]
   },
   "stages": [
     {

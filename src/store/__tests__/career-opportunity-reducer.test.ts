@@ -104,6 +104,25 @@ function addTestVacancy(state: PlayerSave, opportunity: AppointmentCareerOpportu
 
 /** 为相对选拔测试显式冻结玩家高分、NPC 低分事实，避免依赖旧单候选语义。 */
 function configureRelativeScores(state: PlayerSave): void {
+  const currentDay = state.time.totalDaysPlayed;
+  if (currentDay < 180) {
+    const delta = 180 - currentDay;
+    state.time.totalDaysPlayed += delta;
+    const dateFields = [
+      'appearedAtDay',
+      'expiresAtDay',
+      'acceptedAtDay',
+      'rejectedAtDay',
+      'resolvedAtDay',
+      'cancelledAtDay',
+    ] as const;
+    for (const opportunity of state.career.opportunities) {
+      for (const field of dateFields) {
+        const value = opportunity[field];
+        if (value !== null) opportunity[field] = value + delta;
+      }
+    }
+  }
   const experience = state.career.experiences.find((item) => item.endedAtDay === null);
   if (!experience) throw new Error('Expected an open player career experience');
   experience.assessmentResults = [{ year: 2026, score: 100, tier: '优秀' }];
@@ -459,6 +478,7 @@ describe('career opportunity reducer', () => {
     opportunity.eligibilityConditions = [{ signalField: 'tier', op: 'eq', value: '称职' }];
     initial.career.opportunities = [opportunity];
     addTestVacancy(initial, opportunity);
+    configureRelativeScores(initial);
     const store = createTestStore(initial);
 
     store.dispatch({ type: 'ACCEPT_CAREER_OPPORTUNITY', opportunityId: opportunity.id });
@@ -579,7 +599,7 @@ describe('career opportunity reducer', () => {
       _idFactory: ids,
     });
     beforeDeadline.dispatch({ type: 'ADVANCE_TIME', granularity: 'day', _idFactory: ids });
-    expect(beforeDeadline.getRawState().time.totalDaysPlayed).toBe(1);
+    expect(beforeDeadline.getRawState().time.totalDaysPlayed).toBe(181);
     expect(beforeDeadline.getRawState().career.opportunities[0]?.status).toBe('in_process');
     const decoded = decodeCurrentSave(
       JSON.stringify(wrapSaveEnvelope(beforeDeadline.getRawState())),

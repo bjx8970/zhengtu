@@ -153,6 +153,8 @@ export function createOrganizationStateSchema(dependencies: {
       civilServiceRank: z.enum(CIVIL_SERVICE_RANKS),
       appointmentStartedAtDay: z.number().int().nonnegative().nullable(),
       serviceStartedAtDay: z.number().int().nonnegative(),
+      // Schema 13/early Schema 14 candidates had no frozen intervals; decode them as empty.
+      experiences: z.array(dependencies.careerExperience).default([]),
       assessments: z.array(dependencies.careerAssessmentRecord),
       specialties: z.record(z.number()),
       restrictionTypes: z.array(z.string().min(1)),

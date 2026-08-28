@@ -227,6 +227,8 @@ export interface SelectionCandidateSnapshot {
   civilServiceRank: CivilServiceRank;
   appointmentStartedAtDay: number | null;
   serviceStartedAtDay: number;
+  /** Frozen career intervals used for vacancy-specific experience checks. */
+  experiences: CareerExperience[];
   assessments: CareerAssessmentRecord[];
   specialties: Record<string, number>;
   restrictionTypes: string[];
@@ -245,6 +247,8 @@ export interface SelectionCandidateInput {
   civilServiceRank: CivilServiceRank;
   appointmentStartedAtDay: number | null;
   serviceStartedAtDay: number;
+  /** Career intervals captured before the selection starts. */
+  experiences: CareerExperience[];
   assessments: CareerAssessmentRecord[];
   specialties: Record<string, number>;
   restrictionTypes: string[];
@@ -257,6 +261,17 @@ export interface CandidateEligibilityResult {
   reason: string | null;
 }
 
+/** Vacancy facts used by selection eligibility without retaining a mutable Vacancy. */
+export interface SelectionVacancyEligibilityContext {
+  vacancyId: string;
+  positionId: string;
+  institutionId: string;
+  regionId: string;
+  positionDomain: PositionDomain;
+  sourceType: VacancySourceType;
+  conflictingCandidateIds: readonly string[];
+}
+
 /** Inputs captured once when a Selection is created. */
 export interface CreateRelativeSelectionInput {
   selectionId: string;
@@ -264,6 +279,7 @@ export interface CreateRelativeSelectionInput {
   startedAtDay: number;
   candidates: readonly SelectionCandidateInput[];
   rules: RelativeSelectionConfig;
+  eligibilityContext: SelectionVacancyEligibilityContext;
   randomDraws: readonly number[];
   playerCareerProcessId?: string | null;
 }

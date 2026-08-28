@@ -222,6 +222,7 @@ describe('Schema 12 organization state', () => {
       failure: null,
     });
     expect(selection?.stageResults).toHaveLength(6);
+    expect((selection?.candidates as Array<Record<string, unknown>>)[0]?.experiences).toEqual([]);
     expect(migrateSchema13To14(migrated)).toEqual(migrated);
     expect(decodeCurrentSave(JSON.stringify(migrated)).success).toBe(true);
 
@@ -309,6 +310,16 @@ describe('Schema 12 organization state', () => {
       failure: { code: 'stage_no_survivors', stage: 'appointment' },
     });
     expect(decodeCurrentSave(JSON.stringify(activeMigrated)).success).toBe(true);
+
+    const invalidExperiences = structuredClone(migrated);
+    const invalidOrganization = (invalidExperiences.state as Record<string, unknown>)
+      .organization as Record<string, unknown>;
+    const invalidSelection = (invalidOrganization.selections as Array<Record<string, unknown>>)[0];
+    if (!invalidSelection) throw new Error('Expected migrated Selection');
+    const invalidCandidate = (invalidSelection.candidates as Array<Record<string, unknown>>)[0];
+    if (!invalidCandidate) throw new Error('Expected migrated candidate');
+    invalidCandidate.experiences = [{ invalid: true }];
+    expect(decodeCurrentSave(JSON.stringify(invalidExperiences)).success).toBe(false);
 
     const malformed = structuredClone(raw);
     const malformedSelection = (

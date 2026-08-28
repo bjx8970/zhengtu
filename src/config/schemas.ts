@@ -425,6 +425,45 @@ export const CareerOpportunityDefinitionArraySchema = z
   });
 
 /** Relative-selection stage rules Schema (the six-stage order is immutable). */
+const RelativeSelectionSpecialtyRequirementSchema = z
+  .object({
+    specialtyId: z.string().min(1),
+    minimumScore: z.number().min(0).max(100),
+  })
+  .strict();
+
+const RelativeSelectionVacancyScopeSchema = z
+  .object({
+    targetPositionId: z.string().min(1),
+    allowedCurrentPositionIds: z.array(z.string().min(1)).min(1),
+    requireSameInstitution: z.boolean(),
+    requireSameRegion: z.boolean(),
+    requireSamePositionDomain: z.boolean(),
+    minimumInstitutionExperienceDays: z.number().int().nonnegative(),
+    minimumRegionExperienceDays: z.number().int().nonnegative(),
+    minimumDomainExperienceDays: z.number().int().nonnegative(),
+    minimumQualifiedAssessmentCount: z.number().int().nonnegative(),
+    qualifiedAssessmentMinimumScore: z.number().min(0).max(100),
+    minimumLatestAssessmentScore: z.number().min(0).max(100),
+    requiredSpecialties: z.array(RelativeSelectionSpecialtyRequirementSchema),
+  })
+  .strict()
+  .superRefine((scope, ctx) => {
+    if (new Set(scope.allowedCurrentPositionIds).size !== scope.allowedCurrentPositionIds.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['allowedCurrentPositionIds'],
+        message: 'Allowed current position IDs must be unique',
+      });
+    const specialtyIds = scope.requiredSpecialties.map((specialty) => specialty.specialtyId);
+    if (new Set(specialtyIds).size !== specialtyIds.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['requiredSpecialties'],
+        message: 'Required specialty IDs must be unique',
+      });
+  });
+
 export const RelativeSelectionConfigSchema = z
   .object({
     schemaVersion: z.literal(14),
@@ -435,6 +474,7 @@ export const RelativeSelectionConfigSchema = z
         allowedLeadershipRanks: z.array(LeadershipRankSchema).min(1),
         minimumServiceDays: z.number().int().nonnegative(),
         excludedRestrictionTypes: z.array(z.string().min(1)),
+        vacancyScopes: z.array(RelativeSelectionVacancyScopeSchema),
       })
       .strict(),
     stages: z
@@ -469,7 +509,18 @@ export const RelativeSelectionConfigSchema = z
         });
       }),
   })
-  .strict();
+  .strict()
+  .superRefine((config, ctx) => {
+    const targetPositionIds = config.eligibility.vacancyScopes.map(
+      (scope) => scope.targetPositionId,
+    );
+    if (new Set(targetPositionIds).size !== targetPositionIds.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['eligibility', 'vacancyScopes'],
+        message: 'Vacancy scope target position IDs must be unique',
+      });
+  });
 
 // ===== 个人任务配置 Schema =====
 

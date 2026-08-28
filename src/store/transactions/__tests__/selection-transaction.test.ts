@@ -35,11 +35,54 @@ function makeAllCandidatesIneligible(state: PlayerSave, day: number): void {
     cadre.restrictions = [structuredClone(restriction)];
 }
 
-function opportunityFor(state: PlayerSave): AppointmentCareerOpportunity {
-  const vacancy = state.organization.vacancies.find((item) => item.status === 'open');
+function makeSelectionCandidatesEligible(state: PlayerSave): void {
+  state.career.specialties = { public_management: 80 };
+  state.career.experiences = state.career.experiences.map((experience) => ({
+    ...experience,
+    assessmentResults: [{ year: 2025, score: 80, tier: 'qualified' }],
+  }));
+  for (const cadre of state.organization.cadres) {
+    cadre.experiences = cadre.experiences.map((experience) => ({
+      ...experience,
+      assessmentResults: [{ year: 2025, score: 80, tier: 'qualified' }],
+    }));
+    cadre.assessments = [{ year: 2025, score: 80, tier: 'qualified' }];
+  }
+  const unassigned = state.organization.cadres.find((cadre) => cadre.currentAppointment === null);
+  const template = state.career.experiences[0];
+  if (!unassigned || !template)
+    throw new Error('Expected an unassigned cadre and player experience');
+  unassigned.experiences = [
+    {
+      ...structuredClone(template),
+      id: `selection-experience:${unassigned.cadreId}`,
+      appointmentId: `selection-appointment:${unassigned.cadreId}`,
+      positionId: 'admin_l1_0',
+      institutionId: 'township_govt_01',
+      regionId: 'region_qingyun_town',
+      institutionLevel: 'township',
+      positionDomain: 'local_governance',
+      leadershipRank: 'none',
+      startedAtDay: 0,
+      endedAtDay: 180,
+      assessmentResults: [{ year: 2025, score: 80, tier: 'qualified' }],
+    },
+  ];
+  unassigned.assessments = [{ year: 2025, score: 80, tier: 'qualified' }];
+  unassigned.specialties = { public_management: 80 };
+}
+
+function opportunityFor(
+  state: PlayerSave,
+  vacancyId?: string,
+  opportunityId = 'selection-transaction-opportunity',
+): AppointmentCareerOpportunity {
+  const vacancy = state.organization.vacancies.find(
+    (item) => item.status === 'open' && (vacancyId === undefined || item.vacancyId === vacancyId),
+  );
   if (!vacancy) throw new Error('Expected an open Vacancy');
   return {
-    id: 'selection-transaction-opportunity',
+    id: opportunityId,
     definitionId: 'test-selection',
     type: 'leadership_vacancy',
     status: 'accepted',
@@ -79,6 +122,7 @@ function opportunityFor(state: PlayerSave): AppointmentCareerOpportunity {
 describe('relative Selection transaction', () => {
   it('一次性绑定 Vacancy、Selection、CareerProcess 且只在创建时抽取 RNG', () => {
     const state = createInitialState();
+    makeSelectionCandidatesEligible(state);
     const opportunity = opportunityFor(state);
     state.career.opportunities = [opportunity];
     let randomCalls = 0;
@@ -87,7 +131,7 @@ describe('relative Selection transaction', () => {
       state,
       opportunity,
       'process:test',
-      0,
+      180,
       () => `selection:${++idCalls}`,
       () => {
         randomCalls += 1;
@@ -126,6 +170,7 @@ describe('relative Selection transaction', () => {
 
   it('绑定 Vacancy 不合法时保持完整存档不变', () => {
     const state = createInitialState();
+    makeSelectionCandidatesEligible(state);
     const opportunity = opportunityFor(state);
     opportunity.vacancyId = 'missing-vacancy';
     state.career.opportunities = [opportunity];
@@ -134,7 +179,7 @@ describe('relative Selection transaction', () => {
       state,
       opportunity,
       'process:test',
-      0,
+      180,
       () => 'selection:test',
       () => 0.5,
     );
@@ -144,16 +189,21 @@ describe('relative Selection transaction', () => {
 
   it('无合格候选在接受事务内终止 Selection 但保留 open Vacancy', () => {
     const state = createInitialState();
+    makeSelectionCandidatesEligible(state);
     const opportunity = opportunityFor(state);
     state.career.opportunities = [opportunity];
     makeAllCandidatesIneligible(state, 0);
+    let randomCalls = 0;
     const result = createRelativeSelectionInTransaction(
       state,
       opportunity,
       'process:no-qualified',
-      0,
+      180,
       () => 'selection:no-qualified',
-      () => 0.5,
+      () => {
+        randomCalls += 1;
+        return 0.5;
+      },
     );
     expect(result.success).toBe(true);
     if (!result.success) return;
@@ -172,17 +222,49 @@ describe('relative Selection transaction', () => {
       selectionId: null,
       closedAtDay: null,
     });
+    expect(randomCalls).toBe(0);
+  });
+
+  it('冻结完整玩家/NPC履历，并按 Vacancy context 排除不同目标的 NPC', () => {
+    const state = createInitialState();
+    makeSelectionCandidatesEligible(state);
+    const excluded = state.organization.cadres.find((cadre) => cadre.currentAppointment === null);
+    if (!excluded) throw new Error('Expected an unassigned cadre');
+    const sourceExperience = excluded.experiences[0];
+    if (!sourceExperience) throw new Error('Expected cadre experience');
+    sourceExperience.institutionId = 'subdistrict_01';
+    const opportunity = opportunityFor(state);
+    state.career.opportunities = [opportunity];
+    const result = createRelativeSelectionInTransaction(
+      state,
+      opportunity,
+      'process:context',
+      180,
+      () => 'selection:context',
+      () => 0.5,
+    );
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const player = result.selection.candidates.find(
+      (candidate) => candidate.candidateId === 'player',
+    );
+    expect(player?.experiences).toEqual(state.career.experiences);
+    expect(player?.experiences).not.toBe(state.career.experiences);
+    expect(
+      result.selection.candidates.some((candidate) => candidate.candidateId === excluded.cadreId),
+    ).toBe(false);
   });
 
   it('玩家首阶段淘汰后以有界循环完成剩余六阶段且仅保留 NPC winner', () => {
     const state = createInitialState();
+    makeSelectionCandidatesEligible(state);
     const opportunity = opportunityFor(state);
     state.career.opportunities = [opportunity];
     const created = createRelativeSelectionInTransaction(
       state,
       opportunity,
       'process:eliminated',
-      0,
+      180,
       () => 'selection:eliminated',
       () => 0.5,
     );
@@ -226,8 +308,94 @@ describe('relative Selection transaction', () => {
     });
   });
 
+  it('pending/active Selection 的 NPC 冲突排除行为一致，终态 Selection 不排除', () => {
+    const fixtureState = createInitialState();
+    makeSelectionCandidatesEligible(fixtureState);
+    const fixtureOpportunity = opportunityFor(fixtureState);
+    fixtureState.career.opportunities = [fixtureOpportunity];
+    const fixture = createRelativeSelectionInTransaction(
+      fixtureState,
+      fixtureOpportunity,
+      'process:conflict-fixture',
+      180,
+      () => 'selection:conflict-fixture',
+      () => 0.5,
+    );
+    expect(fixture.success).toBe(true);
+    if (!fixture.success) return;
+    const npc = fixture.selection.candidates.find((candidate) => candidate.candidateType === 'npc');
+    if (!npc) throw new Error('Expected a legal NPC candidate in fixture Selection');
+    const sourceVacancy = fixtureState.organization.vacancies.find(
+      (vacancy) => vacancy.vacancyId === fixtureOpportunity.vacancyId,
+    );
+    const targetVacancy = fixtureState.organization.vacancies.find(
+      (vacancy) => vacancy.status === 'open',
+    );
+    if (!sourceVacancy || !targetVacancy)
+      throw new Error('Expected source selecting and target open Vacancies');
+    Object.assign(targetVacancy, {
+      positionId: sourceVacancy.positionId,
+      positionNameSnapshot: sourceVacancy.positionNameSnapshot,
+      institutionId: sourceVacancy.institutionId,
+      institutionNameSnapshot: sourceVacancy.institutionNameSnapshot,
+      regionId: sourceVacancy.regionId,
+      institutionLevel: sourceVacancy.institutionLevel,
+      positionDomain: sourceVacancy.positionDomain,
+      leadershipRank: sourceVacancy.leadershipRank,
+    });
+    sourceVacancy.status = 'open';
+    sourceVacancy.selectionId = null;
+    const base = structuredClone(fixtureState);
+    const run = (status: 'pending' | 'active' | 'completed' | 'failed' | 'cancelled') => {
+      const state = structuredClone(base);
+      const conflict = structuredClone(fixture.selection);
+      conflict.status = status;
+      conflict.candidates = [structuredClone(npc)];
+      conflict.stageResults = [];
+      conflict.stageAudits = [];
+      conflict.winner = null;
+      conflict.winnerId = null;
+      conflict.failure = status === 'failed' ? fixture.selection.failure : null;
+      state.organization.selections = [conflict];
+      const opportunity = opportunityFor(
+        state,
+        targetVacancy.vacancyId,
+        `selection-conflict-${status}`,
+      );
+      state.career.opportunities = [opportunity];
+      return createRelativeSelectionInTransaction(
+        state,
+        opportunity,
+        `process:conflict-${status}`,
+        180,
+        () => `selection:conflict-${status}`,
+        () => 0.5,
+      );
+    };
+    for (const status of ['pending', 'active'] as const) {
+      const result = run(status);
+      expect(result.success).toBe(true);
+      if (!result.success) continue;
+      expect(result.selection.candidates.map((candidate) => candidate.candidateId)).toContain(
+        'player',
+      );
+      expect(result.selection.candidates.map((candidate) => candidate.candidateId)).not.toContain(
+        npc.candidateId,
+      );
+    }
+    for (const status of ['completed', 'failed', 'cancelled'] as const) {
+      const result = run(status);
+      expect(result.success).toBe(true);
+      if (!result.success) continue;
+      expect(result.selection.candidates.map((candidate) => candidate.candidateId)).toContain(
+        npc.candidateId,
+      );
+    }
+  });
+
   it('最终玩家赢家在 blocker 下只完成一次 Selection，解除后复用冻结结果填补 Vacancy', () => {
     const state = createInitialState();
+    makeSelectionCandidatesEligible(state);
     const opportunity = opportunityFor(state);
     state.career.opportunities = [opportunity];
     let randomCalls = 0;
@@ -235,7 +403,7 @@ describe('relative Selection transaction', () => {
       state,
       opportunity,
       'process:blocker',
-      0,
+      180,
       () => 'selection:blocker',
       () => {
         randomCalls += 1;
@@ -277,13 +445,14 @@ describe('relative Selection transaction', () => {
 
   it('中间阶段 wrap/decode 保留冻结候选、RNG 与审计且继续时不重复阶段', () => {
     const state = createInitialState();
+    makeSelectionCandidatesEligible(state);
     const opportunity = opportunityFor(state);
     state.career.opportunities = [opportunity];
     const created = createRelativeSelectionInTransaction(
       state,
       opportunity,
       'process:refresh',
-      0,
+      180,
       () => 'selection:refresh',
       () => 0.5,
     );

@@ -26,6 +26,7 @@ function candidate(
     civilServiceRank: 'clerk_2',
     appointmentStartedAtDay: null,
     serviceStartedAtDay: 0,
+    experiences: [],
     assessments: [],
     specialties: {},
     restrictionTypes: [],

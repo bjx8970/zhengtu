@@ -17,6 +17,7 @@ import type { PlayerSave } from '../../types/player';
 import type {
   OrganizationState,
   SelectionCandidateInput,
+  SelectionVacancyEligibilityContext,
   RelativeStaffingSelection,
 } from '../../types/organization';
 import { buildSelectionCandidatePool } from '../../engine/career/relative-candidate-pool';
@@ -84,6 +85,7 @@ function playerCandidate(
       state.career.experiences,
       state.career.civilServiceRankStartedAtDay,
     ),
+    experiences: structuredClone(state.career.experiences),
     assessments,
     specialties: structuredClone(state.career.specialties),
     restrictionTypes: activeRestrictions(state.career.restrictions, day),
@@ -144,6 +146,7 @@ function cadreCandidate(
     civilServiceRank: cadre.civilServiceRank,
     appointmentStartedAtDay: appointment?.startedAtDay ?? experience?.startedAtDay ?? null,
     serviceStartedAtDay,
+    experiences: structuredClone(cadre.experiences),
     assessments,
     specialties,
     restrictionTypes: activeRestrictions(cadre.restrictions, day),
@@ -205,6 +208,22 @@ export function createRelativeSelectionInTransaction(
     };
   const rules = getConfigLoader().getRelativeSelectionConfig();
   const gameConfig = getConfigLoader().getGameConfig();
+  const conflictingCandidateIds = [
+    ...new Set(
+      transaction.organization.selections
+        .filter((selection) => selection.status === 'pending' || selection.status === 'active')
+        .flatMap((selection) => selection.candidates.map((candidate) => candidate.candidateId)),
+    ),
+  ].sort((left, right) => left.localeCompare(right));
+  const eligibilityContext: SelectionVacancyEligibilityContext = {
+    vacancyId: vacancy.vacancyId,
+    positionId: vacancy.positionId,
+    institutionId: vacancy.institutionId,
+    regionId: vacancy.regionId,
+    positionDomain: vacancy.positionDomain,
+    sourceType: vacancy.sourceType,
+    conflictingCandidateIds,
+  };
   const inputs = candidateInputs(
     transaction,
     currentDay,
@@ -212,7 +231,7 @@ export function createRelativeSelectionInTransaction(
   );
   if (new Set(inputs.map((candidate) => candidate.candidateId)).size !== inputs.length)
     return { success: false, error: 'duplicate_candidate', detail: '候选人稳定 ID 重复' };
-  const candidates = buildSelectionCandidatePool(inputs, rules, currentDay);
+  const candidates = buildSelectionCandidatePool(inputs, rules, currentDay, eligibilityContext);
   const randomDraws = Array.from({ length: candidates.length * 6 }, () => {
     const draw = rng();
     return draw;
@@ -224,6 +243,7 @@ export function createRelativeSelectionInTransaction(
     startedAtDay: currentDay,
     candidates: inputs,
     rules,
+    eligibilityContext,
     randomDraws,
     playerCareerProcessId: processId,
   });

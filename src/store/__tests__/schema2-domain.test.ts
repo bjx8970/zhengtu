@@ -138,7 +138,11 @@ describe('Schema 2 存档', () => {
       civilServiceRank: state.career.civilServiceRank,
       appointmentStartedAtDay: state.career.appointment.startedAtDay,
       serviceStartedAtDay: 0,
-      assessments: [],
+      experiences: structuredClone(state.career.experiences).map((experience) => ({
+        ...experience,
+        startedAtDay: -180,
+      })),
+      assessments: [{ year: 2025, score: 80, tier: 'qualified' }],
       specialties: { public_management: 80 },
       restrictionTypes: [],
       scoringInputs: { assessment: 90, specialty: 80, service: 50, network: 50, integrity: 80 },
@@ -149,6 +153,15 @@ describe('Schema 2 存档', () => {
       startedAtDay: 10,
       candidates: [candidate],
       rules: getConfigLoader().getRelativeSelectionConfig(),
+      eligibilityContext: {
+        vacancyId: vacancy.vacancyId,
+        positionId: vacancy.positionId,
+        institutionId: vacancy.institutionId,
+        regionId: vacancy.regionId,
+        positionDomain: vacancy.positionDomain,
+        sourceType: vacancy.sourceType,
+        conflictingCandidateIds: [],
+      },
       randomDraws: Array(6).fill(0.5),
       playerCareerProcessId: 'selection-process',
     });

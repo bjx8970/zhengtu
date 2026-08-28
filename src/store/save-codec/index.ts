@@ -2601,6 +2601,14 @@ export function migrateSchema13To14(prev: Record<string, unknown>): Record<strin
     const selection = value as Record<string, unknown>;
     if (typeof selection.selectionId !== 'string' || typeof selection.vacancyId !== 'string')
       throw new Error('Schema 13 Selection has invalid identity');
+    if (selection.candidates !== undefined && !Array.isArray(selection.candidates))
+      throw new Error('Schema 13 Selection candidates must be an array');
+    for (const candidateValue of selection.candidates ?? []) {
+      if (!candidateValue || typeof candidateValue !== 'object' || Array.isArray(candidateValue))
+        throw new Error('Schema 13 Selection candidate has an invalid entry');
+      const candidate = candidateValue as Record<string, unknown>;
+      if (candidate.experiences === undefined) candidate.experiences = [];
+    }
     if (selection.rulesVersion === undefined) selection.rulesVersion = 'legacy-schema-13';
     const lastAudit = Array.isArray(selection.stageAudits)
       ? selection.stageAudits.at(-1)

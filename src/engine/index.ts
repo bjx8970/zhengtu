@@ -46,6 +46,7 @@ export * from './career/deviation-penalty';
 export * from './career/style-decay';
 export * from './career/extreme-unlocks';
 export * from './career/relative-candidate-pool';
+export * from './career/relative-selection-eligibility';
 export * from './career/relative-scoring';
 export * from './career/relative-selection-lifecycle';
 export * from './world/flood-risk';

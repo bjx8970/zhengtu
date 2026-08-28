@@ -632,15 +632,35 @@ export interface RelativeSelectionStageConfig {
   requiresUniqueWinner: boolean;
 }
 
+/** A vacancy-specific path and evidence threshold for relative selection. */
+export interface RelativeSelectionVacancyScope {
+  targetPositionId: string;
+  allowedCurrentPositionIds: string[];
+  requireSameInstitution: boolean;
+  requireSameRegion: boolean;
+  requireSamePositionDomain: boolean;
+  minimumInstitutionExperienceDays: number;
+  minimumRegionExperienceDays: number;
+  minimumDomainExperienceDays: number;
+  minimumQualifiedAssessmentCount: number;
+  qualifiedAssessmentMinimumScore: number;
+  minimumLatestAssessmentScore: number;
+  requiredSpecialties: { specialtyId: string; minimumScore: number }[];
+}
+
+/** Immutable eligibility rules shared by player and NPC candidates. */
+export interface RelativeSelectionEligibility {
+  minimumCivilServiceRank: CivilServiceRank;
+  allowedLeadershipRanks: LeadershipRank[];
+  minimumServiceDays: number;
+  excludedRestrictionTypes: string[];
+  vacancyScopes: RelativeSelectionVacancyScope[];
+}
+
 /** Rules frozen into every Selection so future config edits cannot change it. */
 export interface RelativeSelectionConfig {
   schemaVersion: 14;
   rulesVersion: string;
-  eligibility: {
-    minimumCivilServiceRank: CivilServiceRank;
-    allowedLeadershipRanks: LeadershipRank[];
-    minimumServiceDays: number;
-    excludedRestrictionTypes: string[];
-  };
+  eligibility: RelativeSelectionEligibility;
   stages: RelativeSelectionStageConfig[];
 }

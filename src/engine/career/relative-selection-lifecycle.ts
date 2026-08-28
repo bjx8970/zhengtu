@@ -4,7 +4,6 @@
  * A Selection owns all inputs needed for replay: candidate snapshots, rules
  * version, and random draws. Advancement never reads mutable world state.
  */
-
 import {
   RELATIVE_SELECTION_STAGES,
   type RelativeSelectionStage,
@@ -31,13 +30,11 @@ function failure(
 ): SelectionFailure {
   return { code, stage, detail };
 }
-
 function occupantForCandidate(candidate: SelectionCandidateSnapshot): SeatOccupantRef {
   return candidate.candidateType === 'player'
     ? { type: 'player', id: 'player' }
     : { type: 'npc', id: candidate.candidateId };
 }
-
 /**
  * Create a Selection by freezing normalized, qualified candidates and inputs.
  *
@@ -47,7 +44,12 @@ function occupantForCandidate(candidate: SelectionCandidateSnapshot): SeatOccupa
 export function createRelativeSelection(
   input: CreateRelativeSelectionInput,
 ): RelativeSelectionLifecycleResult {
-  const candidates = buildSelectionCandidatePool(input.candidates, input.rules, input.startedAtDay);
+  const candidates = buildSelectionCandidatePool(
+    input.candidates,
+    input.rules,
+    input.startedAtDay,
+    input.eligibilityContext,
+  );
   const requiredDrawCount = candidates.length * RELATIVE_SELECTION_STAGES.length;
   if (
     input.randomDraws.length < requiredDrawCount ||
@@ -80,7 +82,6 @@ export function createRelativeSelection(
   };
   return { success: true, selection };
 }
-
 function currentSurvivors(selection: RelativeStaffingSelection): SelectionCandidateSnapshot[] {
   const last = selection.stageResults.at(-1);
   if (!last) return selection.candidates.map(createSelectionCandidateSnapshot);
@@ -92,7 +93,6 @@ function currentSurvivors(selection: RelativeStaffingSelection): SelectionCandid
     return candidate ? [createSelectionCandidateSnapshot(candidate)] : [];
   });
 }
-
 /**
  * Advance exactly one fixed stage using only Selection-owned frozen inputs.
  *

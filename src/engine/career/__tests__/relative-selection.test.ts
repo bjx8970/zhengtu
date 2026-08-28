@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { RelativeSelectionConfigSchema } from '../../../config/schemas';
 import { RELATIVE_SELECTION_STAGES } from '../../../domain/career/state';
 import type { RelativeSelectionConfig } from '../../../types/config';
-import type { SelectionCandidateInput } from '../../../types/organization';
+import type {
+  SelectionCandidateInput,
+  SelectionVacancyEligibilityContext,
+} from '../../../types/organization';
 import {
   buildSelectionCandidatePool,
   createSelectionCandidateSnapshot,
@@ -22,6 +25,22 @@ const rules: RelativeSelectionConfig = {
     allowedLeadershipRanks: ['none', 'township_deputy'],
     minimumServiceDays: 0,
     excludedRestrictionTypes: ['disciplinary_action'],
+    vacancyScopes: [
+      {
+        targetPositionId: 'admin_l2_0',
+        allowedCurrentPositionIds: ['admin_l1_0'],
+        requireSameInstitution: false,
+        requireSameRegion: false,
+        requireSamePositionDomain: false,
+        minimumInstitutionExperienceDays: 0,
+        minimumRegionExperienceDays: 0,
+        minimumDomainExperienceDays: 0,
+        minimumQualifiedAssessmentCount: 0,
+        qualifiedAssessmentMinimumScore: 60,
+        minimumLatestAssessmentScore: 0,
+        requiredSpecialties: [],
+      },
+    ],
   },
   stages: RELATIVE_SELECTION_STAGES.map((id, index) => ({
     id,
@@ -41,19 +60,50 @@ function candidate(
   return {
     candidateId,
     candidateType,
-    currentPositionId: null,
-    institutionId: null,
-    regionId: null,
+    currentPositionId: 'admin_l1_0',
+    institutionId: 'township_govt_01',
+    regionId: 'region_qingyun_town',
     leadershipRank: 'none',
     civilServiceRank: 'clerk_2',
     appointmentStartedAtDay: null,
     serviceStartedAtDay: 0,
-    assessments: [],
+    experiences: [
+      {
+        id: `${candidateId}:experience`,
+        appointmentId: `${candidateId}:appointment`,
+        positionId: 'admin_l1_0',
+        positionNameSnapshot: '乡镇科员',
+        institutionId: 'township_govt_01',
+        institutionNameSnapshot: '青云镇人民政府',
+        institutionLevel: 'township',
+        regionId: 'region_qingyun_town',
+        positionDomain: 'local_governance',
+        leadershipRank: 'none',
+        startedAtDay: -180,
+        endedAtDay: null,
+        appointmentReason: 'initial_assignment',
+        appointmentType: 'substantive',
+        sourceOpportunityId: null,
+        endReason: null,
+        assessmentResults: [],
+      },
+    ],
+    assessments: [{ year: 2025, score, tier: 'qualified' }],
     specialties: {},
     restrictionTypes: [],
     scoringInputs: { assessment: score },
   };
 }
+
+const eligibilityContext: SelectionVacancyEligibilityContext = {
+  vacancyId: 'vacancy:test',
+  positionId: 'admin_l2_0',
+  institutionId: 'township_govt_01',
+  regionId: 'region_qingyun_town',
+  positionDomain: 'local_governance',
+  sourceType: 'appointment',
+  conflictingCandidateIds: [],
+};
 
 function create(candidates: readonly SelectionCandidateInput[], config = rules) {
   const result = createRelativeSelection({
@@ -62,6 +112,7 @@ function create(candidates: readonly SelectionCandidateInput[], config = rules) 
     startedAtDay: 10,
     candidates,
     rules: config,
+    eligibilityContext,
     randomDraws: Array.from({ length: 20 }, (_, index) => (index % 10) / 10),
   });
   if (!result.success) throw new Error(result.detail);
@@ -72,7 +123,7 @@ describe('relative selection contract', () => {
   it('normalizes player and NPC through one snapshot and sorts stable IDs', () => {
     const npc = candidate('npc:b', 'npc');
     const player = candidate('player', 'player');
-    const pool = buildSelectionCandidatePool([npc, player], rules, 10);
+    const pool = buildSelectionCandidatePool([npc, player], rules, 10, eligibilityContext);
     expect(pool.map((item) => item.candidateId)).toEqual(['npc:b', 'player']);
     expect(createSelectionCandidateSnapshot(player)).toEqual(
       expect.objectContaining({ candidateType: 'player', candidateId: 'player' }),
@@ -116,6 +167,7 @@ describe('relative selection contract', () => {
       startedAtDay: 1,
       candidates: [{ ...candidate('npc:x', 'npc'), restrictionTypes: ['disciplinary_action'] }],
       rules,
+      eligibilityContext,
       randomDraws: [],
     });
     if (!result.success) throw new Error(result.detail);
@@ -129,9 +181,15 @@ describe('relative selection contract', () => {
       ...item,
       serviceStartedAtDay: 96,
     }));
-    expect(buildSelectionCandidatePool(inputs, serviceRules, 100)).toHaveLength(0);
-    expect(buildSelectionCandidatePool(inputs, serviceRules, 105)).toHaveLength(0);
-    expect(buildSelectionCandidatePool(inputs, serviceRules, 106)).toHaveLength(2);
+    expect(buildSelectionCandidatePool(inputs, serviceRules, 100, eligibilityContext)).toHaveLength(
+      0,
+    );
+    expect(buildSelectionCandidatePool(inputs, serviceRules, 105, eligibilityContext)).toHaveLength(
+      0,
+    );
+    expect(buildSelectionCandidatePool(inputs, serviceRules, 106, eligibilityContext)).toHaveLength(
+      2,
+    );
   });
 
   it('reports stage exhaustion and unique-winner failure', () => {
@@ -184,6 +242,7 @@ describe('relative selection contract', () => {
       startedAtDay: 1,
       candidates: [candidate('player', 'player')],
       rules,
+      eligibilityContext,
       randomDraws: [0.1],
     });
     expect(short).toMatchObject({ success: false, error: 'invalid_random_draws' });
@@ -193,6 +252,7 @@ describe('relative selection contract', () => {
       startedAtDay: 1,
       candidates: [candidate('player', 'player')],
       rules,
+      eligibilityContext,
       randomDraws: Array.from({ length: 6 }, (_, index) => (index === 3 ? 2 : 0.1)),
     });
     expect(illegal).toMatchObject({ success: false, error: 'invalid_random_draws' });
