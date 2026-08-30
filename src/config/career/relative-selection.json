@@ -21,7 +21,7 @@
     "vacancyScopes": [
       {
         "targetPositionId": "admin_l2_0",
-        "allowedCurrentPositionIds": ["admin_l1_0"],
+        "allowedCurrentPositionIds": ["admin_l1_0", "admin_l1_2"],
         "requireSameInstitution": true,
         "requireSameRegion": true,
         "requireSamePositionDomain": true,
@@ -31,11 +31,11 @@
         "minimumQualifiedAssessmentCount": 1,
         "qualifiedAssessmentMinimumScore": 60,
         "minimumLatestAssessmentScore": 60,
-        "requiredSpecialties": [{ "specialtyId": "public_management", "minimumScore": 60 }]
+        "requiredSpecialties": [{ "specialtyId": "local_governance", "minimumScore": 60 }]
       },
       {
         "targetPositionId": "admin_l3_0",
-        "allowedCurrentPositionIds": ["admin_l2_0"],
+        "allowedCurrentPositionIds": ["admin_l2_0", "admin_l2_1", "admin_l2_2"],
         "requireSameInstitution": true,
         "requireSameRegion": true,
         "requireSamePositionDomain": true,
@@ -45,7 +45,7 @@
         "minimumQualifiedAssessmentCount": 1,
         "qualifiedAssessmentMinimumScore": 60,
         "minimumLatestAssessmentScore": 60,
-        "requiredSpecialties": [{ "specialtyId": "public_management", "minimumScore": 60 }]
+        "requiredSpecialties": [{ "specialtyId": "local_governance", "minimumScore": 60 }]
       }
     ]
   },
