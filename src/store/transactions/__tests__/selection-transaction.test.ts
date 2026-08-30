@@ -36,7 +36,7 @@ function makeAllCandidatesIneligible(state: PlayerSave, day: number): void {
 }
 
 function makeSelectionCandidatesEligible(state: PlayerSave): void {
-  state.career.specialties = { public_management: 80 };
+  state.career.specialties = { local_governance: 80 };
   state.career.experiences = state.career.experiences.map((experience) => ({
     ...experience,
     assessmentResults: [{ year: 2025, score: 80, tier: 'qualified' }],
@@ -69,7 +69,40 @@ function makeSelectionCandidatesEligible(state: PlayerSave): void {
     },
   ];
   unassigned.assessments = [{ year: 2025, score: 80, tier: 'qualified' }];
-  unassigned.specialties = { public_management: 80 };
+  unassigned.specialties = { local_governance: 80 };
+}
+
+function annualAssessment(score: number): { year: number; score: number; tier: 'qualified' } {
+  return { year: 2012, score, tier: 'qualified' };
+}
+
+function prepareFormalSelectionFacts(
+  state: PlayerSave,
+  cadreIds: readonly string[],
+  cadreScore: number,
+): void {
+  state.time.totalDaysPlayed = 180;
+  state.career.specialties = { local_governance: 60 };
+  const playerExperience = state.career.experiences[0];
+  if (!playerExperience) throw new Error('Expected initial player experience');
+  playerExperience.assessmentResults = [annualAssessment(60)];
+  for (const cadreId of cadreIds) {
+    const cadre = state.organization.cadres.find((item) => item.cadreId === cadreId);
+    if (!cadre) throw new Error(`Expected cadre ${cadreId}`);
+    cadre.assessments = [annualAssessment(cadreScore)];
+  }
+}
+
+function formalCadreFacts(state: PlayerSave): Map<string, unknown> {
+  return new Map(
+    state.organization.cadres.map((cadre) => [
+      cadre.cadreId,
+      {
+        positionId: cadre.currentAppointment?.positionId ?? null,
+        specialties: structuredClone(cadre.specialties),
+      },
+    ]),
+  );
 }
 
 function opportunityFor(
@@ -166,6 +199,97 @@ describe('relative Selection transaction', () => {
       },
     });
     expect(randomCalls).toBe(result.selection.candidates.length * 6);
+  });
+
+  it('正式副镇长 Vacancy 在 day 180 生成玩家与罗霞候选且不改写 NPC 原始事实', () => {
+    const state = createInitialState();
+    const originalCadreFacts = formalCadreFacts(state);
+    prepareFormalSelectionFacts(state, ['cadre_luo_xia'], 100);
+    const vacancy = state.organization.vacancies.find((item) => item.positionId === 'admin_l2_0');
+    if (!vacancy) throw new Error('Expected initial admin_l2_0 Vacancy');
+    const opportunity = opportunityFor(state, vacancy.vacancyId, 'formal-l2-opportunity');
+    state.career.opportunities = [opportunity];
+
+    const result = createRelativeSelectionInTransaction(
+      state,
+      opportunity,
+      'process:formal-l2',
+      180,
+      () => 'selection:formal-l2',
+      () => 0.5,
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.selection.candidates.map((candidate) => candidate.candidateId)).toEqual([
+      'cadre_luo_xia',
+      'player',
+    ]);
+    expect(formalCadreFacts(result.state)).toEqual(originalCadreFacts);
+  });
+
+  it('正式镇长 Vacancy 只依赖真实副职干部而不依赖 initiallyUnassigned 干部', () => {
+    const state = createInitialState();
+    prepareFormalSelectionFacts(state, ['cadre_zhou_lan', 'cadre_sun_qiang'], 100);
+    const vacancy = state.organization.vacancies.find((item) => item.positionId === 'admin_l3_0');
+    if (!vacancy) throw new Error('Expected initial admin_l3_0 Vacancy');
+    const opportunity = opportunityFor(state, vacancy.vacancyId, 'formal-l3-opportunity');
+    state.career.opportunities = [opportunity];
+
+    const result = createRelativeSelectionInTransaction(
+      state,
+      opportunity,
+      'process:formal-l3',
+      180,
+      () => 'selection:formal-l3',
+      () => 0.5,
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const candidateIds = result.selection.candidates.map((candidate) => candidate.candidateId);
+    expect(candidateIds).toEqual(expect.arrayContaining(['cadre_zhou_lan', 'cadre_sun_qiang']));
+    expect(candidateIds).not.toEqual(expect.arrayContaining(['cadre_chen_ming', 'cadre_wang_jun']));
+  });
+
+  it('正式副镇长 Selection 使用冻结 randomDraws 完成六阶段并由罗霞获选', () => {
+    const state = createInitialState();
+    prepareFormalSelectionFacts(state, ['cadre_luo_xia'], 100);
+    const vacancy = state.organization.vacancies.find((item) => item.positionId === 'admin_l2_0');
+    if (!vacancy) throw new Error('Expected initial admin_l2_0 Vacancy');
+    const opportunity = opportunityFor(state, vacancy.vacancyId, 'formal-l2-winner-opportunity');
+    state.career.opportunities = [opportunity];
+    let creationRandomCalls = 0;
+    const created = createRelativeSelectionInTransaction(
+      state,
+      opportunity,
+      'process:formal-l2-winner',
+      180,
+      () => 'selection:formal-l2-winner',
+      () => {
+        creationRandomCalls += 1;
+        return 0.5;
+      },
+    );
+
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+    expect(creationRandomCalls).toBe(created.selection.candidates.length * 6);
+    const store = createTestStore(created.state);
+    for (let stage = 0; stage < 6; stage += 1)
+      store.dispatch({
+        type: 'ADVANCE_CAREER_PROCESS',
+        opportunityId: opportunity.id,
+        _rng: () => {
+          throw new Error('Selection advancement must use frozen randomDraws');
+        },
+      });
+
+    const persisted = store.getRawState().organization.selections[0];
+    if (!persisted) throw new Error('Expected persisted formal Selection');
+    expect(persisted.stageResults).toHaveLength(6);
+    expect(persisted.winner).toEqual({ type: 'npc', id: 'cadre_luo_xia' });
+    expect(persisted.winnerId).toBe('cadre_luo_xia');
   });
 
   it('绑定 Vacancy 不合法时保持完整存档不变', () => {

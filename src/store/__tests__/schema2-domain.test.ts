@@ -143,7 +143,7 @@ describe('Schema 2 存档', () => {
         startedAtDay: -180,
       })),
       assessments: [{ year: 2025, score: 80, tier: 'qualified' }],
-      specialties: { public_management: 80 },
+      specialties: { local_governance: 80 },
       restrictionTypes: [],
       scoringInputs: { assessment: 90, specialty: 80, service: 50, network: 50, integrity: 80 },
     };

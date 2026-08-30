@@ -236,14 +236,14 @@ function freezeRelativeSelectionCompetitionFacts(state: JsonRecord): void {
   const assessments = asRecords(openExperience.assessmentResults, 'assessment results');
   assessments.push({ year, score: 100, tier: '优秀' });
   openExperience.assessmentResults = assessments;
-  career.specialties = { public_management: 100 };
+  career.specialties = { local_governance: 100 };
   const character = asRecord(state.character, 'character');
   character.integrity = 100;
   character.network = 100;
   const organization = asRecord(state.organization, 'organization');
   for (const cadre of asRecords(organization.cadres, 'cadres')) {
     cadre.assessments = [{ year, score: 0, tier: '不称职' }];
-    cadre.specialties = { public_management: 0 };
+    cadre.specialties = { local_governance: 0 };
     cadre.restrictions = [];
   }
 }

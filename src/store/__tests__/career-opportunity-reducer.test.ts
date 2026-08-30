@@ -126,10 +126,10 @@ function configureRelativeScores(state: PlayerSave): void {
   const experience = state.career.experiences.find((item) => item.endedAtDay === null);
   if (!experience) throw new Error('Expected an open player career experience');
   experience.assessmentResults = [{ year: 2026, score: 100, tier: '优秀' }];
-  state.career.specialties = { public_management: 100 };
+  state.career.specialties = { local_governance: 100 };
   for (const [index, cadre] of state.organization.cadres.entries()) {
     cadre.assessments = [{ year: 2026, score: 0, tier: '不称职' }];
-    cadre.specialties = { public_management: 0 };
+    cadre.specialties = { local_governance: 0 };
     cadre.restrictions = [];
     if (cadre.status === 'active') cadre.civilServiceRankStartedAtDay = index;
   }

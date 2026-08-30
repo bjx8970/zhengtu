@@ -69,12 +69,12 @@ function configureRelativeSelectionFacts(store: TestStore): void {
     ...experience.assessmentResults,
     { year: state.time.year, score: 100, tier: '优秀' },
   ];
-  state.career.specialties = { public_management: 100 };
+  state.career.specialties = { local_governance: 100 };
   state.character.integrity = 100;
   state.character.network = 100;
   for (const cadre of state.organization.cadres) {
     cadre.assessments = [{ year: state.time.year, score: 0, tier: '不称职' }];
-    cadre.specialties = { public_management: 0 };
+    cadre.specialties = { local_governance: 0 };
     cadre.restrictions = [];
   }
 }
