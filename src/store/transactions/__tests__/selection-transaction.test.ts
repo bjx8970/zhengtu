@@ -835,6 +835,11 @@ describe('relative Selection transaction', () => {
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
+    const winnerBefore = created.state.organization.cadres.find(
+      (item) => item.cadreId === 'cadre_luo_xia',
+    );
+    const oldWinnerAppointment = structuredClone(winnerBefore?.currentAppointment);
+    const oldWinnerExperiences = structuredClone(winnerBefore?.experiences);
     for (const candidate of created.selection.candidates) {
       const npc = candidate.candidateType === 'npc';
       candidate.scoringInputs.assessment = npc ? 100 : 0;
@@ -854,6 +859,7 @@ describe('relative Selection transaction', () => {
       .getRawState()
       .organization.seats.find((item) => item.seatId === targetVacancy?.seatId);
     if (!targetVacancy || !targetSeat) throw new Error('Expected target Vacancy and Seat');
+    const frozenSelectionSnapshot = structuredClone(store.getRawState().organization.selections[0]);
     targetSeat.occupant = { type: 'npc', id: 'other-cadre' };
     targetSeat.currentAppointmentId = 'other-appointment';
     targetSeat.occupiedAtDay = 180;
@@ -862,16 +868,249 @@ describe('relative Selection transaction', () => {
     targetVacancy.closedAtDay = 180;
     targetVacancy.filledBy = { type: 'npc', id: 'other-cadre' };
     targetVacancy.filledAppointmentId = 'other-appointment';
+    const filledVacancySnapshot = structuredClone(targetVacancy);
+    const occupiedSeatSnapshot = structuredClone(targetSeat);
     store.getRawState().events.activeBlockingEventId = null;
-    const before = structuredClone(store.getRawState());
+    store.dispatch({
+      type: 'ADVANCE_CAREER_PROCESS',
+      opportunityId: opportunity.id,
+      _idFactory: () => 'unused',
+    });
+    const cancelled = store.getRawState();
+    expect(cancelled.career.activeProcess).toBeNull();
+    expect(cancelled.career.opportunities.find((item) => item.id === opportunity.id)).toMatchObject(
+      {
+        status: 'cancelled',
+        cancelledAtDay: 180,
+        finalOutcome: null,
+      },
+    );
+    expect(cancelled.career.completedProcesses.at(-1)).toMatchObject({
+      status: 'cancelled',
+      currentStage: 'appointment',
+      winnerId: 'cadre_luo_xia',
+      stageResults: expect.arrayContaining([
+        expect.objectContaining({
+          stage: 'appointment',
+          outcome: 'cancelled',
+          detail: expect.stringContaining('无法任职'),
+        }),
+      ]),
+    });
+    expect(cancelled.organization.selections[0]).toEqual(frozenSelectionSnapshot);
+    expect(
+      cancelled.organization.vacancies.find((item) => item.vacancyId === vacancy.vacancyId),
+    ).toEqual(filledVacancySnapshot);
+    expect(cancelled.organization.seats.find((item) => item.seatId === targetSeat.seatId)).toEqual(
+      occupiedSeatSnapshot,
+    );
+    const winnerAfter = cancelled.organization.cadres.find(
+      (item) => item.cadreId === 'cadre_luo_xia',
+    );
+    expect(winnerAfter?.currentAppointment).toEqual(oldWinnerAppointment);
+    expect(winnerAfter?.experiences).toEqual(oldWinnerExperiences);
+    const cancelledSnapshot = structuredClone(cancelled);
+    store.dispatch({ type: 'ADVANCE_CAREER_PROCESS', opportunityId: opportunity.id });
+    expect(store.getRawState()).toEqual(cancelledSnapshot);
+  });
+
+  it('running action 期间 NPC 年度退休后解除死锁并保留生命周期关闭事实', () => {
+    const state = createInitialState();
+    prepareFormalSelectionFacts(state, ['cadre_luo_xia'], 100);
+    const vacancy = state.organization.vacancies.find((item) => item.positionId === 'admin_l2_0');
+    if (!vacancy) throw new Error('Expected initial admin_l2_0 Vacancy');
+    const opportunity = opportunityFor(state, vacancy.vacancyId, 'npc-retirement-opportunity');
+    state.career.opportunities = [opportunity];
+    const created = createRelativeSelectionInTransaction(
+      state,
+      opportunity,
+      'process:npc-retirement',
+      180,
+      () => 'selection:npc-retirement',
+      () => 0.5,
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+    for (const candidate of created.selection.candidates) {
+      const npc = candidate.candidateType === 'npc';
+      candidate.scoringInputs.assessment = npc ? 100 : 0;
+      candidate.scoringInputs.specialty = npc ? 100 : 0;
+      candidate.scoringInputs.service = npc ? 100 : 0;
+      candidate.scoringInputs.network = npc ? 100 : 0;
+      candidate.scoringInputs.integrity = npc ? 100 : 0;
+    }
+    const winner = created.state.organization.cadres.find(
+      (item) => item.cadreId === 'cadre_luo_xia',
+    );
+    if (!winner?.currentAppointment) throw new Error('Expected NPC appointment');
+    const oldAppointmentId = winner.currentAppointment.appointmentId;
+    const oldExperienceId = winner.experiences.find((item) => item.endedAtDay === null)?.id;
+    winner.birthYear = 1900;
+    // Keep the timeline one day before year-end while retaining the Selection's
+    // absolute day, so the real annual node retires the frozen winner first.
+    created.state.time.month = 12;
+    created.state.time.day = 30;
+    const store = createTestStore(created.state);
+    store.dispatch({
+      type: 'START_PERSONAL_TASK',
+      taskId: 'task_draft_material',
+      tierKey: 'primary',
+      _idFactory: () => 'npc-retirement-running-action',
+    });
+    expect(store.getRawState().actions.slots.primary.occupants[0]).not.toBeNull();
+    for (let stage = 0; stage < 6; stage += 1)
+      store.dispatch({
+        type: 'ADVANCE_CAREER_PROCESS',
+        opportunityId: opportunity.id,
+        _rng: () => 0.5,
+      });
+    expect(store.getRawState().career.activeProcess).toMatchObject({
+      status: 'active',
+      currentStage: 'appointment',
+      winnerId: 'cadre_luo_xia',
+    });
+    const annualIds = (() => {
+      let index = 0;
+      return () => `npc-retirement-annual-${index++}`;
+    })();
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'day',
+      _rng: () => 1,
+      _idFactory: annualIds,
+    });
+    expect(store.getRawState().time).toMatchObject({ totalDaysPlayed: 181, year: 2013 });
+    const retired = store
+      .getRawState()
+      .organization.cadres.find((item) => item.cadreId === 'cadre_luo_xia');
+    expect(retired).toMatchObject({ status: 'retired', currentAppointment: null });
+    expect(retired?.experiences.find((item) => item.id === oldExperienceId)).toMatchObject({
+      endedAtDay: 181,
+      endReason: 'retirement',
+    });
+    expect(store.getRawState().organization.departures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          cadreId: 'cadre_luo_xia',
+          appointmentId: oldAppointmentId,
+          reason: 'retirement',
+        }),
+      ]),
+    );
+    expect(store.getRawState().actions.slots.primary.occupants[0]).not.toBeNull();
+    store.dispatch({
+      type: 'ADVANCE_TIME',
+      granularity: 'week',
+      _rng: () => 1,
+      _idFactory: annualIds,
+    });
+    expect(store.getRawState().actions.slots.primary.occupants[0]).toBeNull();
+    const beforeResumeSelection = structuredClone(store.getRawState().organization.selections[0]);
+    store.dispatch({
+      type: 'ADVANCE_CAREER_PROCESS',
+      opportunityId: opportunity.id,
+      _rng: () => 0.5,
+      _idFactory: annualIds,
+    });
+    const cancelled = store.getRawState();
+    expect(cancelled.career.activeProcess).toBeNull();
+    expect(cancelled.career.opportunities.find((item) => item.id === opportunity.id)).toMatchObject(
+      {
+        status: 'cancelled',
+        finalOutcome: null,
+      },
+    );
+    expect(cancelled.career.completedProcesses.at(-1)).toMatchObject({
+      status: 'cancelled',
+      winnerId: 'cadre_luo_xia',
+      currentStage: 'appointment',
+      stageResults: expect.arrayContaining([
+        expect.objectContaining({ stage: 'appointment', outcome: 'cancelled' }),
+      ]),
+    });
+    expect(cancelled.organization.selections[0]).toEqual(beforeResumeSelection);
+    expect(
+      cancelled.organization.vacancies.find((item) => item.vacancyId === vacancy.vacancyId),
+    ).toMatchObject({ status: 'open', selectionId: null });
+    expect(
+      validateOrganizationInvariants(cancelled.organization, cancelled.career.appointment),
+    ).toEqual([]);
+    const cancelledSnapshot = structuredClone(cancelled);
+    store.dispatch({ type: 'ADVANCE_CAREER_PROCESS', opportunityId: opportunity.id });
+    expect(store.getRawState()).toEqual(cancelledSnapshot);
+  });
+
+  it('open Vacancy 重绑时发现目标 Seat 被占用也会取消冻结流程', () => {
+    const state = createInitialState();
+    prepareFormalSelectionFacts(state, ['cadre_luo_xia'], 100);
+    const vacancy = state.organization.vacancies.find((item) => item.positionId === 'admin_l2_0');
+    if (!vacancy) throw new Error('Expected initial admin_l2_0 Vacancy');
+    const opportunity = opportunityFor(state, vacancy.vacancyId, 'npc-open-seat-conflict');
+    state.career.opportunities = [opportunity];
+    const created = createRelativeSelectionInTransaction(
+      state,
+      opportunity,
+      'process:npc-open-seat-conflict',
+      180,
+      () => 'selection:npc-open-seat-conflict',
+      () => 0.5,
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+    for (const candidate of created.selection.candidates) {
+      const npc = candidate.candidateType === 'npc';
+      candidate.scoringInputs.assessment = npc ? 100 : 0;
+      candidate.scoringInputs.specialty = npc ? 100 : 0;
+      candidate.scoringInputs.service = npc ? 100 : 0;
+      candidate.scoringInputs.network = npc ? 100 : 0;
+      candidate.scoringInputs.integrity = npc ? 100 : 0;
+    }
+    created.state.events.activeBlockingEventId = 'npc-open-seat-blocker';
+    const store = createTestStore(created.state);
+    for (let index = 0; index < 6; index += 1)
+      store.dispatch({ type: 'ADVANCE_CAREER_PROCESS', opportunityId: opportunity.id });
+    const targetSeat = store
+      .getRawState()
+      .organization.seats.find((item) => item.seatId === vacancy.seatId);
+    if (!targetSeat) throw new Error('Expected target Seat');
+    const frozenSelectionSnapshot = structuredClone(store.getRawState().organization.selections[0]);
+    targetSeat.occupant = { type: 'npc', id: 'other-cadre' };
+    targetSeat.currentAppointmentId = 'other-appointment';
+    targetSeat.occupiedAtDay = 180;
+    const seatSnapshot = structuredClone(targetSeat);
+    store.getRawState().events.activeBlockingEventId = null;
     store.dispatch({
       type: 'ADVANCE_CAREER_PROCESS',
       opportunityId: opportunity.id,
       _idFactory: () => {
-        throw new Error('Conflicting NPC appointment must not allocate IDs');
+        throw new Error('Seat conflict must fail before ID allocation');
       },
     });
-    expect(store.getRawState()).toEqual(before);
+    const cancelled = store.getRawState();
+    expect(cancelled.career.activeProcess).toBeNull();
+    expect(cancelled.career.opportunities.find((item) => item.id === opportunity.id)).toMatchObject(
+      {
+        status: 'cancelled',
+        finalOutcome: null,
+      },
+    );
+    expect(cancelled.career.completedProcesses.at(-1)).toMatchObject({
+      status: 'cancelled',
+      winnerId: 'cadre_luo_xia',
+      stageResults: expect.arrayContaining([
+        expect.objectContaining({ stage: 'appointment', outcome: 'cancelled' }),
+      ]),
+    });
+    expect(cancelled.organization.selections[0]).toEqual(frozenSelectionSnapshot);
+    expect(
+      cancelled.organization.vacancies.find((item) => item.vacancyId === vacancy.vacancyId),
+    ).toMatchObject({
+      status: 'open',
+      selectionId: null,
+    });
+    expect(cancelled.organization.seats.find((item) => item.seatId === vacancy.seatId)).toEqual(
+      seatSnapshot,
+    );
   });
 
   it('中间阶段 wrap/decode 保留冻结候选、RNG 与审计且继续时不重复阶段', () => {
