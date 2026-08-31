@@ -250,12 +250,52 @@ export type CareerProcessStage =
   | 'appointment'
   | 'probation'
   | 'finalization';
+
+/** Relative selection's immutable six-stage order. */
+export const RELATIVE_SELECTION_STAGES = [
+  'eligibility_review',
+  'democratic_recommendation',
+  'organization_inspection',
+  'collective_decision',
+  'public_notice',
+  'appointment',
+] as const;
+
+/** Stable stage key used by the relative selection contract. */
+export type RelativeSelectionStage = (typeof RELATIVE_SELECTION_STAGES)[number];
+
+/** A structured terminal reason for a selection which cannot appoint anyone. */
+export interface SelectionFailure {
+  code: 'no_qualified_candidates' | 'stage_no_survivors' | 'no_unique_winner';
+  stage: RelativeSelectionStage | null;
+  detail: string;
+}
+
+/** Frozen per-candidate audit for one relative-selection stage. */
+export interface SelectionCandidateStageResult {
+  candidateId: string;
+  score: number;
+  rank: number;
+  eliminated: boolean;
+}
+
+/** Complete immutable audit result produced when a stage is resolved. */
+export interface RelativeSelectionStageResult {
+  stage: RelativeSelectionStage;
+  resolvedAtDay: number;
+  candidates: SelectionCandidateStageResult[];
+  survivingCandidateIds: string[];
+}
 export interface CareerProcessStageResult {
   stage: CareerProcessStage;
   resolvedAtDay: number;
   outcome: 'passed' | 'failed' | 'continued' | 'cancelled';
   score: number | null;
   detail: string;
+  /** Relative-selection candidate audit; absent for legacy non-selection processes. */
+  candidateResults?: SelectionCandidateStageResult[];
+  /** Stable IDs surviving this stage, copied from the Selection audit. */
+  survivingCandidateIds?: string[];
 }
 
 /** 进行中的职业流程（如选拔、考察） */
@@ -265,12 +305,19 @@ export interface CareerProcess {
   status: CareerProcessStatus;
   /** 关联的机会 ID */
   opportunityId: string;
+  /** Selection identity; required for relative-selection processes. */
+  selectionId?: string;
+  /** Vacancy identity; required for relative-selection processes. */
+  vacancyId?: string;
   /** 当前阶段 */
   currentStage: CareerProcessStage;
   /** 开始日 */
   startedAtDay: number;
   completedAtDay: number | null;
   stageResults: CareerProcessStageResult[];
+  /** Terminal winner or structured failure for relative-selection processes. */
+  winnerId?: string | null;
+  failure?: SelectionFailure | null;
 }
 
 /** 职业状态（PlayerSave 子状态） */

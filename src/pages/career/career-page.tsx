@@ -23,27 +23,18 @@ import { evaluateCareerOpportunityAcceptanceEligibility } from '../../engine/car
 import { evaluateCareerOpportunityDefinitionReadiness } from '../../engine/career/career-opportunity-readiness';
 import type { CareerOpportunityEligibilityFailure } from '../../types/career';
 import { useGameStore } from '../../store/game-store';
+import { selectCareerSelectionView } from '../../store/selectors/career-selectors';
 import { PageHeader } from '../../components/page-header';
 import {
-  formatCareerProcessStage,
   formatCareerRegion,
   formatCareerRestriction,
   formatOpportunityEligibilityFailure,
   formatOpportunitySource,
   formatOpportunityStatus,
   formatRankFailure,
+  formatSelectionFailure,
+  formatSelectionOutcome,
 } from './career-display';
-
-const SELECTION_STAGES = [
-  'eligibility_review',
-  'democratic_recommendation',
-  'organization_inspection',
-  'collective_decision',
-  'public_notice',
-  'appointment',
-  'probation',
-  'finalization',
-] as const;
 
 /**
  * @param failure 共享职业机会资格判定失败原因
@@ -80,6 +71,7 @@ function formatTenureDays(startDay: number, endDay: number | null, currentDay: n
 export function CareerPage() {
   const { state, dispatch } = useGameStore();
   const currentDay = () => state.time.totalDaysPlayed;
+  const selectionView = createMemo(() => selectCareerSelectionView(state));
 
   const currentPosition = createMemo(() =>
     getConfigLoader().getPositionById(state.career.appointment.positionId),
@@ -547,76 +539,99 @@ export function CareerPage() {
               </div>
             </Show>
 
-            {/* 当前选拔流程 */}
-            <Show when={state.career.activeProcess}>
-              {(process) => (
-                <article class="card" style={{ 'border-color': 'var(--color-secondary)' }}>
+            {/* 当前或最近相对选拔流程 */}
+            <Show when={selectionView()}>
+              {(view) => (
+                <article
+                  class="card"
+                  data-testid="career-selection-card"
+                  style={{ 'border-color': 'var(--color-secondary)' }}
+                >
                   <div class="card-pad flex-col gap-md">
                     <div class="flex between center">
                       <div>
                         <h3 class="serif" style={{ 'font-size': '1.05rem' }}>
-                          当前选拔流程
+                          {view().processActive ? '当前选拔流程' : '最近选拔流程'}
                         </h3>
                         <p class="text-xs secondary-text">
-                          当前阶段：{formatCareerProcessStage(process().currentStage)}
+                          Selection {view().selectionId} · 已完成 {view().resolvedStageCount}/6 阶段
                         </p>
                       </div>
-                      <button
-                        data-testid={`advance-career-process-${process().opportunityId}`}
-                        class="btn btn-primary btn-sm"
-                        onClick={() =>
-                          dispatch({
-                            type: 'ADVANCE_CAREER_PROCESS',
-                            opportunityId: process().opportunityId,
-                          })
-                        }
-                      >
-                        推进当前阶段
-                      </button>
+                      <Show when={view().processActive}>
+                        <button
+                          data-testid={`advance-career-process-${view().opportunityId}`}
+                          class="btn btn-primary btn-sm"
+                          onClick={() =>
+                            dispatch({
+                              type: 'ADVANCE_CAREER_PROCESS',
+                              opportunityId: view().opportunityId,
+                            })
+                          }
+                        >
+                          推进当前阶段
+                        </button>
+                      </Show>
                     </div>
-                    <div class="flex gap-sm" style={{ 'flex-wrap': 'wrap' }}>
-                      <For each={SELECTION_STAGES}>
-                        {(stage) => {
-                          const isDone = () =>
-                            process().stageResults.some((item) => item.stage === stage);
-                          const isCurrent = () => process().currentStage === stage;
-                          return (
+                    <div class="stat-grid">
+                      <div data-testid="selection-candidate-count">
+                        <CareerFact label="候选总数" value={`${view().totalCandidates} 人`} />
+                      </div>
+                      <div data-testid="selection-survivor-count">
+                        <CareerFact label="幸存人数" value={`${view().survivorCount} 人`} />
+                      </div>
+                      <div data-testid="selection-player-performance">
+                        <CareerFact label="玩家相对表现" value={view().playerRelativePerformance} />
+                      </div>
+                      <CareerFact
+                        label="玩家最后得分/排名"
+                        value={`${view().playerScore ?? '—'} 分 / ${view().playerRank ?? '—'} 名`}
+                      />
+                    </div>
+                    <div class="flex-col gap-sm" data-testid="selection-stage-progress">
+                      <h4 class="text-sm">六阶段进度</h4>
+                      <div class="flex gap-sm" style={{ 'flex-wrap': 'wrap' }}>
+                        <For each={view().stages}>
+                          {(stage) => (
                             <span
-                              class={
-                                isDone()
-                                  ? 'tag tag-green'
-                                  : isCurrent()
-                                    ? 'tag tag-red'
-                                    : 'tag tag-gray'
-                              }
+                              class={`tag ${stage.status === 'completed' ? 'tag-green' : stage.status === 'current' ? 'tag-red' : 'tag-gray'}`}
                             >
-                              {formatCareerProcessStage(stage)}
+                              {stage.label}
+                              {stage.status === 'completed'
+                                ? ' · 已完成'
+                                : stage.status === 'current'
+                                  ? ' · 进行中'
+                                  : ' · 待进行'}
                             </span>
-                          );
-                        }}
-                      </For>
-                    </div>
-                    <Show when={process().stageResults.length > 0}>
-                      <div class="flex-col gap-sm" data-testid="career-process-audit">
-                        <For each={process().stageResults}>
-                          {(result) => (
-                            <p class="text-xs secondary-text">
-                              {formatCareerProcessStage(result.stage)} · 第 {result.resolvedAtDay}{' '}
-                              天 ·{' '}
-                              {result.outcome === 'passed'
-                                ? '通过'
-                                : result.outcome === 'continued'
-                                  ? '继续观察'
-                                  : result.outcome === 'cancelled'
-                                    ? '已取消'
-                                    : '未通过'}
-                              {result.score === null ? '' : ` · ${result.score} 分`}：
-                              {result.detail}
-                            </p>
                           )}
                         </For>
                       </div>
-                    </Show>
+                    </div>
+                    <p
+                      class={view().playerEliminated ? 'banner banner-danger' : 'banner'}
+                      data-testid="selection-player-eliminated"
+                    >
+                      玩家状态：{view().playerEliminated ? '已淘汰' : '仍在选拔中'}
+                    </p>
+                    <p class="banner banner-success" data-testid="selection-winner">
+                      最终赢家：{view().winnerName ?? '尚未产生'}
+                    </p>
+                    <p
+                      class={
+                        view().outcome === 'appointed'
+                          ? 'banner banner-success'
+                          : view().outcome === 'in_progress'
+                            ? 'banner'
+                            : 'banner banner-warning'
+                      }
+                      data-testid="selection-outcome"
+                    >
+                      选拔结果：{formatSelectionOutcome(view().outcome)}
+                      <Show when={view().failureDetail}>
+                        {(detail) =>
+                          `：${formatSelectionFailure({ code: view().failureCode ?? 'stage_no_survivors', stage: null, detail: detail() })}`
+                        }
+                      </Show>
+                    </p>
                   </div>
                 </article>
               )}

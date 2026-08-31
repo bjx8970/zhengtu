@@ -9,11 +9,13 @@ import {
   migrateSchema11To12,
   migrateSchema10To11,
   migrateSchema12To13,
+  migrateSchema13To14,
   validatePlayerSave,
   wrapSaveEnvelope,
 } from '../save-codec';
 import { CURRENT_CONTENT_VERSION, CURRENT_SCHEMA_VERSION } from '../../types/save';
-import type { VacancyInstance } from '../../types/organization';
+import type { StaffingSelection, VacancyInstance } from '../../types/organization';
+import { RELATIVE_SELECTION_STAGES } from '../../domain/career/state';
 
 describe('Schema 12 organization state', () => {
   beforeEach(() => localStorage.clear());
@@ -130,7 +132,8 @@ describe('Schema 12 organization state', () => {
     (rawState.organization as Record<string, unknown>).processedProducerKeys = [];
 
     const migrated = migrateSchema12To13(raw);
-    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(migrated.schemaVersion).toBe(13);
+    const migrated14 = migrateSchema13To14(migrated);
     const migratedState = migrated.state as Record<string, unknown>;
     const migratedOrg = migratedState.organization as Record<string, unknown>;
     expect((migratedOrg.vacancies as Array<Record<string, unknown>>)[0]).toMatchObject({
@@ -138,7 +141,7 @@ describe('Schema 12 organization state', () => {
       filledAppointmentId: null,
       cancellationReason: null,
     });
-    const decoded = decodeCurrentSave(JSON.stringify(migrated));
+    const decoded = decodeCurrentSave(JSON.stringify(migrated14));
     expect(decoded.success).toBe(true);
 
     const malformed = structuredClone(raw);
@@ -156,6 +159,176 @@ describe('Schema 12 organization state', () => {
     ).toMatchObject({
       filledBy: 42,
     });
+    expect(decodeCurrentSave(JSON.stringify(malformedMigrated)).success).toBe(false);
+  });
+
+  it('Schema 13 → 14 确定迁移 legacy Selection、终态流程字段并保持幂等', () => {
+    const state = createInitialState();
+    const vacancy = state.organization.vacancies[0];
+    if (!vacancy) throw new Error('Expected initial Vacancy');
+    const appointment = state.career.appointment;
+    const candidate = {
+      candidateId: 'player',
+      candidateType: 'player',
+      currentPositionId: appointment.positionId,
+      institutionId: appointment.institutionId,
+      regionId: appointment.regionId,
+      leadershipRank: appointment.leadershipRank,
+      civilServiceRank: state.career.civilServiceRank,
+      appointmentStartedAtDay: appointment.startedAtDay,
+      serviceStartedAtDay: 0,
+      assessments: [],
+      specialties: {},
+      restrictionTypes: [],
+      scoringInputs: { assessment: 50, specialty: 0, service: 0, network: 0, integrity: 50 },
+    };
+    const stageAudits = RELATIVE_SELECTION_STAGES.map((stage, index) => ({
+      stage,
+      resolvedAtDay: index + 1,
+      survivingCandidateIds: ['player'],
+      detail: 'legacy stage',
+      candidates: [{ candidateId: 'player', score: 50, rank: 1, eliminated: false }],
+    }));
+    const legacySelection = {
+      selectionId: 'legacy-completed-selection',
+      vacancyId: vacancy.vacancyId,
+      status: 'completed',
+      currentStage: 'appointment',
+      startedAtDay: 1,
+      completedAtDay: 6,
+      candidates: [candidate],
+      stageAudits,
+      winner: { type: 'player', id: 'player' },
+      playerCareerProcessId: null,
+      randomDraws: Array.from({ length: 6 }, () => 0.5),
+    };
+    const raw = wrapSaveEnvelope({
+      ...state,
+      organization: {
+        ...state.organization,
+        selections: [legacySelection as unknown as StaffingSelection],
+      },
+    }) as unknown as Record<string, unknown>;
+    raw.schemaVersion = 13;
+    const migrated = migrateSchema13To14(raw);
+    expect(migrated.schemaVersion).toBe(14);
+    const selection = (
+      ((migrated.state as Record<string, unknown>).organization as Record<string, unknown>)
+        .selections as Array<Record<string, unknown>>
+    )[0];
+    expect(selection).toMatchObject({
+      rulesVersion: 'legacy-schema-13',
+      winnerId: 'player',
+      failure: null,
+    });
+    expect(selection?.stageResults).toHaveLength(6);
+    expect((selection?.candidates as Array<Record<string, unknown>>)[0]?.experiences).toEqual([]);
+    expect(migrateSchema13To14(migrated)).toEqual(migrated);
+    expect(decodeCurrentSave(JSON.stringify(migrated)).success).toBe(true);
+
+    const validSchema14 = structuredClone(migrated);
+    const validOrganization = (validSchema14.state as Record<string, unknown>)
+      .organization as Record<string, unknown>;
+    const validSelection = structuredClone(selection);
+    if (!validSelection) throw new Error('Expected migrated Selection');
+    const npcCandidate = { ...candidate, candidateId: 'npc-1', candidateType: 'npc' };
+    validSelection.candidates = [candidate, npcCandidate];
+    validSelection.stageResults = RELATIVE_SELECTION_STAGES.map((stage, index) => {
+      const finalStage = index === RELATIVE_SELECTION_STAGES.length - 1;
+      const candidateResults = [
+        { candidateId: 'player', score: 80, rank: 1, eliminated: false },
+        { candidateId: 'npc-1', score: 70, rank: 2, eliminated: finalStage },
+      ];
+      return {
+        stage,
+        resolvedAtDay: index + 1,
+        candidates: candidateResults,
+        survivingCandidateIds: finalStage ? ['player'] : ['player', 'npc-1'],
+      };
+    });
+    validOrganization.selections = [validSelection];
+    validSelection.randomDraws = Array.from({ length: 12 }, () => 0.5);
+    const validSerialized = JSON.stringify(validSchema14);
+    const validResult = decodeCurrentSave(validSerialized);
+    expect(validResult.success).toBe(true);
+
+    const tamperedDecode = (
+      mutate: (stageResults: Array<Record<string, unknown>>) => void,
+    ): boolean => {
+      const tampered = structuredClone(validSchema14);
+      const tamperedOrganization = (tampered.state as Record<string, unknown>)
+        .organization as Record<string, unknown>;
+      const tamperedSelection = (
+        tamperedOrganization.selections as Array<Record<string, unknown>>
+      )[0];
+      if (!tamperedSelection) throw new Error('Expected Schema 14 Selection');
+      mutate(tamperedSelection.stageResults as Array<Record<string, unknown>>);
+      return decodeCurrentSave(JSON.stringify(tampered)).success;
+    };
+    expect(
+      tamperedDecode((stageResults) => {
+        const first = stageResults[0];
+        if (!first) throw new Error('Expected first stage');
+        const candidates = first.candidates as Array<Record<string, unknown>>;
+        first.candidates = [candidates[0]];
+      }),
+    ).toBe(false);
+    expect(
+      tamperedDecode((stageResults) => {
+        const first = stageResults[0];
+        const second = stageResults[1];
+        if (!first || !second) throw new Error('Expected first two stages');
+        const candidates = first.candidates as Array<Record<string, unknown>>;
+        second.candidates = [candidates[0]];
+      }),
+    ).toBe(false);
+    expect(
+      tamperedDecode((stageResults) => {
+        const first = stageResults[0];
+        if (!first) throw new Error('Expected first stage');
+        first.survivingCandidateIds = ['npc-1', 'player'];
+      }),
+    ).toBe(false);
+
+    const active = structuredClone(raw);
+    const activeOrganization = (active.state as Record<string, unknown>).organization as Record<
+      string,
+      unknown
+    >;
+    activeOrganization.selections = [
+      { ...legacySelection, status: 'active', winner: null, stageAudits: [] },
+    ];
+    const activeMigrated = migrateSchema13To14(active);
+    const activeMigratedOrganization = (activeMigrated.state as Record<string, unknown>)
+      .organization as Record<string, unknown>;
+    const activeSelection = (
+      activeMigratedOrganization.selections as Array<Record<string, unknown>>
+    )[0];
+    expect(activeSelection).toMatchObject({
+      status: 'failed',
+      winnerId: null,
+      failure: { code: 'stage_no_survivors', stage: 'appointment' },
+    });
+    expect(decodeCurrentSave(JSON.stringify(activeMigrated)).success).toBe(true);
+
+    const invalidExperiences = structuredClone(migrated);
+    const invalidOrganization = (invalidExperiences.state as Record<string, unknown>)
+      .organization as Record<string, unknown>;
+    const invalidSelection = (invalidOrganization.selections as Array<Record<string, unknown>>)[0];
+    if (!invalidSelection) throw new Error('Expected migrated Selection');
+    const invalidCandidate = (invalidSelection.candidates as Array<Record<string, unknown>>)[0];
+    if (!invalidCandidate) throw new Error('Expected migrated candidate');
+    invalidCandidate.experiences = [{ invalid: true }];
+    expect(decodeCurrentSave(JSON.stringify(invalidExperiences)).success).toBe(false);
+
+    const malformed = structuredClone(raw);
+    const malformedSelection = (
+      ((malformed.state as Record<string, unknown>).organization as Record<string, unknown>)
+        .selections as Array<Record<string, unknown>>
+    )[0];
+    if (!malformedSelection) throw new Error('Expected migrated Selection');
+    malformedSelection.rulesVersion = 42;
+    const malformedMigrated = migrateSchema13To14(malformed);
     expect(decodeCurrentSave(JSON.stringify(malformedMigrated)).success).toBe(false);
   });
 

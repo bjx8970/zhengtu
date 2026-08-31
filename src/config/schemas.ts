@@ -22,6 +22,7 @@ import { DomainSignalSchema, PolicyCategorySchema } from '../domain/governance/t
 import { PERSONAL_TASK_TYPES } from '../types/config';
 import { KPITier } from '../types/enums';
 import type { PositionConfigV2 } from '../types/position-v2';
+import { RELATIVE_SELECTION_STAGES } from '../domain/career/state';
 
 /** 机构配置 Schema */
 export const InstitutionConfigSchema = z
@@ -421,6 +422,104 @@ export const CareerOpportunityDefinitionArraySchema = z
           message: `Leadership vacancy ${definition.id} must require selection`,
         });
     }
+  });
+
+/** Relative-selection stage rules Schema (the six-stage order is immutable). */
+const RelativeSelectionSpecialtyRequirementSchema = z
+  .object({
+    specialtyId: z.string().min(1),
+    minimumScore: z.number().min(0).max(100),
+  })
+  .strict();
+
+const RelativeSelectionVacancyScopeSchema = z
+  .object({
+    targetPositionId: z.string().min(1),
+    allowedCurrentPositionIds: z.array(z.string().min(1)).min(1),
+    requireSameInstitution: z.boolean(),
+    requireSameRegion: z.boolean(),
+    requireSamePositionDomain: z.boolean(),
+    minimumInstitutionExperienceDays: z.number().int().nonnegative(),
+    minimumRegionExperienceDays: z.number().int().nonnegative(),
+    minimumDomainExperienceDays: z.number().int().nonnegative(),
+    minimumQualifiedAssessmentCount: z.number().int().nonnegative(),
+    qualifiedAssessmentMinimumScore: z.number().min(0).max(100),
+    minimumLatestAssessmentScore: z.number().min(0).max(100),
+    requiredSpecialties: z.array(RelativeSelectionSpecialtyRequirementSchema),
+  })
+  .strict()
+  .superRefine((scope, ctx) => {
+    if (new Set(scope.allowedCurrentPositionIds).size !== scope.allowedCurrentPositionIds.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['allowedCurrentPositionIds'],
+        message: 'Allowed current position IDs must be unique',
+      });
+    const specialtyIds = scope.requiredSpecialties.map((specialty) => specialty.specialtyId);
+    if (new Set(specialtyIds).size !== specialtyIds.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['requiredSpecialties'],
+        message: 'Required specialty IDs must be unique',
+      });
+  });
+
+export const RelativeSelectionConfigSchema = z
+  .object({
+    schemaVersion: z.literal(14),
+    rulesVersion: z.string().min(1),
+    eligibility: z
+      .object({
+        minimumCivilServiceRank: CivilServiceRankSchema,
+        allowedLeadershipRanks: z.array(LeadershipRankSchema).min(1),
+        minimumServiceDays: z.number().int().nonnegative(),
+        excludedRestrictionTypes: z.array(z.string().min(1)),
+        vacancyScopes: z.array(RelativeSelectionVacancyScopeSchema),
+      })
+      .strict(),
+    stages: z
+      .array(
+        z
+          .object({
+            id: z.enum(RELATIVE_SELECTION_STAGES),
+            label: z.string().min(1),
+            scoreWeights: z.record(z.number().finite()),
+            randomWeight: z.number().nonnegative(),
+            eliminationThreshold: z.number().min(0).max(100),
+            requiresUniqueWinner: z.boolean(),
+          })
+          .strict(),
+      )
+      .length(RELATIVE_SELECTION_STAGES.length)
+      .superRefine((stages, ctx) => {
+        const ids = stages.map((stage) => stage.id);
+        if (ids.some((id, index) => id !== RELATIVE_SELECTION_STAGES[index]))
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Relative-selection stages must use the fixed six-stage order',
+          });
+        stages.forEach((stage, index) => {
+          const expected = index === RELATIVE_SELECTION_STAGES.length - 1;
+          if (stage.requiresUniqueWinner !== expected)
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['stages', index, 'requiresUniqueWinner'],
+              message: 'Only the final relative-selection stage may require a unique winner',
+            });
+        });
+      }),
+  })
+  .strict()
+  .superRefine((config, ctx) => {
+    const targetPositionIds = config.eligibility.vacancyScopes.map(
+      (scope) => scope.targetPositionId,
+    );
+    if (new Set(targetPositionIds).size !== targetPositionIds.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['eligibility', 'vacancyScopes'],
+        message: 'Vacancy scope target position IDs must be unique',
+      });
   });
 
 // ===== 个人任务配置 Schema =====

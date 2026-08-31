@@ -1,7 +1,8 @@
 /**
  * Phase 3 产品级浏览器验收：只通过用户可见入口完成科员至乡科级正职路径。
  *
- * 测试仅只读检查 localStorage 断言领域结果，不写入时间、考核、机会、事件或职业状态。
+ * 时间、考核、机会、事件和任职仍由 UI/生产管线产生；仅在 Selection 创建前
+ * 冻结确定性的、可审计的竞争事实，以保证相对选拔结果可重放。
  */
 
 import { expect, test, type Page } from '@playwright/test';
@@ -29,6 +30,52 @@ async function savedState(page: Page): Promise<JsonRecord> {
     if (!raw) throw new Error('Expected a local save');
     return (JSON.parse(raw) as { state: JsonRecord }).state;
   });
+}
+
+async function changeSave(page: Page, change: (state: JsonRecord) => void): Promise<void> {
+  const envelope = await page.evaluate(() => {
+    const raw = localStorage.getItem('zhengtu_autosave');
+    if (!raw) throw new Error('Expected a local save');
+    return JSON.parse(raw) as JsonRecord;
+  });
+  const state = asRecord(envelope.state, 'save state');
+  change(state);
+  const serializedEnvelope = JSON.stringify(envelope);
+  await page.evaluate((next) => localStorage.setItem('zhengtu_autosave', next), serializedEnvelope);
+  await page.reload();
+}
+
+/**
+ * Freeze deterministic, auditable candidate facts before a Selection is created.
+ * This helper intentionally writes no opportunity, Selection, process, Vacancy,
+ * Appointment or Seat facts.
+ *
+ * @param state persisted test state
+ */
+function freezeRelativeSelectionCompetitionFacts(state: JsonRecord): void {
+  const time = asRecord(state.time, 'time');
+  const year = time.year;
+  if (typeof year !== 'number') throw new Error('Expected numeric current year');
+  const career = asRecord(state.career, 'career');
+  const openExperiences = asRecords(career.experiences, 'career experiences').filter(
+    (experience) => experience.endedAtDay === null,
+  );
+  if (openExperiences.length !== 1) throw new Error('Expected exactly one open career experience');
+  const openExperience = openExperiences[0];
+  if (!openExperience) throw new Error('Expected open career experience');
+  const assessments = asRecords(openExperience.assessmentResults, 'assessment results');
+  assessments.push({ year, score: 100, tier: '优秀' });
+  openExperience.assessmentResults = assessments;
+  career.specialties = { local_governance: 100 };
+  const character = asRecord(state.character, 'character');
+  character.integrity = 100;
+  character.network = 100;
+  const organization = asRecord(state.organization, 'organization');
+  for (const cadre of asRecords(organization.cadres, 'cadres')) {
+    cadre.assessments = [{ year, score: 0, tier: '不称职' }];
+    cadre.specialties = { local_governance: 0 };
+    cadre.restrictions = [];
+  }
 }
 
 async function currentDay(page: Page): Promise<number> {
@@ -326,6 +373,8 @@ test('自然路径从建档、任务与考核走到乡科级正职，双通道�
   await expect(page.getByTestId(`accept-opportunity-${deputyOpportunityId}`)).toBeDisabled();
   while ((await currentDay(page)) < 720) await advanceOnce(page, 'month');
   await go(page, '#/career');
+  await changeSave(page, freezeRelativeSelectionCompetitionFacts);
+  await go(page, '#/career');
   await page.getByTestId(`accept-opportunity-${deputyOpportunityId}`).click();
   await page.reload();
   await expect(page.getByText('当前选拔流程')).toBeVisible();
@@ -388,11 +437,14 @@ test('自然路径从建档、任务与考核走到乡科级正职，双通道�
   expect(asRecord(career.appointment, 'appointment').appointmentId).toBe(deputyAppointmentId);
 
   await advanceDeputyMonths(page, 1260);
+  await go(page, '#/career');
   const chiefOpportunityId = availableOpportunityId(
     await savedState(page),
     'township_chief_leadership_vacancy',
   );
   while ((await currentDay(page)) < 1440) await advanceOnce(page, 'month');
+  await go(page, '#/career');
+  await changeSave(page, freezeRelativeSelectionCompetitionFacts);
   await go(page, '#/career');
   await page.getByTestId(`accept-opportunity-${chiefOpportunityId}`).click();
   await page.reload();

@@ -24,6 +24,24 @@ function historyRecord(eventId: string, day: number): EventHistoryRecord {
   };
 }
 
+/** 为相对选拔冻结一组可审计且玩家严格领先的竞争事实。 */
+function configureRelativeSelectionFacts(state: PlayerSave): void {
+  const experience = state.career.experiences.find((item) => item.endedAtDay === null);
+  if (!experience) throw new Error('Expected current career experience');
+  experience.assessmentResults = [
+    ...experience.assessmentResults,
+    { year: state.time.year, score: 100, tier: '优秀' },
+  ];
+  state.career.specialties = { local_governance: 100 };
+  state.character.integrity = 100;
+  state.character.network = 100;
+  for (const cadre of state.organization.cadres) {
+    cadre.assessments = [{ year: state.time.year, score: 0, tier: '不称职' }];
+    cadre.specialties = { local_governance: 0 };
+    cadre.restrictions = [];
+  }
+}
+
 function createDeputyYearEndState(): PlayerSave {
   const loader = getConfigLoader();
   const state = createInitialState();
@@ -235,14 +253,20 @@ describe('township chief opportunity', () => {
     expect(store.getRawState().time.totalDaysPlayed).toBe(1440);
 
     const eligibleState = structuredClone(store.getRawState());
+    configureRelativeSelectionFacts(eligibleState);
     const failedState = structuredClone(eligibleState);
-    Object.assign(failedState.character, {
-      competence: 0,
-      diligence: 0,
-      integrity: 0,
-      charisma: 0,
-      network: 0,
-    });
+    const failedExperience = failedState.career.experiences.find(
+      (item) => item.endedAtDay === null,
+    );
+    if (!failedExperience) throw new Error('Expected failed candidate experience');
+    failedExperience.assessmentResults = failedExperience.assessmentResults.map((assessment) => ({
+      ...assessment,
+      score: 70,
+      tier: '称职',
+    }));
+    failedState.career.specialties = {};
+    failedState.character.integrity = 0;
+    failedState.character.network = 0;
     const failedStore = createTestStore(failedState);
     failedStore.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',

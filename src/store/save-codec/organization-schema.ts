@@ -105,8 +105,8 @@ export function createOrganizationStateSchema(dependencies: {
       closedAtDay: z.number().int().nonnegative().nullable(),
       selectionId: z.string().min(1).nullable(),
       /** Schema 12 had no terminal occupant/cancellation audit fields. */
-      filledBy: SeatOccupantRefSchema.nullable().default(null),
-      filledAppointmentId: z.string().min(1).nullable().default(null),
+      filledBy: SeatOccupantRefSchema.nullable(),
+      filledAppointmentId: z.string().min(1).nullable(),
       cancellationReason: z
         .enum([
           'organization_change',
@@ -115,8 +115,7 @@ export function createOrganizationStateSchema(dependencies: {
           'expired',
           'system',
         ])
-        .nullable()
-        .default(null),
+        .nullable(),
     })
     .strict()
     .superRefine((value, ctx) => {
@@ -154,6 +153,8 @@ export function createOrganizationStateSchema(dependencies: {
       civilServiceRank: z.enum(CIVIL_SERVICE_RANKS),
       appointmentStartedAtDay: z.number().int().nonnegative().nullable(),
       serviceStartedAtDay: z.number().int().nonnegative(),
+      // Schema 13/early Schema 14 candidates had no frozen intervals; decode them as empty.
+      experiences: z.array(dependencies.careerExperience).default([]),
       assessments: z.array(dependencies.careerAssessmentRecord),
       specialties: z.record(z.number()),
       restrictionTypes: z.array(z.string().min(1)),
@@ -191,14 +192,265 @@ export function createOrganizationStateSchema(dependencies: {
             resolvedAtDay: z.number().int().nonnegative(),
             survivingCandidateIds: z.array(z.string().min(1)),
             detail: z.string(),
+            candidates: z.array(
+              z
+                .object({
+                  candidateId: z.string().min(1),
+                  score: z.number().min(0).max(100),
+                  rank: z.number().int().positive(),
+                  eliminated: z.boolean(),
+                })
+                .strict(),
+            ),
           })
           .strict(),
       ),
       winner: SeatOccupantRefSchema.nullable(),
       playerCareerProcessId: z.string().min(1).nullable(),
       randomDraws: z.array(z.number().min(0).max(1)),
+      rulesVersion: z.string().min(1).optional(),
+      stageResults: z
+        .array(
+          z
+            .object({
+              stage: SelectionStageSchema,
+              resolvedAtDay: z.number().int().nonnegative(),
+              candidates: z.array(
+                z
+                  .object({
+                    candidateId: z.string().min(1),
+                    score: z.number().min(0).max(100),
+                    rank: z.number().int().positive(),
+                    eliminated: z.boolean(),
+                  })
+                  .strict(),
+              ),
+              survivingCandidateIds: z.array(z.string().min(1)),
+            })
+            .strict(),
+        )
+        .optional(),
+      winnerId: z.string().min(1).nullable().optional(),
+      failure: z
+        .object({
+          code: z.enum(['no_qualified_candidates', 'stage_no_survivors', 'no_unique_winner']),
+          stage: SelectionStageSchema.nullable(),
+          detail: z.string().min(1),
+        })
+        .strict()
+        .nullable()
+        .optional(),
     })
-    .strict();
+    .strict()
+    .superRefine((value, ctx) => {
+      for (const field of ['rulesVersion', 'stageResults', 'winnerId', 'failure'] as const) {
+        if (
+          !Object.prototype.hasOwnProperty.call(value, field) ||
+          (value[field] as unknown) === undefined
+        )
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [field],
+            message: `Selection ${field} is required in Schema 14`,
+          });
+      }
+      if (value.stageResults) {
+        const stages = value.stageResults.map((result) => result.stage);
+        const expectedPrefix = [
+          'eligibility_review',
+          'democratic_recommendation',
+          'organization_inspection',
+          'collective_decision',
+          'public_notice',
+          'appointment',
+        ];
+        if (stages.some((stage, index) => stage !== expectedPrefix[index]))
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['stageResults'],
+            message: 'Selection stage results must be a fixed-order prefix',
+          });
+        if (new Set(stages).size !== stages.length)
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['stageResults'],
+            message: 'Selection stage results must be unique',
+          });
+        for (const [stageIndex, result] of value.stageResults.entries()) {
+          const candidateIds = new Set(result.candidates.map((candidate) => candidate.candidateId));
+          if (candidateIds.size !== result.candidates.length)
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['stageResults'],
+              message: 'Selection stage candidate IDs must be unique',
+            });
+          result.candidates.forEach((candidate, index) => {
+            if (candidate.rank !== index + 1)
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['stageResults'],
+                message: 'Selection stage ranks must be continuous and match array order',
+              });
+          });
+          if (!result.survivingCandidateIds.every((candidateId) => candidateIds.has(candidateId)))
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['stageResults'],
+              message: 'Survivors must be present in candidate results',
+            });
+          if (
+            !result.survivingCandidateIds.every((candidateId) => {
+              const candidate = result.candidates.find((item) => item.candidateId === candidateId);
+              return candidate !== undefined && !candidate.eliminated;
+            })
+          )
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['stageResults'],
+              message: 'Survivors cannot be eliminated',
+            });
+          const expectedCandidateIds =
+            stageIndex === 0
+              ? value.candidates.map((candidate) => candidate.candidateId)
+              : (value.stageResults[stageIndex - 1]?.survivingCandidateIds ?? []);
+          const actualCandidateIds = result.candidates.map((candidate) => candidate.candidateId);
+          const sortedCandidateIds = (candidateIds: string[]) =>
+            [...candidateIds].sort((left, right) => left.localeCompare(right));
+          const sortedExpectedCandidateIds = sortedCandidateIds(expectedCandidateIds);
+          const sortedActualCandidateIds = sortedCandidateIds(actualCandidateIds);
+          const candidateCollectionMatches =
+            sortedExpectedCandidateIds.length === sortedActualCandidateIds.length &&
+            sortedExpectedCandidateIds.every(
+              (candidateId, index) => sortedActualCandidateIds[index] === candidateId,
+            );
+          if (!candidateCollectionMatches)
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['stageResults', stageIndex, 'candidates'],
+              message:
+                'Selection stage candidates must equal the frozen pool or previous survivors in order',
+            });
+          const expectedSurvivorIds = result.candidates
+            .filter((candidate) => !candidate.eliminated)
+            .map((candidate) => candidate.candidateId);
+          if (
+            expectedSurvivorIds.length !== result.survivingCandidateIds.length ||
+            expectedSurvivorIds.some(
+              (candidateId, index) => result.survivingCandidateIds[index] !== candidateId,
+            )
+          )
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['stageResults', stageIndex, 'survivingCandidateIds'],
+              message: 'Selection survivors must preserve non-eliminated ranking order',
+            });
+        }
+      }
+      if (value.randomDraws.length > 0 && value.randomDraws.length < value.candidates.length * 6)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['randomDraws'],
+          message: 'Selection randomDraws are incomplete',
+        });
+      if (
+        value.winnerId !== null &&
+        !value.candidates.some((candidate) => candidate.candidateId === value.winnerId)
+      )
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['winnerId'],
+          message: 'Selection winner must be a candidate',
+        });
+      if (value.winnerId === null && value.winner !== null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['winner'],
+          message: 'Selection winner reference requires winnerId',
+        });
+      if (value.winnerId !== null && (value.winner === null || value.winner.id !== value.winnerId))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['winner'],
+          message: 'Selection winner reference must match winnerId',
+        });
+      if (value.status === 'completed' && value.winnerId === null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['winnerId'],
+          message: 'Completed Selection requires a winner',
+        });
+      if (value.status === 'completed') {
+        if (value.stageResults?.length !== 6)
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['stageResults'],
+            message: 'Completed Selection requires all six stages',
+          });
+        const final = value.stageResults?.at(-1);
+        if (
+          !final ||
+          final.survivingCandidateIds.length !== 1 ||
+          final.survivingCandidateIds[0] !== value.winnerId
+        )
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['winnerId'],
+            message: 'Completed Selection winner must be the sole final survivor',
+          });
+      }
+      if (value.status === 'completed' && value.failure !== null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['failure'],
+          message: 'Completed Selection cannot have a failure',
+        });
+      if (value.status === 'failed' && value.failure === null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['failure'],
+          message: 'Failed Selection requires a failure',
+        });
+      if (value.status === 'failed' && value.winnerId !== null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['winnerId'],
+          message: 'Failed Selection cannot have a winner',
+        });
+      if (value.status === 'active' && value.winnerId !== null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['winnerId'],
+          message: 'Active Selection cannot have a winner',
+        });
+      if (value.failure) {
+        if (value.failure.code === 'no_qualified_candidates') {
+          if (value.failure.stage !== null || value.candidates.length !== 0)
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['failure'],
+              message: 'No-qualified failure requires an empty candidate pool and null stage',
+            });
+        } else if (value.failure.stage === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['failure'],
+            message: 'Stage failure requires a stage',
+          });
+        }
+      }
+      if (value.status === 'failed' && value.winnerId !== null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['winnerId'],
+          message: 'Failed Selection cannot have a winner',
+        });
+      if (value.status === 'active' && value.failure !== null)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['failure'],
+          message: 'Active Selection cannot have a failure',
+        });
+    });
   return z
     .object({
       initializedAtDay: z.number().int().nonnegative(),

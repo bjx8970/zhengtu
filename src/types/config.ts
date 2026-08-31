@@ -23,6 +23,7 @@ import type {
   CivilServiceRank,
   LeadershipRank,
 } from '../domain/career/types';
+import type { RelativeSelectionStage } from '../domain/career/state';
 
 /** 单类任职可计入职业履历资格的配置规则。 */
 export interface AppointmentTypeExperienceRule {
@@ -619,3 +620,47 @@ export interface TrainingCareerOpportunityDefinition extends CareerOpportunityDe
 /** 由配置驱动的职业机会判别联合。 */
 export type CareerOpportunityDefinition =
   AppointmentCareerOpportunityDefinition | TrainingCareerOpportunityDefinition;
+
+/** One configurable relative-selection stage. */
+export interface RelativeSelectionStageConfig {
+  id: RelativeSelectionStage;
+  label: string;
+  scoreWeights: Record<string, number>;
+  randomWeight: number;
+  eliminationThreshold: number;
+  /** Final-stage ties may be rejected instead of silently choosing by ID. */
+  requiresUniqueWinner: boolean;
+}
+
+/** A vacancy-specific path and evidence threshold for relative selection. */
+export interface RelativeSelectionVacancyScope {
+  targetPositionId: string;
+  allowedCurrentPositionIds: string[];
+  requireSameInstitution: boolean;
+  requireSameRegion: boolean;
+  requireSamePositionDomain: boolean;
+  minimumInstitutionExperienceDays: number;
+  minimumRegionExperienceDays: number;
+  minimumDomainExperienceDays: number;
+  minimumQualifiedAssessmentCount: number;
+  qualifiedAssessmentMinimumScore: number;
+  minimumLatestAssessmentScore: number;
+  requiredSpecialties: { specialtyId: string; minimumScore: number }[];
+}
+
+/** Immutable eligibility rules shared by player and NPC candidates. */
+export interface RelativeSelectionEligibility {
+  minimumCivilServiceRank: CivilServiceRank;
+  allowedLeadershipRanks: LeadershipRank[];
+  minimumServiceDays: number;
+  excludedRestrictionTypes: string[];
+  vacancyScopes: RelativeSelectionVacancyScope[];
+}
+
+/** Rules frozen into every Selection so future config edits cannot change it. */
+export interface RelativeSelectionConfig {
+  schemaVersion: 14;
+  rulesVersion: string;
+  eligibility: RelativeSelectionEligibility;
+  stages: RelativeSelectionStageConfig[];
+}
