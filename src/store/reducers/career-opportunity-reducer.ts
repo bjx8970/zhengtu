@@ -12,6 +12,7 @@ import type { PlayerSave } from '../../types/player';
 import {
   acceptCareerOpportunity,
   cancelCareerOpportunity,
+  invalidateCareerOpportunity,
   rejectCareerOpportunity,
   resolveCareerOpportunity,
 } from '../../engine/career/career-opportunity-lifecycle';
@@ -31,6 +32,7 @@ import {
   getRelativeSelection,
   selectionHasPlayer,
 } from '../transactions/selection-transaction';
+import { appointNpcSelectionWinnerInTransaction } from '../transactions/npc-appointment-transaction';
 import { advanceRelativeSelectionStage } from '../../engine/career/relative-selection-lifecycle';
 import { RELATIVE_SELECTION_STAGES } from '../../domain/career/state';
 import { beginVacancySelection } from '../../engine/organization/vacancy-selection-lifecycle';
@@ -51,6 +53,72 @@ function replaceOpportunity(draft: PlayerSave, next: CareerOpportunity): void {
 function archiveCompletedProcess(transaction: PlayerSave, process: CareerProcess): void {
   transaction.career.completedProcesses.push(structuredClone(process));
   transaction.career.activeProcess = null;
+}
+
+function cancelNpcAppointmentProcess(
+  transaction: PlayerSave,
+  opportunity: Exclude<CareerOpportunity, { type: 'training' }>,
+  process: CareerProcess,
+  frozenSelection: import('../../types/organization').RelativeStaffingSelection,
+  currentDay: number,
+  detail: string,
+): boolean {
+  if (
+    frozenSelection.status !== 'completed' ||
+    !frozenSelection.winnerId ||
+    frozenSelection.winner?.type !== 'npc' ||
+    frozenSelection.winner.id !== frozenSelection.winnerId
+  )
+    return false;
+  const currentSelection = getRelativeSelection(
+    transaction.organization,
+    frozenSelection.selectionId,
+  );
+  if (!currentSelection) return false;
+  // Only the canonical completed Selection, or this helper's temporary active
+  // copy, may be restored. A pre-existing failed/cancelled Selection is a
+  // different world fact and must never be rewritten as completed.
+  if (currentSelection.status !== 'completed' && currentSelection.status !== 'active') return false;
+  // The only permitted difference is the helper's temporary active status.
+  // Reject any other replacement/mutation rather than overwriting a newer
+  // world fact with the stale Selection argument.
+  const comparableCurrent = structuredClone(currentSelection);
+  comparableCurrent.status = 'completed';
+  if (JSON.stringify(comparableCurrent) !== JSON.stringify(frozenSelection)) return false;
+  currentSelection.status = 'completed';
+  const vacancy = transaction.organization.vacancies.find(
+    (item) => item.vacancyId === currentSelection.vacancyId,
+  );
+  // A failed rebind is allowed to leave only an open, detached Vacancy. Never
+  // rewrite a terminal or occupied Vacancy owned by another world fact.
+  if (vacancy?.status === 'selecting' && vacancy.selectionId === currentSelection.selectionId) {
+    vacancy.status = 'open';
+    vacancy.selectionId = null;
+  }
+  const invalidated = invalidateCareerOpportunity(opportunity, currentDay).opportunity;
+  if (invalidated) replaceOpportunity(transaction, invalidated);
+  process.currentStage = 'appointment';
+  process.status = 'cancelled';
+  process.completedAtDay = currentDay;
+  process.winnerId = currentSelection.winnerId;
+  process.failure = currentSelection.failure;
+  const appointmentResult = process.stageResults.find((result) => result.stage === 'appointment');
+  if (appointmentResult) {
+    appointmentResult.resolvedAtDay = currentDay;
+    appointmentResult.outcome = 'cancelled';
+    appointmentResult.score = null;
+    appointmentResult.detail = detail;
+  } else {
+    process.stageResults.push({
+      stage: 'appointment',
+      resolvedAtDay: currentDay,
+      outcome: 'cancelled',
+      score: null,
+      detail,
+    });
+  }
+  archiveCompletedProcess(transaction, process);
+  return true;
 }
 
 function orchestrateSignal(
@@ -401,6 +469,147 @@ function resolveRelativeSelectionFailure(
   archiveCompletedProcess(transaction, process);
 }
 
+function appointRelativeSelectionNpcWinner(
+  transaction: PlayerSave,
+  opportunity: Exclude<CareerOpportunity, { type: 'training' }>,
+  process: CareerProcess,
+  selection: import('../../types/organization').RelativeStaffingSelection,
+  currentDay: number,
+  payload: AdvanceCareerProcessPayload,
+): boolean {
+  const winnerId = selection.winnerId;
+  if (!winnerId || winnerId === 'player') return false;
+  const idFactory = payload._idFactory ?? createRuntimeIdFactory('career');
+  const rng = payload._rng ?? Math.random;
+  process.currentStage = 'appointment';
+  const vacancy = transaction.organization.vacancies.find(
+    (item) => item.vacancyId === selection.vacancyId,
+  );
+  if (!vacancy) return false;
+
+  if (hasRunningCareerAction(transaction) || transaction.events.activeBlockingEventId) {
+    // A terminal winner is frozen while appointment is blocked. Detach the
+    // Vacancy so other world transactions see a legal open Seat; the process
+    // keeps the completed Selection identity for deterministic rebinding.
+    if (vacancy.status === 'selecting') {
+      vacancy.status = 'open';
+      vacancy.selectionId = null;
+    }
+    return true;
+  }
+
+  let boundSelection = getRelativeSelection(transaction.organization, selection.selectionId);
+  if (!boundSelection) return false;
+  const frozenSelection = structuredClone(boundSelection);
+  if (vacancy.status === 'open') {
+    // beginVacancySelection only accepts a live Selection. This temporary
+    // state change exists solely on the transaction copy; the NPC transaction
+    // below receives the canonical completed terminal Selection.
+    boundSelection.status = 'active';
+    const rebound = beginVacancySelection({
+      organization: transaction.organization,
+      currentDay,
+      idFactory,
+      vacancyId: vacancy.vacancyId,
+      selectionId: boundSelection.selectionId,
+    });
+    if (!rebound.success || !rebound.vacancy) {
+      // Rebinding can discover a permanent world conflict (for example, the
+      // Seat was occupied after the blocker released the Vacancy). Restore the
+      // terminal Selection before committing cancellation; no partial active
+      // Selection may leak from the temporary begin call.
+      boundSelection.status = 'completed';
+      if (
+        !cancelNpcAppointmentProcess(
+          transaction,
+          opportunity,
+          process,
+          frozenSelection,
+          currentDay,
+          `NPC winner ${winnerId} 无法重新绑定 Vacancy：${
+            rebound.success ? '绑定结果缺少 Vacancy' : rebound.detail
+          }`,
+        )
+      )
+        return false;
+      return true;
+    }
+    transaction.organization = rebound.organization;
+    boundSelection = getRelativeSelection(transaction.organization, selection.selectionId);
+    if (!boundSelection) {
+      if (
+        !cancelNpcAppointmentProcess(
+          transaction,
+          opportunity,
+          process,
+          frozenSelection,
+          currentDay,
+          `NPC winner ${winnerId} 无法重新绑定 Vacancy：Selection 已不一致`,
+        )
+      )
+        return false;
+      return true;
+    }
+    boundSelection.status = 'completed';
+  }
+
+  const appointed = appointNpcSelectionWinnerInTransaction(transaction, {
+    selectionId: boundSelection.selectionId,
+    vacancyId: boundSelection.vacancyId,
+    cadreId: winnerId,
+    currentDay,
+    idFactory,
+  });
+  if (!appointed.success) {
+    // Only generated-ID collisions are transient injection failures. Every
+    // other appointment error means the frozen winner can no longer be
+    // appointed and must release the player workflow deterministically.
+    if (
+      appointed.error === 'appointment_id_conflict' ||
+      appointed.error === 'experience_id_conflict'
+    )
+      return false;
+    if (
+      !cancelNpcAppointmentProcess(
+        transaction,
+        opportunity,
+        process,
+        frozenSelection,
+        currentDay,
+        `NPC winner ${winnerId} 无法任职：${appointed.detail}`,
+      )
+    )
+      return false;
+    return true;
+  }
+  // The NPC transaction commits by replacing the caller's top-level save;
+  // reacquire nested references before archiving the player process.
+  const committedProcess = transaction.career.activeProcess;
+  const committedSelection = getRelativeSelection(transaction.organization, selection.selectionId);
+  const committedOpportunity = transaction.career.opportunities.find(
+    (item) => item.id === opportunity.id,
+  );
+  if (!committedProcess || !committedSelection || !committedOpportunity) return false;
+  const resolved = resolveCareerOpportunity(
+    committedOpportunity,
+    currentDay,
+    'not_selected',
+  ).opportunity;
+  if (!resolved) return false;
+  replaceOpportunity(transaction, resolved);
+  committedProcess.currentStage = 'appointment';
+  committedProcess.status = 'completed';
+  committedProcess.completedAtDay = currentDay;
+  committedProcess.winnerId = winnerId;
+  committedProcess.failure = committedSelection.failure;
+  archiveCompletedProcess(transaction, committedProcess);
+  // Resolve/archive before delivering vacancy.filled. The signal consumer
+  // invalidates linked active processes, which must not cancel this success.
+  for (const signal of appointed.emittedSignals)
+    orchestrateSignal(transaction, signal, currentDay, rng, idFactory);
+  return true;
+}
+
 function advanceRelativeSelectionProcess(
   draft: PlayerSave,
   opportunity: Exclude<CareerOpportunity, { type: 'training' }>,
@@ -480,13 +689,17 @@ function advanceRelativeSelectionProcess(
     if (finalSelection.status === 'completed') {
       txProcess.winnerId = finalSelection.winnerId;
       if (finalSelection.winnerId !== 'player') {
-        resolveRelativeSelectionFailure(
-          transaction,
-          txOpportunity,
-          txProcess,
-          finalSelection,
-          currentDay,
-        );
+        if (
+          !appointRelativeSelectionNpcWinner(
+            transaction,
+            txOpportunity,
+            txProcess,
+            finalSelection,
+            currentDay,
+            payload,
+          )
+        )
+          return false;
         Object.assign(draft, transaction);
         return true;
       }
@@ -522,8 +735,23 @@ function advanceRelativeSelectionProcess(
     Object.assign(draft, transaction);
     return true;
   }
-  if (selection.status === 'completed' && selection.winnerId === 'player') {
+  if (selection.status === 'completed' && selection.winnerId !== null) {
     txProcess.currentStage = 'appointment';
+    if (selection.winnerId !== 'player') {
+      if (
+        !appointRelativeSelectionNpcWinner(
+          transaction,
+          txOpportunity,
+          txProcess,
+          selection,
+          currentDay,
+          payload,
+        )
+      )
+        return false;
+      Object.assign(draft, transaction);
+      return true;
+    }
     if (hasRunningCareerAction(transaction) || transaction.events.activeBlockingEventId)
       return false;
     selection.status = 'active';
