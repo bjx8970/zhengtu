@@ -31,6 +31,7 @@ import {
   getRelativeSelection,
   selectionHasPlayer,
 } from '../transactions/selection-transaction';
+import { appointNpcSelectionWinnerInTransaction } from '../transactions/npc-appointment-transaction';
 import { advanceRelativeSelectionStage } from '../../engine/career/relative-selection-lifecycle';
 import { RELATIVE_SELECTION_STAGES } from '../../domain/career/state';
 import { beginVacancySelection } from '../../engine/organization/vacancy-selection-lifecycle';
@@ -401,6 +402,92 @@ function resolveRelativeSelectionFailure(
   archiveCompletedProcess(transaction, process);
 }
 
+function appointRelativeSelectionNpcWinner(
+  transaction: PlayerSave,
+  opportunity: Exclude<CareerOpportunity, { type: 'training' }>,
+  process: CareerProcess,
+  selection: import('../../types/organization').RelativeStaffingSelection,
+  currentDay: number,
+  payload: AdvanceCareerProcessPayload,
+): boolean {
+  const winnerId = selection.winnerId;
+  if (!winnerId || winnerId === 'player') return false;
+  const idFactory = payload._idFactory ?? createRuntimeIdFactory('career');
+  const rng = payload._rng ?? Math.random;
+  process.currentStage = 'appointment';
+  const vacancy = transaction.organization.vacancies.find(
+    (item) => item.vacancyId === selection.vacancyId,
+  );
+  if (!vacancy) return false;
+
+  if (hasRunningCareerAction(transaction) || transaction.events.activeBlockingEventId) {
+    // A terminal winner is frozen while appointment is blocked. Detach the
+    // Vacancy so other world transactions see a legal open Seat; the process
+    // keeps the completed Selection identity for deterministic rebinding.
+    if (vacancy.status === 'selecting') {
+      vacancy.status = 'open';
+      vacancy.selectionId = null;
+    }
+    return true;
+  }
+
+  let boundSelection = getRelativeSelection(transaction.organization, selection.selectionId);
+  if (!boundSelection) return false;
+  if (vacancy.status === 'open') {
+    // beginVacancySelection only accepts a live Selection. This temporary
+    // state change exists solely on the transaction copy; the NPC transaction
+    // below receives the canonical completed terminal Selection.
+    boundSelection.status = 'active';
+    const rebound = beginVacancySelection({
+      organization: transaction.organization,
+      currentDay,
+      idFactory,
+      vacancyId: vacancy.vacancyId,
+      selectionId: boundSelection.selectionId,
+    });
+    if (!rebound.success || !rebound.vacancy) return false;
+    transaction.organization = rebound.organization;
+    boundSelection = getRelativeSelection(transaction.organization, selection.selectionId);
+    if (!boundSelection) return false;
+    boundSelection.status = 'completed';
+  }
+
+  const appointed = appointNpcSelectionWinnerInTransaction(transaction, {
+    selectionId: boundSelection.selectionId,
+    vacancyId: boundSelection.vacancyId,
+    cadreId: winnerId,
+    currentDay,
+    idFactory,
+  });
+  if (!appointed.success) return false;
+  // The NPC transaction commits by replacing the caller's top-level save;
+  // reacquire nested references before archiving the player process.
+  const committedProcess = transaction.career.activeProcess;
+  const committedSelection = getRelativeSelection(transaction.organization, selection.selectionId);
+  const committedOpportunity = transaction.career.opportunities.find(
+    (item) => item.id === opportunity.id,
+  );
+  if (!committedProcess || !committedSelection || !committedOpportunity) return false;
+  const resolved = resolveCareerOpportunity(
+    committedOpportunity,
+    currentDay,
+    'not_selected',
+  ).opportunity;
+  if (!resolved) return false;
+  replaceOpportunity(transaction, resolved);
+  committedProcess.currentStage = 'appointment';
+  committedProcess.status = 'completed';
+  committedProcess.completedAtDay = currentDay;
+  committedProcess.winnerId = winnerId;
+  committedProcess.failure = committedSelection.failure;
+  archiveCompletedProcess(transaction, committedProcess);
+  // Resolve/archive before delivering vacancy.filled. The signal consumer
+  // invalidates linked active processes, which must not cancel this success.
+  for (const signal of appointed.emittedSignals)
+    orchestrateSignal(transaction, signal, currentDay, rng, idFactory);
+  return true;
+}
+
 function advanceRelativeSelectionProcess(
   draft: PlayerSave,
   opportunity: Exclude<CareerOpportunity, { type: 'training' }>,
@@ -480,13 +567,17 @@ function advanceRelativeSelectionProcess(
     if (finalSelection.status === 'completed') {
       txProcess.winnerId = finalSelection.winnerId;
       if (finalSelection.winnerId !== 'player') {
-        resolveRelativeSelectionFailure(
-          transaction,
-          txOpportunity,
-          txProcess,
-          finalSelection,
-          currentDay,
-        );
+        if (
+          !appointRelativeSelectionNpcWinner(
+            transaction,
+            txOpportunity,
+            txProcess,
+            finalSelection,
+            currentDay,
+            payload,
+          )
+        )
+          return false;
         Object.assign(draft, transaction);
         return true;
       }
@@ -522,8 +613,23 @@ function advanceRelativeSelectionProcess(
     Object.assign(draft, transaction);
     return true;
   }
-  if (selection.status === 'completed' && selection.winnerId === 'player') {
+  if (selection.status === 'completed' && selection.winnerId !== null) {
     txProcess.currentStage = 'appointment';
+    if (selection.winnerId !== 'player') {
+      if (
+        !appointRelativeSelectionNpcWinner(
+          transaction,
+          txOpportunity,
+          txProcess,
+          selection,
+          currentDay,
+          payload,
+        )
+      )
+        return false;
+      Object.assign(draft, transaction);
+      return true;
+    }
     if (hasRunningCareerAction(transaction) || transaction.events.activeBlockingEventId)
       return false;
     selection.status = 'active';
