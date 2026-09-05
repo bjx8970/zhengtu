@@ -48,7 +48,7 @@ export function StepGaokao(props: StepGaokaoProps) {
           >
             {props.data.gaokaoScore}
           </div>
-          <span class="tag tag-red" style={{ 'font-size': '1rem', padding: '0.3rem 1.2rem' }}>
+          <span class="tag tag-primary" style={{ 'font-size': '1rem', padding: '0.3rem 1.2rem' }}>
             {props.data.gaokaoTier} 档
           </span>
           {prov.ethnicBonus > 0 && (

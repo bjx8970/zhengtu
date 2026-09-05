@@ -106,3 +106,33 @@ test('日程无需刷新即可更新进度、剩余天数和占用数', async ({
     page.locator('.overview-metric', { hasText: '已完成个人任务' }).locator('strong'),
   ).toHaveText('1项');
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`风险徽章在 ${theme} 主题中保留红色语义`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await createCharacter(page);
+    if (theme === 'dark') await page.getByRole('button', { name: '切换主题' }).click();
+    await page.getByRole('navigation').getByRole('link', { name: '年度考核', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    // 新角色的真实初始 KPI 属于最低等级；验证浏览器最终绘制颜色，而非只检查类名。
+    const badge = page.getByText('不称职', { exact: true });
+    await expect(badge).toBeVisible();
+    const expected = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--color-danger)';
+      probe.style.backgroundColor = 'var(--color-danger-soft)';
+      document.body.append(probe);
+      const computed = getComputedStyle(probe);
+      const colors = { color: computed.color, background: computed.backgroundColor };
+      probe.remove();
+      return colors;
+    });
+    await expect(badge).toHaveCSS('color', expected.color);
+    await expect(badge).toHaveCSS('background-color', expected.background);
+    const channels = expected.color.match(/\d+/g)?.map(Number);
+    expect(channels?.length).toBeGreaterThanOrEqual(3);
+    const [red = 0, green = 0, blue = 0] = channels ?? [];
+    expect(red).toBeGreaterThan(green);
+    expect(red).toBeGreaterThan(blue);
+  });
+}

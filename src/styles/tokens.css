@@ -478,7 +478,8 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-.tag-red {
+/* 品牌高亮独立于风险色，主题换色不会改变风险状态的含义。 */
+.tag-primary {
   background: var(--color-primary-soft);
   color: var(--color-primary);
 }
@@ -503,6 +504,8 @@ a:focus-visible {
   color: var(--color-warning);
 }
 
+/* 兼容旧红色标签；风险始终使用危险色令牌。 */
+.tag-red,
 .tag-danger {
   background: var(--color-danger-soft);
   color: var(--color-danger);
