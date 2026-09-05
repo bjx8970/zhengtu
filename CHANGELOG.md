@@ -10,8 +10,9 @@
 
 - Phase 4 组织世界持久化底座：有限 NPC 干部档案、实际岗位席位、动态 Vacancy、世界级 StaffingSelection 与 producer 幂等键。
 - 配置驱动的 9 名初始 NPC 干部池（与玩家合计 10 人）、确定性 Seat 初始化、组织跨引用不变量和 ADR-009。
-- 政治周期驱动的届期评估、干部调整窗口与 Vacancy/selection/appointment 正式链路。
-- Phase 4 自然组织世界验收：NPC 年度演进、无人操作时的 Vacancy 生产、相对竞争、任职级联和刷新恢复。
+- 政治周期驱动的届期评估、干部调整窗口与 Vacancy/selection/appointment 正式链路；周期有活动周期后每日推进阶段，届期结束同日衔接下一届。
+- Phase 4 自然组织世界验收：NPC 年度演进、无人操作时的 Vacancy 生产、相对竞争、任职级联和刷新恢复（`docs/PHASE4_ACCEPTANCE.md`）。
+- 基层调研/走访个人任务自然积累 `local_governance` 专长，玩家得以进入相对选拔候选池（此前玩家专长无任何自然生产者）。
 
 ### Changed
 
@@ -20,7 +21,7 @@
 
 ### Save compatibility
 
-- 存档 Schema 提升至 11，内容版本提升至 `2026.08.8`；Schema 10 存档在迁移日确定性建立组织世界，不伪造迁移日前的 NPC 考核或任职历史。
+- 存档 Schema 提升至 14，内容版本保持 `2026.08.8`；Schema 10 存档在迁移日确定性建立组织世界，不伪造迁移日前的 NPC 考核或任职历史。Schema 11→12 建立离任事实账本，12→13 补齐 Vacancy/机会终态字段，13→14 将无候选快照的旧 Selection 降级为明确的 terminal failed 审计（不猜测赢家、不重抽随机数）。
 
 ## [0.3.0-alpha.1] - 2026-08-23
 
