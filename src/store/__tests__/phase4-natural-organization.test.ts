@@ -6,14 +6,15 @@
  * Store/Engine/统一时间轴，不直接 push cadre/vacancy/selection/opportunity
  * 实例，也不直接设置最终资格事实跳过 producer；localStorage 不参与。
  *
- * 已知内容边界（见 docs/PHASE4_ACCEPTANCE.md）：
- * - 配置未提供任何玩家专长 producer 之外的领导岗位机会定义；NPC 年度考核
- *   复利使其考核事实长期高于玩家，因此自然竞争中"更优 NPC 获胜"是当前
- *   配置下的真实自然结果；
+ * 自然结果边界（见 docs/PHASE4_ACCEPTANCE.md）：
+ * - NPC 年度考核按配置复利累积（早期即 90+ 且高于玩家年度考核均值），
+ *   因此玩家在首次副职竞争中自然落选、NPC 获胜是当前配置下的真实结果；
+ * - 玩家继续基层历练积累专长后可在后续真实空缺中凭真实履历反超获胜；
  * - 政治周期届期评估只对"空置且无活动空缺"的席位生产 Vacancy，而所有
- *   自然空缺都不会自动关闭，因此测试 C/D 使用真实
- *   cancelVacancyInTransaction 事务（organization_change，代表编制核销）
- *   制造前置状态，其余链路全部为真实管线。
+ *   自然空缺都不会自动关闭，因此测试使用真实 cancelVacancyInTransaction
+ *   事务（organization_change，代表编制核销）制造前置状态，其余链路
+ *   （届期评估 → producer → NPC 自主补员 → 机会 → 选拔 → 任职）全部为
+ *   真实管线。
  */
 
 import { describe, expect, it } from 'vitest';
@@ -52,14 +53,31 @@ function resolveBlockingEvents(store: TestStore, idFactory: () => string): void 
   }
 }
 
-function advanceToDay(store: TestStore, targetDay: number, idFactory: () => string): void {
+/**
+ * 确定性变化随机序列：NPC 年度考核偏移与 NPC 自主补员的随机项需要
+ * 候选间彼此不同（否则并列），同时保持整场可重放。
+ */
+function createSequenceRng(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state = (state * 9301 + 49297) % 233280;
+    return state / 233280;
+  };
+}
+
+function advanceToDay(
+  store: TestStore,
+  targetDay: number,
+  idFactory: () => string,
+  rng: () => number = () => 0.99,
+): void {
   // 试用期失败等终局节点会让时间轴永久冻结：护栏防止测试空转。
   for (let guard = 0; guard < 4000; guard += 1) {
     if (store.getRawState().time.totalDaysPlayed >= targetDay) break;
     resolveBlockingEvents(store, idFactory);
     const remaining = targetDay - store.getRawState().time.totalDaysPlayed;
     const granularity: Granularity = remaining >= 30 ? 'month' : remaining >= 7 ? 'week' : 'day';
-    store.dispatch({ type: 'ADVANCE_TIME', granularity, _rng: () => 0.99, _idFactory: idFactory });
+    store.dispatch({ type: 'ADVANCE_TIME', granularity, _rng: rng, _idFactory: idFactory });
   }
   if (store.getRawState().time.totalDaysPlayed < targetDay)
     throw new Error(
@@ -138,27 +156,6 @@ function findDeputyOpportunity(store: TestStore): { id: string; expiresAtDay: nu
   if (!opportunity || opportunity.status !== 'available')
     throw new Error('Expected an available township deputy opportunity');
   return { id: opportunity.id, expiresAtDay: opportunity.expiresAtDay };
-}
-
-/**
- * Phase 3 起沿用的"可审计竞争事实冻结"模式：在 Selection 创建前一次性写入
- * 可复核的考核/专长事实，使玩家基于真实履历获胜的方向可确定性重放。
- * 该步骤不 push 任何 cadre/vacancy/selection/opportunity 实例。
- */
-function freezeAuditableCompetitionFacts(store: TestStore): void {
-  const state = store.getRawState();
-  const experience = state.career.experiences.find((item) => item.endedAtDay === null);
-  if (!experience) throw new Error('Expected current career experience');
-  experience.assessmentResults = [
-    ...experience.assessmentResults,
-    { year: state.time.year, score: 100, tier: '优秀' },
-  ];
-  state.career.specialties = { local_governance: 100 };
-  for (const cadre of state.organization.cadres) {
-    cadre.assessments = [{ year: state.time.year, score: 0, tier: '不称职' }];
-    cadre.specialties = { local_governance: 0 };
-    cadre.restrictions = [];
-  }
 }
 
 function runSelectionRounds(
@@ -325,22 +322,17 @@ describe('Phase 4 自然组织世界路径', () => {
 
   it('政治周期届期评估：留任不制造伪空缺，编制核销后真实释放岗位', () => {
     const idFactory = createIdFactory();
+    const rng = createSequenceRng(7);
     const store = createTestStore();
     newGame(store);
     grassrootsYears(store, 910, idFactory);
-    advanceToDay(store, 2879, idFactory);
-
-    // 第一届届期结束：连续衔接下一届，且当前所有空席都已有活动空缺或在职干部
-    // （留任），因此届期评估不生产任何政治周期 Vacancy。
-    store.dispatch({
-      type: 'ADVANCE_TIME',
-      granularity: 'day',
-      _rng: () => 0.99,
-      _idFactory: idFactory,
-    });
+    // 第一届届期为 [900, 2700]：届期结束当天连续衔接下一届，且当前所有空席
+    // 都已有活动空缺或在职干部（留任），届期评估不生产任何政治周期 Vacancy。
+    advanceToDay(store, 2700, idFactory, rng);
     const termEnd = store.getRawState();
-    expect(termEnd.time.totalDaysPlayed).toBe(2880);
+    expect(termEnd.time.totalDaysPlayed).toBe(2700);
     expect(termEnd.world.activeCycles.map((cycle) => cycle.termNumber)).toEqual([1, 2]);
+    expect(termEnd.world.activeCycles[0]).toMatchObject({ startedAtDay: 900, endsAtDay: 2700 });
     expect(termEnd.organization.processedProducerKeys).toContain(
       'political-cycle:party_congress:1',
     );
@@ -354,7 +346,7 @@ describe('Phase 4 自然组织世界路径', () => {
     const cancelled = cancelVacancyInTransaction(store.getRawState(), {
       vacancyId: chiefVacancyId,
       cancellationReason: 'organization_change',
-      currentDay: 2880,
+      currentDay: 2700,
       idFactory,
     });
     // cancelVacancyInTransaction 通过事务副本原子提交并写回 Store 状态。
@@ -366,7 +358,7 @@ describe('Phase 4 自然组织世界路径', () => {
     ).toMatchObject({ status: 'cancelled', cancellationReason: 'organization_change' });
 
     // 第二届届期结束：政治周期 producer 在被核销席位上真实开放 Vacancy。
-    advanceToDay(store, 4680, idFactory);
+    advanceToDay(store, 4500, idFactory, rng);
     const secondTermEnd = store.getRawState();
     expect(secondTermEnd.organization.processedProducerKeys).toContain(
       'political-cycle:party_congress:2',
@@ -386,223 +378,187 @@ describe('Phase 4 自然组织世界路径', () => {
         (opportunity) => opportunity.definitionId === 'township_chief_leadership_vacancy',
       ),
     ).toEqual([]);
+
+    // 补员延迟（30 天）届满：组织以 NPC-only 相对选拔自主填补周期空缺，
+    // 全程未 dispatch 任何机会接受/选拔推进 action，只有时间推进。
+    const seatsBeforeStaffing = new Map(
+      secondTermEnd.organization.seats
+        .filter((seat) => seat.occupant?.type === 'npc')
+        .map((seat) => [seat.occupant?.id ?? '', seat.seatId]),
+    );
+    advanceToDay(store, 4560, idFactory, rng);
+    const staffed = store.getRawState();
+    expect(
+      staffed.organization.vacancies.find(
+        (vacancy) => vacancy.vacancyId === cycleVacancy?.vacancyId,
+      ),
+    ).toMatchObject({ status: 'filled', filledBy: { type: 'npc' } });
+    const staffingSelection = staffed.organization.selections.find(
+      (selection) => selection.vacancyId === cycleVacancy?.vacancyId,
+    );
+    expect(staffingSelection?.status).toBe('completed');
+    const staffingWinnerId = staffingSelection?.winnerId;
+    expect(staffingWinnerId ?? null).not.toBeNull();
+    expect(staffingWinnerId === 'player').toBe(false);
+    expect(
+      staffingSelection?.candidates.every((candidate) => candidate.candidateType === 'npc'),
+    ).toBe(true);
+    expect(seatOccupant(staffed, 'seat:admin_l3_0:1')).toBe(`npc:${staffingWinnerId}`);
+    const staffingWinnerPreviousSeat = seatsBeforeStaffing.get(staffingWinnerId ?? '');
+    expect(staffingWinnerPreviousSeat ?? null).not.toBeNull();
+    expect(seatOccupant(staffed, staffingWinnerPreviousSeat ?? '')).toBe('empty');
+    expect(
+      staffed.organization.vacancies.some(
+        (vacancy) =>
+          vacancy.status === 'open' &&
+          vacancy.seatId === staffingWinnerPreviousSeat &&
+          vacancy.vacancyId.startsWith('vacancy:appointment:'),
+      ),
+    ).toBe(true);
+    // 级联产生的平行副职空缺向玩家派发真实机会（玩家可再次进入候选池）。
+    const cascadedOpportunity = staffed.career.opportunities.find(
+      (opportunity) =>
+        opportunity.vacancyId?.startsWith('vacancy:appointment:') &&
+        opportunity.status === 'available',
+    );
+    expect(cascadedOpportunity ?? null).not.toBeNull();
   });
 
-  it('政治周期 → 届期评估 → Vacancy → 选拔 → 任职全链经真实管线闭合', () => {
+  it('自然纵向路径：首次落选 → 持续历练 → 政治周期补员级联 → 凭真实履历再获任', () => {
     const idFactory = createIdFactory();
+    const rng = createSequenceRng(11);
     const store = createTestStore();
     newGame(store);
     grassrootsYears(store, 910, idFactory);
-    advanceToDay(store, 960, idFactory);
-    // 冻结可审计竞争事实（Phase 3 沿用模式）：让玩家以确定性事实获胜进入副职。
-    freezeAuditableCompetitionFacts(store);
-    const deputyOpportunity = findDeputyOpportunity(store);
+    advanceToDay(store, 960, idFactory, rng);
+
+    // 首次真实副职竞争：当前配置下 NPC 年度考核复利更高，玩家自然落选，
+    // NPC 获任并经级联 producer 释放原岗位空缺。
+    const firstOpportunity = findDeputyOpportunity(store);
     store.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
-      opportunityId: deputyOpportunity.id,
+      opportunityId: firstOpportunity.id,
       _rng: () => 0,
       _idFactory: idFactory,
     });
-    runSelectionRounds(store, deputyOpportunity.id, 6, idFactory);
+    runSelectionRounds(store, firstOpportunity.id, 6, idFactory);
+    const firstSelection = store.getRawState().organization.selections.at(-1);
+    expect(firstSelection?.status).toBe('completed');
+    expect(firstSelection?.winnerId).toBe('cadre_luo_xia');
+    expect(seatOccupant(store.getRawState(), 'seat:admin_l2_0:1')).toBe('npc:cadre_luo_xia');
     expect(store.getRawState().career.appointment).toMatchObject({
-      positionId: 'admin_l2_0',
-      leadershipRank: 'township_deputy',
+      positionId: 'admin_l1_0',
+      leadershipRank: 'none',
     });
-    // 玩家晋升后原科员席位经同一级联 producer 开放空缺。
-    expect(
-      store
-        .getRawState()
-        .organization.vacancies.find((vacancy) =>
-          vacancy.vacancyId.startsWith('vacancy:appointment:'),
-        ),
-    ).toMatchObject({ seatId: 'seat:admin_l1_0:1', status: 'open' });
 
-    // 副职任内真实治理：防汛行动 + 产业园政策链（镇长机会定义的事件前提）。
-    // 事件链按真实日程激活：轮询等待 industrial_park_policy_proposal 进入 pending。
-    store.dispatch({
-      type: 'START_ACTION',
-      deptId: 'admin_l2_0_dept_2',
-      actionId: 'flood_preparation',
-      tierKey: 'primary',
-      _idFactory: idFactory,
-    });
-    store.dispatch({
-      type: 'START_ACTION',
-      deptId: 'admin_l2_0_dept_0',
-      actionId: 'township_investment_promotion',
-      tierKey: 'primary',
-      _idFactory: idFactory,
-    });
-    let policyApproved = false;
-    for (let step = 0; step < 40 && !policyApproved; step += 1) {
-      resolveBlockingEvents(store, idFactory);
-      const proposal = store
-        .getRawState()
-        .events.pending.find((instance) => instance.eventId === 'industrial_park_policy_proposal');
-      if (proposal) {
-        store.dispatch({
-          type: 'CHOOSE_EVENT_OPTION',
-          eventInstanceId: proposal.instanceId,
-          optionId: 'submit_proposal',
-          _rng: () => 0.99,
-          _idFactory: idFactory,
-        });
-        store.dispatch({
-          type: 'PROPOSE_POLICY',
-          policyId: 'industrial_park_support',
-          _idFactory: idFactory,
-        });
-        const policy = store
-          .getRawState()
-          .governance.policies.find((item) => item.policyId === 'industrial_park_support');
-        if (!policy) throw new Error('Expected industrial park policy instance');
-        store.dispatch({
-          type: 'APPROVE_POLICY',
-          policyInstanceId: policy.instanceId,
-          _rng: () => 0.99,
-          _idFactory: idFactory,
-        });
-        policyApproved = true;
-        break;
-      }
-      advanceToDay(store, store.getRawState().time.totalDaysPlayed + 7, idFactory);
-    }
-    expect(policyApproved).toBe(true);
-    // 政策进入实施阶段时 crisis 事件自然触发（preparation→implementation 转换）。
-    let crisisFired = false;
-    for (let step = 0; step < 30 && !crisisFired; step += 1) {
-      advanceToDay(store, store.getRawState().time.totalDaysPlayed + 7, idFactory);
-      crisisFired = store
-        .getRawState()
-        .events.history.some((record) => record.eventId === 'industrial_park_progress_crisis');
-    }
-    const governed = store.getRawState();
-    const governedEventIds = new Set(governed.events.history.map((record) => record.eventId));
-    expect(governedEventIds.has('flood_preparation_metrics')).toBe(true);
-    expect(crisisFired).toBe(true);
+    // 玩家不放弃：继续基层历练，专长与考核由真实任务/年度结算持续积累。
+    grassrootsYears(store, 1250, idFactory);
+    const lateState = store.getRawState();
+    expect(lateState.career.specialties.local_governance ?? 0).toBeGreaterThan(100);
 
-    // 副职任内持续履职：让两次年度考核自然合格，解锁镇长机会。
-    while (store.getRawState().time.totalDaysPlayed < 1700) {
-      const weekStart = store.getRawState().time.totalDaysPlayed;
-      store.dispatch({
-        type: 'START_ACTION',
-        deptId: 'admin_l2_0_dept_0',
-        actionId: 'township_priority_delivery',
-        tierKey: 'primary',
-        _idFactory: idFactory,
-      });
-      store.dispatch({
-        type: 'START_ACTION',
-        deptId: 'admin_l2_0_dept_1',
-        actionId: 'tax_collection',
-        tierKey: 'secondary',
-        _idFactory: idFactory,
-      });
-      advanceToDay(store, Math.min(weekStart + 7, 1700), idFactory);
-    }
-
-    // 等镇长机会自然出现（两次副职年度考核合格后），随后核销镇长编制：
-    // 关联机会经真实信号管线失效，而不是绕过 producer。
-    advanceToDay(store, 1700, idFactory);
-    const beforeCancel = store.getRawState();
-    const chiefOpportunity = beforeCancel.career.opportunities.find(
-      (item) => item.definitionId === 'township_chief_leadership_vacancy',
-    );
-    expect(chiefOpportunity ?? null).not.toBeNull();
-    const cancelled = cancelVacancyInTransaction(beforeCancel, {
+    // 核销镇长初始编制（真实取消事务）：为政治周期届期评估释放席位。
+    const cancelled = cancelVacancyInTransaction(store.getRawState(), {
       vacancyId: 'vacancy:initial:seat:admin_l3_0:1',
       cancellationReason: 'organization_change',
-      currentDay: beforeCancel.time.totalDaysPlayed,
+      currentDay: store.getRawState().time.totalDaysPlayed,
       idFactory,
     });
     expect(cancelled.success).toBe(true);
-    expect(
-      store
-        .getRawState()
-        .career.opportunities.find(
-          (item) => item.id === chiefOpportunity?.id && item.status === 'available',
-        ) ?? null,
-    ).toBeNull();
-    expect(
-      store
-        .getRawState()
-        .career.opportunities.find(
-          (item) => item.id === chiefOpportunity?.id && item.status === 'available',
-        ) ?? null,
-    ).toBeNull();
 
-    // 第一届届期结束：政治周期在被核销的镇长席位上真实开放 Vacancy，
-    // 并经信号级联重新派发镇长机会（新来源）。
-    advanceToDay(store, 2880, idFactory);
+    // 第一届届期结束：政治周期在被核销席位上真实开放镇长空缺；
+    // 玩家仍为科员，信号管线不派发镇长机会。
+    advanceToDay(store, 2700, idFactory, rng);
     const termEnd = store.getRawState();
     const cycleVacancy = termEnd.organization.vacancies.find((vacancy) =>
       vacancy.vacancyId.startsWith('vacancy:political_cycle:party_congress:1:'),
     );
-    expect(cycleVacancy).toMatchObject({ seatId: 'seat:admin_l3_0:1', status: 'open' });
-    const chiefFromCycle = termEnd.career.opportunities.find(
-      (item) =>
-        item.definitionId === 'township_chief_leadership_vacancy' &&
-        item.vacancyId === cycleVacancy?.vacancyId,
-    );
-    if (!chiefFromCycle || chiefFromCycle.status !== 'available')
-      throw new Error('Expected chief opportunity from political cycle vacancy');
+    expect(cycleVacancy).toMatchObject({
+      seatId: 'seat:admin_l3_0:1',
+      status: 'open',
+      sourceType: 'political_cycle',
+    });
+    expect(
+      termEnd.career.opportunities.filter(
+        (opportunity) => opportunity.vacancyId === cycleVacancy?.vacancyId,
+      ),
+    ).toEqual([]);
 
-    const seatOccupantBeforeChief = new Map(
-      store
-        .getRawState()
-        .organization.seats.filter((seat) => seat.occupant?.type === 'npc')
+    // 补员延迟届满：NPC-only 相对选拔自主填补镇长岗位并级联旧岗位——
+    // 此段全程只推进时间，没有任何机会接受/选拔推进 action。
+    const seatsBeforeStaffing = new Map(
+      termEnd.organization.seats
+        .filter((seat) => seat.occupant?.type === 'npc')
         .map((seat) => [seat.occupant?.id ?? '', seat.seatId]),
     );
+    advanceToDay(store, 2760, idFactory, rng);
+    const staffed = store.getRawState();
+    expect(
+      staffed.organization.vacancies.find(
+        (vacancy) => vacancy.vacancyId === cycleVacancy?.vacancyId,
+      ),
+    ).toMatchObject({ status: 'filled', filledBy: { type: 'npc' } });
+    const staffingSelection = staffed.organization.selections.find(
+      (selection) => selection.vacancyId === cycleVacancy?.vacancyId,
+    );
+    expect(staffingSelection?.status).toBe('completed');
+    const staffingWinnerId = staffingSelection?.winnerId;
+    expect(staffingWinnerId ?? null).not.toBeNull();
+    expect(staffingWinnerId === 'player').toBe(false);
+    expect(
+      staffingSelection?.candidates.every((candidate) => candidate.candidateType === 'npc'),
+    ).toBe(true);
+    expect(seatOccupant(staffed, 'seat:admin_l3_0:1')).toBe(`npc:${staffingWinnerId}`);
+    const staffingWinnerPreviousSeat = seatsBeforeStaffing.get(staffingWinnerId ?? '');
+    expect(staffingWinnerPreviousSeat ?? null).not.toBeNull();
+    expect(seatOccupant(staffed, staffingWinnerPreviousSeat ?? '')).toBe('empty');
+    const cascadeVacancy = staffed.organization.vacancies.find(
+      (vacancy) =>
+        vacancy.status === 'open' &&
+        vacancy.seatId === staffingWinnerPreviousSeat &&
+        vacancy.vacancyId.startsWith('vacancy:appointment:'),
+    );
+    expect(cascadeVacancy ?? null).not.toBeNull();
+
+    // 级联副职空缺向玩家派发真实机会：玩家再次进入同一相对选拔候选池，
+    // 凭持续积累的真实专长/考核履历自然获胜并任职。
+    const secondOpportunity = staffed.career.opportunities.find(
+      (opportunity) =>
+        opportunity.vacancyId === cascadeVacancy?.vacancyId && opportunity.status === 'available',
+    );
+    if (!secondOpportunity) throw new Error('Expected player opportunity from cascade vacancy');
     store.dispatch({
       type: 'ACCEPT_CAREER_OPPORTUNITY',
-      opportunityId: chiefFromCycle.id,
+      opportunityId: secondOpportunity.id,
       _rng: () => 0,
       _idFactory: idFactory,
     });
-    runSelectionRounds(store, chiefFromCycle.id, 6, idFactory);
+    runSelectionRounds(store, secondOpportunity.id, 6, idFactory);
     const after = store.getRawState();
-    const chiefSelection = after.organization.selections.at(-1);
-    expect(chiefSelection?.status).toBe('completed');
-    const winnerId = chiefSelection?.winnerId;
-    expect(winnerId).toBeTruthy();
-    // 周期岗位 Vacancy 消费为真实任职：赢家唯一并落位镇长席位。
-    expect(
-      after.organization.vacancies.find((vacancy) => vacancy.vacancyId === cycleVacancy?.vacancyId),
-    ).toMatchObject({ status: 'filled', filledBy: winnerId ? { id: winnerId } : null });
-    expect(seatOccupant(after, 'seat:admin_l3_0:1')).toBe(
-      winnerId === 'player' ? 'player:player' : `npc:${winnerId}`,
+    const secondSelection = after.organization.selections.find(
+      (selection) => selection.vacancyId === cascadeVacancy?.vacancyId,
     );
-    // 赢家原岗位经同一级联 producer 释放新空缺（组织流动可级联）。
-    if (winnerId && winnerId !== 'player') {
-      const winnerPreviousSeatId = seatOccupantBeforeChief.get(winnerId);
-      if (winnerPreviousSeatId) {
-        expect(seatOccupant(after, winnerPreviousSeatId)).toBe('empty');
-        expect(
-          after.organization.vacancies.some(
-            (vacancy) =>
-              vacancy.status === 'open' &&
-              vacancy.seatId === winnerPreviousSeatId &&
-              vacancy.vacancyId.startsWith('vacancy:appointment:'),
-          ),
-        ).toBe(true);
-      }
-    } else {
-      // 玩家获任镇长：原副职席位经同一级联 producer 释放新空缺。
-      expect(winnerId).toBe('player');
-      expect(seatOccupant(after, 'seat:admin_l2_0:1')).toBe('empty');
-      expect(
-        after.organization.vacancies.some(
-          (vacancy) =>
-            vacancy.status === 'open' &&
-            vacancy.seatId === 'seat:admin_l2_0:1' &&
-            vacancy.vacancyId.startsWith('vacancy:appointment:'),
-        ),
-      ).toBe(true);
-      expect(after.career.appointment).toMatchObject({
-        positionId: 'admin_l3_0',
-        leadershipRank: 'township_chief',
-      });
-    }
-    expect(after.world.activeCycles[0]).toMatchObject({ termNumber: 1, phase: 'evaluation' });
+    expect(secondSelection?.status).toBe('completed');
+    expect(secondSelection?.winnerId).toBe('player');
+    expect(after.career.appointment).toMatchObject({
+      positionId: cascadeVacancy?.positionId,
+      leadershipRank: 'township_deputy',
+    });
+    expect(
+      after.career.opportunities.find((item) => item.id === secondOpportunity.id),
+    ).toMatchObject({
+      status: 'resolved',
+      finalOutcome: 'appointed',
+    });
+    // 玩家原科员席位经同一级联 producer 释放新空缺（组织流动继续级联）。
+    expect(seatOccupant(after, 'seat:admin_l1_0:1')).toBe('empty');
+    expect(
+      after.organization.vacancies.some(
+        (vacancy) =>
+          vacancy.status === 'open' &&
+          vacancy.seatId === 'seat:admin_l1_0:1' &&
+          vacancy.vacancyId.startsWith('vacancy:appointment:'),
+      ),
+    ).toBe(true);
+    expect(after.career.experiences.filter((item) => item.endedAtDay === null)).toHaveLength(1);
   });
 });
