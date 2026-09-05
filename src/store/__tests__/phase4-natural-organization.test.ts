@@ -379,13 +379,60 @@ describe('Phase 4 自然组织世界路径', () => {
       ),
     ).toEqual([]);
 
-    // 补员延迟（30 天）届满：组织以 NPC-only 相对选拔自主填补周期空缺，
-    // 全程未 dispatch 任何机会接受/选拔推进 action，只有时间推进。
+    // 补员延迟（30 天）届满：首次 attempt 使用等值随机输入——两名在职副职
+    // NPC 的考核与专长事实在任命阶段精确并列（no_unique_winner）→ 选拔
+    // 失败审计、Vacancy 重开为 open、不写永久消费键。
     const seatsBeforeStaffing = new Map(
       secondTermEnd.organization.seats
         .filter((seat) => seat.occupant?.type === 'npc')
         .map((seat) => [seat.occupant?.id ?? '', seat.seatId]),
     );
+    advanceToDay(store, 4530, idFactory, () => 0.99);
+    const firstAttempt = store.getRawState();
+    expect(
+      firstAttempt.organization.vacancies.find(
+        (vacancy) => vacancy.vacancyId === cycleVacancy?.vacancyId,
+      ),
+    ).toMatchObject({ status: 'open', selectionId: null });
+    const failedSelection = firstAttempt.organization.selections.find(
+      (selection) =>
+        selection.vacancyId === cycleVacancy?.vacancyId && selection.status === 'failed',
+    );
+    expect(failedSelection?.failure).toMatchObject({ code: 'no_unique_winner' });
+    expect(
+      firstAttempt.organization.processedProducerKeys.includes(
+        `npc-staffing:${cycleVacancy?.vacancyId}`,
+      ),
+    ).toBe(false);
+    expect(
+      firstAttempt.organization.processedProducerKeys.includes(
+        `npc-staffing:${cycleVacancy?.vacancyId}:4530`,
+      ),
+    ).toBe(true);
+
+    // 同日 continuation 重放：当日尝试键保证不重复创建同一次 attempt。
+    const replayState = firstAttempt;
+    replayState.time.pendingContinuation = {
+      absoluteDay: 4530,
+      remainingNodes: [{ type: 'npc_staffing', absoluteDay: 4530 }],
+    };
+    const decoded = decodeCurrentSave(JSON.stringify(wrapSaveEnvelope(replayState)));
+    expect(decoded.success).toBe(true);
+    if (!decoded.state) throw new Error('Expected decoded save');
+    const resumed = createTestStore(decoded.state);
+    resumed.dispatch({ type: 'ADVANCE_TIME', granularity: 'day', _rng: () => 0.99 });
+    expect(resumed.getRawState().time.totalDaysPlayed).toBe(4530);
+    expect(resumed.getRawState().time.pendingContinuation).toBeNull();
+    expect(
+      resumed
+        .getRawState()
+        .organization.selections.filter(
+          (selection) => selection.vacancyId === cycleVacancy?.vacancyId,
+        ),
+    ).toHaveLength(1);
+
+    // 退避间隔（30 天）后的重试：变化随机输入打破并列，同一 Vacancy 创建
+    // 新 Selection 并成功填补、级联旧岗位——失败不永久封死空缺。
     advanceToDay(store, 4560, idFactory, rng);
     const staffed = store.getRawState();
     expect(
@@ -394,9 +441,16 @@ describe('Phase 4 自然组织世界路径', () => {
       ),
     ).toMatchObject({ status: 'filled', filledBy: { type: 'npc' } });
     const staffingSelection = staffed.organization.selections.find(
-      (selection) => selection.vacancyId === cycleVacancy?.vacancyId,
+      (selection) =>
+        selection.vacancyId === cycleVacancy?.vacancyId && selection.status === 'completed',
     );
     expect(staffingSelection?.status).toBe('completed');
+    // 失败 attempt 保留为审计记录，且不阻止同一空缺后续成功填补。
+    expect(
+      staffed.organization.selections.filter(
+        (selection) => selection.vacancyId === cycleVacancy?.vacancyId,
+      ),
+    ).toHaveLength(2);
     const staffingWinnerId = staffingSelection?.winnerId;
     expect(staffingWinnerId ?? null).not.toBeNull();
     expect(staffingWinnerId === 'player').toBe(false);
@@ -493,14 +547,19 @@ describe('Phase 4 自然组织世界路径', () => {
     advanceToDay(store, 2760, idFactory, rng);
     const staffed = store.getRawState();
     expect(
+      staffed.organization.processedProducerKeys.includes(
+        `npc-staffing:${cycleVacancy?.vacancyId}`,
+      ),
+    ).toBe(true);
+    expect(
       staffed.organization.vacancies.find(
         (vacancy) => vacancy.vacancyId === cycleVacancy?.vacancyId,
       ),
     ).toMatchObject({ status: 'filled', filledBy: { type: 'npc' } });
     const staffingSelection = staffed.organization.selections.find(
-      (selection) => selection.vacancyId === cycleVacancy?.vacancyId,
+      (selection) =>
+        selection.vacancyId === cycleVacancy?.vacancyId && selection.status === 'completed',
     );
-    expect(staffingSelection?.status).toBe('completed');
     const staffingWinnerId = staffingSelection?.winnerId;
     expect(staffingWinnerId ?? null).not.toBeNull();
     expect(staffingWinnerId === 'player').toBe(false);

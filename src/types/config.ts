@@ -360,6 +360,8 @@ export interface GameConfig {
   congressCycleYears: number;
   /** 非初始编制 Vacancy 在玩家机会缺位达到该天数后，由 NPC 自主补员 */
   npcStaffingDelayDays: number;
+  /** NPC 自主补员失败后的重试间隔（无状态退避，自首次到期日起算） */
+  npcStaffingRetryIntervalDays: number;
   /** 政治周期各阶段持续天数，合计应等于一个周期长度。 */
   politicalCyclePhaseDurations: {
     preparation: number;

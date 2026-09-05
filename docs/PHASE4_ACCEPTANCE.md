@@ -22,7 +22,8 @@
 | 玩家可在后续真实 Vacancy 中再次参选并获选 | 全链场景：政治周期 Vacancy → 镇长机会 → 玩家接受并获任；`phase3-reachability.test.ts` 四年场景正职获任 | 通过 |
 | 玩家/NPC 职级与领导岗位双通道独立 | `phase3-reachability.test.ts` 职级里程碑不改变任职；副职竞争场景落选后任职保持科员 | 通过 |
 | 政治周期 → 届期评估 → Vacancy → NPC 自主补员/选拔 → 任职闭环；留任不制造伪空缺 | 全链场景经真实管线闭合；届期评估场景断言 occupied/被活动空缺覆盖的席位不生产任何 `vacancy:political_cycle` | 通过 |
-| 玩家不参与时 Vacancy 由 NPC 自主竞争并填补（无任何接受/选拔 action，仅推进时间） | `phase4-natural-organization.test.ts` 届期评估场景：`political_cycle` Vacancy 开放 30 天且玩家机会缺位后，NPC-only 相对选拔自主产生唯一赢家并真实任职、级联原岗位（producer key `npc-staffing:{vacancyId}` 保证每空缺实例只尝试一次） | 通过 |
+| 玩家不参与时 Vacancy 由 NPC 自主竞争并填补（无任何接受/选拔 action，仅推进时间） | `phase4-natural-organization.test.ts` 届期评估场景：`political_cycle` Vacancy 开放 30 天且玩家机会缺位后，NPC-only 相对选拔自主产生唯一赢家并真实任职、级联原岗位 | 通过 |
+| 补员失败（无唯一赢家等）不永久封死空缺：失败审计后按退避间隔重试并成功填补 | 同场景：首次 attempt 因 `no_unique_winner` 失败 → Vacancy 重开为 open、保留 terminal failed 审计、不写永久消费键；同日 continuation 重放不重复创建 attempt；30 天退避后同一 Vacancy 创建新 Selection 并成功填补 | 通过 |
 | 玩家首次落选后继续工作，经后续真实 Vacancy 再次参选并凭真实履历获任 | `phase4-natural-organization.test.ts` 自然纵向路径场景：首次副职竞争落选（NPC 获任级联）→ 继续基层历练 → 政治周期释放镇长席位 → NPC 自主补员级联平行副职空缺 → 玩家再入候选池凭真实专长/考核获胜任职；全程不修改任何竞争事实 | 通过 |
 | 候选快照冻结、刷新/重放不漂移 | 副职竞争场景中期 `decodeCurrentSave` 重放后赢家一致；自然 UI 路径落选后 `reload()` 结果不变；`selection-transaction.test.ts` 创建即冻结单次 RNG | 通过 |
 | 同一 seat 无双 Vacancy；filled 后不可重复消费；取消后机会失效 | `vacancy-lifecycle.test.ts`、`vacancy-transaction.test.ts`、`organization-invariant-checks` 严格解码；全链场景断言周期 Vacancy `filled` 后唯一消费 | 通过 |
