@@ -261,7 +261,7 @@ export function CareerPage() {
                     probation().status === 'passed'
                       ? 'tag tag-green'
                       : probation().status === 'failed'
-                        ? 'tag tag-red'
+                        ? 'tag tag-danger'
                         : 'tag tag-blue'
                   }
                   data-testid="probation-status"
@@ -631,7 +631,7 @@ export function CareerPage() {
                         <For each={view().stages}>
                           {(stage) => (
                             <span
-                              class={`tag ${stage.status === 'completed' ? 'tag-green' : stage.status === 'current' ? 'tag-red' : 'tag-gray'}`}
+                              class={`tag ${stage.status === 'completed' ? 'tag-green' : stage.status === 'current' ? 'tag-primary' : 'tag-gray'}`}
                             >
                               {stage.label}
                               {stage.status === 'completed'
