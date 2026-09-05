@@ -30,6 +30,7 @@ Phase 4 运行时由 producer/consumer 闭环驱动，全部以 `organization.pr
 - **任职级联**：`fillVacancyInTransaction` 在赢家就任目标席位的同时释放其原席位，并以 `vacancy:appointment:{appointmentId}:{seatId}` 打开新空缺——玩家与 NPC 走同一机制。
 - **相对选拔**：`createRelativeSelectionInTransaction` 在玩家接受机会时冻结统一候选池（玩家与 NPC 同一资格框架）、完整随机数与规则版本；`advanceRelativeSelectionStage` 只消费 Selection 自有输入，六阶段后产生唯一赢家，最终任职由世界级事务原子提交。
 - **政治周期**：`processPoliticalCycle` 在 Congress 节点创建届期，每日推进阶段；届期评估对"空置且无活动空缺"的席位以稳定 producer key 打开 `political_cycle` Vacancy，并连续衔接下一届。
+- **NPC 自主补员**：`npc_staffing` 每日节点对"非初始编制、已过 `npcStaffingDelayDays` 延迟、玩家机会缺位"的 open Vacancy 以 NPC-only 候选池运行同一相对选拔框架（producer key `npc-staffing:{vacancyId}` 保证每个空缺实例只尝试一次）；赢家经 NPC 任职事务就任并级联原岗位，组织世界不因玩家不行动而停摆。初始编制（`system`）始终等待玩家职业进程解锁的机会窗口。
 
 验收证据见 `docs/PHASE4_ACCEPTANCE.md`。
 
