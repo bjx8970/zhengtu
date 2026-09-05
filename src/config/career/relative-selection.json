@@ -31,7 +31,12 @@
         "minimumQualifiedAssessmentCount": 1,
         "qualifiedAssessmentMinimumScore": 60,
         "minimumLatestAssessmentScore": 60,
-        "requiredSpecialties": [{ "specialtyId": "local_governance", "minimumScore": 60 }]
+        "requiredSpecialties": [
+          {
+            "specialtyId": "local_governance",
+            "minimumScore": 60
+          }
+        ]
       },
       {
         "targetPositionId": "admin_l3_0",
@@ -45,7 +50,50 @@
         "minimumQualifiedAssessmentCount": 1,
         "qualifiedAssessmentMinimumScore": 60,
         "minimumLatestAssessmentScore": 60,
-        "requiredSpecialties": [{ "specialtyId": "local_governance", "minimumScore": 60 }]
+        "requiredSpecialties": [
+          {
+            "specialtyId": "local_governance",
+            "minimumScore": 60
+          }
+        ]
+      },
+      {
+        "targetPositionId": "admin_l2_1",
+        "allowedCurrentPositionIds": ["admin_l1_0", "admin_l1_2"],
+        "requireSameInstitution": true,
+        "requireSameRegion": true,
+        "requireSamePositionDomain": true,
+        "minimumInstitutionExperienceDays": 180,
+        "minimumRegionExperienceDays": 180,
+        "minimumDomainExperienceDays": 180,
+        "minimumQualifiedAssessmentCount": 1,
+        "qualifiedAssessmentMinimumScore": 60,
+        "minimumLatestAssessmentScore": 60,
+        "requiredSpecialties": [
+          {
+            "specialtyId": "local_governance",
+            "minimumScore": 60
+          }
+        ]
+      },
+      {
+        "targetPositionId": "admin_l2_2",
+        "allowedCurrentPositionIds": ["admin_l1_0", "admin_l1_2"],
+        "requireSameInstitution": true,
+        "requireSameRegion": true,
+        "requireSamePositionDomain": true,
+        "minimumInstitutionExperienceDays": 180,
+        "minimumRegionExperienceDays": 180,
+        "minimumDomainExperienceDays": 180,
+        "minimumQualifiedAssessmentCount": 1,
+        "qualifiedAssessmentMinimumScore": 60,
+        "minimumLatestAssessmentScore": 60,
+        "requiredSpecialties": [
+          {
+            "specialtyId": "local_governance",
+            "minimumScore": 60
+          }
+        ]
       }
     ]
   },
@@ -53,7 +101,10 @@
     {
       "id": "eligibility_review",
       "label": "资格审查",
-      "scoreWeights": { "assessment": 0.6, "service": 0.4 },
+      "scoreWeights": {
+        "assessment": 0.6,
+        "service": 0.4
+      },
       "randomWeight": 0,
       "eliminationThreshold": 50,
       "requiresUniqueWinner": false
@@ -61,7 +112,11 @@
     {
       "id": "democratic_recommendation",
       "label": "民主推荐",
-      "scoreWeights": { "assessment": 0.45, "specialty": 0.35, "network": 0.2 },
+      "scoreWeights": {
+        "assessment": 0.45,
+        "specialty": 0.35,
+        "network": 0.2
+      },
       "randomWeight": 10,
       "eliminationThreshold": 45,
       "requiresUniqueWinner": false
@@ -69,7 +124,11 @@
     {
       "id": "organization_inspection",
       "label": "组织考察",
-      "scoreWeights": { "assessment": 0.4, "specialty": 0.35, "service": 0.25 },
+      "scoreWeights": {
+        "assessment": 0.4,
+        "specialty": 0.35,
+        "service": 0.25
+      },
       "randomWeight": 8,
       "eliminationThreshold": 45,
       "requiresUniqueWinner": false
@@ -77,7 +136,11 @@
     {
       "id": "collective_decision",
       "label": "集体决定",
-      "scoreWeights": { "assessment": 0.5, "integrity": 0.3, "specialty": 0.2 },
+      "scoreWeights": {
+        "assessment": 0.5,
+        "integrity": 0.3,
+        "specialty": 0.2
+      },
       "randomWeight": 6,
       "eliminationThreshold": 45,
       "requiresUniqueWinner": false
@@ -85,7 +148,10 @@
     {
       "id": "public_notice",
       "label": "公示",
-      "scoreWeights": { "assessment": 0.5, "integrity": 0.5 },
+      "scoreWeights": {
+        "assessment": 0.5,
+        "integrity": 0.5
+      },
       "randomWeight": 5,
       "eliminationThreshold": 40,
       "requiresUniqueWinner": false
@@ -93,7 +159,11 @@
     {
       "id": "appointment",
       "label": "任职决定",
-      "scoreWeights": { "assessment": 0.45, "specialty": 0.3, "service": 0.25 },
+      "scoreWeights": {
+        "assessment": 0.45,
+        "specialty": 0.3,
+        "service": 0.25
+      },
       "randomWeight": 4,
       "eliminationThreshold": 40,
       "requiresUniqueWinner": true
