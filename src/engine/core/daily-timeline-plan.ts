@@ -16,7 +16,8 @@ const NODE_PRIORITY: Record<TimelineContinuationNode['type'], number> = {
   monthly_settlement: 4,
   annual_assessment: 5,
   political_cycle: 6,
-  retirement_check: 7,
+  npc_staffing: 7,
+  retirement_check: 8,
 };
 
 /**
@@ -75,6 +76,8 @@ export function buildDailyTimelinePlan(
   if (politicalCycleYear !== undefined && !nodes.some((node) => node.type === 'political_cycle')) {
     nodes.push({ type: 'political_cycle', absoluteDay, year: politicalCycleYear });
   }
+  // 组织自主补员检查每天执行；仅作用于非初始编制且玩家机会缺位的 Vacancy。
+  nodes.push({ type: 'npc_staffing', absoluteDay });
   return nodes.sort(
     (left, right) =>
       getTimelineContinuationNodePriority(left) - getTimelineContinuationNodePriority(right),

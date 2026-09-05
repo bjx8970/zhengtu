@@ -358,6 +358,8 @@ export interface GameConfig {
   startYear: number;
   /** 两会/党代会周期（每 N 年一次） */
   congressCycleYears: number;
+  /** 非初始编制 Vacancy 在玩家机会缺位达到该天数后，由 NPC 自主补员 */
+  npcStaffingDelayDays: number;
   /** 政治周期各阶段持续天数，合计应等于一个周期长度。 */
   politicalCyclePhaseDurations: {
     preparation: number;

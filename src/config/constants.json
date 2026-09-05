@@ -25,6 +25,7 @@
   "retirementAge": 65,
   "startYear": 2012,
   "congressCycleYears": 5,
+  "npcStaffingDelayDays": 30,
   "politicalCyclePhaseDurations": {
     "preparation": 90,
     "session": 30,

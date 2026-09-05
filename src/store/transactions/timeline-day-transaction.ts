@@ -37,6 +37,7 @@ import type {
   TimelineContinuationNode,
 } from '../../types/player';
 import { getConfigLoader } from '../../config/loader';
+import { runNpcStaffingDueVacancies } from './npc-staffing-transaction';
 import { clampAttr } from '../../utils/math';
 import { releasePlayerSeat } from './organization-seat-transaction';
 import {
@@ -254,6 +255,16 @@ export function processTimelineNodes(
       }
       case 'political_cycle':
         processPoliticalCycle(draft, node.absoluteDay, rng, idFactory, definitions);
+        if (draft.events.activeBlockingEventId !== null) {
+          return {
+            interrupted: true,
+            terminal: false,
+            remainingNodes: nodes.slice(index + 1),
+          };
+        }
+        break;
+      case 'npc_staffing':
+        runNpcStaffingDueVacancies(draft, node.absoluteDay, rng, idFactory, definitions);
         if (draft.events.activeBlockingEventId !== null) {
           return {
             interrupted: true,

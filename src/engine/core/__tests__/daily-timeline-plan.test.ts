@@ -10,10 +10,14 @@ describe('daily political cycle plan', () => {
   });
 
   it('adds a daily node for an existing cycle', () => {
-    expect(buildDailyTimelinePlan(91, [], 2015).at(-1)).toEqual({
+    expect(buildDailyTimelinePlan(91, [], 2015).at(-2)).toEqual({
       type: 'political_cycle',
       absoluteDay: 91,
       year: 2015,
+    });
+    expect(buildDailyTimelinePlan(91, [], 2015).at(-1)).toEqual({
+      type: 'npc_staffing',
+      absoluteDay: 91,
     });
   });
 
@@ -28,10 +32,11 @@ describe('daily political cycle plan', () => {
       2020,
     );
     expect(nodes.filter((node) => node.type === 'political_cycle')).toHaveLength(1);
-    expect(nodes.slice(-3).map((node) => node.type)).toEqual([
+    expect(nodes.slice(-4).map((node) => node.type)).toEqual([
       'monthly_settlement',
       'annual_assessment',
       'political_cycle',
+      'npc_staffing',
     ]);
   });
 });
