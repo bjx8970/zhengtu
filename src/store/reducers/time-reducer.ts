@@ -112,7 +112,11 @@ function reduceAdvanceTimeInternal(draft: PlayerSave, payload: AdvanceTimePayloa
     const actionEvents = daily.events.filter(
       (event): event is ActionCompletionTimelineEvent => event.type === 'action_completion',
     );
-    const remainingNodes = buildDailyTimelinePlan(daily.newAbsoluteDay, daily.events);
+    const remainingNodes = buildDailyTimelinePlan(
+      daily.newAbsoluteDay,
+      daily.events,
+      draft.world.activeCycles.length > 0 ? draft.time.year : undefined,
+    );
     processDailyFacts(
       draft,
       daily.newAbsoluteDay,
@@ -145,7 +149,11 @@ function processCurrentDayBeforeAdvance(
   notifications: CompletedActionNotification[],
 ): boolean {
   const currentDay = draft.time.totalDaysPlayed;
-  const nodes = buildDailyTimelinePlan(currentDay, []);
+  const nodes = buildDailyTimelinePlan(
+    currentDay,
+    [],
+    draft.world.activeCycles.length > 0 ? draft.time.year : undefined,
+  );
   processDailyFacts(draft, currentDay, [], rng, idFactory, definitions, notifications);
   if (draft.events.activeBlockingEventId !== null) {
     saveContinuation(draft, nodes);

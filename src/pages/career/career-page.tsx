@@ -63,6 +63,13 @@ function formatTenureDays(startDay: number, endDay: number | null, currentDay: n
   return `${Math.max((endDay ?? currentDay) - startDay, 0)} 天`;
 }
 
+const POLITICAL_CYCLE_PHASE_LABELS = {
+  preparation: '准备期',
+  session: '会议期',
+  implementation: '实施期',
+  evaluation: '评估期',
+} as const;
+
 /**
  * 职务与职级页面组件。
  *
@@ -177,6 +184,37 @@ export function CareerPage() {
       />
 
       <div class="flex-col gap-lg">
+        <Show
+          when={state.world.activeCycles.some(
+            (cycle) => cycle.startedAtDay <= currentDay() && cycle.endsAtDay > currentDay(),
+          )}
+        >
+          <section class="card" data-testid="political-cycle-status">
+            <div class="card-title">
+              <span class="card-title-mark" aria-hidden="true" />
+              当前政治周期
+            </div>
+            <div class="card-pad flex-col gap-sm">
+              <For
+                each={state.world.activeCycles.filter(
+                  (cycle) => cycle.startedAtDay <= currentDay() && cycle.endsAtDay > currentDay(),
+                )}
+              >
+                {(cycle) => (
+                  <div class="row-between">
+                    <span>
+                      第 {cycle.termNumber} 届基层组织调整 ·{' '}
+                      {POLITICAL_CYCLE_PHASE_LABELS[cycle.phase]}
+                    </span>
+                    <span class="muted">截至第 {cycle.endsAtDay} 日</span>
+                  </div>
+                )}
+              </For>
+              <p class="muted">届期评估会通过岗位空缺与选拔事务推动组织调整。</p>
+            </div>
+          </section>
+        </Show>
+
         {/* 任职事实 */}
         <section class="card">
           <div class="card-title">

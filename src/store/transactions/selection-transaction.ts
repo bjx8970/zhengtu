@@ -167,10 +167,26 @@ function candidateInputs(
 ): SelectionCandidateInput[] {
   return [
     playerCandidate(state, day, daysPerYear),
-    ...state.organization.cadres
-      .filter((cadre) => cadre.status === 'active')
-      .map((cadre) => cadreCandidate(cadre, day, daysPerYear)),
+    ...buildNpcSelectionCandidateInputs(state, day, daysPerYear),
   ];
+}
+
+/**
+ * 构建仅含在职 NPC 的候选输入（供组织自主补员使用，玩家不进入池）。
+ *
+ * @param state 完整存档快照
+ * @param day 选拔创建日（绝对日）
+ * @param daysPerYear 一年的天数（由时间配置派生）
+ * @returns 在职 NPC 候选输入，稳定排序与玩家路径一致
+ */
+export function buildNpcSelectionCandidateInputs(
+  state: PlayerSave,
+  day: number,
+  daysPerYear: number,
+): SelectionCandidateInput[] {
+  return state.organization.cadres
+    .filter((cadre) => cadre.status === 'active')
+    .map((cadre) => cadreCandidate(cadre, day, daysPerYear));
 }
 
 /**

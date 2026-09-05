@@ -1,10 +1,10 @@
 # 政途人生 — 架构文档
 
-> 当前版本：0.3.0-alpha.1 | 存档 Schema：11 | 内容版本：2026.08.8
+> 当前版本：0.4.0-alpha.1 | 存档 Schema：14 | 内容版本：2026.08.8
 
 ## 当前范围
 
-当前版本完成 Phase 3 基层纵向切片：新录用科员经个人任务、试用期、年度考核和两次公务员职级晋升，依次进入乡科级副职与正职；领导阶段切换为部门治理，并以招商、防汛、产业园政策/事件链产生正式治理履历。Store 四年场景和不写业务存档的 Playwright 自然路径共同证明完整链路。
+当前版本在 Phase 3 基层纵向切片之上完成 Phase 4 动态干部生态：新录用科员经个人任务、试用期、年度考核和公务员职级晋升自然成长；有限 NPC 干部池在同一统一时间轴下自行考核、晋升、退休或退出；真实 producer（干部离任、任职级联、政治周期届期评估）打开动态 Vacancy；玩家与 NPC 进入同一相对选拔候选池，赢家唯一任职并级联释放原岗位；基层任务提供玩家专长积累入口。Store 自然组织世界场景和不写业务存档的 Playwright 自然路径共同证明完整链路（见 `docs/PHASE4_ACCEPTANCE.md`）。
 
 ## Phase 3 工作模式与双通道
 
@@ -16,13 +16,23 @@
 
 ## 岗位机会与任职事务
 
-职业机会由领域信号驱动并冻结目标快照；生成、接受及最终任职前都复查配置和硬性条件。职业经历资格统一从 `career.experiences` 的单条 `[startedAtDay, endedAtDay)` 记录派生：正式、挂职、临时与代理分别遵循配置化最小时长，地区与机构经历独立统计，当前开放履历按当前绝对日实时计算。领导岗位走最小选拔状态机，training 使用独立判别联合且不改变任职。任职事务在完整状态副本中原子关闭旧履历、创建新任职和开放履历、重建部门运行时、移动玩家 Seat occupant 并产生 `appointment.changed`；执行中行动会阻止最终任职。机会过期是可恢复统一时间轴节点。职业仪表盘（`/career`）已随 #98 接入；NPC 候选池竞争仍属 Phase 4 后续任务。
+职业机会由领域信号驱动并冻结目标快照；生成、接受及最终任职前都复查配置和硬性条件。职业经历资格统一从 `career.experiences` 的单条 `[startedAtDay, endedAtDay)` 记录派生：正式、挂职、临时与代理分别遵循配置化最小时长，地区与机构经历独立统计，当前开放履历按当前绝对日实时计算。领导岗位走相对选拔状态机（六阶段固定序列、候选快照与单次 RNG 冻结于 Selection、赢家唯一），training 使用独立判别联合且不改变任职。任职事务在完整状态副本中原子关闭旧履历、创建新任职和开放履历、重建部门运行时、移动 Seat occupant 并产生 `appointment.changed`；执行中行动会阻止最终任职。机会过期是可恢复统一时间轴节点。职业仪表盘（`/career`）展示任职事实、相对选拔进度与政治周期状态。
 
 ## Phase 4 组织世界底座
 
 `PlayerSave.organization` 是 NPC 干部、实际岗位席位、动态空缺和世界级选拔的唯一持久化容器；玩家自己的任职、履历与机会继续由 `CareerState` 表达。组织世界只以固定 player occupant 引用接入玩家，NPC 复用任职、履历和职业限制契约，不复制玩家行动、治理或事件运行时。
 
-新游戏和 Schema 10→11 迁移均通过纯函数确定性实例化有限干部池与 Seat。职位配置的 `vacancyCount` 在该入口只表示 Seat 模板容量，不等于运行时开放 Vacancy 数。严格解码会校验唯一身份、Seat occupant、NPC 任职/开放履历、Vacancy/Seat、Selection/Vacancy 与赢家候选引用；具体生命周期、producer 和相对竞争由 Phase 4 后续任务接入。
+新游戏和 Schema 10→11 迁移均通过纯函数确定性实例化有限干部池与 Seat。职位配置的 `vacancyCount` 在该入口只表示 Seat 模板容量，不等于运行时开放 Vacancy 数。严格解码会校验唯一身份、Seat occupant、NPC 任职/开放履历、Vacancy/Seat、Selection/Vacancy 与赢家候选引用。
+
+Phase 4 运行时由 producer/consumer 闭环驱动，全部以 `organization.processedProducerKeys` 幂等：
+
+- **干部生命周期**：`settleNpcLifecycle` 在年度节点结算 NPC 考核、职级晋升、退休与退出，产出离任事实账本；`consumeCadreDeparturesInTransaction` 把离任转成真实 Vacancy。
+- **任职级联**：`fillVacancyInTransaction` 在赢家就任目标席位的同时释放其原席位，并以 `vacancy:appointment:{appointmentId}:{seatId}` 打开新空缺——玩家与 NPC 走同一机制。
+- **相对选拔**：`createRelativeSelectionInTransaction` 在玩家接受机会时冻结统一候选池（玩家与 NPC 同一资格框架）、完整随机数与规则版本；`advanceRelativeSelectionStage` 只消费 Selection 自有输入，六阶段后产生唯一赢家，最终任职由世界级事务原子提交。
+- **政治周期**：`processPoliticalCycle` 在 Congress 节点创建届期，每日推进阶段；届期评估对"空置且无活动空缺"的席位以稳定 producer key 打开 `political_cycle` Vacancy，并连续衔接下一届。
+- **NPC 自主补员**：`npc_staffing` 每日节点对"非初始编制、已过 `npcStaffingDelayDays` 延迟、玩家机会缺位"的 open Vacancy 以 NPC-only 候选池运行同一相对选拔框架。整个 attempt 在状态副本上原子执行：成功填补后写入永久消费键 `npc-staffing:{vacancyId}`；失败（空候选池、无唯一赢家、阶段无幸存者）保留 terminal failed 审计与当日尝试键 `npc-staffing:{vacancyId}:{day}`，Vacancy 重开为 open 并按 `npcStaffingRetryIntervalDays` 无状态退避重试，让随时间变化的资格事实（经历、考核、冲突解除）重新产生合格候选。赢家经 NPC 任职事务就任并级联原岗位，组织世界不因玩家不行动而停摆。初始编制（`system`）始终等待玩家职业进程解锁的机会窗口。
+
+验收证据见 `docs/PHASE4_ACCEPTANCE.md`。
 
 政策列表、事件收件箱与 blocking 弹窗 UI 已随 #98 交付，配合 Store 集成测试与 Playwright 端到端验收共同验证运行时。
 
@@ -69,9 +79,11 @@ src/
 ├── utils/                       # 格式化、数学、主题等工具
 ├── config/
 │   ├── career-lines/            # 当前已接入 administrative.json
-│   ├── templates/               # 部门、KPI 等复用模板
+│   ├── templates/               # 部门、KPI、事件、任务等复用模板
+│   ├── organization/cadres.json # 初始 NPC 干部模板
+│   ├── career/                  # 机会定义与相对选拔规则
 │   ├── phase3/acceptance.json   # Phase 3 入口、里程碑与任务可达边界
-│   ├── constants.json           # 时间、槽位、晋升等常量
+│   ├── constants.json           # 时间、槽位、晋升、NPC 生命周期等常量
 │   └── loader.ts                # ConfigLoader
 ├── engine/
 │   ├── core/
@@ -89,7 +101,8 @@ src/
 │   │   ├── source-key.ts             # 来源键派生函数
 │   │   └── metric-signal-bridge.ts   # 指标效果→领域信号
 │   ├── governance/              # assessment/budget/kpi/policy lifecycle
-│   ├── career/                  # promotion/deviation-penalty/spectrum 等
+│   ├── organization/            # 组织初始化/干部生命周期/政治周期/Vacancy 生命周期
+│   ├── career/                  # promotion/机会编排/相对选拔资格与生命周期等
 │   ├── tasks/                   # 个人任务准入、排期与 KPI 结算
 │   └── index.ts                 # 引擎聚合导出
 ├── store/
@@ -102,11 +115,14 @@ src/
 │   │   ├── event-reducer.ts     # CHOOSE_EVENT_OPTION + 原子效果应用
 │   │   └── shared.ts            # 共享辅助函数
 │   ├── transactions/
-│   │   ├── timeline-day-transaction.ts
+│   │   ├── timeline-day-transaction.ts   # 统一时间轴同日结算（含政治周期）
 │   │   ├── organization-seat-transaction.ts
+│   │   ├── vacancy-transaction.ts        # Vacancy open/fill/cancel/expire 与离任消费
+│   │   ├── selection-transaction.ts      # 相对选拔创建与冻结
+│   │   ├── npc-appointment-transaction.ts # NPC 赢家任职与级联
 │   │   └── policy-transition-transaction.ts
 │   └── save-codec/
-│       ├── index.ts             # 严格存档解码器（Zod Schema 11，支持 Schema 2→11 迁移）
+│       ├── index.ts             # 严格存档解码器（Zod Schema 14，支持 Schema 2→14 迁移）
 │       └── organization-schema.ts
 └── services/
     ├── save-repo.ts             # 本地/远程存档读写
@@ -162,7 +178,7 @@ UI（页面/组件） → Store（dispatch/reducer） → Engine（纯函数） 
 
 ```typescript
 interface SaveEnvelope {
-  schemaVersion: number; // 存档结构版本（当前：11）
+  schemaVersion: number; // 存档结构版本（当前：14）
   contentVersion: string; // 内容配置版本（当前：2026.08.8）
   revision: number; // 同一存档的逻辑修订号
   savedAt: number; // 保存时间戳
@@ -172,8 +188,8 @@ interface SaveEnvelope {
 
 ### 严格解码行为
 
-- 当前 Schema 11 的完整 SaveEnvelope 直接进入严格结构解码
-- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11
+- 当前 Schema 14 的完整 SaveEnvelope 直接进入严格结构解码
+- 旧版存档通过确定性链式迁移支持：Schema 2 → 3 → … → 10 → 11 → 12 → 13 → 14
 - `schemaVersion < 2` → 拒绝（`legacy_save_unsupported`）
 - `schemaVersion > CURRENT` → 拒绝（`future_version`）
 - 结构验证失败 → 拒绝（`invalid_envelope`）
@@ -183,7 +199,7 @@ interface SaveEnvelope {
 
 ### 兼容性说明
 
-解码器以 `schemaVersion` 决定结构兼容性；迁移步骤会在需要可靠重建运行时快照时校验对应的历史 `contentVersion`。Schema 2–9 先通过确定性迁移链升级至 Schema 10；Schema 10 内按 `2026.08.2→.3→.4→.5→.6→.7` 应用内容迁移，再于当前绝对日初始化 Schema 11 组织世界。Schema 1 和缺少 Envelope 的裸 PlayerSave 被拒绝并保留只读备份。
+解码器以 `schemaVersion` 决定结构兼容性；迁移步骤会在需要可靠重建运行时快照时校验对应的历史 `contentVersion`。Schema 2–9 先通过确定性迁移链升级至 Schema 10；Schema 10 内按 `2026.08.2→.3→.4→.5→.6→.7` 应用内容迁移，再于当前绝对日初始化组织世界；Schema 11→14 依次补齐离任账本、Vacancy/机会终态字段，并把旧 Selection 转成明确的 terminal failed 审计（不猜测赢家、不重抽随机数）。Schema 1 和缺少 Envelope 的裸 PlayerSave 被拒绝并保留只读备份。
 
 ### revision 和 updatedAt
 
@@ -203,8 +219,8 @@ type TimelineEvent =
   | ActionCompletionTimelineEvent // 行动完成
   | MonthlySettlementTimelineEvent // 月度结算
   | AnnualAssessmentTimelineEvent // 年度考核
-  | PoliticalCycleTimelineEvent // 政治周期（预留）
-  | RetirementCheckTimelineEvent; // 退休检查（预留）
+  | PoliticalCycleTimelineEvent // 政治周期（届期创建）
+  | RetirementCheckTimelineEvent; // 退休检查（兼容占位，退休在年度结算内处理）
 ```
 
 ### 同日事件排序
@@ -219,9 +235,9 @@ type TimelineEvent =
 6. 激活到期计划事件；
 7. 处理事件过期；
 8. 月度结算；
-9. 年度考核并处理 `assessment.completed`；
-10. 政治周期；
-11. 退休检查。
+9. 年度考核（含 NPC 年度生命周期结算与离任消费）并处理 `assessment.completed`；
+10. 政治周期（阶段推进与届期评估；有活动周期后每日执行）；
+11. 退休检查（兼容占位）。
 
 行动全部结算后才处理信号，因此第一个行动触发 blocker 不会丢失同日其他已完成行动。政策事实全部提交后才进入计划事件；考核信号产生的 blocker 发生在政治周期和退休检查之前。
 

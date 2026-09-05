@@ -243,6 +243,7 @@ export type TimelineContinuationNode =
   | { type: 'monthly_settlement'; absoluteDay: number; month: number; year: number }
   | { type: 'annual_assessment'; absoluteDay: number; year: number }
   | { type: 'political_cycle'; absoluteDay: number; year: number }
+  | { type: 'npc_staffing'; absoluteDay: number }
   | { type: 'retirement_check'; absoluteDay: number };
 
 /** blocking 事件暂停的同日时间轴工作。 */

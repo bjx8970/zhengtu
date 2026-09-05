@@ -4,15 +4,49 @@
     "type": "leadership_vacancy",
     "triggerSignals": ["vacancy.opened", "assessment.completed"],
     "conditions": [
-      { "careerCheck": "probation_status", "value": "passed", "op": "eq" },
-      { "careerCheck": "leadership_rank", "value": "none", "op": "eq" },
-      { "careerCheck": "civil_service_rank", "value": "clerk_1", "op": "gte" },
-      { "careerCheck": "assessment_history", "check": "qualified_count", "value": 2, "op": "gte" },
-      { "fact": "assigned_project_delivered", "op": "is_true" },
-      { "careerCheck": "active_restriction", "value": "appointment_selection_freeze", "op": "neq" },
-      { "careerCheck": "active_restriction", "value": "disciplinary_action", "op": "neq" }
+      {
+        "careerCheck": "probation_status",
+        "value": "passed",
+        "op": "eq"
+      },
+      {
+        "careerCheck": "leadership_rank",
+        "value": "none",
+        "op": "eq"
+      },
+      {
+        "careerCheck": "civil_service_rank",
+        "value": "clerk_1",
+        "op": "gte"
+      },
+      {
+        "careerCheck": "assessment_history",
+        "check": "qualified_count",
+        "value": 2,
+        "op": "gte"
+      },
+      {
+        "fact": "assigned_project_delivered",
+        "op": "is_true"
+      },
+      {
+        "careerCheck": "active_restriction",
+        "value": "appointment_selection_freeze",
+        "op": "neq"
+      },
+      {
+        "careerCheck": "active_restriction",
+        "value": "disciplinary_action",
+        "op": "neq"
+      }
     ],
-    "acceptanceConditions": [{ "careerCheck": "years_in_civil_service", "value": 2, "op": "gte" }],
+    "acceptanceConditions": [
+      {
+        "careerCheck": "years_in_civil_service",
+        "value": 2,
+        "op": "gte"
+      }
+    ],
     "expiresAfterDays": 270,
     "repeatPolicy": "once_per_source",
     "cooldownDays": 0,
@@ -27,15 +61,25 @@
     "type": "leadership_vacancy",
     "triggerSignals": ["vacancy.opened", "assessment.completed"],
     "conditions": [
-      { "careerCheck": "leadership_rank", "value": "township_deputy", "op": "eq" },
+      {
+        "careerCheck": "leadership_rank",
+        "value": "township_deputy",
+        "op": "eq"
+      },
       {
         "careerCheck": "assessment_history",
         "check": "current_appointment_qualified_count",
         "value": 2,
         "op": "gte"
       },
-      { "eventHistory": "flood_preparation_metrics", "check": "occurred" },
-      { "eventHistory": "industrial_park_progress_crisis", "check": "occurred" },
+      {
+        "eventHistory": "flood_preparation_metrics",
+        "check": "occurred"
+      },
+      {
+        "eventHistory": "industrial_park_progress_crisis",
+        "check": "occurred"
+      },
       {
         "careerCheck": "active_restriction",
         "value": "appointment_selection_freeze",
@@ -47,13 +91,133 @@
         "op": "neq"
       }
     ],
-    "acceptanceConditions": [{ "careerCheck": "years_in_position", "value": 2, "op": "gte" }],
+    "acceptanceConditions": [
+      {
+        "careerCheck": "years_in_position",
+        "value": 2,
+        "op": "gte"
+      }
+    ],
     "expiresAfterDays": 270,
     "repeatPolicy": "once_per_source",
     "cooldownDays": 0,
     "requiresSelection": true,
     "reasonTemplate": "副职任内两次考核称职并完成防汛和产业园治理后，进入镇长选拔窗口；副职任满两年后可接受。",
     "targetPositionId": "admin_l3_0",
+    "appointmentType": "substantive",
+    "appointmentReason": "promotion"
+  },
+  {
+    "id": "township_deputy_leadership_vacancy_l2_1",
+    "type": "leadership_vacancy",
+    "triggerSignals": ["vacancy.opened", "assessment.completed"],
+    "conditions": [
+      {
+        "careerCheck": "probation_status",
+        "value": "passed",
+        "op": "eq"
+      },
+      {
+        "careerCheck": "leadership_rank",
+        "value": "none",
+        "op": "eq"
+      },
+      {
+        "careerCheck": "civil_service_rank",
+        "value": "clerk_1",
+        "op": "gte"
+      },
+      {
+        "careerCheck": "assessment_history",
+        "check": "qualified_count",
+        "value": 2,
+        "op": "gte"
+      },
+      {
+        "fact": "assigned_project_delivered",
+        "op": "is_true"
+      },
+      {
+        "careerCheck": "active_restriction",
+        "value": "appointment_selection_freeze",
+        "op": "neq"
+      },
+      {
+        "careerCheck": "active_restriction",
+        "value": "disciplinary_action",
+        "op": "neq"
+      }
+    ],
+    "acceptanceConditions": [
+      {
+        "careerCheck": "years_in_civil_service",
+        "value": 2,
+        "op": "gte"
+      }
+    ],
+    "expiresAfterDays": 270,
+    "repeatPolicy": "once_per_source",
+    "cooldownDays": 0,
+    "requiresSelection": true,
+    "reasonTemplate": "与平行副职编制相同的基层历练要求后，进入对应乡科级副职选拔窗口；服务满两年后可接受。",
+    "targetPositionId": "admin_l2_1",
+    "appointmentType": "substantive",
+    "appointmentReason": "promotion"
+  },
+  {
+    "id": "township_deputy_leadership_vacancy_l2_2",
+    "type": "leadership_vacancy",
+    "triggerSignals": ["vacancy.opened", "assessment.completed"],
+    "conditions": [
+      {
+        "careerCheck": "probation_status",
+        "value": "passed",
+        "op": "eq"
+      },
+      {
+        "careerCheck": "leadership_rank",
+        "value": "none",
+        "op": "eq"
+      },
+      {
+        "careerCheck": "civil_service_rank",
+        "value": "clerk_1",
+        "op": "gte"
+      },
+      {
+        "careerCheck": "assessment_history",
+        "check": "qualified_count",
+        "value": 2,
+        "op": "gte"
+      },
+      {
+        "fact": "assigned_project_delivered",
+        "op": "is_true"
+      },
+      {
+        "careerCheck": "active_restriction",
+        "value": "appointment_selection_freeze",
+        "op": "neq"
+      },
+      {
+        "careerCheck": "active_restriction",
+        "value": "disciplinary_action",
+        "op": "neq"
+      }
+    ],
+    "acceptanceConditions": [
+      {
+        "careerCheck": "years_in_civil_service",
+        "value": 2,
+        "op": "gte"
+      }
+    ],
+    "expiresAfterDays": 270,
+    "repeatPolicy": "once_per_source",
+    "cooldownDays": 0,
+    "requiresSelection": true,
+    "reasonTemplate": "与平行副职编制相同的基层历练要求后，进入对应乡科级副职选拔窗口；服务满两年后可接受。",
+    "targetPositionId": "admin_l2_2",
     "appointmentType": "substantive",
     "appointmentReason": "promotion"
   }

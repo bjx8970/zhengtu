@@ -16,7 +16,8 @@ const NODE_PRIORITY: Record<TimelineContinuationNode['type'], number> = {
   monthly_settlement: 4,
   annual_assessment: 5,
   political_cycle: 6,
-  retirement_check: 7,
+  npc_staffing: 7,
+  retirement_check: 8,
 };
 
 /**
@@ -34,11 +35,13 @@ export function getTimelineContinuationNodePriority(node: TimelineContinuationNo
  *
  * @param absoluteDay 当前绝对日
  * @param events 统一时间轴为该日生成的事件
+ * @param politicalCycleYear 已有政治周期时的当前年份，用于每日推进阶段
  * @returns 固定顺序、可序列化的剩余节点
  */
 export function buildDailyTimelinePlan(
   absoluteDay: number,
   events: readonly TimelineEvent[],
+  politicalCycleYear?: number,
 ): TimelineContinuationNode[] {
   const nodes: TimelineContinuationNode[] = [
     { type: 'probation_evaluation', absoluteDay },
@@ -69,6 +72,12 @@ export function buildDailyTimelinePlan(
         break;
     }
   }
+  // congress 事件仍负责首次创建；已有周期每天结算，且届期当天只保留一个节点。
+  if (politicalCycleYear !== undefined && !nodes.some((node) => node.type === 'political_cycle')) {
+    nodes.push({ type: 'political_cycle', absoluteDay, year: politicalCycleYear });
+  }
+  // 组织自主补员检查每天执行；仅作用于非初始编制且玩家机会缺位的 Vacancy。
+  nodes.push({ type: 'npc_staffing', absoluteDay });
   return nodes.sort(
     (left, right) =>
       getTimelineContinuationNodePriority(left) - getTimelineContinuationNodePriority(right),

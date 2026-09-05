@@ -365,6 +365,8 @@ const ConstantsSchema = z.object({
   retirementAge: z.number().min(1),
   startYear: z.number(),
   congressCycleYears: z.number().min(1),
+  npcStaffingDelayDays: z.number().int().min(1),
+  npcStaffingRetryIntervalDays: z.number().int().min(1),
   budgetByLevel: z.array(z.number().min(0)),
   budgetMultiplierByLine: z.record(z.number().min(0)),
   initialTransferCount: z.number().min(0),

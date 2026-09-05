@@ -24,6 +24,14 @@ export interface PoliticalCycleState {
   phase: 'preparation' | 'session' | 'implementation' | 'evaluation';
 }
 
+/** 周期阶段推进所需的显式阶段窗口。 */
+export interface PoliticalCyclePhaseDurations {
+  preparation: number;
+  session: number;
+  implementation: number;
+  evaluation: number;
+}
+
 /** 世界状态（PlayerSave 子状态） */
 export interface WorldState {
   /** 世界事实（键 → 布尔/数值/字符串） */

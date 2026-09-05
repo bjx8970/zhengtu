@@ -1167,6 +1167,12 @@ const TimelineContinuationNodeSchema = z.discriminatedUnion('type', [
     .strict(),
   z
     .object({
+      type: z.literal('npc_staffing'),
+      absoluteDay: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('retirement_check'),
       absoluteDay: z.number().int().nonnegative(),
     })
@@ -1184,7 +1190,8 @@ const TIMELINE_NODE_PRIORITY: Record<
   monthly_settlement: 4,
   annual_assessment: 5,
   political_cycle: 6,
-  retirement_check: 7,
+  npc_staffing: 7,
+  retirement_check: 8,
 };
 
 const GameTimeStateSchema = z
