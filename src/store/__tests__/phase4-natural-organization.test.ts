@@ -19,6 +19,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { getConfigLoader } from '../../config/loader';
+import { isCivilServiceRankAtLeast } from '../../domain/career/types';
 import type { GameAction } from '../../types/game';
 import { cancelVacancyInTransaction } from '../transactions/vacancy-transaction';
 import { createTestStore } from '../game-store';
@@ -619,5 +620,60 @@ describe('Phase 4 自然组织世界路径', () => {
       ),
     ).toBe(true);
     expect(after.career.experiences.filter((item) => item.endedAtDay === null)).toHaveLength(1);
+  });
+
+  it('仅推进时间时 NPC 自然退休并经真实 producer 打开离任空缺', () => {
+    const idFactory = createIdFactory();
+    const rng = createSequenceRng(23);
+    const store = createTestStore();
+    newGame(store);
+    // 建档即冻结每名 NPC 的初始职级，供推进后逐干部对比职级晋升。
+    const initialRanks = new Map(
+      store
+        .getRawState()
+        .organization.cadres.map((cadre) => [cadre.cadreId, cadre.civilServiceRank]),
+    );
+    // 玩家只完成入职培训（否则试用期终局会冻结时间轴），此后 30 年只推进时间。
+    startTask(store, 'task_induction_training', 'primary', idFactory);
+    advanceToDay(store, 90, idFactory, rng);
+    advanceToDay(store, 10990, idFactory, rng);
+
+    const state = store.getRawState();
+    // NPC 年度考核与职级随时间自然变化（世界不是静态的）。
+    const zhaoHai = state.organization.cadres.find((cadre) => cadre.cadreId === 'cadre_zhao_hai');
+    if (!zhaoHai) throw new Error('Expected NPC cadre_zhao_hai');
+    expect(zhaoHai.assessments.length).toBeGreaterThanOrEqual(28);
+    // 职级晋升必须比较同一干部推进前后的职级：与建档时逐干部对比，
+    // 至少一名在职 NPC 的职级严格高于初始职级（rank progression 真实生效，
+    // 而不是依赖初始配置中恰好存在更高职级）。
+    const progressed = state.organization.cadres.filter(
+      (cadre) =>
+        cadre.status === 'active' &&
+        initialRanks.get(cadre.cadreId) !== undefined &&
+        cadre.civilServiceRank !== initialRanks.get(cadre.cadreId) &&
+        isCivilServiceRankAtLeast(cadre.civilServiceRank, initialRanks.get(cadre.cadreId)!),
+    );
+    expect(progressed.length).toBeGreaterThanOrEqual(1);
+
+    // 退休判定来自真实生命周期结算：zhao_hai（1977 年生）在 2042 年到龄退休。
+    const retirement = state.organization.departures.find(
+      (departure) => departure.cadreId === 'cadre_zhao_hai' && departure.reason === 'retirement',
+    );
+    if (!retirement) throw new Error('Expected natural retirement departure for cadre_zhao_hai');
+    expect(retirement.occurredAtDay).toBe(10980);
+    // 离任事实经真实 producer 消费为 open Vacancy（非测试注入）。
+    const departureVacancy = state.organization.vacancies.find(
+      (vacancy) =>
+        vacancy.sourceType === 'cadre_lifecycle' && vacancy.seatId === 'seat:admin_l3_2:1',
+    );
+    expect(departureVacancy).toMatchObject({ status: 'open', reason: 'retirement' });
+    expect(seatOccupant(state, 'seat:admin_l3_2:1')).toBe('empty');
+    // 县级职位没有配置相对选拔 scope：补员管线按契约跳过，不凭空任命，
+    // 空缺保持 open 等待未来内容（或玩家晋升路径）消费。
+    expect(
+      state.organization.selections.some(
+        (selection) => selection.vacancyId === departureVacancy?.vacancyId,
+      ),
+    ).toBe(false);
   });
 });
