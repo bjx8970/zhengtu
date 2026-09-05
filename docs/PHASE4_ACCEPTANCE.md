@@ -16,7 +16,7 @@
 | 验收项 | 自动化证据 | 结论 |
 | --- | --- | --- |
 | 有限 NPC 干部生态随正常时间推进自行变化 | `phase4-natural-organization.test.ts` 无玩家操作场景：NPC 年度考核事实积累、首届政治周期创建与阶段推进、组织事实持续变化 | 通过 |
-| 至少一个 Vacancy 来自真实 producer（非测试注入） | 政治周期届期评估 producer（同测试"编制核销后真实释放岗位"）；任职级联 producer（副职竞争场景）；NPC 退休/退出 producer（`npc-lifecycle.test.ts` 真实 Store 两年结算） | 通过 |
+| 至少一个 Vacancy 来自真实 producer（非测试注入） | **NPC 到龄退休自然路径**：`phase4-natural-organization.test.ts` 仅推进时间 30 年，赵海于 10980 天自然到龄退休 → 离任事实经真实 producer 打开 `cadre_lifecycle` Vacancy（无任何注入）；政治周期届期评估 producer（"编制核销后真实释放岗位"）；任职级联 producer（副职竞争场景） | 通过 |
 | 玩家在真实相对竞争中落选，NPC 获选并真实改变组织状态 | `phase4-natural-organization.test.ts` 自然副职竞争场景；`tests/e2e/phase4-natural-career.spec.ts` 自然 UI 路径断言 `selection-outcome` 落选 | 通过 |
 | NPC 原岗位产生后续 Vacancy，组织流动可级联 | 副职竞争场景断言 `vacancy:appointment:npc-appointment:cadre_luo_xia:0…` 开放且 `sourceType: appointment`；`npc-appointment-transaction.test.ts` 平级/晋升任职级联 | 通过 |
 | 玩家可在后续真实 Vacancy 中再次参选并获选 | 全链场景：政治周期 Vacancy → 镇长机会 → 玩家接受并获任；`phase3-reachability.test.ts` 四年场景正职获任 | 通过 |
