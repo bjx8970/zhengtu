@@ -55,7 +55,14 @@ import { expireCareerOpportunity } from '../../engine/career/career-opportunity-
 import { evaluateProbation } from '../../engine/career/probation-evaluation';
 import { grantAnnualCivilServiceRankQuota } from '../../engine/career/rank-quota';
 import { settleNpcLifecycle } from '../../engine/organization/npc-lifecycle';
-import { consumeCadreDeparturesInTransaction } from './vacancy-transaction';
+import {
+  consumeCadreDeparturesInTransaction,
+  producePoliticalCycleVacanciesInTransaction,
+} from './vacancy-transaction';
+import {
+  advancePoliticalCycles,
+  createPoliticalCycle,
+} from '../../engine/organization/political-cycle';
 
 /**
  * 结算当日行动与到期政策，再统一处理它们产生的领域信号。
@@ -246,6 +253,15 @@ export function processTimelineNodes(
         break;
       }
       case 'political_cycle':
+        processPoliticalCycle(draft, node.absoluteDay, rng, idFactory, definitions);
+        if (draft.events.activeBlockingEventId !== null) {
+          return {
+            interrupted: true,
+            terminal: false,
+            remainingNodes: nodes.slice(index + 1),
+          };
+        }
+        break;
       case 'retirement_check':
         // NPC 退休已在同年 annual_assessment 内结算；保留该兼容节点为无副作用占位，
         // 避免旧存档 continuation 改变顺序，也避免未来重复关闭任职。
@@ -253,6 +269,100 @@ export function processTimelineNodes(
     }
   }
   return { interrupted: false, terminal: false, remainingNodes: [] };
+}
+
+/**
+ * 提交政治周期的阶段推进与届期评估。
+ *
+ * 周期在统一时间轴的 congress 节点创建；已有周期只按绝对日推进，
+ * 因而 continuation 重放不会重复创建周期事实。
+ *
+ * @param draft 完整存档事务草稿
+ * @param currentDay 当前绝对日
+ * @param rng 事件信号处理使用的随机源
+ * @param idFactory 事务共享的稳定 ID 工厂
+ * @param definitions 事件定义目录
+ * @returns void
+ */
+export function processPoliticalCycle(
+  draft: PlayerSave,
+  currentDay: number,
+  rng: () => number,
+  idFactory: () => string,
+  definitions: readonly EventDefinition[],
+): void {
+  const config = getConfigLoader().getGameConfig();
+  const existing = draft.world.activeCycles.find(
+    (cycle) => cycle.endsAtDay >= currentDay && cycle.type === 'party_congress',
+  );
+  if (!existing) {
+    const termNumber =
+      Math.max(
+        0,
+        ...draft.world.activeCycles
+          .filter((cycle) => cycle.type === 'party_congress')
+          .map((cycle) => cycle.termNumber),
+      ) + 1;
+    const cycleYears = Math.max(1, config.congressCycleYears);
+    draft.world.activeCycles.push(
+      createPoliticalCycle(
+        'party_congress',
+        termNumber,
+        currentDay,
+        currentDay + cycleYears * config.daysPerMonth * config.monthsPerYear,
+      ),
+    );
+  }
+  const advanced = advancePoliticalCycles(
+    draft.world,
+    currentDay,
+    config.politicalCyclePhaseDurations,
+  );
+  draft.world.activeCycles = advanced.world.activeCycles;
+  const completedCycles = advanced.evaluations.filter(
+    (evaluation) =>
+      evaluation.completed &&
+      !draft.organization.processedProducerKeys.includes(
+        `political-cycle:${evaluation.cycle.type}:${evaluation.cycle.termNumber}`,
+      ),
+  );
+  for (const evaluation of completedCycles) {
+    const seatIds = draft.organization.seats
+      .filter(
+        (seat) =>
+          seat.occupant === null &&
+          seat.currentAppointmentId === null &&
+          seat.occupiedAtDay === null &&
+          !draft.organization.vacancies.some(
+            (vacancy) =>
+              vacancy.seatId === seat.seatId &&
+              (vacancy.status === 'open' || vacancy.status === 'selecting'),
+          ),
+      )
+      .map((seat) => seat.seatId);
+    const produced = producePoliticalCycleVacanciesInTransaction(
+      draft,
+      { cycle: evaluation.cycle, seatIds },
+      idFactory,
+    );
+    if (!produced.success)
+      throw new Error(
+        `Political cycle Vacancy producer failed (${produced.error}): ${produced.detail}`,
+      );
+    draft.organization.processedProducerKeys.push(
+      `political-cycle:${evaluation.cycle.type}:${evaluation.cycle.termNumber}`,
+    );
+    if (produced.emittedSignals.length > 0) {
+      processCascadeSignalsInTransaction(
+        draft,
+        produced.emittedSignals,
+        currentDay,
+        rng,
+        idFactory,
+        definitions,
+      );
+    }
+  }
 }
 
 function processProbationEvaluation(draft: PlayerSave, currentDay: number): void {
@@ -673,6 +783,9 @@ function processAnnualAssessment(
  *
  * @param draft 可变事务状态
  * @param currentDay 当前绝对日
+ * @param rng 领域信号编排使用的随机源
+ * @param idFactory 事务共享稳定 ID 工厂
+ * @param definitions 事件定义快照
  * @returns void
  */
 export function expireEventsAtDay(draft: PlayerSave, currentDay: number): void {

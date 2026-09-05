@@ -358,6 +358,13 @@ export interface GameConfig {
   startYear: number;
   /** 两会/党代会周期（每 N 年一次） */
   congressCycleYears: number;
+  /** 政治周期各阶段持续天数，合计应等于一个周期长度。 */
+  politicalCyclePhaseDurations: {
+    preparation: number;
+    session: number;
+    implementation: number;
+    evaluation: number;
+  };
   /** 各级别默认年度拨款（万元） */
   budgetByLevel: number[];
   /** 各职业线预算倍率 */

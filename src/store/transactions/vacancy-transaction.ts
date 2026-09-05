@@ -14,6 +14,7 @@ import {
   openVacancy,
 } from '../../engine/organization/vacancy-lifecycle';
 import { produceCadreDepartureVacancies } from '../../engine/organization/vacancy-producers';
+import { producePoliticalCycleVacancies } from '../../engine/organization/political-cycle';
 import type { VacancyLifecycleResult } from '../../types/organization';
 import type {
   OrganizationState,
@@ -71,6 +72,12 @@ export interface ReleasedSeatVacancyInput {
   openedAtDay: number;
   closesAtDay: number | null;
   vacancyId?: string;
+}
+
+/** 周期调整释放席位的事务输入。 */
+export interface PoliticalCycleVacancyInput {
+  cycle: import('../../domain/world-state').PoliticalCycleState;
+  seatIds: readonly string[];
 }
 
 /** Vacancy 填补输入；selection/opportunity 用于跨领域一致性校验。 */
@@ -237,8 +244,10 @@ export function consumeCadreDeparturesInTransaction(
           `Departure ${departure.departureId} target does not match its Seat`,
         );
     }
+
     if (noAppointment) continue;
   }
+
   const sourceOrganization = structuredClone(transaction.organization);
   sourceOrganization.departures = departures.filter((item) => item.occurredAtDay <= currentDay);
   const beforeVacancyIds = new Set(sourceOrganization.vacancies.map((item) => item.vacancyId));
@@ -261,6 +270,41 @@ export function consumeCadreDeparturesInTransaction(
     vacancies,
     processedProducerKeys,
     emittedSignals: produced.emittedSignals,
+  };
+}
+
+/**
+ * 原子提交政治周期调整产生的 Vacancy。
+ *
+ * @param draft 完整 PlayerSave 草稿
+ * @param input 周期及需要释放的席位
+ * @param idFactory 稳定运行时 ID 工厂
+ * @returns 新建 Vacancy 批次；失败时 draft 不变
+ */
+export function producePoliticalCycleVacanciesInTransaction(
+  draft: PlayerSave,
+  input: PoliticalCycleVacancyInput,
+  idFactory: () => string,
+): VacancyProducerSuccess | VacancyTransactionFailure {
+  const transaction = cloneSave(draft);
+  const before = new Set(transaction.organization.vacancies.map((item) => item.vacancyId));
+  const beforeKeys = new Set(transaction.organization.processedProducerKeys);
+  const result = producePoliticalCycleVacancies({
+    organization: transaction.organization,
+    cycle: input.cycle,
+    seatIds: input.seatIds,
+    idFactory,
+  });
+  if (!result.success) return engineFailure(result);
+  transaction.organization = result.organization;
+  assignSave(draft, transaction);
+  return {
+    success: true,
+    vacancies: result.organization.vacancies.filter((item) => !before.has(item.vacancyId)),
+    processedProducerKeys: result.organization.processedProducerKeys.filter(
+      (key) => !beforeKeys.has(key),
+    ),
+    emittedSignals: result.emittedSignals,
   };
 }
 

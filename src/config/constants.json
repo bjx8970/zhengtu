@@ -25,6 +25,12 @@
   "retirementAge": 65,
   "startYear": 2012,
   "congressCycleYears": 5,
+  "politicalCyclePhaseDurations": {
+    "preparation": 90,
+    "session": 30,
+    "implementation": 1560,
+    "evaluation": 120
+  },
   "budgetByLevel": [0, 1000, 2000, 3000, 5000, 8000, 12000, 18000, 25000, 35000, 50000, 70000],
   "budgetMultiplierByLine": {
     "admin": 1,

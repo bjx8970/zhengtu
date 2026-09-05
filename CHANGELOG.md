@@ -10,10 +10,13 @@
 
 - Phase 4 组织世界持久化底座：有限 NPC 干部档案、实际岗位席位、动态 Vacancy、世界级 StaffingSelection 与 producer 幂等键。
 - 配置驱动的 9 名初始 NPC 干部池（与玩家合计 10 人）、确定性 Seat 初始化、组织跨引用不变量和 ADR-009。
+- 政治周期驱动的届期评估、干部调整窗口与 Vacancy/selection/appointment 正式链路。
+- Phase 4 自然组织世界验收：NPC 年度演进、无人操作时的 Vacancy 生产、相对竞争、任职级联和刷新恢复。
 
 ### Changed
 
 - 玩家既有任职变更与试用期失败同步更新实际 Seat occupant，保持 CareerState 与组织世界原子一致。
+- 软件版本提升为 `0.4.0-alpha.1`，基层组织世界可随统一时间轴自行演进。
 
 ### Save compatibility
 
