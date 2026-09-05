@@ -184,7 +184,11 @@ export function CareerPage() {
       />
 
       <div class="flex-col gap-lg">
-        <Show when={state.world.activeCycles.some((cycle) => cycle.endsAtDay >= currentDay())}>
+        <Show
+          when={state.world.activeCycles.some(
+            (cycle) => cycle.startedAtDay <= currentDay() && cycle.endsAtDay > currentDay(),
+          )}
+        >
           <section class="card" data-testid="political-cycle-status">
             <div class="card-title">
               <span class="card-title-mark" aria-hidden="true" />
@@ -192,7 +196,9 @@ export function CareerPage() {
             </div>
             <div class="card-pad flex-col gap-sm">
               <For
-                each={state.world.activeCycles.filter((cycle) => cycle.endsAtDay >= currentDay())}
+                each={state.world.activeCycles.filter(
+                  (cycle) => cycle.startedAtDay <= currentDay() && cycle.endsAtDay > currentDay(),
+                )}
               >
                 {(cycle) => (
                   <div class="row-between">

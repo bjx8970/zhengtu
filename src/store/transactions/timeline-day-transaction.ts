@@ -274,7 +274,7 @@ export function processTimelineNodes(
 /**
  * 提交政治周期的阶段推进与届期评估。
  *
- * 周期在统一时间轴的 congress 节点创建；已有周期只按绝对日推进，
+ * 首届在 congress 节点创建，此后每日推进并在届期边界连续创建下一届，
  * 因而 continuation 重放不会重复创建周期事实。
  *
  * @param draft 完整存档事务草稿
@@ -292,26 +292,24 @@ export function processPoliticalCycle(
   definitions: readonly EventDefinition[],
 ): void {
   const config = getConfigLoader().getGameConfig();
-  const existing = draft.world.activeCycles.find(
-    (cycle) => cycle.endsAtDay >= currentDay && cycle.type === 'party_congress',
-  );
-  if (!existing) {
-    const termNumber =
-      Math.max(
-        0,
-        ...draft.world.activeCycles
-          .filter((cycle) => cycle.type === 'party_congress')
-          .map((cycle) => cycle.termNumber),
-      ) + 1;
-    const cycleYears = Math.max(1, config.congressCycleYears);
-    draft.world.activeCycles.push(
-      createPoliticalCycle(
-        'party_congress',
-        termNumber,
-        currentDay,
-        currentDay + cycleYears * config.daysPerMonth * config.monthsPerYear,
-      ),
+  let latest = draft.world.activeCycles
+    .filter((cycle) => cycle.type === 'party_congress')
+    .reduce<(typeof draft.world.activeCycles)[number] | undefined>(
+      (previous, cycle) => (!previous || cycle.termNumber > previous.termNumber ? cycle : previous),
+      undefined,
     );
+  const cycleDays =
+    Math.max(1, config.congressCycleYears) * config.daysPerMonth * config.monthsPerYear;
+  // 使用上一届的结束日衔接，既覆盖等号边界，也补齐旧存档已经错过的届期。
+  while (!latest || latest.endsAtDay <= currentDay) {
+    const startedAtDay = latest?.endsAtDay ?? currentDay;
+    latest = createPoliticalCycle(
+      'party_congress',
+      (latest?.termNumber ?? 0) + 1,
+      startedAtDay,
+      startedAtDay + cycleDays,
+    );
+    draft.world.activeCycles.push(latest);
   }
   const advanced = advancePoliticalCycles(
     draft.world,
