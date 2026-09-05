@@ -113,7 +113,13 @@
     "budgetDelta": 25,
     "effects": [
       { "target": "character", "field": "charisma", "operation": "add", "value": 2 },
-      { "target": "character", "field": "network", "operation": "add", "value": 1 }
+      { "target": "character", "field": "network", "operation": "add", "value": 1 },
+      {
+        "target": "career_specialty",
+        "specialtyId": "local_governance",
+        "operation": "add",
+        "value": 1
+      }
     ],
     "kpiEffects": [
       { "indicatorId": "livelihood_score", "operation": "add", "value": 8 },
@@ -131,7 +137,15 @@
     "category": "minor",
     "cooldownDays": 14,
     "budgetDelta": 15,
-    "effects": [{ "target": "character", "field": "charisma", "operation": "add", "value": 2 }],
+    "effects": [
+      { "target": "character", "field": "charisma", "operation": "add", "value": 2 },
+      {
+        "target": "career_specialty",
+        "specialtyId": "local_governance",
+        "operation": "add",
+        "value": 1
+      }
+    ],
     "kpiEffects": [{ "indicatorId": "livelihood_score", "operation": "add", "value": 6 }],
     "prerequisites": { "allowedLeadershipRanks": ["none"] },
     "repeatPolicy": "repeatable"
@@ -145,7 +159,15 @@
     "category": "minor",
     "cooldownDays": 14,
     "budgetDelta": 15,
-    "effects": [{ "target": "character", "field": "diligence", "operation": "add", "value": 2 }],
+    "effects": [
+      { "target": "character", "field": "diligence", "operation": "add", "value": 2 },
+      {
+        "target": "career_specialty",
+        "specialtyId": "local_governance",
+        "operation": "add",
+        "value": 1
+      }
+    ],
     "kpiEffects": [
       { "indicatorId": "agricultural_output", "operation": "add", "value": 8 },
       { "indicatorId": "data_accuracy", "operation": "add", "value": 3 }
