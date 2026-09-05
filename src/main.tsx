@@ -10,6 +10,7 @@
  * - localStorage 有不兼容旧档 → 启动页显示不兼容提示
  */
 
+import './styles/workspace.css';
 import { render } from 'solid-js/web';
 import { App } from './app';
 import { dispatch } from './store/game-store';

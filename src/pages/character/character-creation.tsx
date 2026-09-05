@@ -160,7 +160,23 @@ export function CharacterCreation() {
         </div>
       </header>
 
-      <div class="doc-page">
+      <div class="doc-page wizard-layout">
+        <aside class="wizard-sidebar">
+          <div class="doc-eyebrow">YOUR STORY BEGINS</div>
+          <h1>建立你的履历</h1>
+          <p>每一段经历，都会成为未来的伏笔。</p>
+          <For each={STEP_NAMES}>
+            {(name, index) => (
+              <div
+                class={index() === step() ? 'wizard-step-label current' : 'wizard-step-label'}
+                aria-current={index() === step() ? 'step' : undefined}
+              >
+                <span class="wizard-step-number">{index() < step() ? '✓' : index() + 1}</span>
+                {name}
+              </div>
+            )}
+          </For>
+        </aside>
         <div class="doc-shell" style={{ 'max-width': '720px' }}>
           <section class="card">
             <div class="card-pad">

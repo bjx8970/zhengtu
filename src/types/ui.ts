@@ -23,3 +23,20 @@ export interface AlertItem {
   message: string;
   action?: { label: string; route: string };
 }
+
+/** 共享导航与操作图标名称。 */
+export type UiIconName =
+  | 'home'
+  | 'tasks'
+  | 'departments'
+  | 'assessment'
+  | 'career'
+  | 'policies'
+  | 'events'
+  | 'moon'
+  | 'sun'
+  | 'arrow'
+  | 'clock'
+  | 'wallet'
+  | 'plus'
+  | 'logout';
