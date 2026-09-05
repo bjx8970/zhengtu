@@ -1,7 +1,7 @@
 /**
  * 启动页
  *
- * 「红头文件」式首屏：机关抬头 + 大标题 + 存档档案卡。
+ * 两栏封面式首屏：游戏品牌、仕途寄语、建筑插画与存档档案卡。
  * 可继续 / 开始新游戏 / 重新建档三个入口，兼容存档提示分级展示。
  */
 
@@ -28,35 +28,23 @@ export function SplashPage() {
       saveResult.status === 'corrupted');
 
   return (
-    <div class="doc-scroll">
-      <div class="doc-page" style={{ display: 'grid', 'place-items': 'center' }}>
-        <section class="card" style={{ width: 'min(100%, 720px)' }}>
-          <div class="card-pad" style={{ 'border-bottom': '2px solid var(--color-primary)' }}>
-            <div class="doc-eyebrow">中共政途县委员会 · 政途县人民政府</div>
+    <main class="doc-scroll">
+      <div class="splash-screen">
+        <header class="splash-top">
+          <div class="splash-brand">
+            <span class="brand-seal">政</span>政途人生
           </div>
-          <div
-            class="card-pad flex-col gap-lg center"
-            style={{ padding: 'clamp(2rem, 6vw, 4rem)' }}
-          >
-            <h1
-              class="serif"
-              style={{
-                'font-size': 'clamp(3rem, 9vw, 5.5rem)',
-                'line-height': '1.1',
-                'letter-spacing': '0.12em',
-                color: 'var(--color-primary)',
-                'text-align': 'center',
-              }}
-            >
-              政途人生
+          <span>公务员职业生涯模拟</span>
+        </header>
+        <section class="splash-cover">
+          <div class="splash-copy">
+            <div class="splash-kicker">YOUR CHOICES. YOUR JOURNEY.</div>
+            <h1>
+              一纸履历，<span>万里政途。</span>
             </h1>
-            <p
-              class="serif secondary-text"
-              style={{ 'text-align': 'center', 'line-height': '1.9' }}
-            >
-              从一纸履历开始，处理政务、接受考核，在选择中书写自己的仕途。
+            <p class="splash-description">
+              从基层的第一份工作开始，处理政务、接受考核，在每一次选择中，书写属于你的人生。
             </p>
-
             <Show
               when={hasSave}
               fallback={
@@ -96,7 +84,7 @@ export function SplashPage() {
                 </>
               }
             >
-              <div class="flex-col gap-sm" style={{ width: 'min(100%, 420px)' }}>
+              <div class="flex-col gap-sm splash-archive">
                 <div class="doc-eyebrow">本地档案</div>
                 <div class="card card-pad flex-col gap-sm">
                   <strong class="serif" style={{ 'font-size': '1.15rem' }}>
@@ -123,16 +111,30 @@ export function SplashPage() {
                 </div>
               </div>
             </Show>
+            <div class="splash-details">
+              <span>角色自由建档</span>
+              <span>真实工作日程</span>
+              <span>本地保存进度</span>
+            </div>
           </div>
-          <footer
-            class="card-pad flex between text-xs muted"
-            style={{ 'border-top': '1px solid var(--border-color)' }}
-          >
-            <span>政途人生 · {__APP_VERSION__} · 本地存档</span>
-            <span>治大国如烹小鲜</span>
-          </footer>
+          <div class="splash-illustration" aria-hidden="true">
+            <div class="welcome-art">
+              <span class="art-orbit" />
+              <span class="art-building building-back" />
+              <span class="art-building building-front" />
+              <span class="art-tree" />
+              <span class="art-ground" />
+            </div>
+            <div class="splash-quote">
+              心有所向，行有所至。<small>A JOURNEY OF A THOUSAND MILES</small>
+            </div>
+          </div>
         </section>
+        <footer class="splash-bottom">
+          <span>政途人生 · {__APP_VERSION__} · 本地存档</span>
+          <span>治大国如烹小鲜</span>
+        </footer>
       </div>
-    </div>
+    </main>
   );
 }

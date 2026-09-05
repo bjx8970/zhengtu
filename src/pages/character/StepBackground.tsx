@@ -78,7 +78,7 @@ export function StepBackground(props: StepBackgroundProps) {
         <div class="flex gap-sm" style={{ 'flex-wrap': 'wrap' }}>
           <For each={Object.entries(totalBonuses())}>
             {([key, val]) => (
-              <span class="tag tag-red">
+              <span class="tag tag-primary">
                 {ATTR_LABELS[key] ?? key} +{val}
               </span>
             )}

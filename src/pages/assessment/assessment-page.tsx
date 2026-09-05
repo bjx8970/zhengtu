@@ -26,7 +26,7 @@ function tierTagClass(tier: KPITier): string {
     case KPITier.Basic:
       return 'tag tag-warning';
     default:
-      return 'tag tag-red';
+      return 'tag tag-danger';
   }
 }
 

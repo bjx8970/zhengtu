@@ -1,9 +1,9 @@
 /**
- * 全局设计令牌与组件样式 — 「政途 · 案牍」政务公文风
+ * 全局设计令牌与业务组件样式 — 政途现代工作台
  *
  * 设计语言：
- * - 红头文件式抬头 + 宋体标题 + 宣纸底色（亮）/ 墨夜底色（暗）
- * - 朱红（主操作）、藏青（次级）、鎏金（荣誉/警示）、官绿（正向）
+ * - 浅灰画布、白色卡片与清晰的无衬线业务标题
+ * - 青绿（主操作）、蓝色（次级）、金色（荣誉/警示）、红色（风险）
  * - 亮暗主题通过 html[data-theme='dark'] 切换 CSS 变量，组件只引用变量
  * - 组件类名统一 `.doc-*` / `.btn` / `.card` / `.tag` / `.meter` 等，页面禁止内联配色
  */
@@ -14,28 +14,28 @@
   color-scheme: light;
 
   /* 画布与纸张 */
-  --bg-canvas: #e9e4d8;
-  --bg-page: #f6f2e7;
-  --bg-card: #fffdf5;
+  --bg-canvas: #f3f5f7;
+  --bg-page: #f8fafb;
+  --bg-card: #ffffff;
   --bg-card-solid: #ffffff;
-  --bg-soft: #efeadd;
-  --bg-input: #faf7ee;
+  --bg-soft: #f2f5f5;
+  --bg-input: #f8fafb;
   --bg-overlay: rgba(20, 24, 32, 0.45);
 
   /* 文字 */
-  --text-primary: #20242c;
-  --text-secondary: #5c6472;
-  --text-muted: #8c919b;
+  --text-primary: #233432;
+  --text-secondary: #60706f;
+  --text-muted: #74817f;
 
-  /* 朱红主色 */
-  --color-primary: #c3272e;
-  --color-primary-hover: #9f1f26;
-  --color-primary-soft: rgba(195, 39, 46, 0.1);
+  /* 青绿主色 */
+  --color-primary: #207567;
+  --color-primary-hover: #175b50;
+  --color-primary-soft: rgba(32, 117, 103, 0.09);
   --color-primary-text: #ffffff;
 
   /* 藏青次级 */
-  --color-secondary: #1f4e79;
-  --color-secondary-soft: rgba(31, 78, 121, 0.1);
+  --color-secondary: #427da0;
+  --color-secondary-soft: rgba(66, 125, 160, 0.1);
 
   /* 功能色 */
   --color-success: #3f7d46;
@@ -48,18 +48,18 @@
   --color-gold-soft: rgba(169, 134, 46, 0.14);
 
   /* 边框 */
-  --border-color: #d9d1bf;
-  --border-strong: #bdb299;
+  --border-color: #e2e9e7;
+  --border-strong: #a6bbb5;
 
   /* 阴影 */
-  --shadow-card: 0 12px 32px rgba(38, 34, 24, 0.08);
+  --shadow-card: 0 3px 16px rgba(30, 58, 52, 0.025);
   --shadow-modal: 0 24px 64px rgba(10, 12, 18, 0.35);
 
   /* 圆角 */
-  --radius-sm: 3px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
+  --radius-sm: 7px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
 
   /* 间距 */
   --space-xs: 0.25rem;
@@ -69,14 +69,13 @@
   --space-xl: 2rem;
 
   /* 字体 */
-  --font-title:
-    'Source Han Serif SC', 'Noto Serif SC', 'STSong', 'SimSun', '宋体', serif;
+  --font-title: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
   --font-body:
     'Source Han Sans SC', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
     '微软雅黑', sans-serif;
 
   /* 版式 */
-  --shell-max: 1080px;
+  --shell-max: 1480px;
 }
 
 html[data-theme='dark'] {
@@ -92,11 +91,11 @@ html[data-theme='dark'] {
 
   --text-primary: #e5e1d5;
   --text-secondary: #a6adba;
-  --text-muted: #6f7684;
+  --text-muted: #939fad;
 
-  --color-primary: #d64541;
-  --color-primary-hover: #ef5752;
-  --color-primary-soft: rgba(214, 69, 65, 0.16);
+  --color-primary: #63b6a5;
+  --color-primary-hover: #7dcebd;
+  --color-primary-soft: rgba(99, 182, 165, 0.14);
   --color-primary-text: #ffffff;
 
   --color-secondary: #4d82b8;
@@ -153,7 +152,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 a:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 3px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -161,6 +160,7 @@ a:focus-visible {
 
 .doc-scroll {
   height: 100%;
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg-canvas);
@@ -279,7 +279,7 @@ a:focus-visible {
   color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
   text-decoration: none;
 }
 
@@ -369,7 +369,7 @@ a:focus-visible {
   letter-spacing: 0.05em;
   padding: var(--space-md) var(--space-lg);
   border-bottom: 1px solid var(--border-color);
-  background: var(--bg-soft);
+  background: var(--bg-card);
 }
 
 .card-title-mark {
@@ -393,7 +393,7 @@ a:focus-visible {
   color: var(--text-primary);
   cursor: pointer;
   font-weight: 700;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
   transition:
     background 150ms ease,
     border-color 150ms ease,
@@ -478,7 +478,8 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-.tag-red {
+/* 品牌高亮独立于风险色，主题换色不会改变风险状态的含义。 */
+.tag-primary {
   background: var(--color-primary-soft);
   color: var(--color-primary);
 }
@@ -503,6 +504,8 @@ a:focus-visible {
   color: var(--color-warning);
 }
 
+/* 兼容旧红色标签；风险始终使用危险色令牌。 */
+.tag-red,
 .tag-danger {
   background: var(--color-danger-soft);
   color: var(--color-danger);
