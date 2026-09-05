@@ -619,6 +619,30 @@ a:focus-visible {
   gap: var(--space-sm);
 }
 
+/* 建档向导长列表：独立滚动容器，选项数量不再撑开页面高度 */
+.choice-scroll {
+  overflow-y: auto;
+  max-height: clamp(240px, 38vh, 380px);
+  /* 为焦点描边与滚动条预留空隙，避免边缘裁切 */
+  padding: 3px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.choice-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.choice-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+.choice-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .choice-card {
   display: flex;
   flex-direction: column;

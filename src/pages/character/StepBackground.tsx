@@ -37,7 +37,7 @@ export function StepBackground(props: StepBackgroundProps) {
       <div class="flex gap-md responsive-col">
         <div class="flex-1 flex-col gap-sm">
           <span class="form-label">家庭背景</span>
-          <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
+          <div class="choice-grid choice-scroll" style={{ 'grid-template-columns': '1fr' }}>
             <For each={props.backgrounds}>
               {(bg) => (
                 <button
@@ -55,7 +55,7 @@ export function StepBackground(props: StepBackgroundProps) {
         </div>
         <div class="flex-1 flex-col gap-sm">
           <span class="form-label">晋升通道</span>
-          <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
+          <div class="choice-grid choice-scroll" style={{ 'grid-template-columns': '1fr' }}>
             <For each={props.paths}>
               {(p) => (
                 <button
