@@ -15,6 +15,7 @@ const NAV_ITEMS: { path: string; label: string; icon: UiIconName }[] = [
   { path: '/career', label: '职务职级', icon: 'career' },
   { path: '/policies', label: '政策', icon: 'policies' },
   { path: '/events', label: '事件', icon: 'events' },
+  { path: '/settings', label: '设置', icon: 'settings' },
 ];
 
 /**

@@ -10,6 +10,9 @@ export default defineConfig({
   plugins: [solidPlugin()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // 测试环境与生产默认一致：Debug Trace 开启（与 vite.config.ts 保持同步）
+    __ZHENGTU_DEBUG_TRACE__: 'true',
+    __GIT_COMMIT_SHA__: 'null',
   },
   resolve: {
     alias: {

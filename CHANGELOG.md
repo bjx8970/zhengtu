@@ -8,6 +8,9 @@
 
 ### Added
 
+- 旁路式可重放 Debug Bundle（ADR-010）：设置页新增调试区块，可导出含操作日志、随机数消费序列、运行时 ID 与状态哈希的自包含诊断文件（`zhengtu-debug-*.json`），用于开发端逐步重放定位「首个产生状态分歧的操作」；轨迹经 IndexedDB 独立持久化，与正式存档 schema 完全隔离（`VITE_ENABLE_DEBUG_TRACE=false` 可在构建产物中彻底移除）。
+- 设置页（`/settings`）：版本信息（应用版本、构建提交、存档结构/内容版本、当前存档标识）与调试入口，移动端可用。
+- 建档时生成存档唯一标识 `saveId`（Debug Trace 轨迹跨会话关联使用；该字段此前仅存在于 schema 定义）。
 - Phase 4 组织世界持久化底座：有限 NPC 干部档案、实际岗位席位、动态 Vacancy、世界级 StaffingSelection 与 producer 幂等键。
 - 配置驱动的 9 名初始 NPC 干部池（与玩家合计 10 人）、确定性 Seat 初始化、组织跨引用不变量和 ADR-009。
 - 政治周期驱动的届期评估、干部调整窗口与 Vacancy/selection/appointment 正式链路；周期有活动周期后每日推进阶段，届期结束同日衔接下一届。

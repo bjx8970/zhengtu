@@ -81,6 +81,7 @@ export interface ProposePolicyReducerPayload {
   policyId: string;
   regionId?: string;
   institutionId?: string;
+  _rng?: () => number;
   _idFactory?: () => string;
 }
 
@@ -141,7 +142,7 @@ export function reduceProposePolicy(
   if (!result.success) return null;
 
   const definitions = loader.getAllEventDefinitions();
-  const rng = () => Math.random();
+  const rng = payload._rng ?? (() => Math.random());
   const committed = commitPolicyTransition(
     draft,
     result,
