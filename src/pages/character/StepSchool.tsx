@@ -31,7 +31,7 @@ export function StepSchool(props: StepSchoolProps) {
     <div class="flex gap-md responsive-col" style={{ 'max-width': '620px', margin: '0 auto' }}>
       <div class="flex-1 flex-col gap-sm">
         <span class="form-label">院校档次</span>
-        <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
+        <div class="choice-grid choice-scroll" style={{ 'grid-template-columns': '1fr' }}>
           <For each={getAvailableTiers(props.data.gaokaoTier)}>
             {(tier) => (
               <button
@@ -57,7 +57,7 @@ export function StepSchool(props: StepSchoolProps) {
           when={schools()}
           fallback={<div class="card center muted text-sm flex-1">请先选择档次</div>}
         >
-          <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
+          <div class="choice-grid choice-scroll" style={{ 'grid-template-columns': '1fr' }}>
             {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Show guarantees existence */}
             <For each={schools()!}>
               {(school) => (

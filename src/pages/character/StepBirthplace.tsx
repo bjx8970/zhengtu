@@ -26,7 +26,7 @@ export function StepBirthplace(props: StepBirthplaceProps) {
     <div class="flex gap-md responsive-col" style={{ 'max-width': '620px', margin: '0 auto' }}>
       <div class="flex-1 flex-col gap-sm">
         <span class="form-label">选择省份</span>
-        <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
+        <div class="choice-grid choice-scroll" style={{ 'grid-template-columns': '1fr' }}>
           <For each={props.provinces()}>
             {(p) => (
               <button
@@ -53,7 +53,7 @@ export function StepBirthplace(props: StepBirthplaceProps) {
           fallback={<div class="card center muted text-sm flex-1">请先选择省份</div>}
         >
           {(prov) => (
-            <div class="choice-grid" style={{ 'grid-template-columns': '1fr' }}>
+            <div class="choice-grid choice-scroll" style={{ 'grid-template-columns': '1fr' }}>
               <For each={prov().cities}>
                 {(c) => (
                   <button
