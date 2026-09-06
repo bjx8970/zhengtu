@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../debug-storage', () => ({
   LEGACY_TRACE_PREFIX: 'legacy',
   persistTraceMeta: vi.fn(async () => undefined),
-  appendJournalRecord: vi.fn(async () => undefined),
+  commitTraceBatch: vi.fn(async () => undefined),
   loadStoredTrace: vi.fn(async () => null),
   findTraceKeyByStateHash: vi.fn(async () => null),
   clearTrace: vi.fn(async () => undefined),

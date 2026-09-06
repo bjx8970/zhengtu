@@ -3,7 +3,7 @@ import { unwrap } from 'solid-js/store';
 import { getConfigLoader } from '../../config/loader';
 import { advanceCivilServiceRank } from '../../engine/career/civil-service-rank-progression';
 import { processCascadeSignalsInTransaction } from './event-reducer';
-import { createRuntimeIdFactory } from '../runtime-id';
+import { createDefaultIdFactoryFor } from '../runtime-dependencies';
 import type { PlayerSave } from '../../types/player';
 
 export interface AdvanceCivilServiceRankPayload {
@@ -23,7 +23,7 @@ export function reduceAdvanceCivilServiceRank(
   const loader = getConfigLoader();
   const rule = loader.getCivilServiceRankProgressionRule(draft.career.civilServiceRank);
   if (!rule) return false;
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('rank');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('ADVANCE_CIVIL_SERVICE_RANK');
   const transaction = structuredClone(unwrap(draft));
   const config = loader.getGameConfig();
   const result = advanceCivilServiceRank({

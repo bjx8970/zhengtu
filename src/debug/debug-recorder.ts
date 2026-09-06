@@ -24,8 +24,8 @@ import {
 import {
   BRANCH_TRACE_PREFIX,
   LEGACY_TRACE_PREFIX,
-  appendJournalRecord,
   clearTrace,
+  commitTraceBatch,
   findTraceKeyByStateHash,
   loadStoredTrace,
   persistTraceMeta,
@@ -208,8 +208,7 @@ export function debugTraceCommit(stateAfter: PlayerSave, actionType: GameAction[
   // 认领未决期间只入内存：此时最终 traceKey/连续性尚未确定，
   // 提前落盘会污染将被放弃的候选键或与认领结果重复
   if (!current.adopting) {
-    void appendJournalRecord(current.traceKey, record);
-    void persistTraceMeta(toStoredMeta(current, afterStateHash));
+    void commitTraceBatch(toStoredMeta(current, afterStateHash), [record]);
   }
   pending = null;
 }
@@ -293,31 +292,40 @@ async function adoptExistingTrace(candidate: TraceSession, stateHash: string): P
     inheritStoredTrace(candidate, continuous, stateHash);
     return;
   }
-  // 主键下无任何历史：保留候选键（saveId / legacy-uuid）作为新 partial 轨迹
-  if (!primary) {
-    candidate.adopting = false;
-    setTraceStatus(toStatus(candidate));
-    void persistTraceMeta(toStoredMeta(candidate, stateHash));
-    return;
-  }
-  // 主键有历史但末状态不连续（更旧/回滚备份）：以全新分支键记录，
-  // 不覆盖、不拼接原历史；后续再载入同一快照可经哈希匹配续接本分支
-  session = {
-    ...candidate,
-    traceKey: `${BRANCH_TRACE_PREFIX}-${generateTraceId()}`,
-    adopting: false,
-  };
-  setTraceStatus(toStatus(session));
-  void persistTraceMeta(toStoredMeta(session, stateHash));
+  // 无连续既有轨迹：窗口期记录统一补写落盘（刷新后不丢）。
+  // 主键下已有不相关历史时换用全新 branch 键，不覆盖/拼接原历史；
+  // 主键下无任何历史时保留候选键（saveId / legacy-uuid）。
+  finalizeCandidate(
+    candidate,
+    primary ? `${BRANCH_TRACE_PREFIX}-${generateTraceId()}` : candidate.traceKey,
+    stateHash,
+  );
 }
 
 /**
- * 继承末状态连续的既有轨迹：恢复持久化日志与元数据，
- * 认领窗口期内已入内存的记录以最终键与最终 seq 续接落盘。
+ * 认领落定（无继承）：以最终 traceKey 统一补写窗口期记录与元数据。
+ *
+ * @param candidate 发起认领的会话引用（已通过会话存续校验）
+ * @param finalKey 落定后的轨迹标识
+ * @param stateHash 载入快照哈希（窗口期无记录时作为 meta 尾哈希）
+ */
+function finalizeCandidate(candidate: TraceSession, finalKey: string, stateHash: string): void {
+  candidate.traceKey = finalKey;
+  candidate.adopting = false;
+  setTraceStatus(toStatus(candidate));
+  const tail = candidate.journal[candidate.journal.length - 1];
+  void commitTraceBatch(toStoredMeta(candidate, tail ? tail.afterStateHash : stateHash), [
+    ...candidate.journal,
+  ]);
+}
+
+/**
+ * 继承末状态连续的既有轨迹：恢复持久化日志与元数据，认领窗口期内的
+ * 记录以最终键与最终 seq 续接，一次性原子落盘。
  *
  * @param candidate 发起认领的会话引用
  * @param stored 末状态连续的既有轨迹
- * @param stateHash 当前存档状态哈希
+ * @param stateHash 载入快照哈希（窗口期无记录时作为 meta 尾哈希）
  */
 function inheritStoredTrace(
   candidate: TraceSession,
@@ -340,10 +348,13 @@ function inheritStoredTrace(
     adopting: false,
   };
   setTraceStatus(toStatus(session));
-  void persistTraceMeta(toStoredMeta(session, stateHash));
-  for (const record of carried) {
-    void appendJournalRecord(session.traceKey, record);
-  }
+  // 尾哈希取最终 journal tail：窗口期已有新动作时，载入时的 stateHash 已过期，
+  // 否则认领后立即刷新会因 meta 落后而误判不连续
+  const carriedTail = carried[carried.length - 1];
+  void commitTraceBatch(
+    toStoredMeta(session, carriedTail ? carriedTail.afterStateHash : stateHash),
+    carried,
+  );
 }
 
 /**

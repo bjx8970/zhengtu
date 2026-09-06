@@ -60,6 +60,20 @@ function promisify<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
+/**
+ * 等待事务完成（全部请求成功提交后 resolve）。
+ *
+ * @param tx IDB 事务
+ * @returns 事务提交完成后 resolve
+ */
+function transactionDone(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
 /** 已打开数据库的共享 Promise（打开失败后重置以支持重试） */
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -123,25 +137,32 @@ export async function persistTraceMeta(meta: StoredTraceMeta): Promise<void> {
 }
 
 /**
- * 追加一条操作日志（append-only）。
+ * 追加日志并更新元数据 —— 单个跨 store 原子事务。
  *
- * @param traceKey 轨迹标识
- * @param record 操作记录
+ * journal 追加与 meta 覆盖要么同时生效、要么同时失败，避免浏览器在两次
+ * 独立事务之间退出时留下「meta 尾哈希已前进但 journal 缺尾记录」的组合
+ * （认领连续性判断依赖 meta.lastStateHash 与 journal tail 一致）。
+ *
+ * @param meta 轨迹元数据（lastStateHash 必须等于 records 末条的 afterStateHash）
+ * @param records 本批次追加的操作记录（按 seq 升序）
  * @returns 完成后 resolve；失败时静默
  */
-export async function appendJournalRecord(
-  traceKey: string,
-  record: DebugActionRecord,
+export async function commitTraceBatch(
+  meta: StoredTraceMeta,
+  records: DebugActionRecord[],
 ): Promise<void> {
   if (!hasIndexedDb()) return;
   try {
     const db = await openDatabase();
-    const tx = db.transaction(JOURNAL_STORE, 'readwrite');
-    const store = tx.objectStore(JOURNAL_STORE);
-    const stored: StoredJournalRecord = { traceKey, record };
-    await promisify(store.add(stored));
+    const tx = db.transaction([TRACE_STORE, JOURNAL_STORE], 'readwrite');
+    const journal = tx.objectStore(JOURNAL_STORE);
+    for (const record of records) {
+      journal.add({ traceKey: meta.traceKey, record } satisfies StoredJournalRecord);
+    }
+    tx.objectStore(TRACE_STORE).put(meta);
+    await transactionDone(tx);
   } catch (error) {
-    warn('appendJournalRecord', error);
+    warn('commitTraceBatch', error);
   }
 }
 

@@ -1,8 +1,10 @@
 /**
- * 动作注入测试：_rng/_idFactory 包装记录、序列化剥离函数字段。
+ * 动作注入测试：_rng/_idFactory 包装记录、序列化剥离函数字段、
+ * 默认工厂与 reducer 领域前缀一致（traced/untraced 语义相同）。
  */
 
 import { describe, expect, it } from 'vitest';
+import type { GameAction } from '../../types/game';
 import {
   createDebugCapture,
   instrumentGameAction,
@@ -37,25 +39,12 @@ describe('instrumentGameAction', () => {
       },
       capture,
     );
-    if (action.type !== 'START_ACTION' || !action._idFactory)
+    if (action.type !== 'START_ACTION' || !action._idFactory) {
       throw new Error('expected id factory');
+    }
     expect(action._idFactory()).toBe('id-1');
     expect(action._idFactory()).toBe('id-2');
     expect(capture.generatedIds).toEqual(['id-1', 'id-2']);
-  });
-
-  it('未提供函数字段的动作注入默认实现并记录', () => {
-    const capture = createDebugCapture();
-    const action = instrumentGameAction({ type: 'ADVANCE_TIME', granularity: 'day' }, capture);
-    if (action.type !== 'ADVANCE_TIME' || !action._rng || !action._idFactory) {
-      throw new Error('expected injected dependencies');
-    }
-    // 默认源为 Math.random / runtime 工厂：调用即被记录
-    const drawn = action._rng();
-    expect(capture.randomDraws).toEqual([drawn]);
-    const id = action._idFactory();
-    expect(capture.generatedIds).toEqual([id]);
-    expect(id).toContain('debug');
   });
 
   it('不修改原始动作对象', () => {
@@ -70,6 +59,43 @@ describe('instrumentGameAction', () => {
     expect(original._rng()).toBe(0.5);
     expect(capture.randomDraws).toEqual([]);
     expect(wrapped).not.toBe(original);
+  });
+
+  it('未提供函数字段的动作注入与 reducer 一致的默认实现', () => {
+    const capture = createDebugCapture();
+    const action = instrumentGameAction({ type: 'ADVANCE_TIME', granularity: 'day' }, capture);
+    if (action.type !== 'ADVANCE_TIME' || !action._rng || !action._idFactory) {
+      throw new Error('expected injected dependencies');
+    }
+    const drawn = action._rng();
+    expect(capture.randomDraws).toEqual([drawn]);
+    const id = action._idFactory();
+    expect(capture.generatedIds).toEqual([id]);
+    // 领域前缀与 time-reducer 回退语义一致（timeline），而非调试专用前缀
+    expect(id.startsWith('timeline_')).toBe(true);
+  });
+
+  it.each([
+    [{ type: 'ADVANCE_TIME', granularity: 'day' }, 'timeline_'],
+    [{ type: 'CHOOSE_EVENT_OPTION', eventInstanceId: 'e', optionId: 'o' }, 'event_'],
+    [{ type: 'PROPOSE_POLICY', policyId: 'p' }, 'policy_'],
+    [{ type: 'APPROVE_POLICY', policyInstanceId: 'p' }, 'policy_'],
+    [{ type: 'ACTIVATE_POLICY', policyInstanceId: 'p' }, 'policy_'],
+    [{ type: 'SUSPEND_POLICY', policyInstanceId: 'p' }, 'policy_'],
+    [{ type: 'RESUME_POLICY', policyInstanceId: 'p' }, 'policy_'],
+    [{ type: 'FAIL_POLICY', policyInstanceId: 'p' }, 'policy_'],
+    [{ type: 'REPEAL_POLICY', policyInstanceId: 'p' }, 'policy_'],
+    [{ type: 'ADVANCE_CIVIL_SERVICE_RANK' }, 'rank_'],
+    [{ type: 'START_ACTION', deptId: 'd', actionId: 'a', tierKey: 'primary' }, 'action_'],
+    [{ type: 'START_PERSONAL_TASK', taskId: 't', tierKey: 'primary' }, 'task_'],
+    [{ type: 'ACCEPT_CAREER_OPPORTUNITY', opportunityId: 'o' }, 'career_'],
+    [{ type: 'ADVANCE_CAREER_PROCESS', opportunityId: 'o' }, 'career_'],
+  ] as [GameAction, string][])('默认 ID 工厂领域前缀与 reducer 一致：%s → %s', (action, prefix) => {
+    const capture = createDebugCapture();
+    const wrapped = instrumentGameAction(action, capture);
+    const factory = (wrapped as { _idFactory?: () => string })._idFactory;
+    if (!factory) throw new Error('expected injected id factory');
+    expect(factory().startsWith(prefix)).toBe(true);
   });
 });
 

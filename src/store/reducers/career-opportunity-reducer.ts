@@ -24,7 +24,7 @@ import {
 import { applyEffects } from '../../engine/events/effect-executor';
 import { deriveMetricSignalsFromEffects } from '../../engine/events/metric-signal-bridge';
 import { processCascadeSignalsInTransaction } from './event-reducer';
-import { createRuntimeIdFactory } from '../runtime-id';
+import { createDefaultIdFactoryFor } from '../runtime-dependencies';
 import { fillVacancyInTransaction } from '../transactions/vacancy-transaction';
 import { transitionPlayerSeat } from '../transactions/organization-seat-transaction';
 import {
@@ -181,7 +181,7 @@ export function reduceAcceptCareerOpportunity(
   if (!result.success || !result.opportunity) return false;
   const transaction = structuredClone(unwrap(draft));
   replaceOpportunity(transaction, result.opportunity);
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('career');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('ACCEPT_CAREER_OPPORTUNITY');
   const processId = idFactory();
   if (result.opportunity.type !== 'training' && result.opportunity.requiresSelection) {
     const selection = createRelativeSelectionInTransaction(
@@ -479,7 +479,7 @@ function appointRelativeSelectionNpcWinner(
 ): boolean {
   const winnerId = selection.winnerId;
   if (!winnerId || winnerId === 'player') return false;
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('career');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('ADVANCE_CAREER_PROCESS');
   const rng = payload._rng ?? Math.random;
   process.currentStage = 'appointment';
   const vacancy = transaction.organization.vacancies.find(
@@ -724,7 +724,7 @@ function advanceRelativeSelectionProcess(
           txOpportunity,
           txProcess,
           currentDay,
-          payload._idFactory ?? createRuntimeIdFactory('career'),
+          payload._idFactory ?? createDefaultIdFactoryFor('ADVANCE_CAREER_PROCESS'),
           payload._rng ?? Math.random,
         )
       )
@@ -763,7 +763,7 @@ function advanceRelativeSelectionProcess(
       const rebound = beginVacancySelection({
         organization: transaction.organization,
         currentDay,
-        idFactory: payload._idFactory ?? createRuntimeIdFactory('career'),
+        idFactory: payload._idFactory ?? createDefaultIdFactoryFor('ADVANCE_CAREER_PROCESS'),
         vacancyId: vacancy.vacancyId,
         selectionId: selection.selectionId,
       });
@@ -776,7 +776,7 @@ function advanceRelativeSelectionProcess(
         txOpportunity,
         txProcess,
         currentDay,
-        payload._idFactory ?? createRuntimeIdFactory('career'),
+        payload._idFactory ?? createDefaultIdFactoryFor('ADVANCE_CAREER_PROCESS'),
         payload._rng ?? Math.random,
       )
     )
@@ -819,7 +819,7 @@ export function reduceAdvanceCareerProcess(
   const transaction = structuredClone(unwrap(draft));
   const txProcess = transaction.career.activeProcess!;
   const opportunity = transaction.career.opportunities.find((item) => item.id === original.id)!;
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('career');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('ADVANCE_CAREER_PROCESS');
   const rng = payload._rng ?? Math.random;
   txProcess.stageResults.push({
     stage: txProcess.currentStage,

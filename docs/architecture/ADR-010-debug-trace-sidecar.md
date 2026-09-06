@@ -28,9 +28,11 @@ Debug 系统。
 
 - 动作执行前开始捕获（`debugTraceWrapAction`）；
 - 对支持 `_rng` / `_idFactory` 的动作类型**总是注入**记录型包装
-  （调用方已提供则包装之，未提供则包装 `Math.random` / runtime ID 工厂），
-  保证 reducer 的回退分支永远不会产生未记录的随机性——这是设计中最关键的
-  不变量；
+  （调用方已提供则包装之，未提供则包装 `Math.random` / **按动作类型解析的
+  领域前缀默认 ID 工厂**）——默认工厂来自 `store/runtime-dependencies.ts`
+  的穷举映射（timeline/event/policy/rank/career/task/action），reducer 回退
+  与 instrumentation 共用同一解析器，保证 Debug 开启前后产生的运行时 ID
+  语义完全一致，注入是纯旁路观察；这是设计中最关键的不变量；
 - `changed === true` 的动作收口为一条 `DebugActionRecord`（seq、序列化动作、
   前后游戏日、randomDraws、generatedIds、前后状态哈希）；未变化的动作丢弃捕获；
 - `NEW_GAME` 重置轨迹为 `complete`（建档时生成 `saveId` 作为轨迹关联键）；
@@ -39,8 +41,11 @@ Debug 系统。
   （`stored.lastStateHash === 载入快照哈希`）才继承完整历史；同 saveId 但
   哈希不一致（载入更旧/回滚备份）时，换用全新 `branch-` 键记录独立分支，
   绝不覆盖或拼接原历史——否则 journal 会出现时间倒流，重放必然伪分歧；
-- 认领未决期间 commit 仅入内存（不写 IndexedDB），认领落定后才以最终
-  traceKey 与 seq 续接落盘，保证候选键不被污染、记录不重复持久化。
+- 认领未决期间 commit 仅入内存（不写 IndexedDB）；认领落定后**三种结果
+  （继承 / 主键无历史 / 新分支）统一走同一条 flush 路径**：窗口期记录按最终
+  traceKey 与最终 seq 原子补写，meta 尾哈希取最终 journal 末条的
+  afterStateHash（无窗口记录才用载入哈希）——否则刷新后会因 meta 落后或
+  记录丢失而误判、丢数据。
 
 ### 状态哈希
 
@@ -52,6 +57,9 @@ Debug 系统。
 
 - IndexedDB `zhengtu-debug`：`traces`（元数据 + 初始状态快照）与 `journal`
   （append-only），与 `zhengtu_autosave` 完全隔离；全部失败仅 `console.warn`；
+- journal 追加与 meta 更新合并为**单个跨 store 读写事务**（`commitTraceBatch`），
+  原子生效——避免浏览器在两次独立事务之间退出时留下「meta 尾哈希已前进但
+  journal 缺尾记录」的组合（认领连续性判断依赖二者一致）；
 - 导出 Bundle（`zhengtu-debug-<saveId>-<日期>.json`）包含：initialState、
   currentState、journal、录制环境配置快照（ConfigLoader 全量防御性副本）、
   版本元数据（appVersion / commitSha / saveSchemaVersion / contentVersion /

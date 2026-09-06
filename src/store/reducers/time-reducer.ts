@@ -22,7 +22,7 @@ import type {
   TimelineContinuationNode,
 } from '../../types/player';
 import { getConfigLoader } from '../../config/loader';
-import { createRuntimeIdFactory } from '../runtime-id';
+import { createDefaultIdFactoryFor } from '../runtime-dependencies';
 import { processCascadeSignalsInTransaction } from './event-reducer';
 import {
   expireEventsAtDay,
@@ -48,7 +48,7 @@ function reduceAdvanceTimeInternal(draft: PlayerSave, payload: AdvanceTimePayloa
   const config = loader.getGameConfig();
   const definitions = loader.getAllEventDefinitions();
   const rng = payload._rng ?? Math.random;
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('timeline');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('ADVANCE_TIME');
   const notifications: CompletedActionNotification[] = [];
   draft.time.granularity = payload.granularity;
 

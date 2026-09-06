@@ -29,7 +29,7 @@ import { planEventFollowups } from '../../engine/events/event-followup-planner';
 import { processCareerOpportunitySignal } from '../../engine/career/opportunity-orchestrator';
 import { invalidateCareerOpportunity } from '../../engine/career/career-opportunity-lifecycle';
 import { getConfigLoader } from '../../config/loader';
-import { createRuntimeIdFactory } from '../runtime-id';
+import { createDefaultIdFactoryFor } from '../runtime-dependencies';
 
 /** CHOOSE_EVENT_OPTION 载荷 */
 export interface ChooseEventOptionPayload {
@@ -80,7 +80,7 @@ function reduceChooseEventOptionInternal(
 ): EventHistoryRecord | null {
   const definitions = getConfigLoader().getAllEventDefinitions();
   const rng = payload._rng ?? Math.random;
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('event');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('CHOOSE_EVENT_OPTION');
 
   const instance = draft.events.pending.find((item) => item.instanceId === payload.eventInstanceId);
   const option = instance?.snapshot.options.find((item) => item.id === payload.optionId);
