@@ -20,6 +20,7 @@ import { AssessmentPage } from './pages/assessment/assessment-page';
 import { CareerPage } from './pages/career/career-page';
 import { PoliciesPage } from './pages/policies/policies-page';
 import { EventsPage } from './pages/events/events-page';
+import { SettingsPage } from './pages/settings/settings-page';
 import { BlockingEventModal } from './components/blocking-event-modal';
 import { AppShell } from './components/app-shell';
 
@@ -34,6 +35,7 @@ const routes: Route[] = [
   { path: '/career', component: CareerPage, shell: true },
   { path: '/policies', component: PoliciesPage, shell: true },
   { path: '/events', component: EventsPage, shell: true },
+  { path: '/settings', component: SettingsPage, shell: true },
 ];
 
 /**

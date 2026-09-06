@@ -20,7 +20,7 @@ import { getConfigLoader } from '../../config/loader';
 import { clampAttr } from '../../utils/math';
 import { CURRENT_CONTENT_VERSION } from '../../types/save';
 import { createPersonalTaskExecutableSnapshot } from '../action-executable-snapshot';
-import { createRuntimeIdFactory } from '../runtime-id';
+import { createDefaultIdFactoryFor } from '../runtime-dependencies';
 
 /**
  * 处理 START_PERSONAL_TASK 动作。
@@ -58,7 +58,7 @@ export function reduceStartPersonalTask(
   if (!result.success) return;
 
   const occupant: SlotOccupant = {
-    instanceId: (payload._idFactory ?? createRuntimeIdFactory('task'))(),
+    instanceId: (payload._idFactory ?? createDefaultIdFactoryFor('START_PERSONAL_TASK'))(),
     actionId: task.id,
     deptId: PERSONAL_TASK_LEDGER_ID,
     actionName: task.name,

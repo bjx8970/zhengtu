@@ -25,7 +25,7 @@ import {
   repealPolicy,
 } from '../../engine/governance/policy-lifecycle';
 import type { PolicyTransitionResult } from '../../engine/governance/policy-lifecycle';
-import { createRuntimeIdFactory } from '../runtime-id';
+import { createDefaultIdFactoryFor } from '../runtime-dependencies';
 import { commitPolicyTransition as commitPolicyTransitionTransaction } from '../transactions/policy-transition-transaction';
 
 /**
@@ -81,6 +81,7 @@ export interface ProposePolicyReducerPayload {
   policyId: string;
   regionId?: string;
   institutionId?: string;
+  _rng?: () => number;
   _idFactory?: () => string;
 }
 
@@ -94,7 +95,7 @@ export function reduceProposePolicy(
   const definition = loader.getPolicyDefinition(payload.policyId);
   if (!definition) return null;
 
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('policy');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('PROPOSE_POLICY');
 
   const originContext = buildOriginContext(draft);
 
@@ -141,7 +142,7 @@ export function reduceProposePolicy(
   if (!result.success) return null;
 
   const definitions = loader.getAllEventDefinitions();
-  const rng = () => Math.random();
+  const rng = payload._rng ?? (() => Math.random());
   const committed = commitPolicyTransition(
     draft,
     result,
@@ -172,7 +173,7 @@ export function reduceApprovePolicy(
   if (idx === -1) return null;
 
   const loader = getConfigLoader();
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('policy');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('APPROVE_POLICY');
   const rng = payload._rng ?? (() => Math.random());
 
   const instance = draft.governance.policies[idx]!;
@@ -209,7 +210,7 @@ export function reduceActivatePolicy(
   if (idx === -1) return null;
 
   const loader = getConfigLoader();
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('policy');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('ACTIVATE_POLICY');
   const rng = payload._rng ?? (() => Math.random());
 
   const instance = draft.governance.policies[idx]!;
@@ -246,7 +247,7 @@ export function reduceSuspendPolicy(
   if (idx === -1) return null;
 
   const loader = getConfigLoader();
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('policy');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('SUSPEND_POLICY');
   const rng = payload._rng ?? (() => Math.random());
 
   const instance = draft.governance.policies[idx]!;
@@ -283,7 +284,7 @@ export function reduceResumePolicy(
   if (idx === -1) return null;
 
   const loader = getConfigLoader();
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('policy');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('RESUME_POLICY');
   const rng = payload._rng ?? (() => Math.random());
 
   const instance = draft.governance.policies[idx]!;
@@ -320,7 +321,7 @@ export function reduceFailPolicy(
   if (idx === -1) return null;
 
   const loader = getConfigLoader();
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('policy');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('FAIL_POLICY');
   const rng = payload._rng ?? (() => Math.random());
 
   const instance = draft.governance.policies[idx]!;
@@ -357,7 +358,7 @@ export function reduceRepealPolicy(
   if (idx === -1) return null;
 
   const loader = getConfigLoader();
-  const idFactory = payload._idFactory ?? createRuntimeIdFactory('policy');
+  const idFactory = payload._idFactory ?? createDefaultIdFactoryFor('REPEAL_POLICY');
   const rng = payload._rng ?? (() => Math.random());
 
   const instance = draft.governance.policies[idx]!;

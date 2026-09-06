@@ -10,6 +10,7 @@ const PATHS: Record<UiIconName, string[]> = {
   career: ['M3 8h18v12H3z M8 8V4h8v4 M3 12l9 4 9-4 M12 13v4'],
   policies: ['M6 3h9l4 4v14H6z M14 3v5h5 M9 12h7 M9 16h7'],
   events: ['M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z M10 21h4 M12 2v2'],
+  settings: ['M4 6h9 M17 6h3 M15 3v6 M4 12h3 M11 12h9 M9 9v6 M4 18h9 M17 18h3 M15 15v6'],
   moon: ['M20 15A8 8 0 0 1 9 4a8 8 0 1 0 11 11Z'],
   sun: [
     'M12 3V1 M12 23v-2 M3 12H1 M23 12h-2 M4 4l2 2 M18 18l2 2 M4 20l2-2 M18 6l2-2',

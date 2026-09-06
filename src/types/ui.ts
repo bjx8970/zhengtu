@@ -33,6 +33,7 @@ export type UiIconName =
   | 'career'
   | 'policies'
   | 'events'
+  | 'settings'
   | 'moon'
   | 'sun'
   | 'arrow'

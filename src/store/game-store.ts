@@ -17,6 +17,12 @@ import type { EventRuntimeState } from '../domain/events/state';
 import type { WorldState } from '../domain/world-state';
 import { getConfigLoader } from '../config/loader';
 import { writeLocalSave } from '../services/save-repo';
+import {
+  debugTraceAbort,
+  debugTraceAdoptLoadedSave,
+  debugTraceCommit,
+  debugTraceWrapAction,
+} from '../debug/debug-recorder';
 import { createAppointmentProbation } from '../engine/career/probation-evaluation';
 import { createOrganizationState } from '../engine/organization/organization-initialization';
 import type { CurrentAppointment } from '../domain/career/state';
@@ -255,8 +261,15 @@ export function useGameStore() {
 /**
  * 纯状态 reducer：接收 draft 和 action，直接修改 draft。
  * 返回是否发生了实际状态变化。
+ *
+ * 导出说明：debug-replay 依赖本函数逐步重放 Debug Bundle 日志，
+ * 游戏业务代码一律通过 dispatch() 修改状态，不得直接调用。
+ *
+ * @param draft 游戏状态草稿
+ * @param action 待处理的动作
+ * @returns 是否发生实际状态变化
  */
-function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
+export function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
   const careerStageEnded = draft.career.appointment.status === 'ended';
   if (careerStageEnded && action.type !== 'NEW_GAME' && action.type !== 'LOAD_SAVE') return false;
   switch (action.type) {
@@ -318,6 +331,7 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
           regionId: action.regionId,
           institutionId: action.institutionId,
           _idFactory: action._idFactory,
+          _rng: action._rng,
         },
         currentDay,
       );
@@ -419,12 +433,20 @@ function reduceGameState(draft: PlayerSave, action: GameAction): boolean {
 /**
  * 模块级 dispatch（生产用）。
  * 仅在实际状态变化时写入 localStorage 和更新 updatedAt。
+ *
+ * Debug Trace 旁路（可被编译期开关整体移除）：
+ * - 动作执行前开始捕获（注入记录型 _rng/_idFactory）；
+ * - 产生状态变化后收口记录；未变化则丢弃捕获；
+ * - LOAD_SAVE 本身 changed === false，单独走轨迹认领流程。
+ *
+ * @param action 待分发的动作
  */
 export function dispatch(action: GameAction): void {
+  const tracedAction = debugTraceWrapAction(action, unwrap(state));
   let changed = false;
   setState(
     produce((draft) => {
-      changed = reduceGameState(draft, action);
+      changed = reduceGameState(draft, tracedAction);
       if (changed) {
         draft.updatedAt = Date.now();
       }
@@ -432,8 +454,16 @@ export function dispatch(action: GameAction): void {
   );
 
   // 仅在实际变化时持久化（LOAD_SAVE 不触发）
-  if (changed && action.type !== 'LOAD_SAVE') {
-    writeLocalSave(unwrap(state));
+  if (changed) {
+    if (action.type !== 'LOAD_SAVE') {
+      writeLocalSave(unwrap(state));
+    }
+    debugTraceCommit(unwrap(state), action.type);
+  } else {
+    debugTraceAbort();
+  }
+  if (action.type === 'LOAD_SAVE') {
+    debugTraceAdoptLoadedSave(unwrap(state));
   }
 }
 

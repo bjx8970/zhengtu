@@ -16,7 +16,7 @@ import { getConfigLoader } from '../../config/loader';
 import { clampAttr } from '../../utils/math';
 import { CURRENT_CONTENT_VERSION } from '../../types/save';
 import { createActionExecutableSnapshot } from '../action-executable-snapshot';
-import { createRuntimeIdFactory } from '../runtime-id';
+import { createDefaultIdFactoryFor } from '../runtime-dependencies';
 
 /**
  * 处理 START_ACTION 动作。
@@ -73,7 +73,7 @@ export function reduceStartAction(draft: PlayerSave, payload: StartActionPayload
   }
 
   const occupant: SlotOccupant = {
-    instanceId: (payload._idFactory ?? createRuntimeIdFactory('action'))(),
+    instanceId: (payload._idFactory ?? createDefaultIdFactoryFor('START_ACTION'))(),
     actionId: actionConfig.id,
     deptId: payload.deptId,
     actionName: actionConfig.name,

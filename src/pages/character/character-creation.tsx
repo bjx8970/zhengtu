@@ -13,6 +13,7 @@
  */
 import { createSignal, createMemo, Show, For } from 'solid-js';
 import { useGameStore } from '../../store/game-store';
+import { createRuntimeIdFactory } from '../../store/runtime-id';
 import { getConfigLoader } from '../../config/loader';
 import { navigate } from '../../router';
 import { consumeForceNewGame } from '../../services/startup-save-state';
@@ -98,6 +99,8 @@ export function CharacterCreation() {
     dispatch({
       type: 'NEW_GAME',
       data: {
+        // 存档唯一标识：建档时生成，Debug Trace 轨迹以它跨会话关联
+        saveId: createRuntimeIdFactory('save')(),
         characterName: data().characterName,
         gender: data().gender,
         birthPlace: { province: data().province, city: data().city },

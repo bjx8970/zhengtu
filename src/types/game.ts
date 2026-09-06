@@ -47,6 +47,7 @@ export type GameAction =
       policyId: string;
       regionId?: string;
       institutionId?: string;
+      _rng?: () => number;
       _idFactory?: () => string;
     }
   | {
