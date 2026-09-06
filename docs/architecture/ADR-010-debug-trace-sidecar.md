@@ -34,8 +34,13 @@ Debug 系统。
 - `changed === true` 的动作收口为一条 `DebugActionRecord`（seq、序列化动作、
   前后游戏日、randomDraws、generatedIds、前后状态哈希）；未变化的动作丢弃捕获；
 - `NEW_GAME` 重置轨迹为 `complete`（建档时生成 `saveId` 作为轨迹关联键）；
-- `LOAD_SAVE` 以 `partial` 建立会话，异步认领 IndexedDB 中的既有轨迹
-  （saveId 命中，或旧档以「末状态哈希」匹配），认领窗口期内的新记录按 seq 续接。
+- `LOAD_SAVE` 以 `partial` 建立候选会话，异步按「saveId 主键 → 末状态哈希」
+  认领 IndexedDB 中的既有轨迹。**认领必须通过末状态连续性校验**
+  （`stored.lastStateHash === 载入快照哈希`）才继承完整历史；同 saveId 但
+  哈希不一致（载入更旧/回滚备份）时，换用全新 `branch-` 键记录独立分支，
+  绝不覆盖或拼接原历史——否则 journal 会出现时间倒流，重放必然伪分歧；
+- 认领未决期间 commit 仅入内存（不写 IndexedDB），认领落定后才以最终
+  traceKey 与 seq 续接落盘，保证候选键不被污染、记录不重复持久化。
 
 ### 状态哈希
 

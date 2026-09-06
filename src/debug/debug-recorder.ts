@@ -22,6 +22,7 @@ import {
   type DebugCapture,
 } from './debug-instrumentation';
 import {
+  BRANCH_TRACE_PREFIX,
   LEGACY_TRACE_PREFIX,
   appendJournalRecord,
   clearTrace,
@@ -64,6 +65,8 @@ interface TraceSession {
   initialState: PlayerSave;
   journal: DebugActionRecord[];
   seq: number;
+  /** 认领未决期间为 true：commit 仅入内存，落定后才以最终键/seq 持久化 */
+  adopting?: boolean;
 }
 
 interface PendingCapture {
@@ -202,8 +205,12 @@ export function debugTraceCommit(stateAfter: PlayerSave, actionType: GameAction[
   current.seq = record.seq;
   current.journal.push(record);
   setTraceStatus(toStatus(current));
-  void appendJournalRecord(current.traceKey, record);
-  void persistTraceMeta(toStoredMeta(current, afterStateHash));
+  // 认领未决期间只入内存：此时最终 traceKey/连续性尚未确定，
+  // 提前落盘会污染将被放弃的候选键或与认领结果重复
+  if (!current.adopting) {
+    void appendJournalRecord(current.traceKey, record);
+    void persistTraceMeta(toStoredMeta(current, afterStateHash));
+  }
   pending = null;
 }
 
@@ -235,9 +242,13 @@ function startCompleteTrace(stateAfter: PlayerSave): void {
 /**
  * LOAD_SAVE 后认领或新建轨迹。
  *
- * 先以 partial 建立会话（从载入时刻开始记录），再异步查找既有轨迹：
- * saveId 直接命中；旧档（saveId 为空）以「末状态哈希」匹配。认领成功后
- * 恢复持久化日志并继承完整性，恢复窗口期内已记录的动作续接在日志末尾。
+ * 先以 partial 建立候选会话（adopting = true，从载入时刻开始记录），
+ * 再异步按「saveId 主键 → 末状态哈希」查找**末状态连续**的既有轨迹：
+ * - 主键命中且 `lastStateHash` 等于本次载入哈希 → 继承完整历史；
+ * - 主键不连续（例如载入同一 saveId 的更旧/回滚备份）时退回哈希匹配，
+ *   命中则续接此前为该快照建立的分支轨迹；
+ * - 均无连续轨迹且主键下已有不相关历史 → 换用全新 `branch-` 键，
+ *   绝不覆盖或拼接原历史；主键下无任何历史 → 保留候选键。
  *
  * @param stateAfter 载入完成后的游戏状态
  */
@@ -253,6 +264,7 @@ export function debugTraceAdoptLoadedSave(stateAfter: PlayerSave): void {
     initialState: structuredClone(stateAfter),
     journal: [],
     seq: 0,
+    adopting: true,
   };
   session = candidate;
   setTraceStatus(toStatus(candidate));
@@ -260,21 +272,58 @@ export function debugTraceAdoptLoadedSave(stateAfter: PlayerSave): void {
 }
 
 /**
- * 异步认领既有轨迹（详见 debugTraceAdoptLoadedSave）。
+ * 异步认领既有轨迹（查找规则见 debugTraceAdoptLoadedSave）。
  *
  * @param candidate 发起认领的会话引用（会话已被重置时放弃）
  * @param stateHash 当前存档状态哈希
  */
 async function adoptExistingTrace(candidate: TraceSession, stateHash: string): Promise<void> {
-  const matchedKey = candidate.traceKey.startsWith(LEGACY_TRACE_PREFIX)
-    ? await findTraceKeyByStateHash(stateHash)
-    : candidate.traceKey;
-  const stored = matchedKey ? await loadStoredTrace(matchedKey) : null;
+  const primary = await loadStoredTrace(candidate.traceKey);
+  const primaryContinuous = primary !== null && primary.lastStateHash === stateHash;
+  const hashedKey = primaryContinuous ? null : await findTraceKeyByStateHash(stateHash);
+  const hashed =
+    !primaryContinuous && hashedKey && hashedKey !== candidate.traceKey
+      ? await loadStoredTrace(hashedKey)
+      : null;
+  const continuous = primaryContinuous ? primary : hashed;
+
   if (!session || session !== candidate) return;
-  if (!stored) {
+
+  if (continuous) {
+    inheritStoredTrace(candidate, continuous, stateHash);
+    return;
+  }
+  // 主键下无任何历史：保留候选键（saveId / legacy-uuid）作为新 partial 轨迹
+  if (!primary) {
+    candidate.adopting = false;
+    setTraceStatus(toStatus(candidate));
     void persistTraceMeta(toStoredMeta(candidate, stateHash));
     return;
   }
+  // 主键有历史但末状态不连续（更旧/回滚备份）：以全新分支键记录，
+  // 不覆盖、不拼接原历史；后续再载入同一快照可经哈希匹配续接本分支
+  session = {
+    ...candidate,
+    traceKey: `${BRANCH_TRACE_PREFIX}-${generateTraceId()}`,
+    adopting: false,
+  };
+  setTraceStatus(toStatus(session));
+  void persistTraceMeta(toStoredMeta(session, stateHash));
+}
+
+/**
+ * 继承末状态连续的既有轨迹：恢复持久化日志与元数据，
+ * 认领窗口期内已入内存的记录以最终键与最终 seq 续接落盘。
+ *
+ * @param candidate 发起认领的会话引用
+ * @param stored 末状态连续的既有轨迹
+ * @param stateHash 当前存档状态哈希
+ */
+function inheritStoredTrace(
+  candidate: TraceSession,
+  stored: StoredTraceMeta & { records: DebugActionRecord[] },
+  stateHash: string,
+): void {
   const lastStored = stored.records[stored.records.length - 1];
   const offset = lastStored ? lastStored.seq : 0;
   const carried = candidate.journal.map((record, index) => ({
@@ -288,9 +337,13 @@ async function adoptExistingTrace(candidate: TraceSession, stateHash: string): P
     initialState: structuredClone(stored.initialState),
     journal: [...stored.records, ...carried],
     seq: offset + carried.length,
+    adopting: false,
   };
   setTraceStatus(toStatus(session));
   void persistTraceMeta(toStoredMeta(session, stateHash));
+  for (const record of carried) {
+    void appendJournalRecord(session.traceKey, record);
+  }
 }
 
 /**

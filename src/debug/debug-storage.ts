@@ -20,9 +20,12 @@ const TRACE_KEY_INDEX = 'traceKey';
 /** traceKey 兜底前缀（旧存档无 saveId 时生成的临时轨迹标识） */
 export const LEGACY_TRACE_PREFIX = 'legacy';
 
+/** traceKey 分支前缀（saveId 命中但末状态不连续的回滚备份使用，避免污染原轨迹） */
+export const BRANCH_TRACE_PREFIX = 'branch';
+
 /** traces store 中的一条元数据记录 */
 export interface StoredTraceMeta {
-  /** 轨迹标识：优先 character.saveId，旧档为 legacy-* */
+  /** 轨迹标识：优先 character.saveId，旧档为 legacy-*，回滚备份分支为 branch-* */
   traceKey: string;
   /** Bundle 元信息 */
   meta: DebugMetadata;
